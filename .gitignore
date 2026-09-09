@@ -1,0 +1,62 @@
+# ============================================================
+#  Git ignore 规则(三栈统一)
+# ============================================================
+
+# 通用
+.DS_Store
+*.log
+*.swp
+*.bak
+*.tmp
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# Java
+backend-java/target/
+backend-java/*.class
+backend-java/*.jar
+backend-java/*.war
+backend-java/.mvn/
+backend-java/mvnw
+backend-java/mvnw.cmd
+
+# Python
+backend-python/__pycache__/
+backend-python/**/__pycache__/
+backend-python/.pytest_cache/
+backend-python/.mypy_cache/
+backend-python/.ruff_cache/
+backend-python/.venv/
+backend-python/venv/
+backend-python/dist/
+backend-python/build/
+backend-python/*.egg-info/
+backend-python/.uv-cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.next/
+frontend/.nuxt/
+
+# Docker
+docker-compose.override.yml
+
+# 操作系统
+Thumbs.db
+
+# 临时文件
+tmp/
+temp/

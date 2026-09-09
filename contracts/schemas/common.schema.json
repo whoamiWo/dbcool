@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://multistack.local/schemas/common.schema.json",
+  "title": "Multistack Common Schema",
+  "description": "三栈共享基础 schema,由 Cline 维护,各栈代码生成器引用此文件",
+  "version": "0.0.1",
+  "definitions": {
+    "ApiResponse": {
+      "type": "object",
+      "required": ["code", "message", "data"],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "description": "业务状态码: 0=成功,非0=错误(见 errors.yaml)",
+          "minimum": 0,
+          "example": 0
+        },
+        "message": {
+          "type": "string",
+          "description": "人类可读消息",
+          "example": "success"
+        },
+        "data": {
+          "description": "业务数据(任意类型,成功时为有效负载,失败时为 null)"
+        }
+      }
+    },
+    "PageRequest": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "页码(从 1 开始)"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 20,
+          "description": "每页大小"
+        }
+      }
+    },
+    "PageResponse": {
+      "type": "object",
+      "required": ["total", "items"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "总记录数"
+        },
+        "items": {
+          "type": "array",
+          "description": "当前页数据"
+        }
+      }
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 时间戳(UTC)",
+      "example": "2026-09-09T03:00:00Z"
+    }
+  }
+}

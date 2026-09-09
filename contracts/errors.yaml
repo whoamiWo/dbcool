@@ -1,0 +1,94 @@
+# 统一错误码表
+# 维护者: Cline + 契约监督员 Prime (prime-contract)
+# 原则: 三栈异常必须映射到本表中的码
+#       0 表示成功,非 0 表示错误
+
+version: 0.0.1
+last_updated: 2026-09-09
+
+# ============================================================
+# 通用错误(0xxx)
+# ============================================================
+errors:
+  - code: 0
+    name: OK
+    http: 200
+    description: 成功
+    example_message: "success"
+
+  - code: 1000
+    name: INVALID_PARAMS
+    http: 400
+    description: 请求参数无效
+    example_message: "参数 xxx 不能为空"
+
+  - code: 1001
+    name: UNAUTHORIZED
+    http: 401
+    description: 未认证
+    example_message: "请先登录"
+
+  - code: 1002
+    name: FORBIDDEN
+    http: 403
+    description: 无权限
+    example_message: "无权访问该资源"
+
+  - code: 1003
+    name: NOT_FOUND
+    http: 404
+    description: 资源不存在
+    example_message: "资源不存在"
+
+  # ============================================================
+  # 业务错误(2xxx-9xxx 按模块划分)
+  # ============================================================
+  # ⏳ 业务错误码由 Cline 在跨栈任务中定义
+
+# ============================================================
+# 三栈错误映射规则
+# ============================================================
+mappings:
+  java:
+    exception:
+      IllegalArgumentException → 1000
+      SecurityException → 1002
+      NoSuchElementException → 1003
+    pattern: |
+      // 统一异常处理
+      @ExceptionHandler(IllegalArgumentException.class)
+      public ApiResponse<Void> handleIAE(IllegalArgumentException e) {
+          return ApiResponse.fail(1000, e.getMessage());
+      }
+
+  python:
+    exception:
+      ValueError → 1000
+      PermissionError → 1002
+      KeyError → 1003
+      NotFoundError → 1003
+    pattern: |
+      # 统一异常处理(FastAPI 示例)
+      @app.exception_handler(ValueError)
+      async def value_error_handler(request, exc):
+          return JSONResponse(
+              status_code=400,
+              content={"code": 1000, "message": str(exc), "data": None}
+          )
+
+  typescript:
+    error:
+      ValidationError → 1000
+      UnauthorizedError → 1001
+      ForbiddenError → 1002
+      NotFoundError → 1003
+    pattern: |
+      // 统一错误拦截(axios interceptor)
+      apiClient.interceptors.response.use(
+          response => response.data,
+          error => {
+              const code = error.response?.data?.code ?? 1000;
+              const message = error.response?.data?.message ?? error.message;
+              return Promise.reject({ code, message });
+          }
+      );

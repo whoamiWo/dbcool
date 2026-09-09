@@ -1,0 +1,438 @@
+openapi: 3.0.3
+info:
+  title: NocoBase API
+  version: 0.1.0
+  description: |
+    跨栈 API 契约(SSOT)。
+    维护者: Cline + 契约监督员 Prime
+    当前覆盖: auth / users / collections / records / ai
+servers:
+  - url: http://localhost:8080
+    description: Java 后端(主)
+  - url: http://localhost:8000
+    description: Python 后端(AI)
+
+paths:
+  /api/health:
+    get:
+      summary: 健康检查
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /api/auth/login:
+    post:
+      summary: 登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 账号或密码错误
+
+  /api/auth/refresh:
+    post:
+      summary: 刷新 access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: 成功
+
+  /api/users/me:
+    get:
+      summary: 当前用户信息
+      responses:
+        '200':
+          description: 成功
+
+  /api/collections:
+    get:
+      summary: 列出当前 tenant 的所有 collection
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建新 collection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCollectionRequest'
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/collections/{name}:
+    get:
+      summary: 获取单个 collection 详情
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 不存在
+    patch:
+      summary: 修改 collection 元数据(Week 7 US-005)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCollectionRequest'
+      responses:
+        '200':
+          description: 成功
+    delete:
+      summary: 删除 collection(Week 7 仅标记)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+
+  /api/collections/{name}/fields:
+    post:
+      summary: 添加字段(Week 7 US-005)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FieldDef'
+      responses:
+        '200':
+          description: 同步成功(小表)
+        '202':
+          description: 转异步(大表),返回 job_id
+
+  /api/collections/{name}/fields/{fieldName}:
+    delete:
+      summary: 删除字段(Week 7 US-005)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: fieldName
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 同步成功
+        '202':
+          description: 转异步
+    put:
+      summary: 重命名字段(Week 7 US-005)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: fieldName
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameFieldRequest'
+      responses:
+        '200':
+          description: 同步成功
+        '202':
+          description: 转异步
+
+  /api/collections/_jobs/{jobId}:
+    get:
+      summary: 查询迁移 job 状态(Week 7 US-005 异步)
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: job 不存在
+
+  /api/forms:
+    get:
+      summary: 列出表单(可按 collection 过滤)
+      parameters:
+        - name: collection
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 创建表单(Week 8 Epic 2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collectionName, title]
+              properties:
+                collectionName: { type: string }
+                title: { type: string }
+                description: { type: string }
+                layout: { type: string, description: 'JSON 字符串' }
+                rules: { type: string, description: 'JSON 字符串' }
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/forms/{id}:
+    get:
+      summary: 获取单个表单详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 不存在
+    put:
+      summary: 修改表单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                layout: { type: string }
+                rules: { type: string }
+      responses:
+        '200':
+          description: 成功
+    delete:
+      summary: 删除表单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 成功
+
+  /api/collections/{name}/records:
+    get:
+      summary: 列出 collection 的记录
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 插入一条记录
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              example:
+                name: "张三"
+                age: 30
+      responses:
+        '201':
+          description: 创建成功
+
+  /api/ai/echo:
+    get:
+      summary: AI echo 端点(Python 后端)
+      parameters:
+        - name: msg
+          in: query
+          schema: { type: string, default: hello }
+      responses:
+        '200':
+          description: 成功
+        '401':
+          description: 缺/无效 token
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+
+    LoginResponse:
+      type: object
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            access_token: { type: string }
+            refresh_token: { type: string }
+            token_type: { type: string, example: Bearer }
+            expires_in: { type: integer, example: 900 }
+            user:
+              $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        display_name: { type: string }
+        tenant_id: { type: string }
+        roles:
+          type: array
+          items: { type: string }
+
+    CreateCollectionRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,63}$'
+        title: { type: string }
+        description: { type: string }
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldDef'
+
+    UpdateCollectionRequest:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+
+    RenameFieldRequest:
+      type: object
+      required: [newName]
+      properties:
+        newName:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,63}$'
+
+    MutationResponse:
+      type: object
+      properties:
+        async: { type: boolean }
+        operation: { type: string }
+        target: { type: string }
+        job_id: { type: string, format: uuid }
+        poll_url: { type: string }
+
+    MigrationJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        collection: { type: string }
+        operation:
+          type: string
+          enum: [ADD_FIELD, DROP_FIELD, RENAME_FIELD, ALTER_TYPE]
+        status:
+          type: string
+          enum: [PENDING, RUNNING, COMPLETED, FAILED, CANCELLED]
+        error: { type: string }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+
+    FieldDef:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum:
+            - text
+            - number
+            - boolean
+            - date
+            - select
+            - multiSelect
+            - belongsTo
+            - hasMany
+            - formula
+        required: { type: boolean, default: false }
+        label: { type: string }
+        options:
+          type: object
+          additionalProperties: true
+
+security:
+  - BearerAuth: []
