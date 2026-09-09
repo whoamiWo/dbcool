@@ -231,7 +231,7 @@ function FormsListForCollection({ collectionName }: { collectionName: string }) 
         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
       }}
     >
-      <h3 style={{ marginTop: 0 }}>📋 关联表单({forms.length})</h3>
+      <h3 style={{ marginTop: 0 }}>📋 关联表单({forms.length}) · 👁 视图({views.length})</h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {forms.map((f) => (
           <Link

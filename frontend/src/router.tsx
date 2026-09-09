@@ -9,12 +9,14 @@ import { CollectionDetailPage } from './pages/CollectionDetail';
 import { FormDesignerPage } from './pages/FormDesigner';
 import { FormRuntimePage } from './pages/FormRuntime';
 import { FormsListPage } from './pages/FormsList';
+import { TableViewPage } from './pages/TableView';
+import { KanbanViewPage } from './pages/KanbanView';
+import { DetailViewPage } from './pages/DetailView';
+import { ViewDesignerPage } from './pages/ViewDesigner';
+import { ViewsListPage } from './pages/ViewsList';
 
 export const router = createBrowserRouter([
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
     element: <AppLayout />,
@@ -33,10 +35,15 @@ export const router = createBrowserRouter([
       { path: 'designer/forms/:collection/new', element: <FormDesignerPage /> },
       { path: 'designer/forms/:collection/:id/edit', element: <FormDesignerPage /> },
       { path: 'forms/:formId/fill', element: <FormRuntimePage /> },
+
+      // View
+      { path: 'designer/views', element: <ViewsListPage /> },
+      { path: 'designer/views/:collection/new', element: <ViewDesignerPage /> },
+      { path: 'designer/views/:collection/:id/edit', element: <ViewDesignerPage /> },
+      { path: 'views/:id/run', element: <TableViewPage /> },
+      { path: 'views/:id/kanban', element: <KanbanViewPage /> },
+      { path: 'views/:id/detail/:recordId', element: <DetailViewPage /> },
     ],
   },
-  {
-    path: '*',
-    element: <Navigate to="/" replace />,
-  },
+  { path: '*', element: <Navigate to="/" replace /> },
 ]);
