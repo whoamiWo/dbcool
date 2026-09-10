@@ -28,3 +28,4 @@
 | [006](./006-auth-jwt.md) | 认证使用 JWT + Refresh Token | ACCEPTED | 全部 |
 | [007](./007-multitenancy.md) | 多租户采用 Schema 隔离 | ACCEPTED | 全部 |
 | [008](./008-plugin-system.md) | 插件系统采用 Java SPI + REST Hook | ACCEPTED | 全部 |
+| [010](./010-bugs-fixed.md) | Week 0~9 期间修复的真实 Bug 清单(8 个) | ACCEPTED | 全部 |
