@@ -1,0 +1,170 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
+import apiClient from '@/api/client';
+import type { AclAction, AclPolicy, AclType, RoleMeta } from '@/types/acl';
+
+/** ACL 权限编辑器(US-303/304/305 统一) */
+export function AclEditorPage() {
+  const qc = useQueryClient();
+  const [params] = useSearchParams();
+  const roleId = params.get('roleId');
+  const [subject, setSubject] = useState('customer');
+  const [newType, setNewType] = useState<AclType>('FIELD');
+  const [newAction, setNewAction] = useState<AclAction>('DELETE');
+  const [hiddenFields, setHiddenFields] = useState('ssn');
+  const [filterField, setFilterField] = useState('dept');
+  const [filterValue, setFilterValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: roles } = useQuery({
+    queryKey: ['admin', 'roles'],
+    queryFn: () => apiClient.get<RoleMeta[]>('/admin/roles'),
+  });
+  const { data: policies } = useQuery({
+    queryKey: ['admin', 'acl', roleId],
+    queryFn: () => apiClient.get<AclPolicy[]>(`/admin/acl?roleId=${roleId}`),
+    enabled: !!roleId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () => {
+      let config = '{}';
+      if (newType === 'FIELD') {
+        const hidden = hiddenFields.split(',').map((s) => s.trim()).filter(Boolean);
+        config = JSON.stringify({ hidden, readonly: [] });
+      } else if (newType === 'ROW') {
+        config = JSON.stringify({
+          filters: [{ field: filterField, op: 'eq', value: filterValue }],
+        });
+      } else {
+        config = '{}';
+      }
+      return apiClient.post<AclPolicy>('/admin/acl', {
+        roleId,
+        type: newType,
+        subject,
+        action: newType === 'ACTION' ? newAction : null,
+        config,
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'acl', roleId] }),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message ?? '创建失败');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/admin/acl/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'acl', roleId] }),
+  });
+
+  if (!roleId) {
+    return (
+      <div>
+        <h1>🔐 ACL 权限配置</h1>
+        <p>请先到 <a href="/admin/roles">角色管理</a> 选择一个角色。</p>
+      </div>
+    );
+  }
+
+  const role = roles?.find((r) => r.id === roleId);
+  const ps = policies ?? [];
+
+  return (
+    <div>
+      <h1>🔐 权限配置 — 角色 {role?.name ?? roleId}</h1>
+      {error && (
+        <div style={{ padding: 8, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ padding: 16, background: 'white', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <h3 style={{ marginTop: 0 }}>+ 添加策略</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 8 }}>
+          <select value={subject} onChange={(e) => setSubject(e.target.value)} style={{ padding: 6 }}>
+            <option value="customer">customer</option>
+          </select>
+          <select value={newType} onChange={(e) => setNewType(e.target.value as AclType)} style={{ padding: 6 }}>
+            <option value="FIELD">字段权限 (FIELD)</option>
+            <option value="ROW">记录权限 (ROW)</option>
+            <option value="ACTION">操作权限 (ACTION)</option>
+          </select>
+          {newType === 'ACTION' ? (
+            <select value={newAction} onChange={(e) => setNewAction(e.target.value as AclAction)} style={{ padding: 6 }}>
+              <option value="CREATE">CREATE</option>
+              <option value="READ">READ</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+          ) : newType === 'FIELD' ? (
+            <input value={hiddenFields} onChange={(e) => setHiddenFields(e.target.value)} placeholder="ssn, password" style={{ padding: 6 }} />
+          ) : (
+            <input value={filterField} onChange={(e) => setFilterField(e.target.value)} placeholder="字段名(dept)" style={{ padding: 6 }} />
+          )}
+          {newType === 'ROW' ? (
+            <input value={filterValue} onChange={(e) => setFilterValue(e.target.value)} placeholder="值(sales)" style={{ padding: 6 }} />
+          ) : (
+            <div />
+          )}
+        </div>
+        <button
+          onClick={() => createMutation.mutate()}
+          disabled={createMutation.isPending}
+          style={{ padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+        >
+          添加
+        </button>
+      </div>
+
+      <h3>现有策略({ps.length})</h3>
+      {ps.length === 0 ? (
+        <p style={{ color: '#94a3b8' }}>暂无策略</p>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 8, overflow: 'hidden' }}>
+          <thead>
+            <tr style={{ background: '#f1f5f9' }}>
+              <th style={{ padding: 8, textAlign: 'left' }}>类型</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>对象</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>Action</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>配置</th>
+              <th style={{ padding: 8, textAlign: 'right' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {ps.map((p) => (
+              <tr key={p.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                <td style={{ padding: 8 }}>
+                  <span style={{ padding: '2px 8px', background: typeColor(p.type), color: 'white', borderRadius: 4, fontSize: 11 }}>
+                    {p.type}
+                  </span>
+                </td>
+                <td style={{ padding: 8, fontFamily: 'monospace' }}>{p.subject}</td>
+                <td style={{ padding: 8 }}>{p.action ?? '—'}</td>
+                <td style={{ padding: 8, fontSize: 12, fontFamily: 'monospace', color: '#64748b' }}>{p.config_json}</td>
+                <td style={{ padding: 8, textAlign: 'right' }}>
+                  <button
+                    onClick={() => deleteMutation.mutate(p.id)}
+                    style={{ padding: '2px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}
+                  >
+                    删
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <p style={{ fontSize: 12, color: '#64748b', marginTop: 16 }}>
+        💡 Week 10 简化版:ACL 仅配置不强制执行(Week 12+ 接入 CollectionController 拦截器)
+      </p>
+    </div>
+  );
+}
+
+function typeColor(t: AclType): string {
+  return { FIELD: '#7c3aed', ROW: '#0891b2', ACTION: '#dc2626' }[t] ?? '#64748b';
+}

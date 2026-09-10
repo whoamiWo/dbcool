@@ -14,6 +14,10 @@ export function AppLayout() {
   const navItems = [
     { path: '/home', label: '首页' },
     { path: '/designer/schemas', label: '数据模型' },
+    { path: '/designer/views', label: '视图' },
+    { path: '/admin/users', label: '用户' },
+    { path: '/admin/roles', label: '角色' },
+    { path: '/admin/acl', label: '权限' },
   ];
 
   return (

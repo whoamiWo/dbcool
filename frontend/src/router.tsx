@@ -14,6 +14,9 @@ import { KanbanViewPage } from './pages/KanbanView';
 import { DetailViewPage } from './pages/DetailView';
 import { ViewDesignerPage } from './pages/ViewDesigner';
 import { ViewsListPage } from './pages/ViewsList';
+import { UsersListPage } from './pages/UsersList';
+import { RolesListPage } from './pages/RolesList';
+import { AclEditorPage } from './pages/AclEditor';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -39,6 +42,9 @@ export const router = createBrowserRouter([
       // View
       { path: 'designer/views', element: <ViewsListPage /> },
       { path: 'designer/views/:collection/new', element: <ViewDesignerPage /> },
+      { path: 'admin/users', element: <UsersListPage /> },
+      { path: 'admin/roles', element: <RolesListPage /> },
+      { path: 'admin/acl', element: <AclEditorPage /> },
       { path: 'designer/views/:collection/:id/edit', element: <ViewDesignerPage /> },
       { path: 'views/:id/run', element: <TableViewPage /> },
       { path: 'views/:id/kanban', element: <KanbanViewPage /> },
