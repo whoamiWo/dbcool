@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse, CollectionMeta, FieldDef } from '@/types/collection';
+import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { KanbanConfig, ViewFull } from '@/types/view';
 
 interface Record { id: string; [k: string]: unknown; }
@@ -14,7 +14,7 @@ export function KanbanViewPage() {
     queryFn: () => apiClient.get<ViewFull>(`/views/${id}`),
     enabled: !!id,
   });
-  const collectionName = viewData?.data.collection_name;
+  const collectionName = viewData?.collection_name;
   const { data: collectionData } = useQuery({
     queryKey: ['collection', collectionName],
     queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collectionName}`),
@@ -26,11 +26,11 @@ export function KanbanViewPage() {
     enabled: !!collectionName,
   });
 
-  if (!viewData?.data) return <p>加载中…</p>;
-  const view = viewData.data;
+  if (!viewData) return <p>加载中…</p>;
+  const view = viewData;
   const config = view.config as unknown as KanbanConfig;
-  const fields: FieldDef[] = collectionData?.data.fields ?? [];
-  const records: Record[] = recordsData?.data ?? [];
+  const fields: FieldDef[] = collectionData?.fields ?? [];
+  const records: Record[] = recordsData ?? [];
 
   if (!config.groupBy) return <p>看板视图未配置 groupBy 字段</p>;
 

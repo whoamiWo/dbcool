@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse, CollectionMeta, FieldDef } from '@/types/collection';
+import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { FormFull, FormLayoutItem, FormRules, ValidationRule } from '@/types/form';
 import { FormRuntime } from '@/components/forms/FormRuntime';
 
@@ -21,21 +21,21 @@ export function FormDesignerPage() {
   const { data: collectionData } = useQuery({
     queryKey: ['collection', collection],
     queryFn: () =>
-      apiClient.get<ApiResponse<CollectionMeta>>(`/collections/${collection}`),
+      apiClient.get<CollectionMeta>(`/collections/${collection}`),
     enabled: !!collection,
   });
 
-  const fields: FieldDef[] = collectionData?.data.fields ?? [];
+  const fields: FieldDef[] = collectionData?.fields ?? [];
 
   const { data: formData } = useQuery({
     queryKey: ['form', id],
-    queryFn: () => apiClient.get<ApiResponse<FormFull>>(`/forms/${id}`),
+    queryFn: () => apiClient.get<FormFull>(`/forms/${id}`),
     enabled: !!id,
   });
 
   useEffect(() => {
-    if (formData?.data) {
-      const f = formData.data;
+    if (formData) {
+      const f = formData;
       setTitle(f.title);
       setDescription(f.description);
       setLayout(f.layout);
@@ -52,9 +52,9 @@ export function FormDesignerPage() {
         rules: JSON.stringify(rules),
       };
       if (id) {
-        return apiClient.put<ApiResponse<FormFull>>(`/forms/${id}`, payload);
+        return apiClient.put<FormFull>(`/forms/${id}`, payload);
       }
-      return apiClient.post<ApiResponse<FormFull>>('/forms', {
+      return apiClient.post<FormFull>('/forms', {
         collectionName: collection,
         ...payload,
       });
@@ -62,7 +62,7 @@ export function FormDesignerPage() {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['forms', collection] });
       if (!id) {
-        navigate(`/designer/forms/${collection}/${res.data.id}/edit`);
+        navigate(`/designer/forms/${collection}/${res.id}/edit`);
       }
     },
     onError: (err: unknown) => {
@@ -98,7 +98,7 @@ export function FormDesignerPage() {
     const fieldValidations: ValidationRule[] = rules.validation?.[fieldName] ?? [];
     const filtered = fieldValidations.filter((v) => v.type !== 'required');
     const updated = required ? [...filtered, { type: 'required' }] : filtered;
-    setRules({ ...rules, validation: { ...rules.validation, [fieldName]: updated } });
+    setRules({ ...rules, validation: { ...rules.validation, [fieldName]: updated as any } });
   };
 
   const isFieldRequired = (fieldName: string) =>

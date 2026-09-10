@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { FieldDef, FilterRule, SortRule } from '@/types/view';
+import type { FieldDef } from '@/types/collection';
+import type { FilterRule, SortRule } from '@/types/view';
 
 /**
  * 筛选条(US-202) — Week 9 MVP:简化版,客户端筛选。

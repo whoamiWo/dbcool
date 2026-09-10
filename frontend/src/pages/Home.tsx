@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
-import type { ApiResponse, CollectionMeta } from '@/types/collection';
+import type { CollectionMeta } from '@/types/collection';
 
 interface UserInfo {
   id: string;
@@ -16,19 +16,19 @@ export function HomePage() {
 
   const meQuery = useQuery({
     queryKey: ['users', 'me'],
-    queryFn: () => apiClient.get<ApiResponse<UserInfo>>('/users/me'),
+    queryFn: () => apiClient.get<UserInfo>('/users/me'),
   });
 
   const collectionsQuery = useQuery({
     queryKey: ['collections', 'count'],
     queryFn: () =>
-      apiClient.get<ApiResponse<CollectionMeta[]>>('/collections'),
-    select: (res) => res.data.length,
+      apiClient.get<CollectionMeta[]>('/collections'),
+    select: (res) => res.length,
   });
 
   return (
     <div>
-      <h1>👋 欢迎,{user?.display_name ?? user?.username ?? '游客'}</h1>
+      <h1>👋 欢迎,{(user as any)?.display_name ?? user?.username ?? '游客'}</h1>
 
       <div
         style={{

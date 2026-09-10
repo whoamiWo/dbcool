@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse, CollectionMeta, FieldDef } from '@/types/collection';
+import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { CreateViewRequest, ViewFull, ViewType } from '@/types/view';
 
 /** 视图设计器(Week 9) — 创建/编辑视图 */
@@ -23,7 +23,7 @@ export function ViewDesignerPage() {
     queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collection}`),
     enabled: !!collection,
   });
-  const fields: FieldDef[] = collectionData?.data.fields ?? [];
+  const fields: FieldDef[] = collectionData?.fields ?? [];
 
   const { data: viewData } = useQuery({
     queryKey: ['view', id],
@@ -32,8 +32,8 @@ export function ViewDesignerPage() {
   });
 
   useEffect(() => {
-    if (viewData?.data) {
-      const v = viewData.data;
+    if (viewData) {
+      const v = viewData;
       setName(v.name);
       setTitle(v.title);
       setType(v.type);
@@ -60,7 +60,7 @@ export function ViewDesignerPage() {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['views', collection] });
-      const viewId = id ?? res.data.id;
+      const viewId = id ?? res.id;
       navigate(`/views/${viewId}/run`);
     },
     onError: (err: unknown) => {

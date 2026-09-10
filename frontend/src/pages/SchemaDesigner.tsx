@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse, CollectionMeta, FieldDef, FieldType } from '@/types/collection';
+import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 
 const FIELD_TYPES: FieldType[] = ['text', 'number', 'boolean', 'date', 'select', 'multiSelect'];
 
@@ -16,11 +16,11 @@ export function SchemaDesignerPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiClient.post<ApiResponse<CollectionMeta>>(
+      const res = await apiClient.post<CollectionMeta>(
         '/collections',
         { name, title: title || name, description: '', fields },
       );
-      return res.data;
+      return res;
     },
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['collections'] });

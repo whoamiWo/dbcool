@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse } from '@/types/collection';
+import type { } from '@/types/collection';
 import type { ViewMeta } from '@/types/view';
 
 /** 视图列表 — Week 9 */
@@ -17,7 +17,7 @@ export function ViewsListPage() {
 
   if (isLoading) return <p>加载中…</p>;
 
-  const views = data?.data ?? [];
+  const views = data ?? [];
 
   return (
     <div>

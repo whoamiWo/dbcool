@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse } from '@/types/collection';
+import type { } from '@/types/collection';
 import type { FormMeta } from '@/types/form';
 
 export function FormsListPage() {
@@ -9,7 +9,7 @@ export function FormsListPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['forms', collection ?? 'all'],
     queryFn: () =>
-      apiClient.get<ApiResponse<FormMeta[]>>(
+      apiClient.get<FormMeta[]>(
         collection ? `/forms?collection=${collection}` : '/forms'
       ),
   });
@@ -17,7 +17,7 @@ export function FormsListPage() {
   if (isLoading) return <p>加载中…</p>;
   if (error) return <p style={{ color: '#dc2626' }}>加载失败</p>;
 
-  const forms = data?.data ?? [];
+  const forms = data ?? [];
 
   return (
     <div>

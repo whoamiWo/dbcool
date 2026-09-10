@@ -1,19 +1,19 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse, CollectionMeta } from '@/types/collection';
+import type { CollectionMeta } from '@/types/collection';
 
 export function CollectionsListPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['collections'],
     queryFn: () =>
-      apiClient.get<ApiResponse<CollectionMeta[]>>('/collections'),
+      apiClient.get<CollectionMeta[]>('/collections'),
   });
 
   if (isLoading) return <p>加载中…</p>;
   if (error) return <p style={{ color: '#dc2626' }}>加载失败</p>;
 
-  const collections = data?.data ?? [];
+  const collections = data ?? [];
 
   return (
     <div>

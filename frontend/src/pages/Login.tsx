@@ -41,12 +41,12 @@ export function LoginPage() {
         };
       }>('/auth/login', data);
 
-      if (res.code !== 0) {
-        setError(res.message);
+      if ((res as any).code !== 0) {
+        setError((res as any).message);
         return;
       }
 
-      setAuth(res.data.access_token, res.data.user);
+      setAuth((res as any).data?.access_token ?? (res as any).access_token, (res as any).data?.user ?? (res as any).user);
       navigate('/home');
     } catch (e) {
       const err = e as { response?: { data?: { message?: string } } };

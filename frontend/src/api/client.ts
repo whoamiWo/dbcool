@@ -6,7 +6,7 @@ import axios, { type AxiosInstance } from 'axios';
  * Week 3 脚手架:从 zustand store 取 token
  * Week 5+ 会改为 OpenAPI 生成的类型化 client
  */
-const apiClient: AxiosInstance = axios.create({
+const axiosInstance: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 10000,
   headers: {
@@ -14,8 +14,25 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+// 包装:get/post/etc 直接返回 T(response 拦截器已解 data)
+function makeApi(instance: AxiosInstance) {
+  return {
+    get: <T,>(url: string, config?: Parameters<AxiosInstance['get']>[1]) =>
+      instance.get<T, T>(url, config) as unknown as Promise<T>,
+    post: <T,>(url: string, data?: unknown, config?: Parameters<AxiosInstance['post']>[2]) =>
+      instance.post<T, T>(url, data, config) as unknown as Promise<T>,
+    put: <T,>(url: string, data?: unknown, config?: Parameters<AxiosInstance['put']>[2]) =>
+      instance.put<T, T>(url, data, config) as unknown as Promise<T>,
+    patch: <T,>(url: string, data?: unknown, config?: Parameters<AxiosInstance['patch']>[2]) =>
+      instance.patch<T, T>(url, data, config) as unknown as Promise<T>,
+    delete: <T,>(url: string, config?: Parameters<AxiosInstance['delete']>[1]) =>
+      instance.delete<T, T>(url, config) as unknown as Promise<T>,
+  };
+}
+const apiClient = makeApi(axiosInstance);
+
 // 请求拦截器:自动注入 token
-apiClient.interceptors.request.use(
+axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('nocobase_access_token');
     if (token) {
@@ -27,7 +44,7 @@ apiClient.interceptors.request.use(
 );
 
 // 响应拦截器:统一错误处理
-apiClient.interceptors.response.use(
+axiosInstance.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {

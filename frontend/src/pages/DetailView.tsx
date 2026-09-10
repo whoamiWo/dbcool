@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { ApiResponse, CollectionMeta, FieldDef } from '@/types/collection';
+import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { DetailConfig, ViewFull } from '@/types/view';
 
 /** 详情视图(US-205) — 单条记录垂直展示 */
@@ -12,7 +12,7 @@ export function DetailViewPage() {
     queryFn: () => apiClient.get<ViewFull>(`/views/${id}`),
     enabled: !!id,
   });
-  const collectionName = viewData?.data.collection_name;
+  const collectionName = viewData?.collection_name;
   const { data: collectionData } = useQuery({
     queryKey: ['collection', collectionName],
     queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collectionName}`),
@@ -20,15 +20,15 @@ export function DetailViewPage() {
   });
   const { data: recordsData } = useQuery({
     queryKey: ['records', collectionName, 'records'],
-    queryFn: () => apiClient.get<ApiResponse<Record<string, unknown>[]>>(`/collections/${collectionName}/records?limit=500`),
+    queryFn: () => apiClient.get<Record<string, unknown>[] & { id: string }[]>(`/collections/${collectionName}/records?limit=500`),
     enabled: !!collectionName,
   });
 
-  if (!viewData?.data) return <p>加载中…</p>;
-  const view = viewData.data;
+  if (!viewData) return <p>加载中…</p>;
+  const view = viewData;
   const config = view.config as unknown as DetailConfig;
-  const fields: FieldDef[] = collectionData?.data.fields ?? [];
-  const record = recordsData?.data.find((r: any) => r.id === recordId);
+  const fields: FieldDef[] = collectionData?.fields ?? [];
+  const record = recordsData?.find((r: any) => r.id === recordId);
 
   if (!record) return <p>记录不存在</p>;
 

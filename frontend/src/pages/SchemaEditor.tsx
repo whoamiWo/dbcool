@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type {
-  ApiResponse,
   CollectionMeta,
   FieldDef,
   MigrationJob,
@@ -24,39 +23,39 @@ export function SchemaEditorPage() {
 
   const { data: metaData, isLoading } = useQuery({
     queryKey: ['collection', name],
-    queryFn: () => apiClient.get<ApiResponse<CollectionMeta>>(`/collections/${name}`),
+    queryFn: () => apiClient.get<CollectionMeta>(`/collections/${name}`),
     enabled: !!name,
   });
 
   useEffect(() => {
-    if (metaData?.data) {
-      setTitle(metaData.data.title);
-      setDescription(metaData.data.description);
-      setFields(metaData.data.fields ?? []);
+    if (metaData) {
+      setTitle(metaData.title);
+      setDescription(metaData.description);
+      setFields(metaData.fields ?? []);
     }
   }, [metaData]);
 
   const jobQuery = useQuery({
     queryKey: ['migration-job', pollingJob],
     queryFn: () =>
-      apiClient.get<ApiResponse<MigrationJob>>(`/collections/_jobs/${pollingJob}`),
+      apiClient.get<MigrationJob>(`/collections/_jobs/${pollingJob}`),
     enabled: !!pollingJob,
     refetchInterval: (q) => {
-      const status = q.state.data?.data?.status;
+      const status = q.state.data?.status;
       return status === 'COMPLETED' || status === 'FAILED' ? false : 2000;
     },
   });
 
   useEffect(() => {
-    if (jobQuery.data?.data?.status === 'COMPLETED') {
+    if (jobQuery.data?.status === 'COMPLETED') {
       queryClient.invalidateQueries({ queryKey: ['collection', name] });
       setPollingJob(null);
     }
-  }, [jobQuery.data, name, queryClient]);
+  }, [jobQuery, name, queryClient]);
 
   const updateMetaMutation = useMutation({
     mutationFn: () =>
-      apiClient.patch<ApiResponse<CollectionMeta>>(`/collections/${name}`, {
+      apiClient.patch<CollectionMeta>(`/collections/${name}`, {
         title,
         description,
       }),
@@ -104,24 +103,24 @@ export function SchemaEditorPage() {
       await updateMetaMutation.mutateAsync();
 
       for (const removed of removedFields) {
-        const res = await apiClient.delete<ApiResponse<MutationResponse>>(
+        const res = await apiClient.delete<MutationResponse>(
           `/collections/${name}/fields/${removed}`
         );
-        if (res.data.async && res.data.job_id) {
-          setPollingJob(res.data.job_id);
+        if (res.async && res.job_id) {
+          setPollingJob(res.job_id);
         }
       }
       setRemovedFields([]);
 
       for (const f of fields) {
-        const wasInOriginal = metaData?.data.fields?.some((orig) => orig.name === f.name);
+        const wasInOriginal = metaData?.fields?.some((orig) => orig.name === f.name);
         if (!wasInOriginal) {
-          const res = await apiClient.post<ApiResponse<MutationResponse>>(
+          const res = await apiClient.post<MutationResponse>(
             `/collections/${name}/fields`,
             f
           );
-          if (res.data.async && res.data.job_id) {
-            setPollingJob(res.data.job_id);
+          if (res.async && res.job_id) {
+            setPollingJob(res.job_id);
           }
         }
       }
@@ -133,7 +132,7 @@ export function SchemaEditorPage() {
   };
 
   if (isLoading) return <p>加载中…</p>;
-  if (!metaData?.data) return <p>Collection 不存在</p>;
+  if (!metaData) return <p>Collection 不存在</p>;
 
   return (
     <div>
@@ -167,10 +166,10 @@ export function SchemaEditorPage() {
         >
           ⏳ 异步迁移进行中...Job: <code>{pollingJob}</code>
           <br />
-          状态: <strong>{jobQuery.data?.data?.status ?? 'PENDING'}</strong>
-          {jobQuery.data?.data?.status === 'COMPLETED' && ' ✅ 已完成'}
-          {jobQuery.data?.data?.status === 'FAILED' &&
-            ` ❌ 失败: ${jobQuery.data?.data?.error}`}
+          状态: <strong>{jobQuery.data?.status ?? 'PENDING'}</strong>
+          {jobQuery.data?.status === 'COMPLETED' && ' ✅ 已完成'}
+          {jobQuery.data?.status === 'FAILED' &&
+            ` ❌ 失败: ${jobQuery.data?.error}`}
         </div>
       )}
 
