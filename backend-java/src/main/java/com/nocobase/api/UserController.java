@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 用户端点 — Week 4 真接 JWT 解析.
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Users", description = "当前用户")
 @RequestMapping("/api/users")
 public class UserController {
 

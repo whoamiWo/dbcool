@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Form REST API — Epic 2 表单设计器.
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Forms", description = "表单")
 @RequestMapping("/api/forms")
 public class FormController {
 

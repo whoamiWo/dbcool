@@ -26,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
  * Collection REST API — Week 7 扩展支持修改表(US-005).
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Collections", description = "数据模型")
 @RequestMapping("/api/collections")
 public class CollectionController {
 

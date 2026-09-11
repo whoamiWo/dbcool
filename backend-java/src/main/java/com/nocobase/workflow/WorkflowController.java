@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
  * 简化:同步执行,只 MANUAL 触发,只支持 APPROVAL 节点 + SINGLE 模式.
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Workflows", description = "工作流")
 @RequestMapping("/api/workflows")
 public class WorkflowController {
 

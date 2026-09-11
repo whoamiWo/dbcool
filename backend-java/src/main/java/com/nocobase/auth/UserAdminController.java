@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 用户管理 API(US-301, 平台 Admin 用).
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Users", description = "用户管理")
 @RequestMapping("/api/admin/users")
 public class UserAdminController {
 

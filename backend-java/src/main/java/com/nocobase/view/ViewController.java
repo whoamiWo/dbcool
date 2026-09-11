@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 视图 REST API — Week 9 Epic 3.
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Views", description = "视图")
 @RequestMapping("/api/views")
 public class ViewController {
 

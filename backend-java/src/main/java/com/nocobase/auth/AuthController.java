@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>接入 bcrypt + JWT + Refresh Token.
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Auth", description = "认证")
 @RequestMapping("/api/auth")
 public class AuthController {
 

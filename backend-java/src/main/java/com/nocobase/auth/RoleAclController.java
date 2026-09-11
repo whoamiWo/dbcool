@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
  * 角色 + ACL 策略 API(US-302 ~ US-307).
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Roles & ACL", description = "角色 + ACL 策略")
 @RequestMapping("/api/admin")
 public class RoleAclController {
 

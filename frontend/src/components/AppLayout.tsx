@@ -19,6 +19,7 @@ export function AppLayout() {
     { path: '/admin/roles', label: '角色' },
     { path: '/admin/acl', label: '权限' },
     { path: '/admin/audit', label: '审计' },
+    { path: '/swagger', label: 'API 文档', external: 'http://localhost:8080/swagger-ui/index.html' },
     { path: '/designer/workflows', label: '工作流' },
     { path: '/messages', label: '站内信' },
     { path: '/profile', label: '我的' },
@@ -39,7 +40,28 @@ export function AppLayout() {
         <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           <strong style={{ fontSize: 18 }}>🛠 NocoBase</strong>
           {navItems.map((item) => {
-            const active = location.pathname.startsWith(item.path);
+            const active = !item.external && location.pathname.startsWith(item.path);
+            if (item.external) {
+              return (
+                <a
+                  key={item.path}
+                  href={item.external}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    color: 'white',
+                    textDecoration: 'none',
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    background: 'transparent',
+                    borderLeft: '2px solid #475569',
+                    marginLeft: 8,
+                  }}
+                >
+                  {item.label} ↗
+                </a>
+              );
+            }
             return (
               <Link
                 key={item.path}

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 站内信 API(US-506).
  */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Messages", description = "站内信")
 @RequestMapping("/api/messages")
 public class MessageController {
 

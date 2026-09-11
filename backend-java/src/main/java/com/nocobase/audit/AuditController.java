@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 审计日志查询端点 — admin 角色可看全量. */
 @RestController
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Audit", description = "审计日志")
 @RequestMapping("/api/audit")
 public class AuditController {
 

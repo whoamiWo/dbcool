@@ -28,6 +28,13 @@
     </properties>
 
     <dependencies>
+        <!-- Swagger / OpenAPI 文档(Week 14.5) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.6.0</version>
+        </dependency>
+
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

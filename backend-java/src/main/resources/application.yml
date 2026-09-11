@@ -58,6 +58,24 @@ management:
     health:
       show-details: always
 
+# Springdoc / Swagger UI(Week 14.5)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    url: /v3/api-docs
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    doc-expansion: none
+    persist-authorization: true
+  show-actuator: false
+  packages-to-scan: com.nocobase
+  default-produces-media-type: application/json
+
 # 日志
 logging:
   level:
