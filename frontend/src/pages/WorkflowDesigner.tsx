@@ -10,6 +10,8 @@ import ReactFlow, {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  Handle,
+  Position,
   type Node,
   type Edge,
   type Connection,
@@ -37,9 +39,10 @@ const nodeKindMeta: Record<NodeKind, { label: string; icon: string; color: strin
 
 function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolean }) {
   const meta = nodeKindMeta[data.kind];
+  const isCondition = data.kind === 'CONDITION';
   return (
     <div style={{
-      padding: 10, minWidth: 160,
+      padding: 10, minWidth: 160, position: 'relative',
       background: 'white',
       border: `2px solid ${selected ? '#0f172a' : meta.color}`,
       borderRadius: 8,
@@ -49,7 +52,7 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
         <strong>{meta.icon} {meta.label}</strong>
         <button
           onClick={(e) => { e.stopPropagation(); data.onDelete(); }}
-          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}
+          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}
         >×</button>
       </div>
       <div style={{ marginTop: 4, fontSize: 11, color: '#64748b' }}>
@@ -58,8 +61,27 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
         {data.kind === 'CONDITION' && `if ${data.config.field || '?'} ${data.config.op || '?'} ${data.config.value || '?'}`}
         {data.kind === 'APPROVAL' && '(单审批人)'}
       </div>
-      <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
-                    width: 12, height: 12, borderRadius: 6, background: meta.color }} />
+      {/* 左边:输入 handle(所有节点) */}
+      <Handle type="target" position={Position.Left} style={{ background: meta.color, width: 10, height: 10 }} />
+      {/* CONDITION: 底部两个 source handle(then/else) */}
+      {isCondition ? (
+        <>
+          <Handle id="true" type="source" position={Position.Bottom}
+                  style={{ left: '30%', background: '#10b981', width: 12, height: 12, border: '2px solid white' }} />
+          <span style={{ position: 'absolute', bottom: -18, left: '20%', fontSize: 10, color: '#10b981', fontWeight: 'bold' }}>
+            ✓ then
+          </span>
+          <Handle id="false" type="source" position={Position.Bottom}
+                  style={{ left: '70%', background: '#ef4444', width: 12, height: 12, border: '2px solid white' }} />
+          <span style={{ position: 'absolute', bottom: -18, right: '10%', fontSize: 10, color: '#ef4444', fontWeight: 'bold' }}>
+            ✗ else
+          </span>
+        </>
+      ) : (
+        // 其它节点:底部 1 个 source
+        <Handle type="source" position={Position.Bottom}
+                style={{ background: meta.color, width: 10, height: 10 }} />
+      )}
     </div>
   );
 }
@@ -76,6 +98,7 @@ export function WorkflowDesignerPage() {
   const isEdit = !!id;
 
   const [name, setName] = useState('new_workflow');
+  const [triggerType, setTriggerType] = useState('manual');
   const [title, setTitle] = useState('新工作流');
   const [description, setDescription] = useState('');
   const [collectionName, setCollectionName] = useState('customer');
@@ -100,6 +123,10 @@ export function WorkflowDesignerPage() {
       setDescription(existing.description);
       setCollectionName(existing.collection_name);
       setEnabled(existing.enabled);
+      try {
+        const t = JSON.parse(existing.trigger_json || '{}');
+        if (t.type) setTriggerType(t.type);
+      } catch (e) {}
       try {
         const ns = JSON.parse(existing.nodes_json) as WorkflowNodeDef[];
         setNodes(ns.map((n, i) => ({
@@ -191,19 +218,16 @@ export function WorkflowDesignerPage() {
         id: n.id, type: n.data.kind, config: n.data.config,
         position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
       }));
-      // 给 CONDITION 节点的出边打 sourceHandle 标签:
-      // 从该节点出发的边按数组顺序:第 1 条 = "true"(then),第 2 条 = "false"(else)。
-      const edgesOut = edges.map((e) => {
-        const srcNode = nodes.find((n) => n.id === e.source);
-        if (srcNode?.data.kind !== 'CONDITION') return e;
-        const siblings = edges.filter((x) => x.source === e.source);
-        const i = siblings.indexOf(e);
-        return { id: e.id, source: e.source, target: e.target,
-                 sourceHandle: i === 0 ? 'true' : 'false' };
-      });
+      // 边序列化:React Flow 自动在每条边上带 sourceHandle(用户拖边时选了哪个 handle)
+      const edgesOut = edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle ?? null,
+      }));
       const body = {
         name, title, description, collectionName, enabled,
-        trigger: JSON.stringify({ type: 'manual' }),
+        trigger: JSON.stringify({ type: triggerType }),
         nodes: JSON.stringify(nodesOut),
         edges: JSON.stringify(edgesOut),
       };
@@ -242,6 +266,13 @@ export function WorkflowDesignerPage() {
         <label style={lbl}>
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> 启用
         </label>
+        <label style={lbl}>触发器</label>
+        <select value={triggerType} onChange={(e) => setTriggerType(e.target.value)} style={inp}>
+          <option value="manual">⚡ 手动触发</option>
+          <option value="on_create">📥 数据创建时</option>
+          <option value="on_update">✏️ 数据更新时</option>
+          <option value="schedule">⏰ 定时调度</option>
+        </select>
         <h4 style={{ marginTop: 12 }}>拖拽节点</h4>
         {(Object.keys(nodeKindMeta) as NodeKind[]).map((k) => {
           const m = nodeKindMeta[k];
