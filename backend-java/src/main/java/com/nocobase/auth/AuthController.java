@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -116,5 +118,28 @@ public class AuthController {
 
     public record RefreshRequest(
             @NotBlank String refreshToken
+    ) {}
+
+    /**
+     * 改密码(US-502). 需登录.
+     */
+    @PostMapping("/password")
+    public Map<String, Object> changePassword(
+            @RequestBody @Valid ChangePasswordRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        var dbUser = userRepository.findById(user.userId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User 不存在"));
+        if (!passwordEncoder.matches(request.oldPassword(), dbUser.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "旧密码错误");
+        }
+        dbUser.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(dbUser);
+        return Map.of("code", 0, "message", "密码修改成功");
+    }
+
+    public record ChangePasswordRequest(
+            @NotBlank String oldPassword,
+            @NotBlank String newPassword
     ) {}
 }

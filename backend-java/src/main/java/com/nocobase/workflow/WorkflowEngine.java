@@ -39,6 +39,7 @@ public class WorkflowEngine {
     private final WorkflowInstanceRepository instanceRepository;
     private final WorkflowTaskRepository taskRepository;
     private final WorkflowRepository workflowRepository;
+    private final MessageRepository messageRepository;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -46,11 +47,13 @@ public class WorkflowEngine {
             WorkflowInstanceRepository instanceRepository,
             WorkflowTaskRepository taskRepository,
             WorkflowRepository workflowRepository,
+            MessageRepository messageRepository,
             ObjectMapper objectMapper
     ) {
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.workflowRepository = workflowRepository;
+        this.messageRepository = messageRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -117,8 +120,31 @@ public class WorkflowEngine {
 
     private void logNotification(WorkflowInstanceEntity instance, Map<String, Object> node) {
         Map<String, Object> cfg = castConfig(node.get("config"));
-        String msg = (String) cfg.getOrDefault("message", "(no message)");
-        log.info("[workflow {} node {} notification] {}", instance.getId(), node.get("id"), msg);
+        String title = (String) cfg.getOrDefault("title", "通知");
+        String body = (String) cfg.getOrDefault("message", "(no message)");
+        Object recipientObj = cfg.get("recipient");
+        log.info("[workflow {} node {} notification] {}", instance.getId(), node.get("id"), body);
+
+        // 收件人:config.recipient(用户 UUID 字符串) 或 workflow 创建者
+        UUID recipient = instanceRepository.findById(instance.getId()).map(i ->
+                workflowRepository.findById(i.getWorkflowId())
+                        .map(w -> w.getCreatedBy()).orElse(null)
+        ).orElse(null);
+        if (recipientObj instanceof String s && !s.isBlank()) {
+            try { recipient = UUID.fromString(s); } catch (Exception ignored) {}
+        }
+        if (recipient == null) return;
+
+        MessageEntity msg = new MessageEntity();
+        msg.setId(UUID.randomUUID());
+        msg.setRecipient(recipient);
+        msg.setType("workflow");
+        msg.setTitle(title);
+        msg.setBody(body);
+        msg.setRelatedId(instance.getId().toString());
+        msg.setCreatedAt(java.time.Instant.now());
+        msg.setTenantId(instance.getTenantId());
+        messageRepository.save(msg);
     }
 
     /**
