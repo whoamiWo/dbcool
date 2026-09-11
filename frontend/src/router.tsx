@@ -18,6 +18,7 @@ import { WorkflowsListPage } from './pages/WorkflowsList';
 import { UsersListPage } from './pages/UsersList';
 import { WorkflowDesignerPage } from './pages/WorkflowDesigner';
 import { ProfilePage } from './pages/Profile';
+import { MessagesInboxPage } from './pages/MessagesInbox';
 import { RolesListPage } from './pages/RolesList';
 import { AclEditorPage } from './pages/AclEditor';
 
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
       { path: 'designer/workflows/new', element: <WorkflowDesignerPage /> },
       { path: 'designer/workflows/:id/edit', element: <WorkflowDesignerPage /> },
       { path: 'profile', element: <ProfilePage /> },
+      { path: 'messages', element: <MessagesInboxPage /> },
       { path: 'admin/roles', element: <RolesListPage /> },
       { path: 'admin/acl', element: <AclEditorPage /> },
       { path: 'designer/views/:collection/:id/edit', element: <ViewDesignerPage /> },
