@@ -2,9 +2,21 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { CollectionMeta, FieldDef } from '@/types/collection';
+import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 import type { FormFull, FormLayoutItem, FormRules, ValidationRule } from '@/types/form';
 import { FormRuntime } from '@/components/forms/FormRuntime';
+
+const FIELD_ICON: Record<FieldType, string> = {
+  text: '📝',
+  date: '📅',
+  boolean: '☑️',
+  select: '📋',
+  multiSelect: '📋',
+  belongsTo: '🔗',
+  hasMany: '🔗',
+  formula: '🧮',
+  number: '🔢',
+};
 
 export function FormDesignerPage() {
   const { collection, id } = useParams<{ collection: string; id?: string }>();
@@ -17,11 +29,11 @@ export function FormDesignerPage() {
   const [rules, setRules] = useState<FormRules>({});
   const [error, setError] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const { data: collectionData } = useQuery({
     queryKey: ['collection', collection],
-    queryFn: () =>
-      apiClient.get<CollectionMeta>(`/collections/${collection}`),
+    queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collection}`),
     enabled: !!collection,
   });
 
@@ -64,6 +76,7 @@ export function FormDesignerPage() {
       if (!id) {
         navigate(`/designer/forms/${collection}/${res.id}/edit`);
       }
+      setError(null);
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
@@ -71,9 +84,45 @@ export function FormDesignerPage() {
     },
   });
 
-  const addToLayout = (fieldName: string) => {
-    if (layout.some((l) => l.field === fieldName)) return;
-    setLayout([...layout, { field: fieldName, span: 24 }]);
+  // —— Drag & Drop ——
+  // 拖动源可能是「左侧新字段」(data: 'new:<name>') 或「已布局字段」(data: 'move:<name>')
+  const handleDragStart = (e: React.DragEvent, fieldName: string, source: 'palette' | 'layout') => {
+    e.dataTransfer.setData('application/x-form-field', source === 'palette' ? `new:${fieldName}` : `move:${fieldName}`);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number | 'end') => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIdx(idx === 'end' ? layout.length : idx);
+  };
+
+  const handleDragLeaveRow = () => {
+    setDragOverIdx(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIdx: number | 'end') => {
+    e.preventDefault();
+    setDragOverIdx(null);
+    const payload = e.dataTransfer.getData('application/x-form-field');
+    if (!payload) return;
+    const [op, fieldName] = payload.split(':');
+    const targetIdx = dropIdx === 'end' ? layout.length : dropIdx;
+    if (op === 'new') {
+      if (layout.some((l) => l.field === fieldName)) return;
+      const newLayout = [...layout];
+      newLayout.splice(targetIdx, 0, { field: fieldName, span: 24 });
+      setLayout(newLayout);
+    } else if (op === 'move') {
+      const currentIdx = layout.findIndex((l) => l.field === fieldName);
+      if (currentIdx < 0) return;
+      const newLayout = [...layout];
+      const [moved] = newLayout.splice(currentIdx, 1);
+      // 调整目标位置:如果拖到原位置之后,需要减 1
+      const adjusted = currentIdx < targetIdx ? targetIdx - 1 : targetIdx;
+      newLayout.splice(adjusted, 0, moved);
+      setLayout(newLayout);
+    }
   };
 
   const removeFromLayout = (fieldName: string) => {
@@ -82,6 +131,7 @@ export function FormDesignerPage() {
     delete newRules.visibility?.[fieldName];
     delete newRules.validation?.[fieldName];
     setRules(newRules);
+    if (activeField === fieldName) setActiveField(null);
   };
 
   const moveField = (fieldName: string, direction: 'up' | 'down') => {
@@ -134,6 +184,11 @@ export function FormDesignerPage() {
       <h1>
         📋 {id ? '编辑' : '新建'}表单
         <span style={{ color: '#64748b', fontSize: 14, fontWeight: 'normal' }}>({collection})</span>
+        {layout.length > 0 && (
+          <span style={{ marginLeft: 12, fontSize: 13, color: '#10b981' }}>
+            🎯 {layout.length} 字段 — 拖拽调整顺序
+          </span>
+        )}
       </h1>
 
       {error && (
@@ -143,8 +198,10 @@ export function FormDesignerPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 280px', gap: 16 }}>
+        {/* 字段面板(可拖源) */}
         <div style={{ padding: 12, background: 'white', borderRadius: 8 }}>
           <h3 style={{ marginTop: 0 }}>可用字段</h3>
+          <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 8px' }}>拖拽到画布 ↘</p>
           {fields.length === 0 ? (
             <p style={{ color: '#94a3b8', fontSize: 12 }}>该 collection 还没有字段</p>
           ) : (
@@ -152,30 +209,40 @@ export function FormDesignerPage() {
               {fields.map((f) => {
                 const added = layout.some((l) => l.field === f.name);
                 return (
-                  <button
+                  <div
                     key={f.name}
-                    onClick={() => addToLayout(f.name)}
-                    disabled={added}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, f.name, 'palette')}
+                    onDragEnd={handleDragLeaveRow}
+                    onDoubleClick={() => !added && setLayout([...layout, { field: f.name, span: 24 }])}
                     style={{
-                      padding: 6, fontSize: 12,
+                      padding: 6,
+                      fontSize: 12,
                       background: added ? '#e2e8f0' : '#f1f5f9',
                       color: added ? '#94a3b8' : '#0f172a',
                       border: '1px solid #cbd5e1',
                       borderRadius: 4,
-                      cursor: added ? 'not-allowed' : 'pointer',
-                      textAlign: 'left',
+                      cursor: added ? 'not-allowed' : 'grab',
+                      userSelect: 'none',
+                      opacity: added ? 0.6 : 1,
                     }}
+                    title={added ? '已在画布' : '拖动到画布,或双击追加到末尾'}
                   >
-                    {added ? '✓ ' : '+ '}{f.label ?? f.name}{' '}
+                    {added ? '✓ ' : ''}{FIELD_ICON[f.type] ?? '🧩'} {f.label ?? f.name}{' '}
                     <span style={{ color: '#94a3b8' }}>({f.type})</span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
           )}
         </div>
 
-        <div style={{ padding: 16, background: 'white', borderRadius: 8 }}>
+        {/* 画布 */}
+        <div
+          style={{ padding: 16, background: 'white', borderRadius: 8 }}
+          onDragOver={(e) => handleDragOver(e, layout.length)}
+          onDrop={(e) => handleDrop(e, 'end')}
+        >
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontWeight: 500 }}>表单标题</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: 8, width: '100%', fontSize: 16 }} />
@@ -187,49 +254,100 @@ export function FormDesignerPage() {
 
           <h3>布局</h3>
           {layout.length === 0 ? (
-            <p style={{ color: '#94a3b8' }}>从左侧添加字段</p>
+            <div
+              onDragOver={(e) => handleDragOver(e, 0)}
+              onDrop={(e) => handleDrop(e, 0)}
+              style={{
+                padding: 48,
+                border: '2px dashed #cbd5e1',
+                borderRadius: 8,
+                textAlign: 'center',
+                color: '#94a3b8',
+                background: dragOverIdx === 0 ? '#dbeafe' : '#f8fafc',
+              }}
+            >
+              从左侧拖动字段到这里
+            </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               {layout.map((item, idx) => {
                 const f = fieldMap(item.field, fields);
+                const isDragOver = dragOverIdx === idx;
                 return (
-                  <div
-                    key={item.field}
-                    onClick={() => setActiveField(item.field)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: 8,
-                      background: activeField === item.field ? '#dbeafe' : '#f8fafc',
-                      border: '1px solid #cbd5e1', borderRadius: 4,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span style={{ flex: 1 }}>
-                      {idx + 1}. <strong>{f?.label ?? item.field}</strong>{' '}
-                      <span style={{ color: '#94a3b8', fontSize: 12 }}>({f?.type})</span>
-                      {isFieldRequired(item.field) && <span style={{ color: '#dc2626' }}> *</span>}
-                    </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); moveField(item.field, 'up'); }}
-                      disabled={idx === 0}
-                      style={{ padding: '2px 8px', cursor: idx === 0 ? 'not-allowed' : 'pointer' }}
-                    >↑</button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); moveField(item.field, 'down'); }}
-                      disabled={idx === layout.length - 1}
-                      style={{ padding: '2px 8px', cursor: idx === layout.length - 1 ? 'not-allowed' : 'pointer' }}
-                    >↓</button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removeFromLayout(item.field); }}
-                      style={{ padding: '2px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                    >删</button>
+                  <div key={item.field}>
+                    {/* 拖入占位符 */}
+                    <div
+                      onDragOver={(e) => { e.stopPropagation(); handleDragOver(e, idx); }}
+                      onDrop={(e) => { e.stopPropagation(); handleDrop(e, idx); }}
+                      style={{
+                        height: 4,
+                        background: isDragOver ? '#3b82f6' : 'transparent',
+                        borderRadius: 2,
+                        margin: '2px 0',
+                        transition: 'all 0.1s',
+                      }}
+                    />
+                    <div
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item.field, 'layout')}
+                      onDragEnd={handleDragLeaveRow}
+                      onClick={() => setActiveField(item.field)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: 8,
+                        background: activeField === item.field ? '#dbeafe' : '#f8fafc',
+                        border: `1px solid ${activeField === item.field ? '#3b82f6' : '#cbd5e1'}`,
+                        borderRadius: 4,
+                        cursor: 'grab',
+                      }}
+                    >
+                      <span style={{ color: '#94a3b8', cursor: 'grab' }}>⋮⋮</span>
+                      <span style={{ flex: 1 }}>
+                        {idx + 1}. {FIELD_ICON[f?.type ?? 'text']} <strong>{f?.label ?? item.field}</strong>{' '}
+                        <span style={{ color: '#94a3b8', fontSize: 12 }}>({f?.type ?? '?'})</span>
+                        {isFieldRequired(item.field) && <span style={{ color: '#dc2626' }}> *</span>}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveField(item.field, 'up'); }}
+                        disabled={idx === 0}
+                        style={{ padding: '2px 8px', cursor: idx === 0 ? 'not-allowed' : 'pointer' }}
+                        title="上移"
+                      >↑</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveField(item.field, 'down'); }}
+                        disabled={idx === layout.length - 1}
+                        style={{ padding: '2px 8px', cursor: idx === layout.length - 1 ? 'not-allowed' : 'pointer' }}
+                        title="下移"
+                      >↓</button>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ padding: '2px 8px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 4, opacity: 0.4 }}
+                        title="复制(预留)"
+                      >⧉</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeFromLayout(item.field); }}
+                        style={{ padding: '2px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        title="删除"
+                      >×</button>
+                    </div>
                   </div>
                 );
               })}
+              {/* 末尾占位符 */}
+              <div
+                onDragOver={(e) => { e.stopPropagation(); handleDragOver(e, layout.length); }}
+                onDrop={(e) => { e.stopPropagation(); handleDrop(e, layout.length); }}
+                style={{
+                  height: 8,
+                  background: dragOverIdx === layout.length ? '#3b82f6' : 'transparent',
+                  borderRadius: 2,
+                  margin: '4px 0',
+                }}
+              />
             </div>
           )}
 
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
             <button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending}
@@ -242,9 +360,13 @@ export function FormDesignerPage() {
             >
               {saveMutation.isPending ? '保存中…' : '保存表单'}
             </button>
+            {saveMutation.isSuccess && (
+              <span style={{ alignSelf: 'center', color: '#10b981', fontSize: 12 }}>✅ 已保存</span>
+            )}
           </div>
         </div>
 
+        {/* 属性面板 */}
         <div style={{ padding: 12, background: 'white', borderRadius: 8 }}>
           <h3 style={{ marginTop: 0 }}>字段属性</h3>
           {!activeField ? (
@@ -267,7 +389,7 @@ export function FormDesignerPage() {
                 必填
               </label>
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
-                💡 Week 8 MVP:简化属性。Week 9+ 加显隐规则、联动等。
+                💡 可拖拽画布字段重排序。Week 8+ 加显隐规则、默认值。
               </p>
             </div>
           )}
