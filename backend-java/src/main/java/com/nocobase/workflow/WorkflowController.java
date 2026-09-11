@@ -338,8 +338,14 @@ public class WorkflowController {
         dto.put("record_id", i.getRecordId());
         dto.put("current_node_index", i.getCurrentNodeIndex());
         dto.put("error_message", i.getErrorMessage());
-        dto.put("started_at", i.getStartedAt().toString());
+        dto.put("trigger_data_json", i.getTriggerDataJson());
+        dto.put("started_at", i.getStartedAt() != null ? i.getStartedAt().toString() : null);
         dto.put("finished_at", i.getFinishedAt() != null ? i.getFinishedAt().toString() : null);
+        // 关联 workflow 名称/标题(避免前端 N+1)
+        workflowRepository.findById(i.getWorkflowId()).ifPresent(w -> {
+            dto.put("workflow_name", w.getName());
+            dto.put("workflow_title", w.getTitle());
+        });
         return dto;
     }
 
