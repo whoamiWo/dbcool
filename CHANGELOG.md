@@ -4,6 +4,25 @@
 
 ---
 
+## [Unreleased] - 2026-09-11 Epic 5/6 完成
+
+### Added
+- **Epic 5 增强 (US-405 + US-409)**:`WorkflowEngine` 抽出统一处理 4 种节点类型(APPROVAL/NOTIFICATION/CONDITION/HTTP);CONDITION 支持 op eq/neq/contains/gt/lt 从 triggerData 取值;HTTP 节点支持 Bearer/Basic 鉴权
+- **Epic 6 平台基础 (US-501~507)**:
+  - V8 migration:`messages` 表 + `user_preferences` 表
+  - `MessageEntity` + `MessageRepository` + `MessageController`(GET inbox + POST mark-read)
+  - `AuthController` 加 `POST /api/auth/password`(US-502)
+  - `WorkflowEngine.logNotification` 升级:写站内信到 messages 表
+  - 前端 `WorkflowsList.tsx` + `WorkflowDesigner.tsx`(节点编辑 MVP) + `Profile.tsx`(改密码页)
+- **WEEK_12_HANDOFF.md** 完整接力文档
+
+### Verified
+- 端到端:改密码 admin123→admin1234 → 新密码登录成功 → 触发 amount_check workflow amount=500 → 走 NOTIFICATION → 1 条站内信生成 → `GET /api/messages` 返回 `unread_count: 1`
+- 前端 `pnpm build` 绿色(1.36s, 459KB JS)
+- GitHub 同步:`main` 已推送 `086e631`
+
+
+
 ## [Unreleased] - 2026-09-09 封档
 
 ### Added
