@@ -219,6 +219,133 @@ public class CollectionController {
     }
 
     // ============================================================
+    //  CSV Import / Export (Week 14.5)
+    // ============================================================
+
+    @GetMapping(value = "/{name}/export", produces = "text/csv;charset=UTF-8")
+    public ResponseEntity<String> exportCsv(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "1000") int limit,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        CollectionMetaEntity meta = service.get(name);
+        List<Map<String, Object>> records = service.listRecords(name, user.tenantId(), limit);
+        records = records.stream()
+                .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
+                .toList();
+        // 字段顺序:fields_json 中的顺序
+        List<String> headers = new java.util.ArrayList<>();
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> fields = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(meta.getFieldsJson(), List.class);
+            for (Map<String, Object> f : fields) {
+                headers.add((String) f.get("name"));
+            }
+        } catch (Exception ignored) {}
+        StringBuilder csv = new StringBuilder();
+        csv.append(String.join(",", headers)).append("\n");
+        for (Map<String, Object> r : records) {
+            List<String> row = new java.util.ArrayList<>();
+            for (String h : headers) {
+                Object v = r.get(h);
+                row.add(escapeCsv(v == null ? "" : v.toString()));
+            }
+            csv.append(String.join(",", row)).append("\n");
+        }
+        String filename = name + "_" + java.time.LocalDate.now() + ".csv";
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .body(csv.toString());
+    }
+
+    @PostMapping(value = "/{name}/import", consumes = "multipart/form-data")
+    public Map<String, Object> importCsv(
+            @PathVariable String name,
+            @org.springframework.web.bind.annotation.RequestPart("file") org.springframework.web.multipart.MultipartFile file,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.CREATE);
+        if (file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "文件为空");
+        }
+        java.util.List<Map<String, Object>> failed = new java.util.ArrayList<>();
+        int success = 0;
+        int total = 0;
+        try (java.io.BufferedReader br = new java.io.BufferedReader(
+                new java.io.InputStreamReader(file.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+            String headerLine = br.readLine();
+            if (headerLine == null || headerLine.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV 表头为空");
+            }
+            String[] headers = headerLine.split(",");
+            String line;
+            int rowNum = 1; // 表头是 1
+            while ((line = br.readLine()) != null) {
+                rowNum++;
+                if (line.isBlank()) continue;
+                total++;
+                try {
+                    String[] values = parseCsvLine(line);
+                    Map<String, Object> data = new java.util.LinkedHashMap<>();
+                    for (int i = 0; i < headers.length && i < values.length; i++) {
+                        String v = values[i].trim();
+                        if (!v.isEmpty()) data.put(headers[i].trim(), v);
+                    }
+                    service.insertRecord(name, data, user.tenantId());
+                    success++;
+                } catch (Exception e) {
+                    failed.add(Map.of("row", rowNum, "error", e.getMessage() == null ? e.toString() : e.getMessage()));
+                }
+            }
+        } catch (java.io.IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "解析失败: " + e.getMessage());
+        }
+        return Map.of(
+                "code", 0, "message", "imported",
+                "data", Map.of(
+                        "total", total,
+                        "success", success,
+                        "failed", failed.size(),
+                        "errors", failed
+                )
+        );
+    }
+
+    private static String escapeCsv(String s) {
+        if (s.contains(",") || s.contains("\"") || s.contains("\n")) {
+            return "\"" + s.replace("\"", "\"\"") + "\"";
+        }
+        return s;
+    }
+
+    // 简易 CSV 行解析(支持双引号转义)
+    private static String[] parseCsvLine(String line) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean inQuotes = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (inQuotes) {
+                if (c == '"') {
+                    if (i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                        cur.append('"'); i++;
+                    } else inQuotes = false;
+                } else cur.append(c);
+            } else {
+                if (c == ',') { out.add(cur.toString()); cur.setLength(0); }
+                else if (c == '"') inQuotes = true;
+                else cur.append(c);
+            }
+        }
+        out.add(cur.toString());
+        return out.toArray(new String[0]);
+    }
+
+    // ============================================================
     //  DTO
     // ============================================================
 

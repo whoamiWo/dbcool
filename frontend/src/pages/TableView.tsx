@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { useAuthStore } from '@/stores/auth';
 import type { CollectionMeta } from '@/types/collection';
 import type { ViewFull, SortRule, FilterRule } from '@/types/view';
 import { applyFilters, applySort, FilterBar } from '@/components/views/FilterBar';
@@ -27,6 +28,7 @@ export function TableViewPage() {
     enabled: !!collectionName,
   });
 
+  const queryClient = useQueryClient();
   const { data: recordsData, isLoading } = useQuery({
     queryKey: ['records', collectionName],
     queryFn: () => apiClient.get<RecordRow[]>(`/collections/${collectionName}/records?limit=500`),
@@ -42,6 +44,44 @@ export function TableViewPage() {
   const columns = config.columns ?? fields.map((f) => ({ field: f.name, label: f.label ?? f.name }));
 
   const filtered = applyFilters(records, filters);
+
+  const exportCsv = async () => {
+    const token = (useAuthStore.getState().user as { accessToken?: string } | null)?.accessToken ?? '';
+    const res = await fetch('/api/collections/' + collectionName + '/export?limit=5000', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!res.ok) { alert('导出失败: ' + res.status); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = collectionName + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const [importResult, setImportResult] = React.useState<{ total: number; success: number; failed: number } | null>(null);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const token = (useAuthStore.getState().user as { accessToken?: string } | null)?.accessToken ?? '';
+    const res = await fetch('/api/collections/' + collectionName + '/import', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: fd,
+    });
+    const json = await res.json();
+    if (json.code === 0) {
+      setImportResult(json.data);
+      queryClient.invalidateQueries({ queryKey: ['records', collectionName] });
+    } else {
+      alert('导入失败: ' + json.message);
+    }
+    e.target.value = '';
+  };
   const sorted = applySort(filtered, sort);
 
   return (
@@ -50,6 +90,19 @@ export function TableViewPage() {
         ← 返回 {collectionName}
       </Link>
       <h1>{view.title}</h1>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button onClick={exportCsv} style={{ padding: '4px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+          📥 导出 CSV
+        </button>
+        <label style={{ padding: '4px 12px', background: '#3b82f6', color: 'white', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+          📤 导入 CSV
+          <input type="file" accept=".csv" onChange={handleImport} style={{ display: 'none' }} />
+        </label>
+        {importResult && <span style={{ alignSelf: 'center', fontSize: 12, color: importResult.failed > 0 ? '#dc2626' : '#10b981' }}>
+          {importResult.success}/{importResult.total} 成功{importResult.failed > 0 ? `, ${importResult.failed} 失败` : ''}
+        </span>}
+      </div>
 
       <FilterBar fields={fields} filters={filters} onChange={setFilters} />
 
