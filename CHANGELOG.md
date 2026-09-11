@@ -4,6 +4,24 @@
 
 ---
 
+## [Unreleased] - 2026-09-11 Epic 4 收尾 + P1 三件套
+
+### Added
+- **Epic 4 收尾 — ACL 强制拦截器**:`AclEnforcer` 服务,CollectionController 在 createRecord/listRecords 调用 assertCan + filterRecord。白名单语义(无 policy 默认允许,有 policy 按显式允许匹配);FIELD policy hidden 字段自动隐藏
+- **消息分页 (cursor-based)**:`GET /api/messages?limit=20&before=<ISO>`,返回 `next_cursor` + `has_more`;limit 上限 100
+- **工作流设计器画布 (ReactFlow 11)**:三栏布局,左侧节点面板可拖入画布,右侧 config 编辑器;支持 4 种节点 + 边连接
+- **MessagesInbox 前端页面**:列表 + 未读筛选 + 标记已读 + 加载更多
+- **AppLayout 菜单扩展**:工作流 / 站内信 / 我的
+- **WEEK_13_HANDOFF.md** 接力文档
+
+### Verified
+- 端到端:user GET customer 无 READ policy → 403 "ACL 拒绝";加 READ policy → 200;加 FIELD hidden=phone → phone 字段被隐藏
+- 端到端:7 条消息 + limit=3 → 三页 has_more=true/false 正确
+- workflowndesigner build 绿色(612KB JS, gzip 191KB)
+- GitHub 同步:`main` 已推送 `9fb8ddc`
+
+
+
 ## [Unreleased] - 2026-09-11 Epic 5/6 完成
 
 ### Added
