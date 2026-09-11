@@ -360,6 +360,17 @@ public class WorkflowController {
         dto.put("comment", t.getComment());
         dto.put("created_at", t.getCreatedAt().toString());
         dto.put("finished_at", t.getFinishedAt() != null ? t.getFinishedAt().toString() : null);
+        // 关联 instance → workflow 信息
+        instanceRepository.findById(t.getInstanceId()).ifPresent(inst -> {
+            dto.put("trigger_data_json", inst.getTriggerDataJson());
+            dto.put("record_id", inst.getRecordId());
+            dto.put("instance_status", inst.getStatus().name());
+            workflowRepository.findById(inst.getWorkflowId()).ifPresent(w -> {
+                dto.put("workflow_id", w.getId().toString());
+                dto.put("workflow_name", w.getName());
+                dto.put("workflow_title", w.getTitle());
+            });
+        });
         return dto;
     }
 
