@@ -33,17 +33,20 @@ public class CollectionController {
     private final AsyncMigrationService migrationService;
     private final MigrationJobRepository jobRepository;
     private final com.nocobase.auth.AclEnforcer aclEnforcer;
+    private final com.nocobase.audit.AuditService auditService;
 
     public CollectionController(
             CollectionService service,
             AsyncMigrationService migrationService,
             MigrationJobRepository jobRepository,
-            com.nocobase.auth.AclEnforcer aclEnforcer
+            com.nocobase.auth.AclEnforcer aclEnforcer,
+            com.nocobase.audit.AuditService auditService
     ) {
         this.service = service;
         this.migrationService = migrationService;
         this.jobRepository = jobRepository;
         this.aclEnforcer = aclEnforcer;
+        this.auditService = auditService;
     }
 
     // ============================================================
@@ -193,6 +196,8 @@ public class CollectionController {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.CREATE);
         UUID id = service.insertRecord(name, data, user.tenantId());
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "CREATE", name, id.toString(), data);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "code", 0, "message", "success",
                 "data", Map.of("id", id.toString(), "extra", data)

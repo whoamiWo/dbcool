@@ -18,6 +18,7 @@ export function AppLayout() {
     { path: '/admin/users', label: '用户' },
     { path: '/admin/roles', label: '角色' },
     { path: '/admin/acl', label: '权限' },
+    { path: '/admin/audit', label: '审计' },
     { path: '/designer/workflows', label: '工作流' },
     { path: '/messages', label: '站内信' },
     { path: '/profile', label: '我的' },

@@ -23,6 +23,7 @@ import { ProfilePage } from './pages/Profile';
 import { MessagesInboxPage } from './pages/MessagesInbox';
 import { RolesListPage } from './pages/RolesList';
 import { AclEditorPage } from './pages/AclEditor';
+import { AuditLogsPage } from './pages/AuditLogs';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       { path: 'messages', element: <MessagesInboxPage /> },
       { path: 'admin/roles', element: <RolesListPage /> },
       { path: 'admin/acl', element: <AclEditorPage /> },
+      { path: 'admin/audit', element: <AuditLogsPage /> },
       { path: 'designer/views/:collection/:id/edit', element: <ViewDesignerPage /> },
       { path: 'views/:id/run', element: <TableViewPage /> },
       { path: 'views/:id/kanban', element: <KanbanViewPage /> },

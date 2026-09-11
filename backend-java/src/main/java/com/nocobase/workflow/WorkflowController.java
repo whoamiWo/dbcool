@@ -38,19 +38,22 @@ public class WorkflowController {
     private final WorkflowTaskRepository taskRepository;
     private final ObjectMapper objectMapper;
     private final WorkflowEngine engine;
+    private final com.nocobase.audit.AuditService auditService;
 
     public WorkflowController(
             WorkflowRepository workflowRepository,
             WorkflowInstanceRepository instanceRepository,
             WorkflowTaskRepository taskRepository,
             ObjectMapper objectMapper,
-            WorkflowEngine engine
+            WorkflowEngine engine,
+            com.nocobase.audit.AuditService auditService
     ) {
         this.workflowRepository = workflowRepository;
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.objectMapper = objectMapper;
         this.engine = engine;
+        this.auditService = auditService;
     }
 
     // ============================================================
@@ -109,7 +112,9 @@ public class WorkflowController {
     @Transactional
     public ResponseEntity<Map<String, Object>> trigger(
             @PathVariable UUID id,
-            @RequestBody(required = false) Map<String, Object> payload
+            @RequestBody(required = false) Map<String, Object> payload,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+                    com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user
     ) {
         WorkflowEntity w = mustGet(id);
         if (!w.isEnabled()) {
@@ -159,6 +164,9 @@ public class WorkflowController {
         }
 
         if (result == WorkflowEngine.NodeResult.NEEDS_APPROVAL) {
+            auditService.log(user.tenantId(), user.userId(), user.username(),
+                    "TRIGGER", "workflow", w.getId().toString(),
+                    Map.of("instance", instance.getId().toString(), "result", "PENDING"));
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
                     "code", 0, "message", "workflow waiting for approval",
                     "data", instanceToDto(instance)
@@ -166,6 +174,9 @@ public class WorkflowController {
         }
 
         String msg = result == WorkflowEngine.NodeResult.FAILED ? "workflow failed" : "workflow completed";
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "TRIGGER", "workflow", w.getId().toString(),
+                Map.of("instance", instance.getId().toString(), "result", instance.getStatus().name()));
         return ResponseEntity.ok(Map.of(
                 "code", result == WorkflowEngine.NodeResult.FAILED ? 500 : 0,
                 "message", msg,
@@ -300,6 +311,11 @@ public class WorkflowController {
         instance.setErrorMessage("用户在节点 " + task.getNodeId() + " 拒绝");
         instance.setFinishedAt(Instant.now());
         instanceRepository.save(instance);
+
+        WorkflowEntity wf = workflowRepository.findById(instance.getWorkflowId()).orElse(null);
+        auditService.log("tenant_default", task.getAssignee(), null,
+                "REJECT", "workflow_task", task.getId().toString(),
+                Map.of("workflow", wf != null ? wf.getId().toString() : "", "comment", task.getComment() == null ? "" : task.getComment()));
 
         return Map.of("code", 0, "message", "workflow rejected",
                 "data", instanceToDto(instance));

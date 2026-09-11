@@ -8,6 +8,7 @@ interface UserInfo { id: string; username: string; tenant_id: string; roles: str
 interface MessagePreview { id: string; title: string; is_read: boolean; created_at: string; }
 interface TaskPreview { id: string; workflow_title: string; node_id: string; status: string; instance_id: string; created_at: string; }
 interface InstancePreview { id: string; workflow_title: string; status: string; started_at: string; }
+interface AuditPreview { id: string; action: string; resource: string; resource_id: string | null; username: string | null; created_at: string; }
 
 export function HomePage() {
   const { user } = useAuthStore();
@@ -71,8 +72,8 @@ export function HomePage() {
         </Panel>
       </div>
 
-      {/* 未读站内信 */}
-      <div style={{ marginTop: 16 }}>
+      {/* 未读站内信 + 最近审计 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
         <Panel title="📨 未读站内信" link="/messages" linkText="查看全部">
           {(unreadQuery.data?.messages ?? []).length === 0 && <Empty text="无未读消息" />}
           {(unreadQuery.data?.messages ?? []).map((m) => (
@@ -82,6 +83,7 @@ export function HomePage() {
             </div>
           ))}
         </Panel>
+        <AuditWidget />
       </div>
 
       {/* 系统状态 */}
@@ -132,3 +134,45 @@ const itemLink: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center',
   padding: 6, borderBottom: '1px solid #f1f5f9', color: '#1e293b', textDecoration: 'none', fontSize: 13,
 };
+
+function AuditWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['audit-recent'],
+    queryFn: async () => {
+      const r = await apiClient.get<{ code: number; data: { logs: AuditPreview[]; total: number } }>(
+        '/audit/logs?limit=8');
+      return r.data.data;
+    },
+    refetchInterval: 30000,  // 30s 自动刷新
+  });
+  const logs = data?.logs ?? [];
+  return (
+    <div style={{ background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <h3 style={{ margin: 0, fontSize: 14 }}>🔍 最近审计 ({data?.total ?? '…'})</h3>
+        <Link to="/admin/audit" style={{ fontSize: 11, color: '#3b82f6' }}>查看全部 →</Link>
+      </div>
+      {isLoading && <Empty text="加载中…" />}
+      {!isLoading && logs.length === 0 && <Empty text="暂无审计记录" />}
+      {logs.map((l) => {
+        const color = l.action.startsWith('CREATE') || l.action === 'APPROVE' ? '#10b981'
+          : l.action.startsWith('DELETE') || l.action === 'REJECT' ? '#ef4444'
+          : l.action === 'TRIGGER' ? '#8b5cf6'
+          : '#3b82f6';
+        return (
+          <div key={l.id} style={itemLink}>
+            <span style={{ fontWeight: 500, fontSize: 12 }}>
+              <span style={{ color, marginRight: 6 }}>●</span>
+              {l.username || '?'} → <code style={{ fontSize: 11 }}>{l.resource}</code>
+            </span>
+            <span style={{
+              fontSize: 10, padding: '1px 6px', borderRadius: 3,
+              background: color + '20', color,
+            }}>{l.action}</span>
+            <span style={{ color: '#94a3b8', fontSize: 11 }}>{l.created_at.slice(11, 19)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
