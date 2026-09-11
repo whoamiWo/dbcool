@@ -32,15 +32,18 @@ public class CollectionController {
     private final CollectionService service;
     private final AsyncMigrationService migrationService;
     private final MigrationJobRepository jobRepository;
+    private final com.nocobase.auth.AclEnforcer aclEnforcer;
 
     public CollectionController(
             CollectionService service,
             AsyncMigrationService migrationService,
-            MigrationJobRepository jobRepository
+            MigrationJobRepository jobRepository,
+            com.nocobase.auth.AclEnforcer aclEnforcer
     ) {
         this.service = service;
         this.migrationService = migrationService;
         this.jobRepository = jobRepository;
+        this.aclEnforcer = aclEnforcer;
     }
 
     // ============================================================
@@ -187,6 +190,8 @@ public class CollectionController {
             @RequestBody Map<String, Object> data,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.CREATE);
         UUID id = service.insertRecord(name, data, user.tenantId());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "code", 0, "message", "success",
@@ -200,9 +205,16 @@ public class CollectionController {
             @RequestParam(defaultValue = "50") int limit,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        List<Map<String, Object>> records = service.listRecords(name, user.tenantId(), limit);
+        // FIELD policy 过滤:对每条记录应用隐藏字段
+        records = records.stream()
+                .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
+                .toList();
         return Map.of(
                 "code", 0, "message", "success",
-                "data", service.listRecords(name, user.tenantId(), limit)
+                "data", records
         );
     }
 
