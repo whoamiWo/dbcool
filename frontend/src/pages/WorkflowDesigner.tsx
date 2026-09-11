@@ -1,36 +1,73 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import ReactFlow, {
+  Background,
+  Controls,
+  MiniMap,
+  ReactFlowProvider,
+  useReactFlow,
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Node,
+  type Edge,
+  type Connection,
+  type NodeChange,
+  type EdgeChange,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import apiClient from '@/api/client';
 
-interface WorkflowMeta {
-  id: string;
-  name: string;
-  title: string;
-  description: string;
-  collection_name: string;
-  trigger_json: string;
-  nodes_json: string;
-  enabled: boolean;
-  created_at: string;
+type NodeKind = 'APPROVAL' | 'NOTIFICATION' | 'CONDITION' | 'HTTP';
+
+interface WorkflowNodeData {
+  kind: NodeKind;
+  config: Record<string, string>;
+  onChange: (patch: Partial<WorkflowNodeData>) => void;
+  onDelete: () => void;
 }
 
-interface NodeDef {
-  id: string;
-  type: string;
-  config?: Record<string, unknown>;
-}
+const nodeKindMeta: Record<NodeKind, { label: string; icon: string; color: string }> = {
+  APPROVAL:     { label: '审批',     icon: '📝', color: '#3b82f6' },
+  NOTIFICATION: { label: '通知',     icon: '🔔', color: '#8b5cf6' },
+  CONDITION:    { label: '条件',     icon: '🔀', color: '#f59e0b' },
+  HTTP:         { label: 'HTTP',    icon: '🌐', color: '#10b981' },
+};
 
-const NODE_TYPES = [
-  { value: 'APPROVAL', label: '📝 审批(单人)' },
-  { value: 'NOTIFICATION', label: '🔔 通知' },
-  { value: 'CONDITION', label: '🔀 条件分支' },
-  { value: 'HTTP', label: '🌐 HTTP 调用' },
-];
+function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolean }) {
+  const meta = nodeKindMeta[data.kind];
+  return (
+    <div style={{
+      padding: 10, minWidth: 160,
+      background: 'white',
+      border: `2px solid ${selected ? '#0f172a' : meta.color}`,
+      borderRadius: 8,
+      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <strong>{meta.icon} {meta.label}</strong>
+        <button
+          onClick={(e) => { e.stopPropagation(); data.onDelete(); }}
+          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}
+        >×</button>
+      </div>
+      <div style={{ marginTop: 4, fontSize: 11, color: '#64748b' }}>
+        {data.kind === 'NOTIFICATION' && (data.config.message?.slice(0, 40) || '(未设置)')}
+        {data.kind === 'HTTP' && `${data.config.method || 'GET'} ${(data.config.url || '').slice(0, 30)}`}
+        {data.kind === 'CONDITION' && `if ${data.config.field || '?'} ${data.config.op || '?'} ${data.config.value || '?'}`}
+        {data.kind === 'APPROVAL' && '(单审批人)'}
+      </div>
+      <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
+                    width: 12, height: 12, borderRadius: 6, background: meta.color }} />
+    </div>
+  );
+}
+const nodeTypes = { flowNode: FlowNode };
 
 /**
- * 工作流设计器(Week 11 MVP)— 节点列表编辑(暂不画流程图).
- * 触发 + 节点类型都通过 JSON 编辑.
+ * 工作流设计器画布版(Week 13 — ReactFlow).
+ * 左侧节点面板可拖拽到画布,右侧编辑选中节点的 config.
  */
 export function WorkflowDesignerPage() {
   const { id } = useParams<{ id?: string }>();
@@ -42,10 +79,13 @@ export function WorkflowDesignerPage() {
   const [title, setTitle] = useState('新工作流');
   const [description, setDescription] = useState('');
   const [collectionName, setCollectionName] = useState('customer');
-  const [triggerType, setTriggerType] = useState('manual');
   const [enabled, setEnabled] = useState(true);
-  const [nodes, setNodes] = useState<NodeDef[]>([{ id: 'n1', type: 'APPROVAL' }]);
+  const [nodes, setNodes] = useState<Node<WorkflowNodeData>[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { project } = useReactFlow();
 
   const { data: existing } = useQuery({
     queryKey: ['workflow', id],
@@ -61,28 +101,108 @@ export function WorkflowDesignerPage() {
       setCollectionName(existing.collection_name);
       setEnabled(existing.enabled);
       try {
-        const trig = JSON.parse(existing.trigger_json);
-        if (trig.type) setTriggerType(trig.type);
-        const ns = JSON.parse(existing.nodes_json);
-        if (Array.isArray(ns)) setNodes(ns);
+        const ns = JSON.parse(existing.nodes_json) as WorkflowNodeDef[];
+        setNodes(ns.map((n, i) => ({
+          id: n.id || `n${i}`,
+          type: 'flowNode',
+          position: n.position || { x: 100 + i * 220, y: 100 },
+          data: {
+            kind: n.type as NodeKind,
+            config: n.config || {},
+            onChange: () => {}, // 会被下面的 useEffect 重新绑定
+            onDelete: () => {},
+          },
+        })));
+        setEdges(buildEdgesFromSequence(ns.map((n, i) => n.id || `n${i}`)));
       } catch (e) {}
     }
   }, [existing]);
 
+  // 给每个 node 的 data 绑定回调(避免闭包过期)
+  useEffect(() => {
+    setNodes((nds) => nds.map((n) => ({
+      ...n,
+      data: {
+        ...n.data,
+        onChange: (patch) => updateNodeData(n.id, patch),
+        onDelete: () => deleteNode(n.id),
+      },
+    })));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes.length, edges.length]);
+
+  const buildEdgesFromSequence = (ids: string[]): Edge[] => {
+    const es: Edge[] = [];
+    for (let i = 0; i < ids.length - 1; i++) {
+      es.push({ id: `e${i}`, source: ids[i], target: ids[i + 1] });
+    }
+    return es;
+  };
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setNodes((nds) => applyNodeChanges(changes, nds) as Node<WorkflowNodeData>[]);
+  }, []);
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    setEdges((eds) => applyEdgeChanges(changes, eds));
+  }, []);
+  const onConnect = useCallback((conn: Connection) => {
+    setEdges((eds) => addEdge({ ...conn, id: `e${Date.now()}` }, eds));
+  }, []);
+
+  const updateNodeData = (id: string, patch: Partial<WorkflowNodeData>) => {
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, ...patch } } : n));
+  };
+
+  const deleteNode = (id: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== id));
+    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+    if (selectedNodeId === id) setSelectedNodeId(null);
+  };
+
+  const onDragStart = (event: React.DragEvent, kind: NodeKind) => {
+    event.dataTransfer.setData('application/reactflow', kind);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+  const onDrop = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    const kind = event.dataTransfer.getData('application/reactflow') as NodeKind;
+    if (!kind || !reactFlowWrapper.current) return;
+    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+    const position = project({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+    const newNode: Node<WorkflowNodeData> = {
+      id: `n${Date.now()}`,
+      type: 'flowNode',
+      position,
+      data: {
+        kind, config: defaultConfig(kind),
+        onChange: () => {}, onDelete: () => {},
+      },
+    };
+    setNodes((nds) => [...nds, newNode]);
+  }, [project]);
+
   const saveMutation = useMutation({
     mutationFn: () => {
+      const nodesOut: WorkflowNodeDef[] = nodes.map((n) => ({
+        id: n.id, type: n.data.kind, config: n.data.config,
+        position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
+      }));
       const body = {
         name, title, description, collectionName, enabled,
-        trigger: JSON.stringify({ type: triggerType }),
-        nodes: JSON.stringify(nodes),
+        trigger: JSON.stringify({ type: 'manual' }),
+        nodes: JSON.stringify(nodesOut),
       };
       return isEdit
         ? apiClient.put<WorkflowMeta>(`/workflows/${id}`, body)
         : apiClient.post<WorkflowMeta>('/workflows', body);
     },
-    onSuccess: (res) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
-      navigate(`/workflows/${res.id}/run`);
+      navigate('/designer/workflows');
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
@@ -90,139 +210,162 @@ export function WorkflowDesignerPage() {
     },
   });
 
-  const addNode = () => {
-    const next = `n${nodes.length + 1}`;
-    setNodes([...nodes, { id: next, type: 'NOTIFICATION' }]);
-  };
-
-  const removeNode = (i: number) => {
-    setNodes(nodes.filter((_, idx) => idx !== i));
-  };
-
-  const moveNode = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= nodes.length) return;
-    const next = [...nodes];
-    [next[i], next[j]] = [next[j], next[i]];
-    setNodes(next);
-  };
-
-  const updateNode = (i: number, patch: Partial<NodeDef>) => {
-    setNodes(nodes.map((n, idx) => (idx === i ? { ...n, ...patch } : n)));
-  };
-
-  const updateConfig = (i: number, key: string, value: string) => {
-    setNodes(nodes.map((n, idx) => {
-      if (idx !== i) return n;
-      const cfg = { ...(n.config ?? {}), [key]: value };
-      return { ...n, config: cfg };
-    }));
-  };
+  const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
   return (
-    <div style={{ maxWidth: 800 }}>
-      <button
-        onClick={() => navigate('/designer/workflows')}
-        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: 16 }}
-      >
-        ← 返回列表
-      </button>
-      <h1>{isEdit ? '编辑' : '新建'}工作流</h1>
+    <div style={{ display: 'flex', height: 'calc(100vh - 100px)', gap: 12 }}>
+      {/* 左:节点面板 + 元数据 */}
+      <aside style={{ width: 200, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
+        <button onClick={() => navigate('/designer/workflows')}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: 8 }}>
+          ← 返回列表
+        </button>
+        <h3 style={{ marginTop: 0 }}>{isEdit ? '编辑' : '新建'}工作流</h3>
+        {error && <div style={{ padding: 4, marginBottom: 8, background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontSize: 11 }}>{error}</div>}
+        <label style={lbl}>技术名 *</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
+        <label style={lbl}>标题</label>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
+        <label style={lbl}>Collection</label>
+        <input value={collectionName} onChange={(e) => setCollectionName(e.target.value)} style={inp} />
+        <label style={lbl}>
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> 启用
+        </label>
+        <h4 style={{ marginTop: 12 }}>拖拽节点</h4>
+        {(Object.keys(nodeKindMeta) as NodeKind[]).map((k) => {
+          const m = nodeKindMeta[k];
+          return (
+            <div key={k}
+                 draggable
+                 onDragStart={(e) => onDragStart(e, k)}
+                 style={{ padding: 8, marginBottom: 6, background: m.color, color: 'white',
+                          borderRadius: 4, cursor: 'grab', fontSize: 13 }}>
+              {m.icon} {m.label}
+            </div>
+          );
+        })}
+        <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
+                style={{ marginTop: 12, width: '100%', padding: 8, background: saveMutation.isPending ? '#94a3b8' : '#16a34a',
+                         color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+          {saveMutation.isPending ? '保存中…' : '💾 保存'}
+        </button>
+      </aside>
 
-      {error && (
-        <div style={{ padding: 8, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>{error}</div>
-      )}
-
-      <div style={{ padding: 16, background: 'white', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <div style={{ marginBottom: 8 }}>
-          <label>技术名 *</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-        </div>
-        <div style={{ marginBottom: 8 }}>
-          <label>显示标题</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} />
-        </div>
-        <div style={{ marginBottom: 8 }}>
-          <label>Collection</label>
-          <input value={collectionName} onChange={(e) => setCollectionName(e.target.value)} style={inputStyle} />
-        </div>
-        <div style={{ marginBottom: 8 }}>
-          <label>触发器</label>
-          <select value={triggerType} onChange={(e) => setTriggerType(e.target.value)} style={inputStyle}>
-            <option value="manual">manual(手动)</option>
-          </select>
-        </div>
-        <div style={{ marginBottom: 8 }}>
-          <label>
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> 启用
-          </label>
-        </div>
+      {/* 中:画布 */}
+      <div ref={reactFlowWrapper} style={{ flex: 1, background: '#f8fafc', borderRadius: 8 }} onDrop={onDrop} onDragOver={onDragOver}>
+        <ReactFlow
+          nodes={nodes} edges={edges}
+          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          onNodeClick={(_e, n) => setSelectedNodeId(n.id)}
+          onPaneClick={() => setSelectedNodeId(null)}
+          fitView
+        >
+          <Background />
+          <Controls />
+          <MiniMap />
+        </ReactFlow>
       </div>
 
-      <h3>节点列表({nodes.length})</h3>
-      {nodes.map((n, i) => (
-        <div key={i} style={{ ...cardStyle, marginBottom: 8 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ width: 30, color: '#64748b' }}>{i + 1}.</span>
-            <input value={n.id} onChange={(e) => updateNode(i, { id: e.target.value })} style={{ ...inputStyle, width: 100, fontFamily: 'monospace' }} />
-            <select value={n.type} onChange={(e) => updateNode(i, { type: e.target.value })} style={{ ...inputStyle, width: 180 }}>
-              {NODE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <button onClick={() => moveNode(i, -1)} disabled={i === 0} style={btnSm}>↑</button>
-            <button onClick={() => moveNode(i, 1)} disabled={i === nodes.length - 1} style={btnSm}>↓</button>
-            <button onClick={() => removeNode(i)} style={{ ...btnSm, background: '#dc2626' }}>删</button>
-          </div>
-          <NodeConfigEditor node={n} onChange={(k, v) => updateConfig(i, k, v)} />
-        </div>
-      ))}
-      <button onClick={addNode} style={{ ...btnStyle, background: '#475569' }}>+ 添加节点</button>
-
-      <button
-        onClick={() => saveMutation.mutate()}
-        disabled={saveMutation.isPending}
-        style={{ ...btnStyle, marginTop: 16, background: saveMutation.isPending ? '#94a3b8' : '#16a34a' }}
-      >
-        {saveMutation.isPending ? '保存中…' : '保存并触发'}
-      </button>
+      {/* 右:配置面板 */}
+      <aside style={{ width: 280, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
+        <h3 style={{ marginTop: 0 }}>节点配置</h3>
+        {!selectedNode ? (
+          <p style={{ color: '#64748b' }}>点选节点以编辑</p>
+        ) : (
+          <NodeConfigEditor
+            node={selectedNode}
+            onChange={(patch) => updateNodeData(selectedNode.id, patch)}
+          />
+        )}
+      </aside>
     </div>
   );
 }
 
-function NodeConfigEditor({ node, onChange }: { node: NodeDef; onChange: (k: string, v: string) => void }) {
-  if (node.type === 'NOTIFICATION') {
-    return (
-      <div style={{ marginTop: 8, paddingLeft: 38 }}>
-        <input
-          placeholder="通知内容"
-          defaultValue={(node.config?.message as string) ?? ''}
-          onBlur={(e) => onChange('message', e.target.value)}
-          style={{ ...inputStyle, fontSize: 12 }}
-        />
+function NodeConfigEditor({ node, onChange }: { node: Node<WorkflowNodeData>; onChange: (patch: Partial<WorkflowNodeData>) => void }) {
+  const meta = nodeKindMeta[node.data.kind];
+  const cfg = node.data.config;
+  const setCfg = (k: string, v: string) => onChange({ config: { ...cfg, [k]: v } });
+  return (
+    <div>
+      <div style={{ padding: 6, marginBottom: 8, background: meta.color, color: 'white', borderRadius: 4 }}>
+        {meta.icon} {meta.label}(id: {node.id})
       </div>
-    );
-  }
-  if (node.type === 'CONDITION') {
-    return (
-      <div style={{ marginTop: 8, paddingLeft: 38, fontSize: 12, color: '#64748b' }}>
-        JSON config(在 triggerData 上判断):
-        <code style={{ marginLeft: 8 }}>
-          {`{when: {field, op, value}, then: <id>, else: <id>}`}
-        </code>
-      </div>
-    );
-  }
-  if (node.type === 'HTTP') {
-    return (
-      <div style={{ marginTop: 8, paddingLeft: 38, display: 'flex', gap: 4 }}>
-        <input placeholder="GET/POST" defaultValue={(node.config?.method as string) ?? 'GET'} onBlur={(e) => onChange('method', e.target.value)} style={{ ...inputStyle, width: 70, fontSize: 12 }} />
-        <input placeholder="https://..." defaultValue={(node.config?.url as string) ?? ''} onBlur={(e) => onChange('url', e.target.value)} style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
-      </div>
-    );
-  }
-  return null;
+      {node.data.kind === 'NOTIFICATION' && (
+        <>
+          <label style={lbl}>标题</label>
+          <input value={cfg.title || ''} onChange={(e) => setCfg('title', e.target.value)} style={inp} />
+          <label style={lbl}>消息内容</label>
+          <textarea value={cfg.message || ''} onChange={(e) => setCfg('message', e.target.value)} style={{ ...inp, height: 60 }} />
+        </>
+      )}
+      {node.data.kind === 'HTTP' && (
+        <>
+          <label style={lbl}>Method</label>
+          <select value={cfg.method || 'GET'} onChange={(e) => setCfg('method', e.target.value)} style={inp}>
+            <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+          </select>
+          <label style={lbl}>URL</label>
+          <input value={cfg.url || ''} onChange={(e) => setCfg('url', e.target.value)} style={inp} />
+        </>
+      )}
+      {node.data.kind === 'CONDITION' && (
+        <>
+          <label style={lbl}>字段名(来自 triggerData)</label>
+          <input value={cfg.field || ''} onChange={(e) => setCfg('field', e.target.value)} style={inp} />
+          <label style={lbl}>操作符</label>
+          <select value={cfg.op || 'eq'} onChange={(e) => setCfg('op', e.target.value)} style={inp}>
+            <option value="eq">等于 eq</option>
+            <option value="neq">不等于 neq</option>
+            <option value="contains">包含 contains</option>
+            <option value="gt">大于 gt</option>
+            <option value="lt">小于 lt</option>
+          </select>
+          <label style={lbl}>比较值</label>
+          <input value={cfg.value || ''} onChange={(e) => setCfg('value', e.target.value)} style={inp} />
+        </>
+      )}
+      {node.data.kind === 'APPROVAL' && (
+        <p style={{ color: '#64748b', fontSize: 13 }}>(审批节点使用当前用户作为审批人,无配置项)</p>
+      )}
+    </div>
+  );
 }
 
-const inputStyle = { padding: 6, width: '100%', border: '1px solid #cbd5e1', borderRadius: 4 };
-const cardStyle = { padding: 12, background: 'white', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' };
-const btnStyle = { padding: '8px 16px', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' };
-const btnSm = { padding: '2px 8px', background: '#1e293b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 };
+function defaultConfig(kind: NodeKind): Record<string, string> {
+  if (kind === 'NOTIFICATION') return { title: '通知', message: '' };
+  if (kind === 'HTTP') return { method: 'GET', url: '' };
+  if (kind === 'CONDITION') return { field: '', op: 'eq', value: '' };
+  return {};
+}
+
+const lbl = { display: 'block', fontSize: 12, color: '#475569', marginTop: 6 };
+const inp = { padding: 4, width: '100%', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 };
+
+interface WorkflowMeta {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  collection_name: string;
+  trigger_json: string;
+  nodes_json: string;
+  enabled: boolean;
+  created_at: string;
+}
+interface WorkflowNodeDef {
+  id: string;
+  type: string;
+  config?: Record<string, string>;
+  position?: { x: number; y: number };
+}
+
+/** Provider 包装,React Flow 11 需要 */
+export function WorkflowDesignerPageWithProvider() {
+  return (
+    <ReactFlowProvider>
+      <WorkflowDesignerPage />
+    </ReactFlowProvider>
+  );
+}
