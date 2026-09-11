@@ -43,6 +43,10 @@ public class WorkflowEntity {
     @Column(name = "nodes", columnDefinition = "jsonb", nullable = false)
     private String nodesJson = "[]";
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "edges", columnDefinition = "jsonb", nullable = false)
+    private String edgesJson = "[]";
+
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
@@ -71,6 +75,8 @@ public class WorkflowEntity {
     public void setTriggerJson(String triggerJson) { this.triggerJson = triggerJson; }
     public String getNodesJson() { return nodesJson; }
     public void setNodesJson(String nodesJson) { this.nodesJson = nodesJson; }
+    public String getEdgesJson() { return edgesJson; }
+    public void setEdgesJson(String edgesJson) { this.edgesJson = edgesJson; }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public String getTenantId() { return tenantId; }

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,8 +59,91 @@ public class WorkflowEngine {
     }
 
     /**
-     * 同步执行从 startIdx 开始的节点,遇到 APPROVAL 暂停并返回。
-     * 已经处理过的节点不再执行(条件分支跳过也算)。
+     * 同步执行从 startNodeId 开始的节点(图遍历),遇到 APPROVAL 暂停并返回。
+     * <p>Week 14:支持边驱动的图执行;起点由上游传入(无入边的节点或 trigger 指定)。
+     * <p>顺序默认 fallback 到 {@link #executeFrom}(老数组模式)。
+     */
+    @Transactional
+    public NodeResult executeGraphFrom(
+            WorkflowInstanceEntity instance,
+            List<Map<String, Object>> nodes,
+            List<Map<String, Object>> edges,
+            String startNodeId,
+            UUID defaultAssignee
+    ) {
+        // node id → Map
+        Map<String, Map<String, Object>> byId = new java.util.HashMap<>();
+        for (Map<String, Object> n : nodes) {
+            String id = (String) n.get("id");
+            if (id != null) byId.put(id, n);
+        }
+        // source → list of (target, sourceHandle)
+        Map<String, List<Map<String, Object>>> out = new java.util.HashMap<>();
+        for (Map<String, Object> e : edges) {
+            String src = (String) e.get("source");
+            out.computeIfAbsent(src, k -> new java.util.ArrayList<>())
+               .add(Map.of("target", String.valueOf(e.get("target")),
+                            "handle", String.valueOf(e.getOrDefault("sourceHandle", ""))));
+        }
+        Set<String> visited = new java.util.HashSet<>();
+        String current = startNodeId;
+        while (current != null) {
+            if (!visited.add(current)) {
+                log.warn("workflow {} cycle detected at {}", instance.getId(), current);
+                break;
+            }
+            Map<String, Object> node = byId.get(current);
+            if (node == null) {
+                log.warn("workflow {} node {} not found", instance.getId(), current);
+                break;
+            }
+            instance.setCurrentNodeIndex(nodes.indexOf(node));
+            String nodeType = (String) node.get("type");
+            String next = null;
+            String[] handleHolder = {null}; // 用 array 持有 handle 状态(lambda 用 final)
+            if ("APPROVAL".equals(nodeType)) {
+                createApprovalTask(instance.getId(), current, defaultAssignee);
+                instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+                instanceRepository.save(instance);
+                return NodeResult.NEEDS_APPROVAL;
+            } else if ("NOTIFICATION".equals(nodeType)) {
+                logNotification(instance, node);
+            } else if ("CONDITION".equals(nodeType)) {
+                // 评估 then/else,带 sourceHandle = "true" / "false"
+                boolean matched = matchCondition(instance, castConfig(castConfig(node.get("config")).get("when")));
+                handleHolder[0] = matched ? "true" : "false";
+                log.info("workflow {} condition {} matched={}", instance.getId(), current, matched);
+            } else if ("HTTP".equals(nodeType)) {
+                executeHttp(instance, node);
+            } else {
+                log.warn("workflow {} unknown node type: {}", instance.getId(), nodeType);
+            }
+            // 找到下一节点
+            List<Map<String, Object>> outs = out.getOrDefault(current, List.of());
+            if (outs.isEmpty()) break; // 无出边 → 完成
+            if (handleHolder[0] != null) {
+                // 条件分支:找 sourceHandle 匹配的边
+                Map<String, Object> picked = null;
+                for (Map<String, Object> o : outs) {
+                    if (handleHolder[0].equals(o.get("handle"))) { picked = o; break; }
+                }
+                if (picked == null) picked = outs.get(0);
+                next = (String) picked.get("target");
+            } else {
+                // 顺序流:取第一个
+                next = (String) outs.get(0).get("target");
+            }
+            current = next;
+        }
+        instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
+        instance.setFinishedAt(java.time.Instant.now());
+        instanceRepository.save(instance);
+        return NodeResult.CONTINUE;
+    }
+
+    /**
+     * 同步执行从 startIdx 开始的节点(数组顺序模式,Week 11 旧实现,保留兼容).
+     * 遇到 APPROVAL 暂停并返回。
      */
     @Transactional
     public NodeResult executeFrom(

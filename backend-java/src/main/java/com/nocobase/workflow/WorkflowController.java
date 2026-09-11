@@ -72,9 +72,11 @@ public class WorkflowController {
         Map<String, Object> dto = toDto(w);
         try {
             dto.put("nodes", objectMapper.readValue(w.getNodesJson(), new TypeReference<List<Map<String, Object>>>() {}));
+            dto.put("edges", objectMapper.readValue(w.getEdgesJson(), new TypeReference<List<Map<String, Object>>>() {}));
             dto.put("trigger", objectMapper.readValue(w.getTriggerJson(), Map.class));
         } catch (Exception e) {
             dto.put("nodes", List.of());
+            dto.put("edges", List.of());
             dto.put("trigger", Map.of());
         }
         return Map.of("code", 0, "message", "success", "data", dto);
@@ -93,6 +95,7 @@ public class WorkflowController {
         w.setCollectionName(req.collectionName());
         w.setTriggerJson(req.trigger() != null ? req.trigger() : "{\"type\":\"manual\"}");
         w.setNodesJson(req.nodes() != null ? req.nodes() : "[]");
+        w.setEdgesJson(req.edges() != null ? req.edges() : "[]");
         w.setEnabled(req.enabled() == null || req.enabled());
         w.setTenantId("tenant_default");
         w.setCreatedAt(Instant.now());
@@ -133,16 +136,27 @@ public class WorkflowController {
         instance.setTenantId("tenant_default");
         instance = instanceRepository.save(instance);
 
-        // 2. 解析节点 + 调用 engine 执行(US-405 条件 / US-409 HTTP 也支持)
+        // 2. 解析节点 + edges(Week 14:支持图遍历)
         List<Map<String, Object>> nodes;
+        List<Map<String, Object>> edges;
         try {
             nodes = objectMapper.readValue(w.getNodesJson(),
                     new TypeReference<List<Map<String, Object>>>() {});
+            edges = objectMapper.readValue(w.getEdgesJson(),
+                    new TypeReference<List<Map<String, Object>>>() {});
         } catch (Exception e) {
             nodes = List.of();
+            edges = List.of();
         }
 
-        WorkflowEngine.NodeResult result = engine.executeFrom(instance, nodes, 0, w.getCreatedBy());
+        // 3. 优先图遍历(若 edges 非空);否则回退数组顺序
+        WorkflowEngine.NodeResult result;
+        if (!edges.isEmpty() && !nodes.isEmpty()) {
+            String startId = (String) nodes.get(0).get("id");
+            result = engine.executeGraphFrom(instance, nodes, edges, startId, w.getCreatedBy());
+        } else {
+            result = engine.executeFrom(instance, nodes, 0, w.getCreatedBy());
+        }
 
         if (result == WorkflowEngine.NodeResult.NEEDS_APPROVAL) {
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
@@ -309,6 +323,7 @@ public class WorkflowController {
         dto.put("collection_name", w.getCollectionName());
         dto.put("trigger_json", w.getTriggerJson());
         dto.put("nodes_json", w.getNodesJson());
+        dto.put("edges_json", w.getEdgesJson());
         dto.put("enabled", w.isEnabled());
         dto.put("tenant_id", w.getTenantId());
         dto.put("created_at", w.getCreatedAt().toString());
@@ -349,6 +364,7 @@ public class WorkflowController {
             @NotBlank String collectionName,
             String trigger,
             String nodes,
+            String edges,
             Boolean enabled
     ) {}
 }

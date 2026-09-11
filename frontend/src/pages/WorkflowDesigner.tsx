@@ -191,10 +191,21 @@ export function WorkflowDesignerPage() {
         id: n.id, type: n.data.kind, config: n.data.config,
         position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
       }));
+      // 给 CONDITION 节点的出边打 sourceHandle 标签:
+      // 从该节点出发的边按数组顺序:第 1 条 = "true"(then),第 2 条 = "false"(else)。
+      const edgesOut = edges.map((e) => {
+        const srcNode = nodes.find((n) => n.id === e.source);
+        if (srcNode?.data.kind !== 'CONDITION') return e;
+        const siblings = edges.filter((x) => x.source === e.source);
+        const i = siblings.indexOf(e);
+        return { id: e.id, source: e.source, target: e.target,
+                 sourceHandle: i === 0 ? 'true' : 'false' };
+      });
       const body = {
         name, title, description, collectionName, enabled,
         trigger: JSON.stringify({ type: 'manual' }),
         nodes: JSON.stringify(nodesOut),
+        edges: JSON.stringify(edgesOut),
       };
       return isEdit
         ? apiClient.put<WorkflowMeta>(`/workflows/${id}`, body)
