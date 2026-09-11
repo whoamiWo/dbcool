@@ -37,17 +37,20 @@ public class WorkflowController {
     private final WorkflowInstanceRepository instanceRepository;
     private final WorkflowTaskRepository taskRepository;
     private final ObjectMapper objectMapper;
+    private final WorkflowEngine engine;
 
     public WorkflowController(
             WorkflowRepository workflowRepository,
             WorkflowInstanceRepository instanceRepository,
             WorkflowTaskRepository taskRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            WorkflowEngine engine
     ) {
         this.workflowRepository = workflowRepository;
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.objectMapper = objectMapper;
+        this.engine = engine;
     }
 
     // ============================================================
@@ -130,7 +133,7 @@ public class WorkflowController {
         instance.setTenantId("tenant_default");
         instance = instanceRepository.save(instance);
 
-        // 2. 解析节点,依次执行(Week 11 MVP 同步 + 只 APPROVAL)
+        // 2. 解析节点 + 调用 engine 执行(US-405 条件 / US-409 HTTP 也支持)
         List<Map<String, Object>> nodes;
         try {
             nodes = objectMapper.readValue(w.getNodesJson(),
@@ -139,49 +142,19 @@ public class WorkflowController {
             nodes = List.of();
         }
 
-        int nodeCount = nodes.size();
-        boolean failed = false;
+        WorkflowEngine.NodeResult result = engine.executeFrom(instance, nodes, 0, w.getCreatedBy());
 
-        for (int i = 0; i < nodeCount; i++) {
-            Map<String, Object> node = nodes.get(i);
-            instance.setCurrentNodeIndex(i);
-
-            String nodeType = (String) node.get("type");
-            if ("APPROVAL".equals(nodeType)) {
-                // 创建一个 PENDING 任务,等审批
-                WorkflowTaskEntity task = new WorkflowTaskEntity();
-                task.setId(UUID.randomUUID());
-                task.setInstanceId(instance.getId());
-                task.setNodeId((String) node.get("id"));
-                task.setNodeType("APPROVAL");
-                // 简化:审批人 = workflow 创建者(下一版用 assignees 列表)
-                task.setAssignee(w.getCreatedBy());
-                task.setStatus(WorkflowTaskEntity.Status.PENDING);
-                task.setCreatedAt(Instant.now());
-                taskRepository.save(task);
-
-                // 同步执行到此暂停:实例设为 PENDING 等待审批
-                instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
-                instanceRepository.save(instance);
-                return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
-                        "code", 0, "message", "workflow waiting for approval",
-                        "data", instanceToDto(instance)
-                ));
-            } else if ("NOTIFICATION".equals(nodeType)) {
-                // 通知节点:Week 11 简化 — 直接 log
-                System.out.println("[workflow " + w.getId() + " node " + i + "] notification: " + node.get("config"));
-            } else {
-                // 未知节点类型 — 跳过
-            }
+        if (result == WorkflowEngine.NodeResult.NEEDS_APPROVAL) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
+                    "code", 0, "message", "workflow waiting for approval",
+                    "data", instanceToDto(instance)
+            ));
         }
 
-        // 全部跑完 — 完成
-        instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
-        instance.setFinishedAt(Instant.now());
-        instanceRepository.save(instance);
-
+        String msg = result == WorkflowEngine.NodeResult.FAILED ? "workflow failed" : "workflow completed";
         return ResponseEntity.ok(Map.of(
-                "code", 0, "message", "workflow completed",
+                "code", result == WorkflowEngine.NodeResult.FAILED ? 500 : 0,
+                "message", msg,
                 "data", instanceToDto(instance)
         ));
     }
