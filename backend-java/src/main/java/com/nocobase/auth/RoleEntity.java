@@ -9,6 +9,7 @@ import java.util.UUID;
 
 /**
  * 角色(Week 10 Epic 4 US-302).
+ * US-308 加 parent_role_id 支持继承。
  */
 @Entity
 @Table(name = "roles")
@@ -27,6 +28,9 @@ public class RoleEntity {
     @Column(name = "tenant_id", nullable = false, length = 64)
     private String tenantId;
 
+    @Column(name = "parent_role_id")
+    private UUID parentRoleId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -43,6 +47,9 @@ public class RoleEntity {
 
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
+
+    public UUID getParentRoleId() { return parentRoleId; }
+    public void setParentRoleId(UUID parentRoleId) { this.parentRoleId = parentRoleId; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

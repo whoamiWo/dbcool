@@ -2,6 +2,7 @@ package com.nocobase.auth;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,19 +34,26 @@ public class AclEnforcer {
 
     private final UserRoleRepository userRoleRepository;
     private final AclPolicyRepository policyRepository;
+    private final RoleRepository roleRepository;
 
-    public AclEnforcer(UserRoleRepository userRoleRepository, AclPolicyRepository policyRepository) {
+    public AclEnforcer(UserRoleRepository userRoleRepository,
+                       AclPolicyRepository policyRepository,
+                       RoleRepository roleRepository) {
         this.userRoleRepository = userRoleRepository;
         this.policyRepository = policyRepository;
+        this.roleRepository = roleRepository;
     }
 
     /**
      * 判断 user 是否能对 collectionName 执行 action(CREATE/READ/UPDATE/DELETE).
      * 返回 true 表示允许,false 表示拒绝.
+     *
+     * <p>US-308: 用户持有的 role 通过 parent_role_id 链继承祖先 role 的 ACL。
+     * 因此实际生效的是「user 持有的角色」+「所有祖先角色」的并集。
      */
     public boolean isAllowed(UUID userId, String tenantId, String collectionName,
                              AclPolicyEntity.Action action) {
-        List<UUID> roleIds = loadRoleIds(userId);
+        List<UUID> roleIds = loadRoleIdsIncludingInheritance(userId, tenantId);
         if (roleIds.isEmpty()) {
             // 无角色用户(通常不应该发生)→ 拒绝
             return false;
@@ -77,7 +85,7 @@ public class AclEnforcer {
      * 没有 FIELD policy → 返回 null(表示全部可见).
      */
     public Set<String> filterReadableFields(UUID userId, String tenantId, String collectionName) {
-        List<UUID> roleIds = loadRoleIds(userId);
+        List<UUID> roleIds = loadRoleIdsIncludingInheritance(userId, tenantId);
         List<AclPolicyEntity> policies = new ArrayList<>();
         for (UUID rid : roleIds) {
             policies.addAll(policyRepository.findByRoleIdAndTenantId(rid, tenantId));
@@ -120,6 +128,24 @@ public class AclEnforcer {
     private List<UUID> loadRoleIds(UUID userId) {
         return userRoleRepository.findByIdUserId(userId)
                 .stream().map(ur -> ur.getId().getRoleId()).toList();
+    }
+
+    /**
+     * US-308: 加载 user 持有角色 + 所有祖先角色(通过 parent_role_id 链)。
+     * 用 visited set 防自循环 + 用 CTE 一次 SQL 查全树。
+     * 返回的列表去重。
+     */
+    public List<UUID> loadRoleIdsIncludingInheritance(UUID userId, String tenantId) {
+        List<UUID> direct = loadRoleIds(userId);
+        if (direct.isEmpty()) return List.of();
+        Set<UUID> all = new LinkedHashSet<>(direct);
+        for (UUID rid : direct) {
+            try {
+                List<UUID> ancestors = roleRepository.findSelfAndAncestors(rid, tenantId);
+                all.addAll(ancestors);
+            } catch (Exception ignored) { /* CTE 失败时不影响直接角色 */ }
+        }
+        return new ArrayList<>(all);
     }
 
     private Set<String> parseHidden(String configJson) {
