@@ -35,19 +35,34 @@ public class CollectionController {
     private final MigrationJobRepository jobRepository;
     private final com.nocobase.auth.AclEnforcer aclEnforcer;
     private final com.nocobase.audit.AuditService auditService;
+    private final com.nocobase.acl.RowAclService rowAclService;
+    private final com.nocobase.auth.RoleRepository roleRepository;
 
     public CollectionController(
             CollectionService service,
             AsyncMigrationService migrationService,
             MigrationJobRepository jobRepository,
             com.nocobase.auth.AclEnforcer aclEnforcer,
-            com.nocobase.audit.AuditService auditService
+            com.nocobase.audit.AuditService auditService,
+            com.nocobase.acl.RowAclService rowAclService,
+            com.nocobase.auth.RoleRepository roleRepository
     ) {
         this.service = service;
         this.migrationService = migrationService;
         this.jobRepository = jobRepository;
         this.aclEnforcer = aclEnforcer;
         this.auditService = auditService;
+        this.rowAclService = rowAclService;
+        this.roleRepository = roleRepository;
+    }
+
+    /** 构建 RowAclService.Principal(从当前认证用户). */
+    private com.nocobase.acl.RowAclService.Principal rowAclPrincipal(
+            com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user) {
+        java.util.List<String> roles = roleRepository.findRoleNamesByUserId(
+                user.userId(), user.tenantId());
+        return new com.nocobase.acl.RowAclService.Principal(
+                user.userId().toString(), roles);
     }
 
     // ============================================================
@@ -218,6 +233,9 @@ public class CollectionController {
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
                 .toList();
+        // ROW ACL 过滤:每条记录过表达式策略(Week 14.5)
+        records = rowAclService.filterReadable(
+                user.tenantId(), name, records, rowAclPrincipal(user));
         return Map.of(
                 "code", 0, "message", "success",
                 "data", records
@@ -241,6 +259,8 @@ public class CollectionController {
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
                 .toList();
+        records = rowAclService.filterReadable(
+                user.tenantId(), name, records, rowAclPrincipal(user));
         // 字段顺序:fields_json 中的顺序
         List<String> headers = new java.util.ArrayList<>();
         try {

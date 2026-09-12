@@ -19,6 +19,7 @@ export function AppLayout() {
     { path: '/admin/roles', label: '角色' },
     { path: '/admin/acl', label: '权限' },
     { path: '/admin/audit', label: '审计' },
+    { path: '/admin/row-acl', label: '行级 ACL' },
     { path: '/swagger', label: 'API 文档', external: 'http://localhost:8080/swagger-ui/index.html' },
     { path: '/designer/workflows', label: '工作流' },
     { path: '/messages', label: '站内信' },
