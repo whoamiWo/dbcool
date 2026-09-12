@@ -2,6 +2,7 @@ package com.nocobase.workflow;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.notification.NotificationService;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -41,6 +42,7 @@ public class WorkflowEngine {
     private final WorkflowTaskRepository taskRepository;
     private final WorkflowRepository workflowRepository;
     private final MessageRepository messageRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -49,12 +51,14 @@ public class WorkflowEngine {
             WorkflowTaskRepository taskRepository,
             WorkflowRepository workflowRepository,
             MessageRepository messageRepository,
+            NotificationService notificationService,
             ObjectMapper objectMapper
     ) {
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
         this.workflowRepository = workflowRepository;
         this.messageRepository = messageRepository;
+        this.notificationService = notificationService;
         this.objectMapper = objectMapper;
     }
 
@@ -219,6 +223,7 @@ public class WorkflowEngine {
         }
         if (recipient == null) return;
 
+        // 1) InApp 站内信(原有)
         MessageEntity msg = new MessageEntity();
         msg.setId(UUID.randomUUID());
         msg.setRecipient(recipient);
@@ -229,6 +234,25 @@ public class WorkflowEngine {
         msg.setCreatedAt(java.time.Instant.now());
         msg.setTenantId(instance.getTenantId());
         messageRepository.save(msg);
+
+        // 2) 多渠道通知(Week 14.5 P3 — 新)
+        // event 格式:workflow.<type> e.g. workflow.notification
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("title", title);
+            payload.put("body", body);
+            payload.put("data", Map.of(
+                    "instance_id", instance.getId().toString(),
+                    "node_id", String.valueOf(node.get("id")),
+                    "workflow_id", instance.getWorkflowId().toString()
+            ));
+            String recipientStr = recipient.toString();
+            // events match in channel config: "workflow.*" or 全部事件
+            notificationService.fire(instance.getTenantId(), "workflow.notification",
+                    recipientStr, payload);
+        } catch (Exception e) {
+            log.warn("notify fire failed: {}", e.getMessage());
+        }
     }
 
     /**

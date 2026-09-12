@@ -25,6 +25,7 @@ import { RolesListPage } from './pages/RolesList';
 import { AclEditorPage } from './pages/AclEditor';
 import { AuditLogsPage } from './pages/AuditLogs';
 import { RowAclAdminPage } from './pages/RowAclAdmin';
+import { NotificationChannelsPage } from './pages/NotificationChannels';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
       { path: 'admin/acl', element: <AclEditorPage /> },
       { path: 'admin/audit', element: <AuditLogsPage /> },
       { path: 'admin/row-acl', element: <RowAclAdminPage /> },
+      { path: 'admin/notifications', element: <NotificationChannelsPage /> },
       { path: 'designer/views/:collection/:id/edit', element: <ViewDesignerPage /> },
       { path: 'views/:id/run', element: <TableViewPage /> },
       { path: 'views/:id/kanban', element: <KanbanViewPage /> },
