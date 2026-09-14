@@ -4,6 +4,27 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 18 Sprint — Java 单元测试 — 阶段 5 提前(1 commit)
+
+### Added
+- **AclEnforcerTest** (`AclEnforcerTest.java`) — 31 tests,全 PASS
+  - Mockito 隔离 DB,覆盖 7 个公开方法所有分支
+  - isAllowed / filterReadableFields / filterWritableFields / assertCanWriteFields
+  - loadRoleIdsIncludingInheritance(CTE 容错 + 祖先去重)
+  - filterRecord(隐藏字段实际删除)
+- **DynamicTableManagerOrderByTest** (`DynamicTableManagerOrderByTest.java`) — 25 tests,全 PASS
+  - 反射调用 private buildOrderBy
+  - 覆盖基本白名单 / 系统字段 / 多字段组合
+  - **9 个 SQL injection 防御场景**(DROP TABLE / 分号 / 空格 / 单引号 / 数字开头 / 等)
+  - 7 个空/null 处理场景
+
+### Verified
+- `mvn test` 总计 **70 tests PASS**(旧 14 + 新 56)
+- 覆盖率:AclEnforcer / DynamicTableManager.buildOrderBy 100%
+- 运行时间 3.3 秒,CI 友好
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 17 Sprint — 字段级 ACL 细分 + listRecords 服务端 filter/sort(3 commits)
 
 ### Added
