@@ -1,3 +1,22 @@
+## Week 39 Step A+B (2026-09-14) — 0% 覆盖率洼地(57 tests)
+- A. **FormRuntime 测试** (25 tests, 0% → 97.54% 覆盖)
+  - 6 种字段类型 (text/number/select/multiSelect/boolean/date) + 默认未知类型
+  - 7 种 validation (required/minLength/maxLength/min/max/pattern/email) + 默认 label 名消息
+  - 5 种 visibility 规则 (eq/neq/gt + 默认 + undefined 边界)
+  - 提交流程 (成功 / submitting 状态 / onSubmit 失败恢复)
+- B. **FilterBar 测试** (32 tests, 0% → 98.93% 覆盖)
+  - UI 交互 (展开 / 收起 / 加筛选 / 删除 / 取消 / 不可添加空字段)
+  - applyFilters 7 种 op (eq/neq/contains/gt/lt/empty/notEmpty) + 多筛选 AND
+  - applySort asc/desc + 多级排序 (name + age)
+  - sortToQuery / filtersToQuery 序列化 (含 empty/notEmpty 不带 value / 过滤空 field/direction)
+- **覆盖率飞跃**: **29.11% → 98.73%** ⭐ (核心 utils/api/store/components 接近全覆盖)
+- **总测试**: 555 → **612** (+57)
+
+### 已知源码 bug (记录,不修)
+1. `FormRuntime.tsx:97-102` handleSubmit 只有 try/finally 没 catch,onSubmit reject 会触发 unhandled rejection (Week 39)
+2. `AuditLogs.tsx:64` `r.data.code` 实际应为 `r.code` (Week 38)
+3. `vi.mock('axios')` 必须用 vi.hoisted 共享 fakeInstance (Week 38 踩坑)
+
 ## [Unreleased] - 2026-09-14 Week 38 Sprint — A:API client + B:coverage + C:4 个 list 页(55 → 92)(1 commit)
 
 ### Added
