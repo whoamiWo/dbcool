@@ -195,7 +195,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.65</minimum>
+                                            <minimum>0.70</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -226,7 +226,7 @@
                                         <exclude>com.nocobase.auth.JwtAuthFilter</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- meta 模块(Week 21/25/28):行覆盖 ≥ 50%(Week 28 加 CollectionController) -->
+                                <!-- meta 模块(Week 21/25/28/30):行覆盖 ≥ 50%(Week 30 维持,无新增) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -318,7 +318,7 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- notification 模块(Week 22/24):行覆盖 ≥ 50%(Week 24 加 controller) -->
+                                <!-- notification 模块(Week 22/24/30):行覆盖 ≥ 85%(Week 30 加 3 dispatcher 抬到 94%) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -328,7 +328,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.50</minimum>
+                                            <minimum>0.85</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

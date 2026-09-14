@@ -1,3 +1,64 @@
+## [Unreleased] - 2026-09-14 Week 30 Sprint — 3 NotificationDispatcher + GlobalExceptionHandler + RefreshTokenService + 红线抬升(1 commit)
+
+### Added
+- **DingTalkDispatcherTest** (`DingTalkDispatcherTest.java`) — 8 tests,全 PASS
+  - supportedType / 缺 webhook URL → error / HTTP 200 → ok / HTTP 403 → error
+  - 加签后 URL 包含 timestamp & sign / HTTP 抛异常 → ConnectException / recipient fallback URL
+  - 长 body 截断(>200 + ...)
+- **WeChatWorkDispatcherTest** (`WeChatWorkDispatcherTest.java`) — 7 tests,全 PASS
+  - supportedType / 缺 URL → error / recipient fallback / HTTP 200 → ok / 403 → error
+  - HTTP 抛异常 / 长 body 截断
+- **WebhookDispatcherTest** (`WebhookDispatcherTest.java`) — 10 tests,全 PASS
+  - supportedType / 缺 URL → error / 默认 POST / PUT 方法切换 / 自定义 headers 应用
+  - payload.data 包含在 body / HTTP 抛异常 / 5xx → error / 2xx → ok / recipient fallback
+- **GlobalExceptionHandlerTest** (`GlobalExceptionHandlerTest.java`) — 11 tests,全 PASS
+  - ResponseStatus: 有 reason / null reason fallback
+  - IllegalArgument: 有 message / null message → "参数无效"
+  - Security: 有 message / null message → "未认证"
+  - MethodArgumentNotValid: 多个 field error 拼接 / 无 error → "参数校验失败"
+  - HttpMessageNotReadable: → "请求体格式错误"
+  - RuntimeException: 有 message / null → 类名
+- **RefreshTokenServiceTest** (`RefreshTokenServiceTest.java`) — 3 tests,全 PASS
+  - issue → 存储到 Redis key=refresh:{token},value=userId,ttl=7 天
+  - consume 存在的 token → 返回 userId 并删除 / 不存在 → 返回 null 不删除
+
+### Changed
+- **抬 Jacoco 红线**(Week 30 重点 notification):
+  - **BUNDLE** 65% → **70%**
+  - **notification** 50% → **85%**(Week 30 加 3 dispatcher 抬到 94%)
+- **meta 尝试抬 55% 失败 → 退回 50%**(实测 54%,差 1%,避免红线不达)
+- **auth excludes 不变**(RefreshTokenService 之前就没 exclude,现在 8→100%)
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **390 tests PASS**(351 → 390,+39)
+- **覆盖率**:
+  - **notification** 56% → **94%** (+38%)
+  - **bundle** 75% → **80%** (+5%)
+  - **auth** 79% → **81%** (+2%)
+  - **config** 21% → **28%** (+7%)
+
+### Key technical findings
+- **HttpClient 是 final 字段 + 实例化**:3 个 dispatcher 都用 `HttpClient.newBuilder().build()`,用 `Field.setAccessible(true)` 反射替换为 mock
+- **Mockito 泛型问题**:`HttpResponse<String>` final 不能 mock;用 raw types `HttpResponse mockResp` + `doReturn().when(mockResp).statusCode()` 绕过
+- **DingTalk 加签**:`Mac.getInstance("HmacSHA256")` + Base64 + URLEncoder,加签后 URL 追加 `?timestamp=X&sign=Y`
+- **WebhookDispatcher.HttpRequest.BodyPublishers**:不直接 toString,只能 verify `bodyPublisher().isPresent()`
+- **GlobalExceptionHandler null message fallback**:每个 handler 都安全处理 null message
+- **`ops.setValue()` 是 void**:必须用 `doNothing().when(ops).set(...)`,不是 `when().thenReturn()`
+
+### Coverage Trend
+
+| Week | tests | bundle | auth | meta | workflow | notification | config | notes |
+|------|-------|--------|------|------|----------|--------------|--------|-------|
+| 30 | 390 | 80% | 81% | 58% | 92% | **94%** | 28% | 3 dispatcher + GlobalEx + RefreshToken + 红线 BUNDLE 0.70/notification 0.85 |
+| 29 | 351 | 75% | 79% | 58% | 92% | 56% | 21% | WorkflowController + TemplateService + workflow 红线 0.80 |
+| 28 | 322 | 65% | 79% | 58% | 51% | 56% | 21% | CollectionController + WorkflowEngine + 红线三连跳 |
+| 27 | 276 | 47% | 79% | 20% | 22% | 56% | 21% | AuthController + RoleAclController + 红线大跃升 |
+| 26 | 247 | 38% | 35% | 20% | 22% | 56% | 21% | UserAdminController + FormController + RowAclController |
+| 25 | — | 33% | 35% | 20% | 22% | — | — | (基线) |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 29 Sprint — WorkflowController + WorkflowTemplateService + workflow 红线大跳(1 commit)
 
 ### Added
