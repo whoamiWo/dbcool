@@ -188,14 +188,14 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 21%(Week 23,加 api controller 测试) -->
+                                <!-- 全局:行覆盖 ≥ 28%(Week 24,3 个 controller 测试) -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.21</minimum>
+                                            <minimum>0.28</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -265,7 +265,7 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- audit 模块(Week 21 引入):行覆盖 ≥ 45% -->
+                                <!-- audit 模块(Week 21/24):行覆盖 ≥ 80%(Week 24 加 controller) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -275,11 +275,11 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.45</minimum>
+                                            <minimum>0.80</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- view 模块(Week 21 引入):行覆盖 ≥ 40% -->
+                                <!-- view 模块(Week 21/24):行覆盖 ≥ 90%(Week 24 加 controller) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -289,7 +289,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.40</minimum>
+                                            <minimum>0.90</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
@@ -307,7 +307,7 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- notification 模块(Week 22 引入):行覆盖 ≥ 25% -->
+                                <!-- notification 模块(Week 22/24):行覆盖 ≥ 50%(Week 24 加 controller) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -317,7 +317,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.25</minimum>
+                                            <minimum>0.50</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
