@@ -336,4 +336,39 @@ public class CollectionService {
         }
         return tableManager.deleteRecord(collectionName, id) > 0;
     }
+
+    /**
+     * 删除 collection 元数据 + 物理表(Week 41 B3 修复).
+     *
+     * <p>原 delete 端点只返回 "deleted (mark only)" 假成功,物理表残留在 schema,
+     * 长期积累会污染 schema 并影响 ER 图统计。
+     *
+     * <p>顺序与失败语义(报告 3.3 建议):
+     * <ol>
+     *   <li>先删元数据(主流程不可逆)</li>
+     *   <li>再删物理表(失败仅记日志,不回滚元数据 — 元数据已删,残留表危害小于元数据残留)</li>
+     * </ol>
+     */
+    @Transactional
+    public boolean deleteMeta(String collectionName, String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除该 collection");
+        }
+        // 1. 删元数据(主流程)
+        long deleted = repository.deleteByName(collectionName);
+        if (deleted == 0) {
+            // 已被并发删除 — 视为幂等成功
+            return false;
+        }
+        // 2. 删物理表(失败仅记日志,不抛)
+        try {
+            tableManager.dropTable(collectionName);
+        } catch (Exception e) {
+            // 记录日志但不抛 — 元数据已删,残留物理表可由运维清理
+            org.slf4j.LoggerFactory.getLogger(CollectionService.class)
+                    .warn("collection {} 元数据已删,物理表清理失败: {}", collectionName, e.getMessage());
+        }
+        return true;
+    }
 }

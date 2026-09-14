@@ -116,11 +116,10 @@ public class CollectionController {
             @PathVariable String name,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        CollectionMetaEntity meta = service.get(name);
-        if (!meta.getTenantId().equals(user.tenantId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除");
-        }
-        return Map.of("code", 0, "message", "deleted (mark only in Week 7)", "data", Map.of());
+        // Week 41 B3:真正删元数据 + 物理表,不再只是"mark only"
+        boolean deleted = service.deleteMeta(name, user.tenantId());
+        return Map.of("code", 0, "message", deleted ? "deleted" : "idempotent (already deleted)",
+                "data", Map.of("name", name));
     }
 
     // ============================================================

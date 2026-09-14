@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -166,9 +167,10 @@ class CollectionControllerTest {
 
     @Test
     void delete_crossTenant_returns403() {
-        CollectionMetaEntity other = makeMeta("posts");
-        other.setTenantId("tenant_other"); // 不同租户
-        when(service.get("posts")).thenReturn(other);
+        // Week 41 B3:controller 直接调 service.deleteMeta,跨租户校验在 service 内
+        // 模拟 service.deleteMeta 抛 FORBIDDEN
+        when(service.deleteMeta(eq("posts"), eq(testUser.tenantId())))
+                .thenThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除该 collection"));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> controller.delete("posts", testUser));
@@ -178,10 +180,13 @@ class CollectionControllerTest {
     @Test
     void delete_sameTenant_succeeds() {
         when(service.get("posts")).thenReturn(makeMeta("posts"));
+        // Week 41 B3:deleteMeta 需要 mock 返回成功
+        when(service.deleteMeta(eq("posts"), eq(testUser.tenantId()))).thenReturn(true);
 
         Map<String, Object> resp = controller.delete("posts", testUser);
 
         assertEquals(0, resp.get("code"));
+        assertEquals("deleted", resp.get("message"));
     }
 
     // ============ Fields ============

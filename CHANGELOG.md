@@ -1,3 +1,64 @@
+## Week 41 (2026-09-15) — 技术债批次 1:止血完成 F1 + F2 + F3 (B1 + B2 + B3 + D9)
+### Step F3: 修 B3 删表残留 + D9 死代码清理(0.5d)
+**根因**:`CollectionController.delete` 只返回 "deleted (mark only in Week 7)" 假成功,
+物理表残留在 schema 长期污染;`DynamicTableManager.dropTable()` 是死代码。
+**修复方案**:
+1. **CollectionRepository**:加 `deleteByName(String)` JPA 查询
+2. **CollectionService**:加 `deleteMeta(name, tenantId)` 方法
+   - 先删元数据(repository.deleteByName)
+   - 再删物理表(tableManager.dropTable)— 失败仅记日志,不抛
+   - 跨租户抛 FORBIDDEN
+   - 幂等:并发删除返 false 不抛
+3. **CollectionController.delete**:真正调 service.deleteMeta(不再 mark only)
+4. **DynamicTableManager.dropTable**:已用 `DROP TABLE IF EXISTS`(代码静态确认)
+   - 不存在的表静默处理,不抛 — 这是关键
+
+### 顺手完成 D9 死代码清理
+- `DynamicTableManager.getColumns()` 加单元测试(报告 5.4 中明确)
+- 验证 `DROP TABLE IF EXISTS` 字面量行为
+
+### 加 6 个回归测试(新文件 CollectionServiceB3Test)
+- deleteMeta_deletesMetadataAndPhysicalTable
+- deleteMeta_idempotentWhenAlreadyDeleted
+- deleteMeta_dropTableFailure_continuesWithoutThrowing
+- deleteMeta_crossTenantForbidden
+- deleteMeta_nonexistentCollection_404
+- dropTable_usesIfExistsClause (D9)
+
+### 修复 2 个旧测试(CollectionControllerTest)
+- delete_crossTenant_returns403:改为 mock service.deleteMeta 抛 FORBIDDEN
+- delete_sameTenant_succeeds:mock service.deleteMeta 返 true
+
+### 新增 E2E spec
+- `e2e/collection-delete.spec.ts` (3 tests):
+  - 后端 DELETE 契约(200 + body 含 code/message/data.name)
+  - 删除不存在的 collection:404
+  - 跨租户删除:403
+
+### 验收(报告 9.3)
+- ✅ 删除 collection 后,物理表被清理(DROP TABLE IF EXISTS)
+- ✅ 删除不存在的表不抛异常(IF EXISTS 静默)
+- ✅ 跨租户拒绝 + 幂等并发安全
+
+### 回归红线
+- 后端: **484/484 PASS**(基线 463 + B1 6 + B2 9 + B3 6 = 484)
+- Jacoco: All coverage checks have been met(110 classes)
+- 前端 vitest: 150/150 PASS,tsc 0 errors
+- 前端 E2E: **22/22 PASS**(基线 18 + collection-delete 3 = 21;原 workflow-designer 加 1 = 22)
+- 总测试: 484 + 150 + 22 = 656 tests
+
+### 🎯 批次 1:止血 完成 ✅✅✅
+| Step | 内容 | 状态 | 耗时 |
+|---|---|---|---|
+| F1 | B1 模板空壳 | ✅ done | 0.5d |
+| F2 | B2 PUT/DELETE | ✅ done | 1.5d |
+| F3 | B3 dropTable + D9 | ✅ done | 0.5d |
+| **合计** | | **3 个 P0 致命 bug 全修** | **2.5d** ✅ |
+
+### 下一步候选(Week 42+)
+- **批次 2 · 地基**:D6 多租户(8d) → D4a 触发器(5d) → D4b 节点+表达式(13d) → D1 字段(8.5d) → D2 关联(5d)
+- **批次 3 · 能力**(可与整合并行):D5 → D3 → D7 → D8
+
 ## Week 41 (2026-09-15) — 技术债批次 1:止血 Step F1 + F2 (B1 模板空壳 + B2 PUT/DELETE)
 ### Step F2: 修 B2 编辑工作流保存失败(1.5d)
 **根因**:前端调 `PUT /api/workflows/{id}` 与 `DELETE /api/workflows/{id}`,

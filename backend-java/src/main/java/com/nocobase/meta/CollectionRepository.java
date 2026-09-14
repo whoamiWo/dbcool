@@ -13,4 +13,7 @@ public interface CollectionRepository extends JpaRepository<CollectionMetaEntity
     List<CollectionMetaEntity> findByTenantId(String tenantId);
 
     boolean existsByName(String name);
+
+    /** Week 41 B3:删除 collection 元数据(配合 CollectionService.deleteMeta 调用)。 */
+    long deleteByName(String name);
 }
