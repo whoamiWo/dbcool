@@ -125,6 +125,66 @@ public class AclEnforcer {
         return copy;
     }
 
+    /**
+     * Week 16 US-FIELD-WRITE: 返回不可写字段名集合。
+     *
+     * <p>语义与 {@link #filterReadableFields} 对偶:
+     * <ul>
+     *   <li>无 FIELD policy on this action → 返回 null(表示全部可写)</li>
+     *   <li>有 FIELD policy action=CREATE/UPDATE → cfg.hidden 是禁写字段</li>
+     * </ul>
+     *
+     * <p>CREATE 与 UPDATE 视为同一个禁写集合(Week 16 MVP 范围);
+     * 后续若需细分"只能创建不能修改"可加 action 维度过滤。
+     */
+    public Set<String> filterWritableFields(UUID userId, String tenantId, String collectionName) {
+        List<UUID> roleIds = loadRoleIdsIncludingInheritance(userId, tenantId);
+        List<AclPolicyEntity> policies = new ArrayList<>();
+        for (UUID rid : roleIds) {
+            policies.addAll(policyRepository.findByRoleIdAndTenantId(rid, tenantId));
+        }
+        Set<String> forbidden = new HashSet<>();
+        boolean hasFieldPolicy = false;
+        for (AclPolicyEntity p : policies) {
+            if (!collectionName.equals(p.getSubject())) continue;
+            if (p.getType() != AclPolicyEntity.Type.FIELD) continue;
+            // CREATE 与 UPDATE 都视为禁写
+            if (p.getAction() != AclPolicyEntity.Action.CREATE
+                    && p.getAction() != AclPolicyEntity.Action.UPDATE) continue;
+            hasFieldPolicy = true;
+            forbidden.addAll(parseHidden(p.getConfigJson()));
+        }
+        return hasFieldPolicy ? forbidden : null;
+    }
+
+    /**
+     * Week 16: 拒绝检查 — 若 data 中含任何禁写字段,抛 403。
+     *
+     * <p>语义:
+     * <ul>
+     *   <li>无 FIELD policy → 直接通过</li>
+     *   <li>data 为 null/空 → 通过(没东西要写)</li>
+     *   <li>data 任何 key 在禁写集合里 → 403 + 列出违规字段</li>
+     * </ul>
+     *
+     * <p>NULL 值视为显式赋值(意图清空字段),同样禁止。
+     */
+    public void assertCanWriteFields(UUID userId, String tenantId, String collectionName,
+                                     Map<String, Object> data) {
+        if (data == null || data.isEmpty()) return;
+        Set<String> forbidden = filterWritableFields(userId, tenantId, collectionName);
+        if (forbidden == null || forbidden.isEmpty()) return;
+        List<String> violations = new ArrayList<>();
+        for (String k : data.keySet()) {
+            if (forbidden.contains(k)) violations.add(k);
+        }
+        if (!violations.isEmpty()) {
+            throw new ResponseStatusException(FORBIDDEN,
+                    "ACL 拒绝: 字段不可写 collection=" + collectionName
+                            + " forbidden=" + violations);
+        }
+    }
+
     private List<UUID> loadRoleIds(UUID userId) {
         return userRoleRepository.findByIdUserId(userId)
                 .stream().map(ur -> ur.getId().getRoleId()).toList();
