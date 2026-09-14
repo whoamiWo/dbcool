@@ -4,6 +4,40 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 23 Sprint — UserController MockMvc + 红线(1 commit)
+
+### Added
+- **UserControllerTest** (`UserControllerTest.java`) — 2 tests,全 PASS
+  - `@WebMvcTest(UserController.class)` + `@AutoConfigureMockMvc(addFilters=false)` 跳过 Security
+  - `@MockBean SecurityConfig + JwtAuthFilter` 隔离依赖
+  - `me_withUser_returnsInfo`:SecurityContext 注入 Authentication → code 0
+  - `me_withoutAuth_returnsCode1001`:空 SecurityContext → code 1001
+
+### Changed
+- **抬 Jacoco 红线**:bundle 14%→21%
+- **新增 1 包规则**:api ≥95%(实际 100%)
+
+### Verified
+- `mvn clean verify` 183 tests 全 PASS + All coverage checks met
+- 覆盖率:api 0%→100%
+- 已覆盖包从 9 → 10(13 个生产包的 77%)
+
+### Trend(Week 18 → 23)
+| 周 | tests | 覆盖包数 | bundle 红线 |
+|----|------|---------|------------|
+| 18 | 70 | 1 | — |
+| 19 | 70 | 2 | 5% |
+| 20 | 112 | 4 | 8% |
+| 21 | 145 | 7 | 12% |
+| 22 | 181 | 9 | 14% |
+| 23 | 183 | 10 | 21% |
+
+### Key 经验
+- `@WebMvcTest` + `addFilters=false` + `@MockBean SecurityConfig` 是 controller 测试的有效模板
+- 后续 controllers(Auth/UserAdmin/RoleAcl 等)可复用,Week 24 批量补
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 22 Sprint — notification/form 测试 + 红线(1 commit)
 
 ### Added
