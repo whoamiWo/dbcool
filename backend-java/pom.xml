@@ -188,14 +188,14 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 33%(Week 26,3 个 controller 测试大提升) -->
+                                <!-- 全局:行覆盖 ≥ 48%(Week 27,AuthController/RoleAclController 大提升) -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.38</minimum>
+                                            <minimum>0.47</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -207,7 +207,7 @@
                                         <exclude>com.nocobase.*.config.*</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- auth 模块(已含 AclEnforcerTest + UserAdminControllerTest):行覆盖 ≥ 35%(Week 26 提升) -->
+                                <!-- auth 模块(已含 AclEnforcer/UserAdmin/Auth/RoleAcl controller 测试):行覆盖 ≥ 70%(Week 27 大提升) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -217,14 +217,12 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.35</minimum>
+                                            <minimum>0.70</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
-                                        <!-- Auth/Role controllers 暂未测,留余地;UserAdminController 已在 Week 26 测(98%) -->
+                                        <!-- UserAdminService 业务代码暂未测(Week 26 移除了 UserAdminController,Week 27 移除 AuthController/RoleAclController) -->
                                         <exclude>com.nocobase.auth.UserAdminService</exclude>
-                                        <exclude>com.nocobase.auth.RoleAclController</exclude>
-                                        <exclude>com.nocobase.auth.AuthController</exclude>
                                         <exclude>com.nocobase.auth.JwtAuthFilter</exclude>
                                     </excludes>
                                 </rule>
