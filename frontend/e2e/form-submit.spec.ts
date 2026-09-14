@@ -156,3 +156,47 @@ test.describe('表单提交流程 E2E', () => {
     expect(postedPayload.customer).toBe('张三');
   });
 });
+  test('datetime + attachment 字段:Week 41 D1 新类型渲染', async ({ page }) => {
+    // 覆盖新建 attachment 字段 + datetime 字段的渲染(Week 41 D1.1/D1.2)
+    const sampleFormD1 = {
+      id: 'f1',
+      collection_name: 'orders',
+      title: '订单表单',
+      description: '',
+      layout_json: '[{"field":"event_time"},{"field":"receipt"}]',
+      rules_json: '{}',
+      tenant_id: 't1',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+
+    const sampleFieldsD1 = [
+      { name: 'event_time', label: '事件时间', type: 'datetime', required: false },
+      { name: 'receipt', label: '回执', type: 'attachment', required: false },
+    ];
+
+    await page.route('**/api/forms/f1', async (route) => {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', data: sampleFormD1 }),
+      });
+    });
+    await page.route('**/api/collections/orders', async (route) => {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0, message: 'ok',
+          data: { name: 'orders', display_name: '订单', fields: sampleFieldsD1 },
+        }),
+      });
+    });
+
+    await page.goto('/forms/f1/fill');
+
+    // datetime-local input
+    await expect(page.locator('input[type="datetime-local"]')).toBeVisible({ timeout: 5000 });
+    // attachment placeholder input
+    await expect(page.getByPlaceholder(/storageKey/)).toBeVisible();
+    // disabled upload button(Week 42+ D1.4)
+    await expect(page.getByRole('button', { name: /上传/ })).toBeDisabled();
+  });
+

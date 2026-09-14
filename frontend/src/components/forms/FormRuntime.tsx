@@ -170,6 +170,45 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
             style={{ ...inputStyle, width: '100%' }}
           />
         );
+      case 'datetime':
+        // Week 41 D1.1: datetime 与 date 共用 TIMESTAMPTZ,前端按 datetime-local 渲染(精确到分钟)
+        return (
+          <input
+            type="datetime-local"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{ ...inputStyle, width: '100%' }}
+          />
+        );
+      case 'attachment':
+        // Week 41 D1.2: Week 42+ 接 MinIO 后会升级为完整上传 UI
+        // Week 41 暂为 placeholder 输入框,接收 storageKey 字符串
+        return (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              style={{ ...inputStyle, width: '100%' }}
+              placeholder="storageKey (Week 42+ 接入 MinIO)"
+            />
+            <button
+              type="button"
+              disabled
+              style={{
+                padding: '4px 8px',
+                background: '#e2e8f0',
+                color: '#64748b',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'not-allowed',
+                fontSize: 12,
+              }}
+              title="Week 42+ D1.4 MinIO 集成"
+            >
+              上传(Week 42+)
+            </button>
+          </div>
+        );
       case 'select':
         return (
           <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, width: '100%' }}>

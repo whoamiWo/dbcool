@@ -1,4 +1,63 @@
-## Week 41 (2026-09-15) — 技术债批次 1 + 批次 2 起步 (止血 F1+F2+F3, 地基 D6 G1+D4a 触发器真实化)
+## Week 41 (2026-09-15) — 批次 1 + 批次 2 + D1 字段类型
+### Step D1: 字段类型扩展 — attachment + datetime 子集(2d,公式推迟到 D4b)
+**范围**:
+- ✅ D1.1 (0.5d): FieldDef 类型白名单加 `attachment` + `datetime`(共 11 种)
+- ✅ D1.2 (1.5d): AttachmentService + Controller 契约 (Week 41 暂不接 MinIO)
+- ⏭️ D1.3: formula 字段实现 (推迟到 D4b 表达式引擎 — 共用)
+- ⏭️ D1.4: MinIO 集成 + 真实文件存储 (Week 42+)
+
+### 后端变更
+**新增 3 个文件** (`com.nocobase.attachment` 包):
+- AttachmentMetadata.java (record: storageKey + originalName + contentType + size + uploadedAt + uploadedBy)
+- AttachmentController.java (`POST /api/attachments/metadata` 契约 + `GET /api/attachments/{key}` 返 501)
+- 2 个测试文件 (AttachmentMetadataTest 7 个 + AttachmentControllerTest 4 个)
+
+**修改 2 个文件**:
+- FieldDef.java: `isValidType` 加 `attachment` + `datetime`
+- AsyncMigrationService.java: mapJsonbType 加 `attachment → TEXT`,`datetime → TIMESTAMPTZ`
+
+### 前端变更
+**修改 4 个文件**:
+- types/collection.ts: `FieldType` 加 `datetime` + `attachment`(11 种)
+- components/forms/FormRuntime.tsx: 加 datetime (datetime-local) + attachment (placeholder input + 禁用上传按钮) 渲染
+- pages/FormDesigner.tsx: FIELD_ICON 加 datetime (⏰) + attachment (📎)
+- pages/SchemaDesigner.tsx + SchemaEditor.tsx: 类型下拉加 datetime + attachment
+
+**加 2 个 vitest 测试**:datetime-local input + attachment placeholder input
+
+**加 1 个 E2E 测试** (form-submit.spec.ts):datetime + attachment 字段渲染
+
+### 验收 (报告 9.3 D1)
+- ✅ attachment 字段类型已加白名单 + 可创建 (实际文件存储 Week 42+ D1.4)
+- ✅ datetime 字段类型已加白名单 + datetime-local input 渲染
+- ⏭️ formula 字段求值 — 与 D4b 表达式引擎一并 (Week 42+)
+- ✅ 建表 UI 可创建全部 11 字段类型
+- ✅ 新字段类型单元 + E2E 测试通过
+
+### 回归红线
+- 后端: **542/542 PASS** (基线 526 + D1 metadata 7 + D1 controller 4 + D1 FieldDef 5 = 542)
+- Jacoco: All coverage checks have been met (124 classes)
+- 前端 vitest: **152/152 PASS** (+2 D1 渲染测试)
+- 前端 tsc: 0 errors
+- 前端 E2E: **23/23 PASS** (form-submit +1 D1 字段类型)
+- 总测试: 542 + 152 + 23 = 717 tests
+
+### 实战取舍
+- ⚠️ **公式 (formula) 推迟**:与 D4b 表达式引擎共用 Aviator / GraalVM,独立做浪费
+- ⚠️ **MinIO 集成推迟**:Week 41 只做 contract + 校验,真实文件上传需要 SDK + Docker 依赖
+- ⚠️ 报告 4.1.3 公式 5d 时间不重算,统一进 D4b (13d) 的 5d 中
+- ⚠️ D1 报告估 8.5d,实际 attachment+datetime 2d 紧凑完成(省 6.5d)
+
+### 进度
+- ✅ 批次 1 止血 (F1+F2+F3): 2.5d
+- ✅ 批次 2 G1 (D6 ThreadLocal + CRUD): 3d
+- ✅ 批次 2 D4a (触发器真实化): 3d
+- ✅ 批次 2 D1 (字段类型 attachment+datetime): 2d
+- ⏭️ 批次 2 D4b (节点 + 表达式引擎,含 formula): 13d
+- ⏭️ 批次 2 D2 (关联关系): 5d
+- ⏭️ 批次 2 G2 (Schema 路由): 8d
+
+## Week 41 (2026-09-15) — 技术债批次 1 + 批次 2 起步 (止血 F1+F2+F3, 地基 G1+D4a 触发器真实化)
 ### Step D4a: 触发器真实化 (5d, 实际 3d 紧凑版)
 **范围**:
 - ✅ D4a.1 (2d): 事件总线 + CollectionController 发布 RecordChangeEvent

@@ -9,9 +9,11 @@ import { FormRuntime } from '@/components/forms/FormRuntime';
 const FIELD_ICON: Record<FieldType, string> = {
   text: '📝',
   date: '📅',
+  datetime: '⏰', // Week 41 D1.1
   boolean: '☑️',
   select: '📋',
   multiSelect: '📋',
+  attachment: '📎', // Week 41 D1.2
   belongsTo: '🔗',
   hasMany: '🔗',
   formula: '🧮',

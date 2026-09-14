@@ -301,3 +301,20 @@ describe('FormRuntime — 提交流程', () => {
     });
   });
 });
+  describe('Week 41 D1.1 + D1.2 字段类型', () => {
+    it('datetime 字段渲染 datetime-local input', () => {
+      wrap({ fields: [{ name: 'event_time', label: '时间', type: 'datetime', required: false }] });
+      const input = document.querySelector('input[type="datetime-local"]');
+      expect(input).not.toBeNull();
+    });
+
+    it('attachment 字段渲染 storageKey input + 禁用上传按钮', () => {
+      wrap({ fields: [{ name: 'receipt', label: '回执', type: 'attachment', required: false }] });
+      const input = screen.getByPlaceholderText(/storageKey/);
+      expect(input).not.toBeNull();
+      const uploadBtn = screen.getByRole('button', { name: /上传/ });
+      expect(uploadBtn).toBeDisabled();
+      expect(uploadBtn.getAttribute('title')).toContain('D1.4');
+    });
+  });
+

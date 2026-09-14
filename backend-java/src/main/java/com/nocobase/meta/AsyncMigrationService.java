@@ -108,7 +108,9 @@ public class AsyncMigrationService {
             case "text", "select", "multiSelect" -> "TEXT";
             case "number" -> "NUMERIC";
             case "boolean" -> "BOOLEAN";
-            case "date" -> "TIMESTAMPTZ";
+            case "date", "datetime" -> "TIMESTAMPTZ";
+            // Week 41 D1.2: attachment 存文件 key (TEXT,Week 42+ 接 MinIO)
+            case "attachment" -> "TEXT";
             case "belongsTo", "hasMany" -> "UUID";
             case "formula" -> "TEXT";
             default -> throw new IllegalArgumentException("不支持的字段类型: " + type);

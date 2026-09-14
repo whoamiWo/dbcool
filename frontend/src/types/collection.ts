@@ -5,8 +5,10 @@ export type FieldType =
   | 'number'
   | 'boolean'
   | 'date'
+  | 'datetime' // Week 41 D1.1: 区别于 date,精确到分钟(后端共用 TIMESTAMPTZ)
   | 'select'
   | 'multiSelect'
+  | 'attachment' // Week 41 D1.2: 文件,Week 42+ 接 MinIO
   | 'belongsTo'
   | 'hasMany'
   | 'formula';

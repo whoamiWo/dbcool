@@ -244,6 +244,13 @@ export function SchemaEditorPage() {
                     <option value="number">number</option>
                     <option value="boolean">boolean</option>
                     <option value="date">date</option>
+                    <option value="datetime">datetime (Week 41 D1.1)</option>
+                    <option value="select">select</option>
+                    <option value="multiSelect">multiSelect</option>
+                    <option value="attachment">attachment (Week 41 D1.2)</option>
+                    <option value="belongsTo">belongsTo</option>
+                    <option value="hasMany">hasMany</option>
+                    <option value="formula">formula</option>
                   </select>
                 </td>
                 <td style={{ padding: 8 }}>

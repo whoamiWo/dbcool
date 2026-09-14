@@ -4,7 +4,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 
-const FIELD_TYPES: FieldType[] = ['text', 'number', 'boolean', 'date', 'select', 'multiSelect'];
+const FIELD_TYPES: FieldType[] = [
+  'text', 'number', 'boolean', 'date', 'datetime',
+  'select', 'multiSelect', 'attachment',
+  'belongsTo', 'hasMany', 'formula'
+];
 
 export function SchemaDesignerPage() {
   const navigate = useNavigate();
