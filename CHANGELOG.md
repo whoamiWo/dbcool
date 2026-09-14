@@ -4,6 +4,75 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 14.5 P3 Sprint 收尾(7 commits)
+
+### Added
+- **审计日志 (US-AUDIT) — P3-1** (`0b6b7a5`)
+  - `audit_log` 表 + JPA entity + service + controller
+  - 写入点:登录、record CRUD、role/ACL/policy 变更
+  - `GET /api/audit/logs?limit=N&actor=&action=&from=&to=` 支持过滤
+  - 前端 `/admin/audit` 列表页 + 详情对话框
+
+- **Swagger/OpenAPI 文档 — P3-2** (`105bfcd`)
+  - springdoc-openapi 2.6.0 集成
+  - 所有 controller 加 `@Operation` / `@Tag` / `@SecurityRequirement`
+  - `GET /v3/api-docs` + Swagger UI `/swagger-ui.html`
+  - OpenAPI paths: 25 → 48
+
+- **ROW-level ACL — P3-3** (`1007bf7`)
+  - `acl_row_policy` 表 + `RowAclService` 表达式求值
+  - 支持 ops:`eq/neq/in/is_null/not_null/contains`
+  - 占位符:`$currentUser` / `$currentRoles`
+  - OR 语义:任一 policy 命中 = 允许
+  - `GET /api/admin/row-acl` CRUD + `/by-collection/{name}`
+  - **write 评估补完** (`cfe89e8`):`evaluateUpdate` / `evaluateDelete` + 单条 record 端点 (GET/PUT/DELETE `/api/collections/{name}/records/{id}`)
+
+- **多渠道通知 — P3-4** (`3db2c5d`)
+  - NotificationChannel 抽象 + Email/Webhook/InApp 实现
+  - 失败 fallback (try/catch + 重试占位)
+  - 用户 channel 偏好设置
+
+- **角色继承 US-308 — P3-3.5** (`bf232c4`)
+  - `roles.parent_role_id` + CTE ancestor 链
+  - Cycle 检测(创建时拒绝)
+  - ACL 评估时聚合所有祖先角色的 policy
+  - **清理**: `125ccc0` 删除 RoleRepository.java.extra 残留
+
+- **工作流模板市场 US-410 — P3-3.6** (`a603780`)
+  - 3 个内置模板:Leave Approval / Expense Approval / Customer Followup
+  - `POST /api/workflow-templates/{id}/install` 一键部署
+  - 前端 `/admin/workflow-templates` 列表 + 一键安装按钮
+
+- **ER 图可视化 — P3-5** (`1f7a2b4`)
+  - `GET /api/admin/er-diagram` 返回 nodes + edges + stats
+  - 前端 `/admin/er`:自绘 SVG force-directed 布局,无外部依赖
+  - 颜色:🟢系统表 / 🔵业务表 / 🟠ER demo
+  - 6 个 demo collection:`er_dept` / `er_employee` / `er_project` / `er_member` / `er_order` / `er_order_item`
+  - 7 条 belongsTo 关系
+
+### Verified (Week 14.5 P3 全量 E2E)
+- **ROW ACL CRUD 矩阵**(manager 角色,`created_by == $currentUser`):
+
+  | 操作 | alice 的 A | bob 的 B |
+  |------|----------|---------|
+  | GET 单条 | 404 ✅ (隐藏存在性) | 200 ✅ |
+  | UPDATE   | 403 ✅               | 200 ✅ |
+  | DELETE   | 403 ✅               | 200 ✅ |
+
+- 角色继承:carol(employee) → 继承 manager 角色的 customer READ ACL
+- OpenAPI paths:25 → **51**(本周 +26 个 endpoint)
+- 审计日志写入 + 过滤验证(7 种 action 类型)
+- 模板市场:3 模板一键 install,工作流实例立即可用
+- ER 图:35 → 37 节点 / 0 → 7 关系,SVG 拖拽交互顺畅
+- build 绿色:73 个 Java 源文件,`BUILD SUCCESS 3.6s`
+
+### Known (Week 14.5 残留)
+- 通知 channel 重试未实现(占位 + try/catch)
+- 模板市场不支持卸载(只 install)
+- ER 图节点超 50 时布局可能拥挤(目前 37 个)
+
+---
+
 ## [Unreleased] - 2026-09-11 Epic 4 收尾 + P1 三件套
 
 ### Added
