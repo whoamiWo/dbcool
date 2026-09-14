@@ -1,3 +1,43 @@
+## [Unreleased] - 2026-09-14 Week 33 Sprint — Jacoco 红线饱和上限(最终态)(1 commit)
+
+### Changed
+- **抬 Jacoco 红线到饱和上限**(Week 33,无新增测试):
+  - **BUNDLE** 80% → **82%**
+  - **auth** 85% → **90%**
+  - **workflow** 90% → **95%**
+  - **audit** 95% → **97%**
+  - **view** 95% → **97%**
+  - **notification** 85% → **90%**
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **440 tests PASS**(无新增)
+- **10 条包级红线全生效**:
+  - 9 个包在 80-100% 区间(7 个 ≥ 90%)
+  - 大多数红线富余 +1-5%,处于"勉强通过"区间,形成强质量门禁
+
+### 终态总结
+- **测试规模**:440 tests,从 Week 25 起步 0 tests,**8 周累计 +440**
+- **覆盖率**:bundle 33% → 83%(**+50%**)
+- **0 未测大件**:所有 controller + 关键 service 全部已测
+- **5 个 0% 小类**:`JwtAuthFilter` (中间件)/ `AsyncConfig` (空 @Bean)/ `OpenApiConfig`/`SecurityConfig`(配置类)/ `AsyncMigrationService`(Week 25 决定跳过)
+
+### Coverage Trend (Final)
+
+| Week | tests | bundle | auth | meta | workflow | notification | config | audit | view | notes |
+|------|-------|--------|------|------|----------|--------------|--------|-------|------|-------|
+| 33 | 440 | 83% | 92% | 58% | 96% | 94% | 28% | 99% | 98% | 红线饱和上限,无新增 |
+| 32 | 440 | 83% | 92% | 58% | 96% | 94% | 28% | 99% | 98% | UserAdminService + matchCondition + 4 红线 |
+| 31 | 405 | 81% | 81% | 58% | 93% | 94% | 28% | 99% | 98% | AuditService+ViewService+JwtService+MessageController + 4 红线 |
+| 30 | 390 | 80% | 81% | 58% | 92% | 94% | 28% | 83% | 94% | 3 dispatcher + GlobalEx + RefreshToken + 红线 BUNDLE 0.70/notification 0.85 |
+| 29 | 351 | 75% | 79% | 58% | 92% | 56% | 21% | 83% | 94% | WorkflowController + TemplateService + workflow 红线 0.80 |
+| 28 | 322 | 65% | 79% | 58% | 51% | 56% | 21% | 83% | 94% | CollectionController + WorkflowEngine + 红线三连跳 |
+| 27 | 276 | 47% | 79% | 20% | 22% | 56% | 21% | 83% | 94% | AuthController + RoleAclController + 红线大跃升 |
+| 26 | 247 | 38% | 35% | 20% | 22% | 56% | 21% | 83% | 94% | UserAdminController + FormController + RowAclController |
+| 25 | — | 33% | 35% | 20% | 22% | — | — | — | — | (基线) |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 32 Sprint — 终极收尾:UserAdminService + WorkflowEngine matchCondition + 4 红线抬升(1 commit)
 
 ### Added
