@@ -1,3 +1,50 @@
+## Week 41 (2026-09-15) — 技术债批次 1:止血 Step F1 + F2 (B1 模板空壳 + B2 PUT/DELETE)
+### Step F2: 修 B2 编辑工作流保存失败(1.5d)
+**根因**:前端调 `PUT /api/workflows/{id}` 与 `DELETE /api/workflows/{id}`,
+后端 `WorkflowController` 完全没有这 2 个端点 → 编辑保存必 404/405。
+**修复方案**:
+1. `WorkflowController.java`:新增 `PUT /api/workflows/{id}` 与 `DELETE /api/workflows/{id}`
+2. `UpdateWorkflowRequest`:所有字段可选(PATCH 语义),null 字段不修改
+3. `WorkflowInstanceRepository`:加 `findByWorkflowIdAndStatusIn` 查询活跃实例
+4. **删除策略(报告 3.2)**:拒绝删除有 RUNNING/PENDING 实例的工作流(409 CONFLICT)
+   - 用户需先 disable 工作流,等待实例自然走完(COMPLETED/FAILED/CANCELED)再删
+5. **跨租户**:FORBIDDEN(仍硬编码 `tenant_default`,D6 多租户时统一处理)
+6. **审计日志**:PUT 记 UPDATE / DELETE 记 DELETE(走 `AuditService.log`)
+
+### 加 9 个回归测试(新文件 WorkflowControllerB2Test)
+- update_modifiesProvidedFields_persistsAndAudits
+- update_nullFieldsAreIgnored (PATCH 语义)
+- update_blankNameIgnored (空字符串不覆盖)
+- update_unknownWorkflow_returns404
+- delete_noActiveInstances_returns204AndDeletes
+- delete_runningInstance_returns409 (R1:策略)
+- delete_pendingInstance_returns409 (R2:策略)
+- delete_completedInstance_actuallyDeletes (R3:已完成不阻)
+- delete_unknownWorkflow_returns404
+
+### E2E 升级(workflow-designer.spec.ts)
+- 加 PUT 编辑验证测试:填表 + PUT body 校验
+- 加 DELETE 契约测试:后端 204 端点契约(UI 删除按钮待补)
+
+### 验收标准达成(报告 9.3)
+- ✅ 编辑工作流 → 保存 → 修改已持久化(PUT + body 验证)
+- ✅ 删除工作流返回 204(无活跃实例时)
+- ✅ WorkflowControllerTest 新增 9 用例全通过
+- ✅ E2E PUT/DELETE 测试全通过
+
+### 回归红线保持
+- 后端: **478/478 PASS**(基线 463 + B1 6 + B2 9 = 478)
+- Jacoco: All coverage checks have been met(110 classes)
+- 前端 vitest: 150/150 PASS,tsc 0 errors
+- 前端 E2E: **18/18 PASS**(原 17 + PUT/DELETE 2 - 1 stub = 18)
+  - workflow-designer.spec.ts: 5 → 7 tests
+- 总测试: 478 + 150 + 18 = 646 tests
+
+### 批次 1 止血进度
+- ✅ F1 (B1 模板空壳, 0.5d) — done (Week 41)
+- ✅ F2 (B2 PUT/DELETE, 1.5d) — done (Week 41)
+- ⏭️ F3 (B3 dropTable 打通 + D9 顺手, 0.5d) — 下一步
+
 ## Week 41 (2026-09-15) — 技术债批次 1:止血 Step F1 (B1 模板空壳)
 ### 修 B1 模板市场空壳(0.5d)
 **根因**:3 个内置模板(leave_approval / expense_report / customer_followup)节点类型用

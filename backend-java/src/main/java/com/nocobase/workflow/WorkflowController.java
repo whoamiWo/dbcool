@@ -15,9 +15,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -107,6 +109,68 @@ public class WorkflowController {
         WorkflowEntity saved = workflowRepository.save(w);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("code", 0, "message", "success", "data", toDto(saved)));
+    }
+
+    /**
+     * 更新工作流(Week 41 B2 修复 — 前端编辑保存此前必失败).
+     *
+     * <p>允许修改:name / title / description / collectionName / enabled / trigger / nodes / edges.
+     * 不可修改:id / tenantId / createdAt / createdBy(由 createdBy 决定归属).
+     */
+    @PutMapping("/{id}")
+    public Map<String, Object> update(
+            @PathVariable UUID id,
+            @RequestBody @Valid UpdateWorkflowRequest req,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        WorkflowEntity w = mustGet(id);
+        // 租户校验:跨租户不可改(Week 41 仍硬编码 tenant_default,与 D6 多租户债务一致)
+        if (!"tenant_default".equals(w.getTenantId()) || !"tenant_default".equals(user.tenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "跨租户不可修改");
+        }
+        if (req.name() != null && !req.name().isBlank()) w.setName(req.name());
+        if (req.title() != null) w.setTitle(req.title());
+        if (req.description() != null) w.setDescription(req.description());
+        if (req.collectionName() != null && !req.collectionName().isBlank()) w.setCollectionName(req.collectionName());
+        if (req.trigger() != null) w.setTriggerJson(req.trigger());
+        if (req.nodes() != null) w.setNodesJson(req.nodes());
+        if (req.edges() != null) w.setEdgesJson(req.edges());
+        if (req.enabled() != null) w.setEnabled(req.enabled());
+        WorkflowEntity saved = workflowRepository.save(w);
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "UPDATE", "workflow", w.getId().toString(),
+                Map.of("name", saved.getName()));
+        return Map.of("code", 0, "message", "success", "data", toDto(saved));
+    }
+
+    /**
+     * 删除工作流(Week 41 B2 修复).
+     *
+     * <p>删除策略(报告 3.2):拒绝删除有活跃实例(RUNNING / PENDING)的工作流。
+     * 用户需先 disable 工作流,等待所有实例自然走完(COMPLETED / FAILED / CANCELED)后再删。
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> delete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        WorkflowEntity w = mustGet(id);
+        if (!"tenant_default".equals(w.getTenantId()) || !"tenant_default".equals(user.tenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "跨租户不可删除");
+        }
+        // 检查活跃实例
+        List<WorkflowInstanceEntity> active = instanceRepository.findByWorkflowIdAndStatusIn(
+                id, List.of(WorkflowInstanceEntity.Status.RUNNING, WorkflowInstanceEntity.Status.PENDING));
+        if (!active.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "工作流有 " + active.size() + " 个运行中实例,请先禁用并等待完成后再删");
+        }
+        // 记录审计后再删
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "DELETE", "workflow", id.toString(),
+                Map.of("name", w.getName()));
+        workflowRepository.delete(w);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @PostMapping("/{id}/trigger")
@@ -396,6 +460,21 @@ public class WorkflowController {
             String title,
             String description,
             @NotBlank String collectionName,
+            String trigger,
+            String nodes,
+            String edges,
+            Boolean enabled
+    ) {}
+
+    /**
+     * Week 41 B2:所有字段可选(PATCH 语义),null 表示不修改。
+     * 强制约束:name / collectionName 非空且非 blank 时才覆盖。
+     */
+    public record UpdateWorkflowRequest(
+            String name,
+            String title,
+            String description,
+            String collectionName,
             String trigger,
             String nodes,
             String edges,

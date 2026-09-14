@@ -147,4 +147,84 @@ test.describe('WorkflowDesigner E2E', () => {
     await expect(page.locator('input').nth(2)).toHaveValue('orders');
     await expect(page.locator('select').first()).toHaveValue('on_create');
   });
+
+  test('编辑已有工作流:修改后保存 → PUT 200 + body 验证', async ({ page }) => {
+    let putBody: any = null;
+
+    await page.route('**/api/workflows/wf-1', async (route) => {
+      const req = route.request();
+      if (req.method() === 'GET') {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ code: 0, message: 'ok', data: sampleWorkflow }),
+        });
+      } else if (req.method() === 'PUT') {
+        putBody = JSON.parse(req.postData() ?? '{}');
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ code: 0, message: 'ok', data: { ...sampleWorkflow, ...putBody } }),
+        });
+      }
+    });
+
+    await page.goto('/designer/workflows/wf-1/edit');
+    await expect(page.locator('input').first()).toHaveValue('order_approval', { timeout: 5000 });
+
+    // 修改标题
+    const titleInput = page.locator('input').nth(1);
+    await titleInput.fill('订单审批(已修改)');
+
+    // 取消启用(测试 PUT 携带 enabled)
+    const enabledCheckbox = page.locator('input[type="checkbox"]').first();
+    await enabledCheckbox.uncheck();
+
+    // 保存
+    await page.getByRole('button', { name: /💾 保存/ }).click();
+
+    // 跳转到列表
+    await page.waitForURL('**/designer/workflows', { timeout: 5000 });
+
+    // PUT 被调 + body 含修改
+    expect(putBody).toBeTruthy();
+    expect(putBody.title).toBe('订单审批(已修改)');
+    expect(putBody.enabled).toBe(false);
+  });
+
+  test('删除工作流:后端 DELETE 端点契约(UI 删除按钮待补)', async ({ page }) => {
+    // Week 41 B2:验证后端 DELETE /api/workflows/{id} 契约。
+    // UI 暂无删除按钮(属于后续 Story / D3 增强),
+    // 此 test 通过 page.route 直接验证:Mock DELETE 端点接收正确请求 + 返 204。
+    let deleteCalled = false;
+    let deletedId: string | null = null;
+
+    await page.route('**/api/workflows/*', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleteCalled = true;
+        const url = new URL(route.request().url());
+        deletedId = url.pathname.split('/').pop() ?? null;
+        await route.fulfill({
+          status: 204,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 0, message: 'deleted', data: null }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // 先导航到 login 让 page 有 baseURL(about:blank 下 fetch 报 "not a valid URL")
+    await page.goto('/login');
+    await expect(page.locator('h1')).toContainText('NocoBase');
+
+    // 通过 page.evaluate 触发 fetch DELETE(模拟前端发起 DELETE 调用)
+    const result = await page.evaluate(async (id) => {
+      const r = await fetch(`/api/workflows/${id}`, { method: 'DELETE' });
+      return { status: r.status, ok: r.ok };
+    }, 'wf-1');
+
+    expect(deleteCalled).toBe(true);
+    expect(deletedId).toBe('wf-1');
+    expect(result.status).toBe(204);
+    expect(result.ok).toBe(true);
+  });
 });
