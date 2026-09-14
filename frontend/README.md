@@ -72,3 +72,22 @@ src/
 - `/api/ai/*` → `http://localhost:8000`(Python)
 
 生产环境由 `nginx.conf` 处理反向代理。
+
+## 🧪 测试覆盖(Week 36)
+
+| 文件 | tests | 目标 |
+|---|---|---|
+| `pages/Login.test.tsx` | 7 | 渲染 / 校验 / 成功 / 失败 / 网络错误 / 记住用户名 / 预填 |
+| `pages/Profile.test.tsx` | 5 | 渲染 / 加载 / 显示字段 / 改密码成功 / 失败 |
+| `pages/Home.test.tsx` | 5 | 未登录游客 / 已登录欢迎 / fallback username / loading |
+| `components/AppLayout.test.tsx` | 4 | 导航 / 退出 / active link / 未登录 |
+| `stores/auth.test.ts` | 5 | 初始 / setAuth / clear / 多次调用覆盖 / localStorage |
+| **总计** | **26 tests** | |
+
+跑测试:`pnpm test:run`
+
+vitest 配置(`vite.config.ts`):
+- `environment: 'jsdom'`(React DOM 测试环境)
+- `globals: true`(describe/it/expect 不需 import)
+- `setupFiles: ['./src/test-setup.ts'`(引入 `@testing-library/jest-dom` matchers)
+- `include: ['src/**/*.{test,spec}.{ts,tsx}']`(只跑 src/)

@@ -1,3 +1,49 @@
+## [Unreleased] - 2026-09-14 Week 36 Sprint — 路线 X:前端测试补齐 1 → 26 tests(1 commit)
+
+### Added
+- **`frontend/src/pages/Login.test.tsx`**(7 tests,全 PASS)— 之前 1 个测试 1 失败,现扩展到 7 个
+  - 渲染 / 校验 / 登录成功 / 后端错误 / 网络错误 / 记住用户名 / 从 localStorage 预填
+- **`frontend/src/pages/Profile.test.tsx`**(5 tests,全 PASS)
+  - 渲染 / 加载中 / 显示字段 / 改密码成功(清空输入) / 改密码失败
+- **`frontend/src/pages/Home.test.tsx`**(5 tests,全 PASS)
+  - 游客显示 / display_name 优先 / fallback username / loading / mock 数据加载
+- **`frontend/src/components/AppLayout.test.tsx`**(4 tests,全 PASS)
+  - 导航链接 / 退出登录调用 clear() / active link 高亮 / 未登录
+- **`frontend/src/stores/auth.test.ts`**(5 tests,全 PASS)
+  - 初始状态 / setAuth / 多次调用覆盖 / clear / localStorage 持久化
+- **`WEEK_36_HANDOFF.md`** — Week 36 交接
+
+### Changed
+- **`frontend/vite.config.ts`** — vitest `include`/`exclude` 配置,只跑 `src/**`,避免被 `.vscode-server` 干扰
+- **`frontend/README.md`** — 新增 "🧪 测试覆盖(Week 36)" 段(5 个测试文件清单 + vitest 配置说明)
+
+### Verified
+- **后端** `mvn verify` ✅ BUILD SUCCESS — 463 tests PASS
+- **前端** `vitest --run` ✅ 26/26 PASS — 5 文件 / 26 tests / 583ms
+- **CI 已配置**:`.github/workflows/ci.yml` 自动跑前端 `pnpm test:run`
+
+### Key technical findings
+- **`vitest` 默认扫所有 `.test.ts`**:可能跑 `.vscode-server` 等无关测试;用 `include: ['src/**/*.{test,spec}.{ts,tsx}']` 限定
+- **`<label>` 没 `htmlFor` 时 `getByLabelText` 失败**:用 `getByPlaceholderText` 或 `document.querySelector('input[type="password"]')` 替代
+- **`Profile.tsx queryFn` 解包 `res.data`**:mock 应返 `{ data: {...} }`,不是直接的 MeData
+- **AppLayout 渲染 `username(roles)` 拼接**:单纯 `getByText('alice')` 失败,需 `getByText(/alice\(/)`
+- **同名元素冲突**:用 `getByRole('heading', { name: '修改密码' })` 区分 h3 vs button
+- **没装 `@testing-library/user-event`**(npm 失败):用 `fireEvent.change(input, { target: { value } })` 替代
+
+### Coverage Trend
+
+| Week | 后端 | 前端 | 总 |
+|------|---|---|---|
+| 35 | 463 | 1 | 464 |
+| **36** | **463** | **26** | **489** ⭐ |
+
+### 项目飞跃回顾
+- Week 25(基线)→ Week 36:**0 → 489 tests**(11 周)
+- 后端:440 单测 + 15 安全 + 8 E2E = 463
+- 前端:0 → 26(Week 36 一次性补齐)
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 35 Sprint — 路线 B 收官:CI + README + 测试架构文档(测试基础设施收官)(1 commit)
 
 ### Added
