@@ -4,6 +4,38 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 20 Sprint — 抬红线 + GitHub Actions CI(2 commits)
+
+### Added
+- **RowAclServiceTest** (`RowAclServiceTest.java`) — 18 tests,全 PASS
+  - evaluate 入口(Read/Update/Delete 含 fallback 到 read)
+  - filterReadable(无 policy / 按 policy 过滤)
+  - 7 个 op(eq/neq/in/is_null/not_null/contains/unknown)
+  - appliesTo(user/role principal) + resolveValue 占位符
+  - exception path(非法 JSON log warn 后 fail-safe 拒绝)
+- **CollectionServiceMatchFilterTest** (`CollectionServiceMatchFilterTest.java`) — 24 tests,全 PASS
+  - 镜像前端 FilterRule op
+  - toDouble helper(null/number/string/garbage)
+- **GitHub Actions CI** (`.github/workflows/backend-ci.yml`)
+  - push / PR 触发,mvn verify 跑 Tests + JaCoCo 红线
+  - Maven cache + 30 天 artifact 保留
+  - 当前单测用 Mockito 不需 DB;集成测试引入后加 services
+
+### Changed
+- **抬 Jacoco 红线**:bundle 5%→8% / auth 20%→25% / meta 5%→10% / 新增 acl ≥45%
+- **CollectionService.matchFilter / toDouble** 改 package-private(Week 19 教训:反射不被 JaCoCo 计入)
+- **README.md** 加 CI badge + coverage gate badge
+
+### Verified
+- `mvn clean verify` 112 tests 全 PASS + All coverage checks met
+- 覆盖率:acl 0% → 48% / meta 8% → 10%(Week 19 → 20)
+
+### Known
+- GitHub SSH 仍不可达,workflow 本地写,push 后才生效
+- Badge 数字写死(待 Codecov/Sonar 接入后变动态)
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 19 Sprint — JaCoCo 覆盖率 + CI 红线(1 commit)
 
 ### Added
