@@ -48,7 +48,7 @@ describe('MyTasksPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // 重置 auth store
-    useAuthStore.setState({ user: { id: 'u1', username: 'me' } as any, token: 'tk' });
+    useAuthStore.setState({ user: { id: 'u1', username: 'me' } as any, accessToken: 'tk' });
   });
 
   it('加载中:显示"加载中..."', async () => {

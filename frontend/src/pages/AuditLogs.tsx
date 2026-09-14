@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import apiClient from '@/api/client';
 
 interface AuditEntry {
@@ -60,12 +59,13 @@ export function AuditLogsPage() {
       const params: Record<string, any> = { limit };
       if (actionFilter) params.action = actionFilter;
       if (resourceFilter) params.resource = resourceFilter;
-      const r = await apiClient.get('/audit/logs', { params });
-      // axios 响应拦截器已解包(r.data 是后端业务 data),后端 {code, message, data}
-      // 所以 r.code / r.data.logs,不是 r.data.code / r.data.data
-      if ((r as any).code === 0) {
-        setLogs((r as any).data.logs);
-        setTotal((r as any).data.total);
+      const r = await apiClient.get<{ code: number; message: string; data: { logs: any[]; total: number } }>('/audit/logs', { params });
+      // apiClient.get<T> 返回 Promise<T>(拦截器已解包)
+      // 后端返回 { code, message, data: { logs, total } }
+      // 解包后 r 就是这个结构
+      if (r.code === 0) {
+        setLogs(r.data.logs);
+        setTotal(r.data.total);
       }
     } catch (e) {
       console.error(e);

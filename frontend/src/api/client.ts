@@ -48,8 +48,12 @@ axiosInstance.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('nocobase_access_token');
-      window.location.href = '/login';
+      // 已在登录页时不要强制 reload(让 Login page 自己处理错误消息)
+      const isLoginPage = window.location.pathname.startsWith('/login');
+      if (!isLoginPage) {
+        localStorage.removeItem('nocobase_access_token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   },

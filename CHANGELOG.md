@@ -1,3 +1,50 @@
+## Week 40 (2026-09-14) — E3:修 TS 错误 + E1:WorkflowDesigner E2E + 4 个新发现的源码 bug
+### 修 49 个 TS 错误(tsc 0 errors)
+- FormRuntime.test.tsx: 补 `required` + FormFull 完整字段(8 处)
+- FilterBar.test.tsx: 删 SortRule + 补 required(3 处)
+- AuditLogs.tsx: 删 Link import
+- Home.tsx: axios envelope 解包(r.data.data → r.data)
+- ErDiagram.tsx: 删 useMemo + 加 x/y 字段到 ErPayload.nodes
+- ViewsList.test.tsx: 删重复 MemoryRouter import
+- FormsList.test.tsx / Home.test.tsx / CollectionsList.test.tsx: 删未用 waitFor
+- stores/auth.test.ts: 删未用 vi
+- MyTasks.test.tsx: token → accessToken(对齐 store)
+- FormRuntime.test.tsx / FormRuntime.tsx: 类型补全
+### 新增第 4 个 E2E spec
+- `e2e/workflow-designer.spec.ts` (5 tests,Week 40 Step E1):
+  - WorkflowsList 显示 + 空状态
+  - WorkflowDesigner 元数据表单 + 节点面板 + 保存按钮
+  - 填元数据 + 保存 → POST body 验证 + 跳列表
+  - 编辑已有工作流:useEffect 填充 input
+### 新发现并修复 4 个源码 bug(Step E1 真跑 E2E 时暴露)
+**这些 bug Step C 时没暴露(因为当时 container 没 chromium,只跑了 --list)**
+1. **axios 拦截器没解 envelope**: `response.data` return 整个 body
+   后端返回 `{code, message, data: [...]}` 但前端直接当数组用 → `.map is not a function`
+   **修**:5 个 list 页(UsersList / CollectionsList / FormsList / ViewsList / WorkflowsList)
+   + 2 个详情页(WorkflowDesigner / FormRuntime)在 queryFn 里显式 `(r as any).data ?? r ?? []`
+2. **FormRuntime page 没解析 layout_json/rules_json**:直接传给 FormRuntime 组件
+   组件用 `form.layout`(对象),但后端给 `form.layout_json`(字符串) → "e.layout is undefined"
+   **修**:FormRuntime.tsx 加 JSON.parse + formForComponent 中间变量
+3. **axios 401 拦截器强制 reload /login**:即使已经在 login 页也 reload
+   → Login page 提交失败时 setError 消息没显示就被 reload 清掉
+   **修**:client.ts 加 `if (!isLoginPage)` 判断,401 在 login 页透传给 catch
+4. **vitest E2E mock glob 不匹配详情/PATCH 路径**:`**/api/admin/users*` 不 match `**/api/admin/users/u1`
+   **修**:拆成两个 route (list + detail),用 regex `\/api\/admin\/users\/?$`
+### vitest 401 测试更新
+- `src/api/client.test.ts`:拆为两个 case(非 login / login 路径),覆盖新行为
+### 总数
+- 后端: **463/463 PASS**
+- 前端 vitest: **150/150 PASS**(+1 new test,15 → 16 用例) / 覆盖率 98.55%
+- 前端 tsc: **0 errors**(从 49 个)
+- 前端 E2E: **34 tests / 4 files**(chromium 17 + firefox 17,**真跑过**)
+- 总测试: **647 tests**(463 + 150 + 34)
+### Week 40 验证方式升级
+Step E1 在容器装 chromium 验证:**34/34 E2E 真跑过**(Step C 时未真跑,只 --list)
+### 覆盖率保持 + Step E3 升级
+- Week 39: 149/149 → **Week 40: 150/150**
+- 前端覆盖率 98.55%(保持)
+- 新发现 4 个真实源码 bug 修复(axios envelope / layout_json / 401 reload / mock glob)
+
 ## Week 39 Step D (2026-09-14) — 修 3 个源码 bug + 第 3 个 E2E spec
 ### 修源码 bug
 1. **`FormRuntime.tsx:97-105`**: handleSubmit 加 catch — onSubmit reject 静默处理

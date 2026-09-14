@@ -9,10 +9,15 @@ export function ViewsListPage() {
   const { collection } = useParams<{ collection?: string }>();
   const { data, isLoading } = useQuery({
     queryKey: ['views', collection ?? 'all'],
-    queryFn: () =>
-      apiClient.get<ViewMeta[]>(
+    queryFn: async () => {
+      // 后端 envelope: {code, message, data: ViewMeta[]}
+      const r = await apiClient.get<{ code: number; data: ViewMeta[] }>(
         collection ? `/views?collection=${collection}` : '/views'
-      ),
+      );
+      // 兼容 vitest mock 直接返数组 + 后端 envelope: r 是数组 OR {code, data: [...]} 
+      if (Array.isArray(r)) return r;  // vitest 模式
+      return r.data ?? [];  // 真后端 envelope
+    },
   });
 
   if (isLoading) return <p>加载中…</p>;

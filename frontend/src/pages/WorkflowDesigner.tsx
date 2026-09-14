@@ -115,7 +115,14 @@ export function WorkflowDesignerPage() {
 
   const { data: existing } = useQuery({
     queryKey: ['workflow', id],
-    queryFn: () => apiClient.get<WorkflowMeta>(`/workflows/${id}`),
+    queryFn: async () => {
+      // 后端 envelope: {code, message, data: WorkflowMeta}
+      // 兼容 vitest mock 直接返 WorkflowMeta 数组 vs 真后端 envelope
+      const r = await apiClient.get<WorkflowMeta | { code: number; data: WorkflowMeta }>(`/workflows/${id}`);
+      if (Array.isArray(r)) return null; // 数组 → 不可能(详情接口不返数组)
+      if ('name' in r) return r as WorkflowMeta; // vitest 模式
+      return (r as { code: number; data: WorkflowMeta }).data;
+    },
     enabled: isEdit,
   });
 

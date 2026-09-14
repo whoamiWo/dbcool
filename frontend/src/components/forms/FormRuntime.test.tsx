@@ -14,16 +14,18 @@ import type { FormFull, FieldDef } from '@/types/form';
 
 const baseForm: FormFull = {
   id: 'f1', title: '订单表单', description: '请填写订单信息',
-  layout: [],
-  rules: {},
+  collection_name: 'orders', tenant_id: 't1',
+  layout_json: '[]', rules_json: '{}',
+  created_at: '2026-01-01T00:00:00Z', updated_at: null,
+  layout: [], rules: {},
 };
 
-const textField: FieldDef = { name: 'name', label: '姓名', type: 'text' };
-const numberField: FieldDef = { name: 'age', label: '年龄', type: 'number' };
-const selectField: FieldDef = { name: 'category', label: '类别', type: 'select', options: { vip: 'VIP', normal: '普通' } };
-const multiSelectField: FieldDef = { name: 'tags', label: '标签', type: 'multiSelect', options: { a: 'A', b: 'B', c: 'C' } };
-const boolField: FieldDef = { name: 'agreed', label: '同意', type: 'boolean' };
-const dateField: FieldDef = { name: 'birthday', label: '生日', type: 'date' };
+const textField: FieldDef = { name: 'name', label: '姓名', type: 'text', required: false };
+const numberField: FieldDef = { name: 'age', label: '年龄', type: 'number', required: false };
+const selectField: FieldDef = { name: 'category', label: '类别', type: 'select', required: false, options: { vip: 'VIP', normal: '普通' } };
+const multiSelectField: FieldDef = { name: 'tags', label: '标签', type: 'multiSelect', required: false, options: { a: 'A', b: 'B', c: 'C' } };
+const boolField: FieldDef = { name: 'agreed', label: '同意', type: 'boolean', required: false };
+const dateField: FieldDef = { name: 'birthday', label: '生日', type: 'date', required: false };
 
 const wrap = (props: Partial<React.ComponentProps<typeof FormRuntime>> = {}) => {
   const onSubmit = props.onSubmit ?? vi.fn();
@@ -51,7 +53,7 @@ describe('FormRuntime — 渲染', () => {
   });
 
   it('不显示描述时无 <p>', () => {
-    wrap({ form: { id: 'f1', title: '无描述表单', description: '', layout: [], rules: {} } });
+    wrap({ form: { id: 'f1', title: '无描述表单', description: '', collection_name: 'c1', tenant_id: 't1', layout_json: '[]', rules_json: '{}', created_at: '2026-01-01T00:00:00Z', updated_at: null, layout: [], rules: {} } });
     expect(screen.queryByText('请填写订单信息')).not.toBeInTheDocument();
   });
 
@@ -102,7 +104,7 @@ describe('FormRuntime — 字段类型', () => {
   });
 
   it('未知类型:显示"暂不支持"placeholder', () => {
-    wrap({ fields: [{ name: 'weird', label: '奇怪', type: 'weird' as any }] });
+    wrap({ fields: [{ name: 'weird', label: '奇怪', type: 'weird' as any, required: false }] });
     expect(screen.getByPlaceholderText(/暂不支持类型 weird/)).toBeInTheDocument();
   });
 });
@@ -204,7 +206,7 @@ describe('FormRuntime — visibility', () => {
 
   it('eq 规则:触发值等于目标值才显示', () => {
     wrap({
-      fields: [{ name: 'reason', label: '原因', type: 'text' }],
+      fields: [{ name: 'reason', label: '原因', type: 'text', required: false }],
       form: {
         ...baseForm,
         rules: { visibility: { reason: { when: 'category', op: 'eq', value: 'vip' } } },

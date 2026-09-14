@@ -15,7 +15,13 @@ interface WorkflowMeta {
 export function WorkflowsListPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['workflows', 'all'],
-    queryFn: () => apiClient.get<WorkflowMeta[]>('/workflows'),
+    queryFn: async () => {
+      // 后端 envelope: {code, message, data: WorkflowMeta[]}
+      const r = await apiClient.get<{ code: number; data: WorkflowMeta[] }>('/workflows');
+      // 兼容 vitest mock 直接返数组 + 后端 envelope: r 是数组 OR {code, data: [...]} 
+      if (Array.isArray(r)) return r;  // vitest 模式
+      return r.data ?? [];  // 真后端 envelope
+    },
   });
   if (isLoading) return <p>加载中…</p>;;
   const workflows = data ?? [];

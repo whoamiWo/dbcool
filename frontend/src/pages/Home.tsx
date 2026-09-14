@@ -139,9 +139,11 @@ function AuditWidget() {
   const { data, isLoading } = useQuery({
     queryKey: ['audit-recent'],
     queryFn: async () => {
-      const r = await apiClient.get<{ code: number; data: { logs: AuditPreview[]; total: number } }>(
+      // apiClient.get<T> 返回 Promise<T>(拦截器已解包)
+      // 后端返回 { code, message, data: { logs, total } }
+      // 拦截器解包后 r 直接是 { logs, total }
+      return apiClient.get<{ logs: AuditPreview[]; total: number }>(
         '/audit/logs?limit=8');
-      return r.data.data;
     },
     refetchInterval: 30000,  // 30s 自动刷新
   });
@@ -154,7 +156,7 @@ function AuditWidget() {
       </div>
       {isLoading && <Empty text="加载中…" />}
       {!isLoading && logs.length === 0 && <Empty text="暂无审计记录" />}
-      {logs.map((l) => {
+      {logs.map((l: AuditPreview) => {
         const color = l.action.startsWith('CREATE') || l.action === 'APPROVE' ? '#10b981'
           : l.action.startsWith('DELETE') || l.action === 'REJECT' ? '#ef4444'
           : l.action === 'TRIGGER' ? '#8b5cf6'

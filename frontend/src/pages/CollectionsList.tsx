@@ -6,8 +6,13 @@ import type { CollectionMeta } from '@/types/collection';
 export function CollectionsListPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['collections'],
-    queryFn: () =>
-      apiClient.get<CollectionMeta[]>('/collections'),
+    queryFn: async () => {
+      // 后端 envelope: {code, message, data: CollectionMeta[]}
+      const r = await apiClient.get<{ code: number; data: CollectionMeta[] }>('/collections');
+      // 兼容 vitest mock 直接返数组 + 后端 envelope: r 是数组 OR {code, data: [...]} 
+      if (Array.isArray(r)) return r;  // vitest 模式
+      return r.data ?? [];  // 真后端 envelope
+    },
   });
 
   if (isLoading) return <p>加载中…</p>;

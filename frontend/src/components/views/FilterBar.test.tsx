@@ -18,12 +18,12 @@ import {
   filtersToQuery,
 } from './FilterBar';
 import type { FieldDef } from '@/types/collection';
-import type { FilterRule, SortRule } from '@/types/view';
+import type { FilterRule } from '@/types/view';
 
 const fields: FieldDef[] = [
-  { name: 'name', label: '姓名', type: 'text' },
-  { name: 'age', label: '年龄', type: 'number' },
-  { name: 'email', label: '邮箱', type: 'text' },
+  { name: 'name', label: '姓名', type: 'text', required: false },
+  { name: 'age', label: '年龄', type: 'number', required: false },
+  { name: 'email', label: '邮箱', type: 'text', required: false },
 ];
 
 const wrap = (

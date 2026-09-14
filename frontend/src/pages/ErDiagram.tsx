@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import apiClient from '@/api/client';
 
 /**
@@ -34,6 +34,8 @@ interface ErPayload {
     title: string;
     field_count: number;
     fields_preview: string[];
+    x: number;
+    y: number;
   }>;
   edges: ErEdge[];
   stats: { collections: number; relationships: number };

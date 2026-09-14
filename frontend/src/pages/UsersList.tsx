@@ -17,7 +17,13 @@ export function UsersListPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'users'],
-    queryFn: () => apiClient.get<UserMeta[]>('/admin/users'),
+    queryFn: async () => {
+      // 后端 envelope: {code, message, data: UserMeta[]}
+      const r = await apiClient.get<{ code: number; data: UserMeta[] }>('/admin/users');
+      // 兼容 vitest mock 直接返数组 + 后端 envelope: r 是数组 OR {code, data: [...]} 
+      if (Array.isArray(r)) return r;  // vitest 模式
+      return r.data ?? [];  // 真后端 envelope
+    },
   });
 
   const createMutation = useMutation({

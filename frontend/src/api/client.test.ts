@@ -90,12 +90,31 @@ describe('apiClient — 拦截器', () => {
       expect(mocks.getResponseSuccess()!(r)).toEqual({ id: 'u1', name: 'alice' });
     });
 
-    it('401 错误:清 token + 重定向 /login', async () => {
+    it('401 错误(非 login 页):清 token + 重定向 /login', async () => {
       localStorage.setItem('nocobase_access_token', 'old-token');
+      // 模拟非 login 页(window.location.pathname = '/admin/users')
+      Object.defineProperty(window, 'location', {
+        value: { pathname: '/admin/users', href: '' },
+        writable: true,
+      });
       const err = { response: { status: 401 } };
       await expect(mocks.getResponseError()!(err)).rejects.toBe(err);
       expect(localStorage.getItem('nocobase_access_token')).toBeNull();
       expect(window.location.href).toBe('/login');
+    });
+
+    it('401 错误(已在 login 页):不清 token + 不重定向', async () => {
+      localStorage.setItem('nocobase_access_token', 'keep-me');
+      // 模拟在 login 页
+      Object.defineProperty(window, 'location', {
+        value: { pathname: '/login', href: '' },
+        writable: true,
+      });
+      const err = { response: { status: 401 } };
+      await expect(mocks.getResponseError()!(err)).rejects.toBe(err);
+      // 已在 login 页,不清 token(让 Login page 自己处理),不重定向
+      expect(localStorage.getItem('nocobase_access_token')).toBe('keep-me');
+      expect(window.location.href).toBe('');
     });
 
     it('非 401 错误(500):透传 + 保留 token', async () => {

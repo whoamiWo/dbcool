@@ -1,8 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
-import type { CollectionMeta } from '@/types/collection';
-import type { FormFull } from '@/types/form';
 import { FormRuntime as FormRuntimeComponent } from '@/components/forms/FormRuntime';
 
 /**
@@ -15,16 +13,24 @@ export function FormRuntimePage() {
 
   const { data: formData, isLoading } = useQuery({
     queryKey: ['form', formId],
-    queryFn: () => apiClient.get<FormFull>(`/forms/${formId}`),
+    queryFn: async () => {
+      // 后端 envelope: {code, message, data: FormFull}
+      const r = await apiClient.get(`/forms/${formId}`);
+      // 兼容 vitest mock 直接返 FormFull + 真后端 envelope
+      return (r as any)?.data ?? r ?? null;
+    },
     enabled: !!formId,
   });
 
   const { data: collectionData } = useQuery({
     queryKey: ['collection', formData?.collection_name],
-    queryFn: () =>
-      apiClient.get<CollectionMeta>(
+    queryFn: async () => {
+      // 后端 envelope: {code, message, data: CollectionMeta}
+      const r = await apiClient.get(
         `/collections/${formData?.collection_name}`
-      ),
+      );
+      return (r as any)?.data ?? r ?? null;
+    },
     enabled: !!formData?.collection_name,
   });
 
@@ -32,10 +38,13 @@ export function FormRuntimePage() {
     mutationFn: async (payload: Record<string, unknown>) => {
       const collectionName = formData?.collection_name;
       if (!collectionName) throw new Error('collection 不存在');
-      return apiClient.post<{ id: string }>(
+      // 后端 envelope: {code, message, data: { id: string }}
+      const r = await apiClient.post<{ code: number; data: { id: string } }>(
         `/collections/${collectionName}/records`,
         payload
       );
+      // 返回 { id } 让 onSuccess 用
+      return Array.isArray(r) ? r : (r.data);
     },
     onSuccess: () => {
       alert('提交成功!');
@@ -50,6 +59,17 @@ export function FormRuntimePage() {
   if (isLoading) return <p>加载中…</p>;
   if (!formData) return <p>表单不存在</p>;
   if (!collectionData) return <p>关联的 Collection 不存在</p>;
+
+  // 解析 layout_json / rules_json 给 FormRuntime 组件用
+  let parsedLayout: { field: string; span?: number }[] = [];
+  let parsedRules: { validation?: Record<string, unknown[]>; visibility?: Record<string, unknown> } = {};
+  try { parsedLayout = JSON.parse(formData.layout_json ?? '[]'); } catch (e) { console.error('layout_json parse failed', e); }
+  try { parsedRules = JSON.parse(formData.rules_json ?? '{}'); } catch (e) { console.error('rules_json parse failed', e); }
+  const formForComponent = {
+    ...formData,
+    layout: parsedLayout,
+    rules: parsedRules,
+  };
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -68,7 +88,7 @@ export function FormRuntimePage() {
         }}
       >
         <FormRuntimeComponent
-          form={formData}
+          form={formForComponent}
           fields={collectionData.fields ?? []}
           onSubmit={(data) => { submitMutation.mutate(data); }}
           submitLabel={submitMutation.isPending ? '提交中…' : '提交'}

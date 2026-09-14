@@ -12,7 +12,7 @@ test.describe('UsersList CRUD E2E', () => {
     await mockMe(page);
   });
 
-  test('空列表:显示"暂无用户"', async ({ page }) => {
+  test('空列表:渲染空表格 + 用户管理(0)', async ({ page }) => {
     await page.route('**/api/admin/users*', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
@@ -25,7 +25,9 @@ test.describe('UsersList CRUD E2E', () => {
     });
 
     await page.goto('/admin/users');
-    await expect(page.getByText(/暂无用户|无数据|0 个/)).toBeVisible({ timeout: 5000 });
+    // UsersList 没有专门的空态,空 table + 用户管理(0) 表示无数据
+    await expect(page.getByRole('heading', { name: /用户管理\(0\)/ })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /\+ 新建用户/ })).toBeVisible();
   });
 
   test('列表:渲染已有用户 + 显示启停状态', async ({ page }) => {
@@ -41,8 +43,9 @@ test.describe('UsersList CRUD E2E', () => {
     });
 
     await page.goto('/admin/users');
-    await expect(page.getByText('alice')).toBeVisible();
-    await expect(page.getByText('bob')).toBeVisible();
+    // 用 exact + cell role 避免 'alice' / 'Alice' 冲突
+    await expect(page.getByRole('cell', { name: 'alice', exact: true })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'bob', exact: true })).toBeVisible();
   });
 
   test('新建用户:POST 后列表增加', async ({ page }) => {
@@ -88,18 +91,24 @@ test.describe('UsersList CRUD E2E', () => {
 
   test('启停用户:PATCH 调用 + UI 更新', async ({ page }) => {
     let patchCalled = false;
-    await page.route('**/api/admin/users*', async (route) => {
-      const req = route.request();
-      if (req.method() === 'GET') {
-        await route.fulfill({
-          status: 200, contentType: 'application/json',
-          body: JSON.stringify({ code: 0, message: 'ok', data: sampleUsers }),
-        });
-      } else if (req.method() === 'PATCH') {
+    // 拦截 PATCH /admin/users/<id>(具体路径,避免 glob 不匹配)
+    await page.route('**/api/admin/users/*', async (route) => {
+      if (route.request().method() === 'PATCH') {
         patchCalled = true;
         await route.fulfill({
           status: 200, contentType: 'application/json',
           body: JSON.stringify({ code: 0, message: 'ok', data: { ...sampleUsers[0], enabled: false } }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+    // 拦截 GET /admin/users(无 /id 后缀)
+    await page.route(/\/api\/admin\/users\/?$/, async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ code: 0, message: 'ok', data: sampleUsers }),
         });
       } else {
         await route.continue();
