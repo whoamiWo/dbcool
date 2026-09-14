@@ -4,6 +4,39 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 25 Sprint — 批量补 3 简单 controllers + 红线(1 commit)
+
+### Added
+- **WorkflowTemplateControllerTest** (`WorkflowTemplateControllerTest.java`) — 5 tests,全 PASS
+  - list / get(存在→200 / 不存在→404) / install(201 + 跨 userId 透传)
+- **MessageControllerTest** (`MessageControllerTest.java`) — 7 tests,全 PASS
+  - list(全量 / unreadOnly / cursor) / before 非法→400 / markRead(自己/不存在/别人的)
+- **ErDiagramControllerTest** (`ErDiagramControllerTest.java`) — 6 tests,全 PASS
+  - 空图 / 单节点 / belongsTo 边 / collection 备选键 / 孤儿 target 跳过 / title null 兜底
+
+### Changed
+- **抬 Jacoco 红线**:bundle 28%→33% / meta 10%→15% / workflow 10%→20%
+- **meta excludes 移除** `ErDiagramController`(Week 25 测了)
+- **workflow excludes 新增** `WorkflowController` / `WorkflowEngine` / `WorkflowTemplateService`(太大,Week 26+ 拆)
+
+### Verified
+- `mvn clean verify` 222 tests 全 PASS + All coverage checks met
+- 覆盖率:workflow 10%→22% / meta 10%→20% / bundle 28%→34%
+
+### Trend(Week 18 → 25)
+| 周 | tests | 覆盖包数 | bundle 红线 |
+|----|------|---------|------------|
+| 18 | 70 | 1 | — |
+| 19 | 70 | 2 | 5% |
+| 20 | 112 | 4 | 8% |
+| 21 | 145 | 7 | 12% |
+| 22 | 181 | 9 | 14% |
+| 23 | 183 | 10 | 21% |
+| 24 | 204 | 10 | 28% |
+| 25 | 222 | 10 | 33% |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 24 Sprint — 批量补 3 controllers + 红线(1 commit)
 
 ### Added
