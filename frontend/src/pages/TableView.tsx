@@ -37,11 +37,14 @@ export function TableViewPage() {
 
   if (!viewData) return <p>加载中…</p>;
   const view = viewData;
-  const config = (view.config ?? {}) as { columns?: Array<{ field: string; label?: string }>; pageSize?: number };
+  const config = (view.config ?? {}) as { columns?: Array<{ field: string; label?: string; width?: number; visible?: boolean }>; pageSize?: number };
   const fields = collectionData?.fields ?? [];
   const records = recordsData ?? [];
   const fieldMap = new Map(fields.map((f) => [f.name, f]));
-  const columns = config.columns ?? fields.map((f) => ({ field: f.name, label: f.label ?? f.name }));
+  // 过滤掉 visible=false 的列(Week 15 US-206)
+  type Col = { field: string; label?: string; width?: number; visible?: boolean };
+  const allColumns: Col[] = config.columns ?? fields.map((f) => ({ field: f.name, label: f.label ?? f.name, width: 160, visible: true }));
+  const columns = allColumns.filter((c) => c.visible !== false);
 
   const filtered = applyFilters(records, filters);
 
@@ -141,11 +144,16 @@ export function TableViewPage() {
             overflowX: 'auto',
           }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+            <colgroup>
+              {columns.map((c) => (
+                <col key={c.field} style={{ width: c.width ?? 160 }} />
+              ))}
+            </colgroup>
             <thead>
               <tr style={{ background: '#f1f5f9' }}>
                 {columns.map((c) => (
-                  <th key={c.field} style={{ padding: 8, textAlign: 'left' }}>
+                  <th key={c.field} style={{ padding: 8, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {c.label ?? c.field}
                   </th>
                 ))}
@@ -165,7 +173,7 @@ export function TableViewPage() {
                       const f = fieldMap.get(c.field);
                       const val = r[c.field];
                       return (
-                        <td key={c.field} style={{ padding: 8 }}>
+                        <td key={c.field} style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {renderCell(val, f)}
                         </td>
                       );
