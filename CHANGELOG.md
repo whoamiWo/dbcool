@@ -4,6 +4,51 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 15 Sprint — 视图+工作流 P1 收尾(3 commits)
+
+### Added
+- **US-206 ViewDesigner 列设置** (`54e81fd`)
+  - 表格视图:每列可见 checkbox + 列宽 number + ↑↓ 排序
+  - Detail 视图:字段勾选 + 排序,写入 `config.fields`
+  - 保存到 `config.columns = [{field, label, width, visible}]`
+  - TableView 用 `tableLayout=fixed + colgroup` 按列宽渲染,过滤 `visible=false`
+
+- **US-406 WorkflowDesigner 测试运行** (`9615592`)
+  - 侧栏蓝色按钮 ▶ 测试运行(模拟数据)
+  - JSON 输入 triggerData → 调 `POST /workflows/{id}/trigger`
+  - 新建未保存工作流先自动保存,确保触发最新版本
+  - 成功后显示 instance id + 跳转实例详情链接
+
+- **US-407 WorkflowInstances 详情增强** (`9615592`)
+  - 审批任务从 div → 表格,新增"耗时"列(`humanDuration` 算 `finished_at - created_at`)
+  - triggerData 从 inline code → `details + pre` 可折叠 JSON 美化
+  - Task 类型补 `finished_at?` / `comment?` / `assignee?`
+
+- **US-501 Login UX** (`8799616`)
+  - localStorage `nocobase:login:lastUsername` 记住用户名(checkbox 控制)
+  - 错误提示加左侧 border + ❌ 图标 + ✕ 关闭按钮
+  - 成功提示"登录成功,正在跳转…"
+  - 忘记密码占位链接(US-501 后续)
+
+- **US-502 Profile 信息卡** (`8799616`)
+  - 后端: `GET /api/auth/me` 返回 `{id, username, tenant_id, roles[], created_at}`
+  - 注入 `UserRoleRepository` + `RoleRepository`,使用 `findByIdUserId` + `getId().getRoleId`
+  - 前端信息卡:用户名 + ID + 租户 + 角色徽章 + 注册时间
+
+### Verified
+- alice/admin 登录 + /me E2E 通过(alice=[user],admin=[admin, employee])
+- 前端 `pnpm tsc` 我修改的文件 0 错误
+- 后端 `mvn compile` 0 错误
+- OpenAPI paths: 51 → **52**(`/auth/me`)
+
+### Known(Week 16+ 候选)
+- US-501 后续: 密码找回流程(需 email/SMS 通道)
+- US-202/203 服务端 filter/sort
+- 字段级 + ROW write 联动(salary 测试)
+- 审计日志过滤查询 E2E
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 14.5 P3 Sprint 收尾(7 commits)
 
 ### Added
