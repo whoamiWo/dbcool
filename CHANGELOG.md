@@ -1,3 +1,58 @@
+## [Unreleased] - 2026-09-14 Week 35 Sprint — 路线 B 收官:CI + README + 测试架构文档(测试基础设施收官)(1 commit)
+
+### Added
+- **`backend-java/src/test/resources/application-test.properties`**(新建,30 行)
+  - E2E 专用 profile:H2 `MODE=PostgreSQL` + JPA `create-drop` + Flyway disabled
+  - 完整 JWT / CORS / logging 配置
+- **`ARCHITECTURE_TESTING.md`**(新建,326 行)
+  - 测试金字塔图(单元 440 / 安全 15 / E2E 8)
+  - 3 类测试模板:Controller(`@WebMvcTest + @MockBean(SecurityConfig)`)/ Service(`new Service(deps)`)/ 复杂组件(反射替换 final)
+  - E2E 模式 + 关键踩坑(JDK 401 重试 / H2 PG-specific 不兼容)
+  - 安全审计 9 类攻击向量清单
+  - Jacoco 红线规范 + 抬升工作流
+  - CI 集成 + 失败调试流程
+  - 未来方向:E2E 扩展 / 性能测试 / 分支覆盖率
+- **`WEEK_35_HANDOFF.md`** — Week 35 交接
+
+### Changed
+- **`README.md`**(268 行,完全重写)
+  - 反映 Week 35 状态(463 tests / 83% bundle / 10 Jacoco 红线)
+  - 后端模块结构表(12 包 × 端点数 × 覆盖率)
+  - 测试金字塔(单元 440 + 安全 15 + E2E 8)
+  - Jacoco 红线全表 + 修改会被 CI 拦截说明
+  - 修复 Coverage badge: `9%` → `83%`
+- **`backend-java/README.md`**(140 行,完全重写)
+  - 当前状态 + 本地启动 + 测试命令 + 模块结构
+  - Jacoco 红线 + E2E 配置 + 环境变量
+- **`ARCHITECTURE.md`**(末尾加链接到 `ARCHITECTURE_TESTING.md`)
+- **`.github/workflows/backend-ci.yml`(更新)**
+  - `mvn test` → `mvn verify`(跑 Jacoco coverage gate)
+  - 添加 **Coverage Summary** 步骤,自动生成到 GitHub Actions summary
+  - 注释更新:说明不需要外部服务(单元 mock + E2E H2)
+- **`Makefile`**:`test-java` 改用 `mvn verify`
+- **`CollectionLifecycleE2ETest` + `E2ESetupSmokeTest`**:用 `@ActiveProfiles("test")` 替代散落的 `@TestPropertySource`,集中配置
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **463 tests PASS**(无新增)
+- **10 条 Jacoco 红线全过**
+
+### 项目飞跃回顾
+- Week 25(基线)→ Week 35(饱和):**0 → 463 tests / 33% → 83% bundle**
+- Week 34(方向变更)→ Week 35(基础设施):E2E 跑通 → CI + 文档化
+
+### Coverage Trend
+
+| Week | tests | bundle | 事件 |
+|------|-------|--------|------|
+| 35 | 463 | 83% | CI + README + ARCHITECTURE_TESTING(本会话) |
+| 34 | 463 | 83% | E2E + 安全审计(方向变更) |
+| 33 | 440 | 83% | Jacoco 红线抬到饱和上限 |
+| 32 | 440 | 83% | UserAdminService + WorkflowEngine matchCondition |
+| 31 | 405 | 81% | AuditService+ViewService+JwtService+MessageController |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 34 Sprint — 安全审计 + E2E 集成测试(方向变更)(1 commit)
 
 ### Added

@@ -164,6 +164,7 @@ services:
 ## 九、关联文档
 
 - `ARCHITECTURE_DIAGRAM.md` — 详细时序图
+- `ARCHITECTURE_TESTING.md` — 测试架构(Week 35,463 tests / 83% bundle / 10 Jacoco 红线)
 - `ADR/` — 每个决策的详细理由
 - `contracts/` — 跨栈契约
 - `RISKS.md` — 架构层风险

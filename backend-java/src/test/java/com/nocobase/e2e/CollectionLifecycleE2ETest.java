@@ -45,18 +45,7 @@ import com.nocobase.auth.UserRepository;
  * </ul>
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@TestPropertySource(properties = {
-    "spring.datasource.url=jdbc:h2:mem:e2e;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
-    "spring.datasource.driver-class-name=org.h2.Driver",
-    "spring.datasource.username=sa",
-    "spring.datasource.password=",
-    "spring.jpa.hibernate.ddl-auto=create-drop",
-    "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-    "spring.jpa.properties.hibernate.dialect.storage_engine=org.hibernate.dialect.H2Dialect",
-    "spring.flyway.enabled=false",
-    "spring.data.redis.host=localhost",
-    "spring.data.redis.port=6379"
-})
+@org.springframework.test.context.ActiveProfiles("test")
 class CollectionLifecycleE2ETest {
 
     @LocalServerPort int port;

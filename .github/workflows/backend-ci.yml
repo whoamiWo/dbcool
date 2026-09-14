@@ -20,12 +20,12 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build & Test (mvn verify + JaCoCo)
+    name: Build & Test (mvn verify + JaCoCo coverage gates)
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    # 当前所有测试都是 Mockito 单测,不需要 DB/Redis
-    # 集成测试(Testcontainers)引入后再加 services 块
+    # 单元测试 mock-based + E2E H2 in-memory,不需要外部服务
+    # Flyway 在 test profile 中被禁用(Week 35),JPA 用 entity 自动建表
 
     steps:
       - name: Checkout
@@ -55,3 +55,15 @@ jobs:
         run: |
           echo "::error::mvn verify failed (likely coverage gate or test failure). See logs above."
           exit 1
+
+      - name: Summarize coverage
+        if: success()
+        working-directory: backend-java
+        run: |
+          echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # 抓 BUNDLE 覆盖率
+          COV=$(grep -oE 'ctr2">[0-9]+%' target/site/jacoco/index.html | head -1 | grep -oE '[0-9]+')
+          TESTS=$(mvn test 2>&1 | grep -oE 'Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+' | head -1)
+          echo "- **Bundle coverage**: ${COV}%" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests**: ${TESTS}" >> $GITHUB_STEP_SUMMARY

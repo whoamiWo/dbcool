@@ -68,8 +68,8 @@ test: ## 三栈全部测试
 	cd frontend && pnpm test --run
 	@echo "✅ 全部测试完成"
 
-test-java: ## 仅 Java
-	cd backend-java && mvn test
+test-java: ## 仅 Java(单元 + E2E + Jacoco coverage gate)
+	cd backend-java && mvn verify
 
 test-python: ## 仅 Python
 	cd backend-python && uv run pytest
