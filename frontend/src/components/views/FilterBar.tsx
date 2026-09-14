@@ -201,3 +201,36 @@ export function applySort<T extends Record<string, unknown>>(
   });
   return sorted;
 }
+
+/**
+ * Week 17 US-202/203: 把 SortRule[] 转成后端 query string。
+ * 例: `[{field:'name',direction:'asc'},{field:'salary',direction:'desc'}]
+ *   → "name,-salary"`
+ */
+export function sortToQuery(sort?: SortRule[]): string {
+  if (!sort || sort.length === 0) return '';
+  return sort
+    .filter((r) => r.field && r.direction)
+    .map((r) => (r.direction === 'desc' ? `-${r.field}` : r.field))
+    .join(',');
+}
+
+/**
+ * Week 17: 把 FilterRule[] 转成后端 query string。
+ * 例: `[{field:'name',op:'contains',value:'A'},{field:'salary',op:'gt',value:1000}]
+ *   → "name:contains:A,salary:gt:1000"`
+ *
+ * <p>value 安全:仅在 op 缺省空且 value 为 null 时输出 "field:op"(适合 empty/notEmpty)。
+ */
+export function filtersToQuery(filters?: FilterRule[]): string {
+  if (!filters || filters.length === 0) return '';
+  return filters
+    .filter((f) => f.field && f.op)
+    .map((f) => {
+      if (f.value === undefined || f.value === null || f.value === '') {
+        return `${f.field}:${f.op}`;
+      }
+      return `${f.field}:${f.op}:${f.value}`;
+    })
+    .join(',');
+}

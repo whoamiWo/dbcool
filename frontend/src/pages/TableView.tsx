@@ -5,7 +5,7 @@ import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import type { CollectionMeta } from '@/types/collection';
 import type { ViewFull, SortRule, FilterRule } from '@/types/view';
-import { applyFilters, applySort, FilterBar } from '@/components/views/FilterBar';
+import { filtersToQuery, sortToQuery, FilterBar } from '@/components/views/FilterBar';
 
 interface RecordRow { id: string; [k: string]: unknown; }
 
@@ -30,8 +30,16 @@ export function TableViewPage() {
 
   const queryClient = useQueryClient();
   const { data: recordsData, isLoading } = useQuery({
-    queryKey: ['records', collectionName],
-    queryFn: () => apiClient.get<RecordRow[]>(`/collections/${collectionName}/records?limit=500`),
+    queryKey: ['records', collectionName, filters, sort],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      params.set('limit', '500');
+      const sq = sortToQuery(sort);
+      const fq = filtersToQuery(filters);
+      if (sq) params.set('sort', sq);
+      if (fq) params.set('filter', fq);
+      return apiClient.get<RecordRow[]>(`/collections/${collectionName}/records?${params}`);
+    },
     enabled: !!collectionName,
   });
 
@@ -46,7 +54,7 @@ export function TableViewPage() {
   const allColumns: Col[] = config.columns ?? fields.map((f) => ({ field: f.name, label: f.label ?? f.name, width: 160, visible: true }));
   const columns = allColumns.filter((c) => c.visible !== false);
 
-  const filtered = applyFilters(records, filters);
+  const filtered = records; // Week 17: 服务端已 filter+sort,前端直接用
 
   const exportCsv = async () => {
     const token = (useAuthStore.getState().user as { accessToken?: string } | null)?.accessToken ?? '';
@@ -85,7 +93,7 @@ export function TableViewPage() {
     }
     e.target.value = '';
   };
-  const sorted = applySort(filtered, sort);
+  const sorted = filtered; // Week 17: 服务端 sort 已完成
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
