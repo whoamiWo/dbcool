@@ -1,3 +1,60 @@
+## [Unreleased] - 2026-09-14 Week 37 Sprint — 5 个简单 list 页前端测试(26 → 55)(1 commit)
+
+### Added
+- **`frontend/src/pages/CollectionsList.test.tsx`**(5 tests,全 PASS)
+  - 加载中 / 加载失败 / 空列表 / 数据(表格 + 字段数 + 打开链接)/ 新建按钮跳转
+- **`frontend/src/pages/FormsList.test.tsx`**(6 tests,全 PASS)
+  - 加载中 / 错误 / 无 collection / 有 collection / 数据 / collection 特定空状态
+- **`frontend/src/pages/ViewsList.test.tsx`**(4 tests,全 PASS)
+  - 加载 / 空 / collection 过滤(用 `<Routes>` 包裹)/ 数据(table + badge + monospace)
+- **`frontend/src/pages/RolesList.test.tsx`**(7 tests,全 PASS)
+  - 加载 / 空 / 数据(emoji 🎭 + name)/ 创建按钮 / 成功 / 失败 / disabled
+- **`frontend/src/pages/UsersList.test.tsx`**(7 tests,全 PASS)
+  - 加载 / 空 / 数据(状态 badge)/ 创建按钮 / 成功 / 失败 / disabled
+- **`WEEK_37_HANDOFF.md`** — Week 37 交接
+
+### Changed
+- **`frontend/README.md`** — 测试覆盖段更新到 10 文件 / 55 tests(Week 37)
+
+### Verified
+- **后端** `mvn verify` ✅ BUILD SUCCESS — 463 tests PASS
+- **前端** `vitest --run` ✅ 55/55 PASS — 10 文件 / 55 tests / 1.5 秒
+- **总测试**:**518 tests**(440 + 15 + 8 + 55)
+
+### Key technical findings
+- **`useParams` 需要 `<Routes>` 包裹**:直接 `<MemoryRouter><Page /></MemoryRouter>` → `useParams()` 返 `{}`;需 `<Routes><Route path="/..." element={<Page />} /></Routes>`
+- **QueryClient 缓存 + gcTime:0**:每个 beforeEach 新建 QueryClient + `gcTime: 0, staleTime: 0` 防跨 test 污染
+- **拼接文本用正则**:`🎭 admin` 是 `<h3>🎭 admin</h3>`,`getByText('admin')` 失败 → 用 `getByText(/🎭 admin/)`
+- **同名元素多次出现**:`修改密码` 在 h3 和 button / `启用/禁用` 在 badge + button → 用 `getAllByText(/.../)` 验证 ≥ N 个
+- **mock data 字段名要看 type 定义**:`UserMeta` 没有 `roles` 字段 → 改用状态 badge(启用/禁用)
+- **MemoryRouter initialEntries 必须匹配 Route path**:`/designer/views` 不匹配 `/designer/views/:collection` → 必须定义两个 Route
+- **`@testing-library/user-event` 不必要**:用 `fireEvent.change(input, { target: { value } })` 已够,避免额外依赖
+
+### Coverage Trend
+
+| Week | 后端 | 前端 | 总 |
+|------|---|---|---|
+| 35 | 463 | 1 | 464 |
+| 36 | 463 | 26 | 489 |
+| **37** | **463** | **55** | **518** ⭐ |
+
+### 项目飞跃回顾
+- Week 25(基线)→ Week 37:**0 → 518 tests**(12 周)
+- 后端:440 单测 + 15 安全 + 8 E2E = 463
+- 前端:0 → 55(Week 36-37 一次性补齐)
+
+### 项目测试规模分布
+
+| 类型 | 数量 | 占比 |
+|---|---|---|
+| 后端单元 | 440 | 85% |
+| 后端 E2E | 8 | 1.5% |
+| 后端安全 | 15 | 3% |
+| 前端 React | 55 | 11% |
+| **总计** | **518** | |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 36 Sprint — 路线 X:前端测试补齐 1 → 26 tests(1 commit)
 
 ### Added
