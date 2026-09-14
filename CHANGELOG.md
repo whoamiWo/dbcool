@@ -1,3 +1,60 @@
+## [Unreleased] - 2026-09-14 Week 32 Sprint — 终极收尾:UserAdminService + WorkflowEngine matchCondition + 4 红线抬升(1 commit)
+
+### Added
+- **UserAdminServiceTest** (`UserAdminServiceTest.java`) — 19 tests,全 PASS
+  - listAll / get 404 / create(成功/重复 409/null displayName)/ update(部分/全部/404)/ resetPassword / delete
+  - getUserRoles(成功/orphan role 跳过)/ assignRole(新增/已存在 no-op)/ removeRole
+  - getEffectivePermissions 返回 roles + policies_summary
+- **WorkflowEngineMatchConditionTest** (`WorkflowEngineMatchConditionTest.java`) — 16 tests,全 PASS
+  - matchCondition 全 5 op: eq(默认)/ neq / contains / gt / lt
+  - 异常分支: 未知 op → false / 缺字段 → false / bad JSON → false
+  - executeGraphFrom: 未知节点类型跳过 / 无出边完成 / handle 不匹配 fallback 第一个
+  - executeHttp: 默认 method=POST / 自定义 headers 应用
+  - logNotification: instance 不存在跳过 / 非法 recipient fallback createdBy / notificationService fire 抛异常被吞
+
+### Changed
+- **移除 auth excludes** `UserAdminService`(Week 32 已测)
+- **保留 auth excludes** `JwtAuthFilter`(中间件,继续跳过)
+- **抬 Jacoco 红线**(Week 32 大跃升):
+  - **BUNDLE** 75% → **80%**
+  - **auth** 75% → **85%**(UserAdminService 0→100%,红线上限)
+  - **workflow** 80% → **90%**(matchCondition 全 op 收尾)
+  - **audit** 90% → **95%**(近饱和)
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **440 tests PASS**(405 → 440,+35)
+- **覆盖率爆炸**:
+  - **auth** 81% → **92%** (+11%)🎯🎯🎯
+  - **workflow** 93% → **96%** (+3%)
+  - **bundle** 81% → **83%** (+2%)
+
+### Key technical findings
+- **`UserRoleEntity` 构造器**:`new UserRoleEntity(userId, roleId)`,内部用 `new UserRoleId(userId, roleId)` 包装
+- **`assignRole` 用 findById(UserRoleId) 检测重复**:已存在 → no-op
+- **`getUserRoles` 用 stream + filter 跳过 orphan role**(`roleRepository.findById` 返回 empty 时)
+- **matchCondition 默认 op = "eq"**:`when.getOrDefault("op", "eq")`
+- **未知 op → false**(默认 case),不抛异常
+- **triggerDataJson 坏 JSON → parseTriggerData 返回 null → actual=null → false**
+- **executeHttp method 默认 "POST"**:缺 method 字段时 fallback
+- **`HttpMethod.valueOf` 抛 IllegalArgumentException**,被 RestClientException catch 接不到(测试发现)
+- **`HttpHeaders.firstValue(key)` 是 spring-web 6.1+ API**;旧版本用 `getFirst(key)`
+- **`logNotification` instance 不存在时整个跳过**:不会 save message 也不会 fire notification
+- **`recipient` 非 UUID 字符串 → try/catch 解析失败 → fallback createdBy**
+
+### Coverage Trend
+
+| Week | tests | bundle | auth | meta | workflow | notification | config | audit | view | notes |
+|------|-------|--------|------|------|----------|--------------|--------|-------|------|-------|
+| 32 | 440 | 83% | **92%** | 58% | **96%** | 94% | 28% | 99% | 98% | UserAdminService + matchCondition 收尾 + 4 红线大跃升 |
+| 31 | 405 | 81% | 81% | 58% | 93% | 94% | 28% | 99% | 98% | AuditService+ViewService+JwtService+MessageController + 4 红线 |
+| 30 | 390 | 80% | 81% | 58% | 92% | 94% | 28% | 83% | 94% | 3 dispatcher + GlobalEx + RefreshToken + 红线 BUNDLE 0.70/notification 0.85 |
+| 29 | 351 | 75% | 79% | 58% | 92% | 56% | 21% | 83% | 94% | WorkflowController + TemplateService + workflow 红线 0.80 |
+| 28 | 322 | 65% | 79% | 58% | 51% | 56% | 21% | 83% | 94% | CollectionController + WorkflowEngine + 红线三连跳 |
+| 27 | 276 | 47% | 79% | 20% | 22% | 56% | 21% | 83% | 94% | AuthController + RoleAclController + 红线大跃升 |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 31 Sprint — 全包收尾:AuditService+ViewService+JwtService+MessageController + 4 红线抬升(1 commit)
 
 ### Added

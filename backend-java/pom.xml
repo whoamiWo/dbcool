@@ -188,14 +188,14 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 75%(Week 31 抬升,audit/view 收尾) -->
+                                <!-- 全局:行覆盖 ≥ 80%(Week 32 抬升,UserAdminService+WorkflowEngine 收尾) -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.75</minimum>
+                                            <minimum>0.80</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -207,7 +207,7 @@
                                         <exclude>com.nocobase.*.config.*</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- auth 模块(已含 AclEnforcer/UserAdmin/Auth/RoleAcl controller 测试 + JwtService):行覆盖 ≥ 75%(Week 31 抬升) -->
+                                <!-- auth 模块(已含 UserAdminService 测试):行覆盖 ≥ 85%(Week 32 抬到 92%) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -217,12 +217,11 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.75</minimum>
+                                            <minimum>0.85</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
-                                        <!-- UserAdminService 业务代码暂未测(Week 26 移除了 UserAdminController,Week 27 移除 AuthController/RoleAclController) -->
-                                        <exclude>com.nocobase.auth.UserAdminService</exclude>
+                                        <!-- JwtAuthFilter 中间件保留 exclude;UserAdminService Week 32 已测 -->
                                         <exclude>com.nocobase.auth.JwtAuthFilter</exclude>
                                     </excludes>
                                 </rule>
@@ -244,7 +243,7 @@
                                         <exclude>com.nocobase.meta.AsyncMigrationService</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- workflow 模块(Week 21/25/28/29):行覆盖 ≥ 80%(Week 29 加 WorkflowController + TemplateService) -->
+                                <!-- workflow 模块(Week 21/25/28/29/32):行覆盖 ≥ 90%(Week 32 收尾 matchCondition 全 op,96%) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -254,7 +253,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.80</minimum>
+                                            <minimum>0.90</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -276,7 +275,7 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- audit 模块(Week 21/24/31):行覆盖 ≥ 90%(Week 31 收尾 AuditService+AuditController,99%) -->
+                                <!-- audit 模块(Week 21/24/31/32):行覆盖 ≥ 95%(Week 32 维持 99%,近饱和) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -286,7 +285,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.90</minimum>
+                                            <minimum>0.95</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
