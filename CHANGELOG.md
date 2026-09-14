@@ -4,6 +4,36 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 22 Sprint — notification/form 测试 + 红线(1 commit)
+
+### Added
+- **EmailDispatcherTest** (`EmailDispatcherTest.java`) — 7 tests,全 PASS
+  - supportedType + null/blank recipient + mock/real SMTP 模式
+- **NotificationServiceTest** (`NotificationServiceTest.java`) — 13 tests,全 PASS
+  - fire 入口(无 channels / dispatcher 路由 / 抛异常捕获)
+  - matchesEvent(null/blank/CSV精确/case-insensitive/混合)
+  - testSend(channel 不存在 → IAE / 委托 / 无 dispatcher)
+- **FormServiceTest** (`FormServiceTest.java`) — 16 tests,全 PASS
+  - 5 公开方法(create/get/update/list/delete)+ 2 parser(parseLayout/parseRules)
+  - null/blank layout/rules 默认值 + 404 + 部分字段更新保持
+
+### Changed
+- **抬 Jacoco 红线**:bundle 12%→14%
+- **新增 2 包规则**:notification ≥25% / form ≥45%
+
+### Verified
+- `mvn clean verify` 181 tests 全 PASS + All coverage checks met
+- 覆盖率:notification 0%→25% / form 0%→49%
+- 已覆盖包从 7 → 9(13 个生产包的 69%)
+
+### Trend(Week 18 → 22)
+- tests:70 → 181(+158%)
+- 覆盖包数:1 → 9(+800%)
+- bundle 红线:5% → 14%(每周 +2%)
+- 节奏:每周 +30 tests / +1 包 / +2% 红线
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 21 Sprint — 继续抬红线 + 新覆盖 3 包(1 commit)
 
 ### Added
