@@ -125,6 +125,18 @@ jobs:
         working-directory: frontend
         run: pnpm test:run
 
+      - name: Run tests with coverage
+        working-directory: frontend
+        run: pnpm test:coverage
+
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 7
+
       - name: Build
         working-directory: frontend
         run: pnpm build

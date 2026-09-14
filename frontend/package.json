@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "test": "vitest",
     "test:run": "vitest --run",
+    "test:coverage": "vitest --run --coverage",
     "tsc": "tsc --noEmit"
   },
   "dependencies": {
@@ -36,6 +37,8 @@
     "@typescript-eslint/eslint-plugin": "^8.10.0",
     "@typescript-eslint/parser": "^8.10.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "axios-mock-adapter": "^2.1.0",
     "eslint": "^9.13.0",
     "jsdom": "^25.0.0",
     "prettier": "^3.3.0",

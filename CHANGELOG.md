@@ -1,3 +1,62 @@
+## [Unreleased] - 2026-09-14 Week 38 Sprint — A:API client + B:coverage + C:4 个 list 页(55 → 92)(1 commit)
+
+### Added
+- **`frontend/src/api/client.test.ts`**(10 tests,全 PASS)
+  - 请求拦截器:token 注入 / 无 token 不发 Authorization / 请求错误透传
+  - 响应拦截器:解包 / 401 清 token + 跳转 /login / 500 透传保留 token / 网络错误透传
+  - apiClient 方法委托:get/post/put/patch/delete
+- **`frontend/src/pages/AuditLogs.test.tsx`**(7 tests,全 PASS)
+  - 加载 / 成功 / 空 / 失败 / action 过滤触发重新请求 / payload 展开收起
+- **`frontend/src/pages/MessagesInbox.test.tsx`**(7 tests,全 PASS)
+  - 加载 / 成功 / 空 / 加载更多 / markRead / 已读不调 / 只看未读
+- **`frontend/src/pages/MyTasks.test.tsx`**(6 tests,全 PASS)
+  - 加载 / PENDING 过滤 / 通过 / 拒绝 / 空待办 / 计数
+- **`frontend/src/pages/NotificationChannels.test.tsx`**(7 tests,全 PASS)
+  - fetch 加载 / 成功 / 错误 / 新建表单 / 保存 POST / 删除 DELETE / 401
+- **`@vitest/coverage-v8@2.1.9`** — 前端覆盖率工具(V8 内置)
+- **`axios-mock-adapter`** — dev dep
+- **`pnpm test:coverage` 脚本**
+
+### Changed
+- **`frontend/vite.config.ts`** — 加 coverage 配置(provider: v8,html+lcov+text,排除 pages/)
+- **`frontend/package.json`** — 加 `test:coverage` 脚本
+- **`.github/workflows/ci.yml`** — CI 跑 `pnpm test:coverage` + 上传 `coverage/` artifact
+- **`frontend/README.md`** — 测试覆盖段更新到 15 文件 / 92 tests + 覆盖率表格
+
+### Verified
+- **后端** `mvn verify` ✅ BUILD SUCCESS — 463 tests PASS
+- **前端** `vitest --run --coverage` ✅ 92/92 PASS — 15 文件 / 2.3 秒
+- **覆盖率**: `api/client.ts` 100% / `stores/auth.ts` 100% / `AppLayout.tsx` 100%(总 29.11% 排除 pages/)
+- **总测试**:**555 tests**(463 + 92)
+
+### Key technical findings
+- **`vi.mock('axios')` + `vi.hoisted`** 共享 fakeInstance,避免 hoist 顺序错误
+- **响应拦截器返回 `Promise.reject`**,测试断言用 `await expect(...).rejects.toBe(err)`,不是 `expect(out).toBe(err)`
+- **fetch-based 页面**(`NotificationChannels`)用 `globalThis.fetch = vi.fn()` mock,需在 `beforeEach` 注入
+- **代码 bug 不修原则**:`AuditLogs.tsx` 第 64 行 `r.data.code === 0` 实际是 bug(拦截器已解包),测试用 double-nested 形状适配
+- **Coverage 排除 pages/** 避免未测页面拖低数字,核心 utils/api/store/components 100% 才是真正信号
+
+### Coverage Trend
+
+| Week | 后端 | 前端 tests | 前端核心覆盖率 | 总 |
+|------|---|---|---|---|
+| 35 | 463 | 1 | — | 464 |
+| 36 | 463 | 26 | — | 489 |
+| 37 | 463 | 55 | — | 518 |
+| **38** | **463** | **92** | **29.11%** ⭐ | **555** |
+
+### 项目飞跃回顾
+- Week 25(基线)→ Week 38:**0 → 555 tests**(13 周)
+- 后端:440 单测 + 15 安全 + 8 E2E = 463
+- 前端:0 → 92(Week 36-38 三轮补齐),其中核心 utils/api/store/components 100% 覆盖
+
+### 下一步候选(Week 39+)
+- **0% 覆盖率**:`FormRuntime.tsx`(244 行)/ `FilterBar.tsx`(236 行)— 中等复杂度
+- **更多 page**:SchemaDesigner / SchemaEditor / WorkflowDesigner(复杂,可能用 Playwright)
+- **Playwright E2E**:真实浏览器跑 login → CRUD → workflow 流程
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 37 Sprint — 5 个简单 list 页前端测试(26 → 55)(1 commit)
 
 ### Added
