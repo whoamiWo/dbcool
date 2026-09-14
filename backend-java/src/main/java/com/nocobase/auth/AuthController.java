@@ -11,6 +11,7 @@ import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,17 +29,23 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthController {
 
     private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
     public AuthController(
             UserRepository userRepository,
+            UserRoleRepository userRoleRepository,
+            RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             RefreshTokenService refreshTokenService
     ) {
         this.userRepository = userRepository;
+        this.userRoleRepository = userRoleRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
@@ -143,4 +150,31 @@ public class AuthController {
             @NotBlank String oldPassword,
             @NotBlank String newPassword
     ) {}
+
+    /**
+     * 当前登录用户信息(US-502 个人中心).
+     */
+    @GetMapping("/me")
+    public Map<String, Object> me(@AuthenticationPrincipal AuthenticatedUser user) {
+        var dbUser = userRepository.findById(user.userId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User 不存在"));
+        var roleNames = userRoleRepository.findByIdUserId(user.userId())
+                .stream()
+                .map(ur -> roleRepository.findById(ur.getId().getRoleId()))
+                .filter(java.util.Optional::isPresent)
+                .map(java.util.Optional::get)
+                .map(r -> r.getName())
+                .toList();
+        return Map.of(
+                "code", 0,
+                "message", "success",
+                "data", Map.of(
+                        "id", dbUser.getId().toString(),
+                        "username", dbUser.getUsername(),
+                        "tenant_id", dbUser.getTenantId(),
+                        "roles", roleNames,
+                        "created_at", dbUser.getCreatedAt().toString()
+                )
+        );
+    }
 }

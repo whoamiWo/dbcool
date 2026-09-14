@@ -1,15 +1,31 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 
+interface MeData {
+  id: string;
+  username: string;
+  tenant_id: string;
+  roles: string[];
+  created_at: string;
+}
+
 /**
- * 个人中心(US-502 改密码).
+ * 个人中心(US-502 我的信息 + 改密码).
  */
 export function ProfilePage() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const meQuery = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: MeData }>('/auth/me');
+      return res.data;
+    },
+  });
 
   const changeMutation = useMutation({
     mutationFn: () =>
@@ -33,17 +49,42 @@ export function ProfilePage() {
   return (
     <div style={{ maxWidth: 500 }}>
       <h1>👤 个人中心</h1>
+
+      {/* 我的信息卡(US-502) */}
+      <div style={{ padding: 16, background: 'white', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: 16 }}>
+        <h3 style={{ marginTop: 0 }}>我的信息</h3>
+        {meQuery.isLoading && <p style={{ color: '#64748b' }}>加载中…</p>}
+        {meQuery.data && (
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr><td style={lbl}>用户名</td><td style={val}><code>{meQuery.data.username}</code></td></tr>
+              <tr><td style={lbl}>用户 ID</td><td style={val}><code style={{ fontSize: 11 }}>{meQuery.data.id}</code></td></tr>
+              <tr><td style={lbl}>租户</td><td style={val}>{meQuery.data.tenant_id}</td></tr>
+              <tr><td style={lbl}>角色</td><td style={val}>
+                {meQuery.data.roles.map((r) => (
+                  <span key={r} style={{ display: 'inline-block', marginRight: 6, padding: '2px 8px',
+                                        background: r === 'admin' ? '#7c3aed' : '#0ea5e9',
+                                        color: 'white', borderRadius: 4, fontSize: 12 }}>{r}</span>
+                ))}
+              </td></tr>
+              <tr><td style={lbl}>注册时间</td><td style={val}>{meQuery.data.created_at.replace('T', ' ').slice(0, 19)}</td></tr>
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* 修改密码(US-502) */}
       <div style={{ padding: 16, background: 'white', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <h3 style={{ marginTop: 0 }}>修改密码(US-502)</h3>
+        <h3 style={{ marginTop: 0 }}>修改密码</h3>
         {error && <div style={{ padding: 8, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>{error}</div>}
         {success && <div style={{ padding: 8, marginBottom: 12, background: '#dcfce7', color: '#166534', borderRadius: 4 }}>{success}</div>}
         <div style={{ marginBottom: 8 }}>
           <label>旧密码</label>
-          <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} style={{ ...inputStyle }} />
+          <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} style={inputStyle} />
         </div>
         <div style={{ marginBottom: 8 }}>
           <label>新密码</label>
-          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={{ ...inputStyle }} />
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={inputStyle} />
         </div>
         <button onClick={() => changeMutation.mutate()} disabled={changeMutation.isPending || !oldPassword || !newPassword} style={btnStyle}>
           {changeMutation.isPending ? '修改中…' : '修改密码'}
@@ -55,3 +96,5 @@ export function ProfilePage() {
 
 const inputStyle = { padding: 6, width: '100%', border: '1px solid #cbd5e1', borderRadius: 4 };
 const btnStyle = { padding: '8px 16px', background: '#1e293b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' };
+const lbl = { padding: '6px 8px 6px 0', color: '#64748b', width: 80, verticalAlign: 'top' } as const;
+const val = { padding: '6px 0' } as const;
