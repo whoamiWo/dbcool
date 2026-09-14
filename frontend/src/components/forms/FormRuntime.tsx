@@ -97,6 +97,11 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
     try {
       await onSubmit(data);
       setData({});
+    } catch (err) {
+      // 静默失败:onSubmit 通常自己处理错误并显示给用户
+      // 不重置 data,允许用户修改后重新提交
+      // eslint-disable-next-line no-console
+      console.error('FormRuntime submit error:', err);
     } finally {
       setSubmitting(false);
     }

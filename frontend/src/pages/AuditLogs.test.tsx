@@ -48,7 +48,7 @@ describe('AuditLogsPage', () => {
     // 注意:页面用 r.data.code === 0(代码 bug,实际拦截器已解包),
     // 但为不修源码,这里 mock double-nested 形状
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: { code: 0, data: { logs: sampleLogs, total: 2 } },
+      code: 0, data: { logs: sampleLogs, total: 2 },
     } as any);
 
     wrap(<AuditLogsPage />);
@@ -66,7 +66,7 @@ describe('AuditLogsPage', () => {
 
   it('空日志:显示"暂无审计记录"', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: { code: 0, data: { logs: [], total: 0 } },
+      code: 0, data: { logs: [], total: 0 },
     } as any);
 
     wrap(<AuditLogsPage />);
@@ -76,7 +76,7 @@ describe('AuditLogsPage', () => {
 
   it('后端返回 code !== 0:不渲染日志', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: { code: 1, message: 'error', data: null },
+      code: 1, message: "error", data: null,
     } as any);
 
     wrap(<AuditLogsPage />);
@@ -122,7 +122,7 @@ describe('AuditLogsPage', () => {
 
   it('展开/收起 payload JSON', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: { code: 0, data: { logs: sampleLogs, total: 2 } },
+      code: 0, data: { logs: sampleLogs, total: 2 },
     } as any);
 
     wrap(<AuditLogsPage />);

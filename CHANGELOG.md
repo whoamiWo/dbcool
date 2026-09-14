@@ -1,3 +1,35 @@
+## Week 39 Step D (2026-09-14) — 修 3 个源码 bug + 第 3 个 E2E spec
+### 修源码 bug
+1. **`FormRuntime.tsx:97-105`**: handleSubmit 加 catch — onSubmit reject 静默处理
+   (Week 39 步 A 发现的 unhandled rejection 根因,记入 CHANGELOG 3 周后真修)
+2. **`AuditLogs.tsx:64-68`**: `r.data.code` → `r.code`,`r.data.data.logs` → `r.data.logs`
+   (Week 38 发现的 axios 解包 bug,记入 CHANGELOG 2 周后真修)
+3. **`AuditLogs.test.tsx`**: 同步更新 mock shape 适配修复后的源码
+   (从 double-nested 改回 single-nested,更准确表达 API 行为)
+
+### 新增文档
+- `frontend/TESTING_PATTERNS.md`(12 个模式 + 常用导入)
+  - vi.mock + vi.hoisted 共享模式
+  - Promise.reject + rejects 模式
+  - globalThis.fetch mock 模式
+  - getAllByText 多元素模式
+  - FormRuntime layout 渲染规则
+  - visibility undefined 边界 (NaN)
+  - Playwright page.route() mock API 模式
+  - 数据 mock `as any` 模式
+  - Time mock vi.useFakeTimers
+
+### 新增 E2E(第 3 个 spec)
+- `e2e/form-submit.spec.ts`(3 tests):
+  - FormsList 列表:渲染表单
+  - required 校验:空提交不调 POST,显示错误
+  - 填表成功:POST payload + 跳转 collection 详情
+
+### 总数
+- 前端 vitest: **149/149 PASS**(覆盖率 98.73%)
+- 前端 E2E: **12 tests / 3 files**(login 5 + users-crud 4 + form-submit 3)
+- 后端: **463/463 PASS**
+
 ## Week 39 Step C (2026-09-14) — Playwright E2E(9 tests,2 specs)
 - `@playwright/test@1.63.0` 安装 + `playwright.config.ts`
 - 策略: 前端 E2E + API mock(不启 Spring,快/稳/CI 友好)

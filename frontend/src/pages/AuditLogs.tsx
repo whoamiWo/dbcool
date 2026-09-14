@@ -61,9 +61,11 @@ export function AuditLogsPage() {
       if (actionFilter) params.action = actionFilter;
       if (resourceFilter) params.resource = resourceFilter;
       const r = await apiClient.get('/audit/logs', { params });
-      if (r.data.code === 0) {
-        setLogs(r.data.data.logs);
-        setTotal(r.data.data.total);
+      // axios 响应拦截器已解包(r.data 是后端业务 data),后端 {code, message, data}
+      // 所以 r.code / r.data.logs,不是 r.data.code / r.data.data
+      if ((r as any).code === 0) {
+        setLogs((r as any).data.logs);
+        setTotal((r as any).data.total);
       }
     } catch (e) {
       console.error(e);
