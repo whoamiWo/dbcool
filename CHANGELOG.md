@@ -1,3 +1,60 @@
+## Week 41 (2026-09-15) — 技术债批次 1 + 批次 2 起步 (止血 F1+F2+F3, 地基 G1)
+### Step G1: 多租户 (D6) 最小可行版本 — ThreadLocal + CRUD + 关键硬编码清理(3d)
+**范围**:
+- ✅ TenantContext ThreadLocal(报告 7.3 步骤 2)
+- ✅ TenantEntity/Repository/Service/Controller CRUD(报告 7.3 步骤 1)
+- ✅ JwtAuthFilter 解析 JWT 时填 TenantContext + finally 清零(报告 7.3 步骤 2)
+- ✅ WorkflowController 关键硬编码 "tenant_default" → TenantContext.currentTenantId()
+- ⏭️ **保留**:Schema 路由(`SET search_path` + MultiTenantConnectionProvider)推迟到 G2(8d 大工程,风险大)
+
+**新增 6 个文件** (新包 com.nocobase.tenant):
+- TenantContext.java (ThreadLocal + DEFAULT_TENANT 兼容常量)
+- TenantEntity.java (id/name/slug/status/schemaName)
+- TenantRepository.java (JPA + findByStatus)
+- TenantService.java (CRUD + 校验 + seedDefaultIfEmpty)
+- TenantController.java (`/api/admin/tenants` CRUD, @PreAuthorize ADMIN)
+- TenantContextTest.java (9 tests)
+- TenantServiceTest.java (9 tests)
+
+**改 2 个文件**:
+- JwtAuthFilter.java: try/finally + TenantContext.set/clear(防线程复用泄漏)
+- WorkflowController.java: 5 处 "tenant_default" 硬编码 → TenantContext.currentTenantId()
+  - w.setTenantId(创建工作流时)
+  - instance.setTenantId(trigger 时)
+  - list/listInstances 列表查询
+  - getInstance 详情查询
+  - auditService REJECT log
+  - 保留:跨租户 FORBIDDEN 校验(user.tenantId() 已正确)
+
+### 加 18 个回归测试
+- TenantContextTest: 9 个(基础 + 线程隔离 + requireTenantId fail-fast)
+- TenantServiceTest: 9 个(CRUD + 校验 + 默认租户不可禁用 + seed 幂等)
+
+### 验收标准达成(报告 9.3)
+- ✅ TenantContext 存在且有单元测试
+- ⏭️ 两租户同名 Collection 物理表落在不同 schema — G2 才做
+- ✅ 全仓搜索 "tenant_default" 硬编码:WorkflowController 关键写入路径已清零
+- ✅ 租户 CRUD 可用(`/api/admin/tenants`)
+- ✅ 现有 463 后端测试 + 150 前端测试 无退化
+- ✅ 向后兼容:未设置 TenantContext 时返回 tenant_default(Week 1-40 数据兼容)
+
+### 风险缓解
+- **C-R02 (硬编码 NPE)**:分批替换 — Step G1 仅清理 WorkflowController 写入路径,其他模块保留待 G2/G3 渐进清理
+- **线程泄漏 (D6 副作用)**:JwtAuthFilter try/finally 强制 clear,单元测试覆盖 set/clear 配对
+
+### 回归红线
+- 后端: **502/502 PASS**(基线 463 + B1 6 + B2 9 + B3 6 + G1 18 = 502)
+- Jacoco: All coverage checks have been met(112 classes,+2)
+- 前端 vitest: 150/150 PASS,tsc 0 errors
+- 前端 E2E: 22/22 PASS
+- 总测试: 502 + 150 + 22 = 674 tests
+
+### 进度
+- ✅ 批次 1:止血 F1+F2+F3 完成(B1 + B2 + B3 + D9, 2.5d)
+- ✅ 批次 2 第一步 G1:D6 ThreadLocal + CRUD (3d) 完成
+- ⏭️ 批次 2 下一步 G2:D6 Schema 路由(8d,含 Flyway迁移 + Hibernate 重构)
+- ⏭️ 批次 2 后续:D4a 触发器 → D4b 节点 → D1 字段 → D2 关联
+
 ## Week 41 (2026-09-15) — 技术债批次 1:止血完成 F1 + F2 + F3 (B1 + B2 + B3 + D9)
 ### Step F3: 修 B3 删表残留 + D9 死代码清理(0.5d)
 **根因**:`CollectionController.delete` 只返回 "deleted (mark only in Week 7)" 假成功,

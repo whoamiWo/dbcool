@@ -3,6 +3,7 @@ package com.nocobase.workflow;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.tenant.TenantContext;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
@@ -65,9 +66,11 @@ public class WorkflowController {
 
     @GetMapping
     public Map<String, Object> list(@RequestParam(required = false) String collection) {
+        // Week 41 D6 G1:从 TenantContext 取当前租户(替代硬编码 "tenant_default")
+        String tenant = TenantContext.currentTenantId();
         List<WorkflowEntity> ws = (collection != null && !collection.isBlank())
-                ? workflowRepository.findByCollectionNameAndTenantIdOrderByCreatedAtDesc(collection, "tenant_default")
-                : workflowRepository.findByTenantIdOrderByCreatedAtDesc("tenant_default");
+                ? workflowRepository.findByCollectionNameAndTenantIdOrderByCreatedAtDesc(collection, tenant)
+                : workflowRepository.findByTenantIdOrderByCreatedAtDesc(tenant);
         return Map.of("code", 0, "message", "success",
                 "data", ws.stream().map(this::toDto).toList());
     }
@@ -103,7 +106,7 @@ public class WorkflowController {
         w.setNodesJson(req.nodes() != null ? req.nodes() : "[]");
         w.setEdgesJson(req.edges() != null ? req.edges() : "[]");
         w.setEnabled(req.enabled() == null || req.enabled());
-        w.setTenantId("tenant_default");
+        w.setTenantId(TenantContext.currentTenantId());
         w.setCreatedAt(Instant.now());
         w.setCreatedBy(user.userId());
         WorkflowEntity saved = workflowRepository.save(w);
@@ -203,7 +206,7 @@ public class WorkflowController {
         }
         instance.setStartedAt(Instant.now());
         instance.setCurrentNodeIndex(0);
-        instance.setTenantId("tenant_default");
+        instance.setTenantId(TenantContext.currentTenantId());
         instance = instanceRepository.save(instance);
 
         // 2. 解析节点 + edges(Week 14:支持图遍历)
@@ -255,16 +258,18 @@ public class WorkflowController {
 
     @GetMapping("/instances")
     public Map<String, Object> listInstances(@RequestParam(required = false) UUID workflowId) {
+        // Week 41 D6 G1:从 TenantContext 取当前租户
+        String tenant = TenantContext.currentTenantId();
         List<WorkflowInstanceEntity> list = (workflowId != null)
-                ? instanceRepository.findByWorkflowIdAndTenantIdOrderByStartedAtDesc(workflowId, "tenant_default")
-                : instanceRepository.findByTenantIdOrderByStartedAtDesc("tenant_default");
+                ? instanceRepository.findByWorkflowIdAndTenantIdOrderByStartedAtDesc(workflowId, tenant)
+                : instanceRepository.findByTenantIdOrderByStartedAtDesc(tenant);
         return Map.of("code", 0, "message", "success",
                 "data", list.stream().map(this::instanceToDto).toList());
     }
 
     @GetMapping("/instances/{id}")
     public Map<String, Object> getInstance(@PathVariable UUID id) {
-        WorkflowInstanceEntity i = instanceRepository.findByIdAndTenantId(id, "tenant_default")
+        WorkflowInstanceEntity i = instanceRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "实例不存在"));
         Map<String, Object> dto = instanceToDto(i);
         dto.put("tasks", taskRepository.findByInstanceId(id).stream()
@@ -378,7 +383,7 @@ public class WorkflowController {
         instanceRepository.save(instance);
 
         WorkflowEntity wf = workflowRepository.findById(instance.getWorkflowId()).orElse(null);
-        auditService.log("tenant_default", task.getAssignee(), null,
+        auditService.log(TenantContext.currentTenantId(), task.getAssignee(), null,
                 "REJECT", "workflow_task", task.getId().toString(),
                 Map.of("workflow", wf != null ? wf.getId().toString() : "", "comment", task.getComment() == null ? "" : task.getComment()));
 
