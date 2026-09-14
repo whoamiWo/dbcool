@@ -163,6 +163,99 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+
+            <!-- Week 19: JaCoCo 覆盖率 + 红线 -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <!-- 默认 test 阶段准备 agent -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals><goal>prepare-agent</goal></goals>
+                    </execution>
+                    <!-- test 阶段生成 jacoco.exec + HTML 报告 -->
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals><goal>report</goal></goals>
+                    </execution>
+                    <!-- verify 阶段检查红线(整体 + 包级) -->
+                    <execution>
+                        <id>check-coverage</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <!-- 全局:行覆盖 ≥ 5%(起步,后续按周提升 5-10%) -->
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.05</minimum>
+                                        </limit>
+                                    </limits>
+                                    <excludes>
+                                        <!-- JPA entities / DTOs / config 暂不要求 -->
+                                        <exclude>com.nocobase.*.model.*</exclude>
+                                        <exclude>com.nocobase.*.entity.*</exclude>
+                                        <exclude>com.nocobase.*.dto.*</exclude>
+                                        <exclude>com.nocobase.NocoBaseApplication</exclude>
+                                        <exclude>com.nocobase.*.config.*</exclude>
+                                    </excludes>
+                                </rule>
+                                <!-- auth 模块(已含 AclEnforcerTest):行覆盖 ≥ 20% -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.nocobase.auth</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.20</minimum>
+                                        </limit>
+                                    </limits>
+                                    <excludes>
+                                        <!-- Auth/User controllers 暂未测,留余地 -->
+                                        <exclude>com.nocobase.auth.UserAdminService</exclude>
+                                        <exclude>com.nocobase.auth.RoleAclController</exclude>
+                                        <exclude>com.nocobase.auth.UserAdminController</exclude>
+                                        <exclude>com.nocobase.auth.AuthController</exclude>
+                                        <exclude>com.nocobase.auth.JwtAuthFilter</exclude>
+                                    </excludes>
+                                </rule>
+                                <!-- meta 模块(已含 DynamicTableManagerTest + FieldDefTest):行覆盖 ≥ 5% -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.nocobase.meta</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.05</minimum>
+                                        </limit>
+                                    </limits>
+                                    <excludes>
+                                        <!-- Controller / AsyncMigrationService 暂未测 -->
+                                        <exclude>com.nocobase.meta.CollectionController</exclude>
+                                        <exclude>com.nocobase.meta.AsyncMigrationService</exclude>
+                                        <exclude>com.nocobase.meta.ErDiagramController</exclude>
+                                    </excludes>
+                                </rule>
+                                <!-- workflow 模块:本周暂无测试,红线 0% 不强制 -->
+                                <!-- view / audit / notification / form / api:0% 不强制 -->
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

@@ -119,9 +119,12 @@ public class DynamicTableManager {
      * </ul>
      *
      * <p>不再强制 ∈ collection_meta.fields(因为动态 schema 里该数组可能空)。
+     *
+     * <p><b>package-private</b> 让测试可以正常实例方法调用(反射调用在 JaCoCo 中
+     * 不计入覆盖率)。
      */
-    private String buildOrderBy(String sortExpr,
-                                List<com.nocobase.meta.FieldDef> fields) {
+    String buildOrderBy(String sortExpr,
+                         List<com.nocobase.meta.FieldDef> fields) {
         if (sortExpr == null || sortExpr.isBlank()) {
             return null;
         }
