@@ -1,98 +1,122 @@
 package com.nocobase.audit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.nocobase.auth.JwtAuthFilter;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.config.SecurityConfig;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.context.SecurityContextImpl;
-import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * AuditController MockMvc 测试(Week 24).
+ * AuditController 单测(Week 31).
  */
-@WebMvcTest(AuditController.class)
-@AutoConfigureMockMvc(addFilters = false)
 class AuditControllerTest {
 
-    @Autowired private MockMvc mockMvc;
-    @MockBean private AuditService service;
-    @MockBean private SecurityConfig securityConfig;
-    @MockBean private JwtAuthFilter jwtAuthFilter;
+    private AuditService service;
+    private AuditController controller;
+    private AuthenticatedUser testUser;
 
-    private void login(String tenant) {
-        AuthenticatedUser u = new AuthenticatedUser(UUID.randomUUID(), "admin", tenant);
-        Authentication auth = new UsernamePasswordAuthenticationToken(
-                u, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
-        SecurityContextHolder.setContext(new SecurityContextImpl(auth));
+    @BeforeEach
+    void setUp() {
+        service = org.mockito.Mockito.mock(AuditService.class);
+        controller = new AuditController(service);
+        testUser = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");
+        SecurityContextHolder.setContext(new SecurityContextImpl(
+                new UsernamePasswordAuthenticationToken(testUser, "n/a",
+                        List.of(new SimpleGrantedAuthority("ROLE_USER")))));
     }
 
-    private AuditLogEntity makeLog(String action) {
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private AuditLogEntity makeLog() {
         AuditLogEntity e = new AuditLogEntity();
         e.setId(UUID.randomUUID());
         e.setTenantId("tenant_default");
-        e.setUserId("u1");
+        e.setUserId(testUser.userId().toString());
         e.setUsername("alice");
-        e.setAction(action);
-        e.setResource("customer");
+        e.setAction("CREATE");
+        e.setResource("posts");
+        e.setResourceId("p-1");
+        e.setPayloadJson("{}");
+        e.setIp("127.0.0.1");
+        e.setUserAgent("ua");
         e.setCreatedAt(Instant.now());
         return e;
     }
 
     @Test
-    void logs_noFilters_returnsAll() throws Exception {
-        login("tenant_default");
-        when(service.find("tenant_default", null, null, null, 50))
-                .thenReturn(List.of(makeLog("CREATE"), makeLog("UPDATE")));
-        when(service.count("tenant_default")).thenReturn(42L);
+    void list_returnsLogsAndTotal() {
+        when(service.find(eq("tenant_default"), any(), any(), any(), anyInt()))
+                .thenReturn(List.of(makeLog(), makeLog()));
+        when(service.count("tenant_default")).thenReturn(100L);
 
-        mockMvc.perform(get("/api/audit/logs"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.total").value(42))
-                .andExpect(jsonPath("$.data.logs.length()").value(2));
+        Map<String, Object> resp = controller.list(null, null, null, 50, testUser);
+
+        assertEquals(0, resp.get("code"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertEquals(100L, data.get("total"));
+        assertEquals(2, ((List<?>) data.get("logs")).size());
     }
 
     @Test
-    void logs_withFilters_passesToService() throws Exception {
-        login("tenant_default");
-        when(service.find("tenant_default", "customer", "CREATE", "u1", 10))
-                .thenReturn(List.of(makeLog("CREATE")));
-        when(service.count("tenant_default")).thenReturn(1L);
+    void list_withFilters_passesToService() {
+        when(service.find(eq("tenant_default"), eq("posts"), eq("CREATE"), eq("alice"), eq(50)))
+                .thenReturn(List.of());
+        when(service.count(anyString())).thenReturn(0L);
 
-        mockMvc.perform(get("/api/audit/logs")
-                        .param("resource", "customer")
-                        .param("action", "CREATE")
-                        .param("userId", "u1")
-                        .param("limit", "10"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.logs.length()").value(1));
+        controller.list("posts", "CREATE", "alice", 50, testUser);
+
+        org.mockito.Mockito.verify(service).find("tenant_default", "posts", "CREATE", "alice", 50);
     }
 
     @Test
-    void logs_defaultLimitIs50() throws Exception {
-        login("tenant_default");
-        when(service.find("tenant_default", null, null, null, 50)).thenReturn(List.of());
-        when(service.count("tenant_default")).thenReturn(0L);
+    void list_defaultLimitUsed() {
+        when(service.find(anyString(), any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(service.count(anyString())).thenReturn(0L);
 
-        // 不传 limit → 默认 50
-        mockMvc.perform(get("/api/audit/logs"))
-                .andExpect(status().isOk());
+        controller.list(null, null, null, 50, testUser);
+
+        org.mockito.Mockito.verify(service).find(anyString(), any(), any(), any(), eq(50));
+    }
+
+    @Test
+    void list_logDtoIncludesAllFields() {
+        AuditLogEntity e = makeLog();
+        when(service.find(any(), any(), any(), any(), anyInt())).thenReturn(List.of(e));
+        when(service.count(anyString())).thenReturn(1L);
+
+        Map<String, Object> resp = controller.list(null, null, null, 50, testUser);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> logs = (List<Map<String, Object>>) data.get("logs");
+        assertEquals(1, logs.size());
+        Map<String, Object> log = logs.get(0);
+        assertNotNull(log.get("id"));
+        assertEquals("alice", log.get("username"));
+        assertEquals("CREATE", log.get("action"));
+        assertEquals("posts", log.get("resource"));
+        assertEquals("p-1", log.get("resource_id"));
+        assertEquals("127.0.0.1", log.get("ip"));
+        assertNotNull(log.get("created_at"));
     }
 }

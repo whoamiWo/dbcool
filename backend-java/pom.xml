@@ -188,14 +188,14 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 48%(Week 27,AuthController/RoleAclController 大提升) -->
+                                <!-- 全局:行覆盖 ≥ 75%(Week 31 抬升,audit/view 收尾) -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.70</minimum>
+                                            <minimum>0.75</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -207,7 +207,7 @@
                                         <exclude>com.nocobase.*.config.*</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- auth 模块(已含 AclEnforcer/UserAdmin/Auth/RoleAcl controller 测试):行覆盖 ≥ 70%(Week 27 大提升) -->
+                                <!-- auth 模块(已含 AclEnforcer/UserAdmin/Auth/RoleAcl controller 测试 + JwtService):行覆盖 ≥ 75%(Week 31 抬升) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -217,7 +217,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.70</minimum>
+                                            <minimum>0.75</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -262,7 +262,7 @@
                                     </excludes>
                                 </rule>
                                 <!-- view / audit / notification / form / api:0% 不强制 -->
-                                <!-- acl 模块(Week 20/21/26):行覆盖 ≥ 85%(Week 26 加 RowAclController,89%) -->
+                                <!-- acl 模块(Week 20/21/26/31):行覆盖 ≥ 85%(Week 31 维持 89%) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -276,7 +276,7 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- audit 模块(Week 21/24):行覆盖 ≥ 80%(Week 24 加 controller) -->
+                                <!-- audit 模块(Week 21/24/31):行覆盖 ≥ 90%(Week 31 收尾 AuditService+AuditController,99%) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -286,11 +286,11 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.80</minimum>
+                                            <minimum>0.90</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- view 模块(Week 21/24):行覆盖 ≥ 90%(Week 24 加 controller) -->
+                                <!-- view 模块(Week 21/24/31):行覆盖 ≥ 95%(Week 31 收尾 ViewService,98%) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>

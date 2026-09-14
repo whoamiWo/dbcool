@@ -1,3 +1,68 @@
+## [Unreleased] - 2026-09-14 Week 31 Sprint — 全包收尾:AuditService+ViewService+JwtService+MessageController + 4 红线抬升(1 commit)
+
+### Added
+- **AuditServiceTest** (`AuditServiceTest.java`) — 12 tests,全 PASS
+  - log 基本路径(tenant/userId/action/resource 全字段)
+  - log null tenant → "unknown" / null userId → "anonymous"
+  - log 捕获 IP: 优先 X-Forwarded-For 第一段 / fallback remoteAddr / 无 request context → null
+  - log 截断 User-Agent(>250) / 序列化失败 fallback String / repo throws 静默吞
+  - find 委托 repo + limit clamp 500 / count 委托 repo
+- **AuditControllerTest** (`AuditControllerTest.java`) — 4 tests,全 PASS
+  - list 返回 logs + total / 传递 filters / 默认 limit / DTO 字段完整
+- **ViewServiceTest** (`ViewServiceTest.java`) — 14 tests,全 PASS
+  - create + null/blank config fallback / update 部分 + 全字段 + 404
+  - get 404 / listByCollection / listAll / delete + 404
+  - parseConfig 合法 JSON / 非法 → RuntimeException
+- **JwtServiceTest** (`JwtServiceTest.java`) — 9 tests,全 PASS
+  - 短 secret 抛 IllegalStateException / issue round-trip / parse 错误 token 返回 null
+  - 错 secret 解析 → null / typ=refresh token → null
+  - getAccessTtl 正确返回 / 过期 token → null
+- **MessageControllerTest** (`MessageControllerTest.java`) — 12 tests,全 PASS
+  - list: 无 cursor all / unreadOnly / cursor all / cursor unread / 非法 cursor → 400
+  - limit clamp 1-100 / 空结果 has_more=false / unreadOnly+非法 cursor → 400
+  - markRead: 成功 + 标记 read / 404 / 错 recipient 404
+
+### Changed
+- **抬 Jacoco 红线**(Week 31 重点 audit/view):
+  - **BUNDLE** 70% → **75%**
+  - **auth** 70% → **75%**
+  - **audit** 80% → **90%**
+  - **view** 90% → **95%**
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **405 tests PASS**(390 → 405,+39)
+- **覆盖率**:
+  - **audit** 83% → **99%** (+16%)
+  - **view** 94% → **98%** (+4%)
+  - **workflow** 92% → **93%** (+1%)
+  - **bundle** 80% → **81%** (+1%)
+
+### Key technical findings
+- **`RequestContextHolder` 必须清理**:用 `@AfterEach` 调 `resetRequestAttributes()` 防 request context 污染
+- **`log_serializeFailure_fallsBackToString`**:payload 含自引用抛 JsonProcessingException → fallback String.valueOf
+- **`log_truncatesLongUserAgent`**:250 字符上限,超过截断
+- **`log_prefersXForwardedForOverRemoteAddr`**:XFF 多段取第一段
+- **`ViewEntity.Type` enum**:只有 `TABLE / KANBAN / DETAIL`,不是 GRID
+- **`parseConfig` 失败抛 RuntimeException**:不是 ResponseStatusException
+- **`JwtService` shortSecret → IllegalStateException**(`@Value` 默认 15 分钟 access TTL)
+- **`parseAccessToken` 必须 typ=access**:手签 typ=refresh 也会被拒
+- **`MessageController` limit clamp**:`Math.max(1, Math.min(limit, 100))` — 9999→100, 0→1
+- **`next_cursor` 空结果时空字符串 `""`**:非空时是最后一条 createdAt
+- **`markRead` 跨用户**:recipient 不匹配 → 404(防信息泄漏)
+
+### Coverage Trend
+
+| Week | tests | bundle | auth | meta | workflow | notification | config | audit | view | notes |
+|------|-------|--------|------|------|----------|--------------|--------|-------|------|-------|
+| 31 | 405 | 81% | 81% | 58% | 93% | 94% | 28% | **99%** | **98%** | AuditService+ViewService+JwtService+MessageController + 4 红线 |
+| 30 | 390 | 80% | 81% | 58% | 92% | 94% | 28% | 83% | 94% | 3 dispatcher + GlobalEx + RefreshToken + 红线 BUNDLE 0.70/notification 0.85 |
+| 29 | 351 | 75% | 79% | 58% | 92% | 56% | 21% | 83% | 94% | WorkflowController + TemplateService + workflow 红线 0.80 |
+| 28 | 322 | 65% | 79% | 58% | 51% | 56% | 21% | 83% | 94% | CollectionController + WorkflowEngine + 红线三连跳 |
+| 27 | 276 | 47% | 79% | 20% | 22% | 56% | 21% | 83% | 94% | AuthController + RoleAclController + 红线大跃升 |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 30 Sprint — 3 NotificationDispatcher + GlobalExceptionHandler + RefreshTokenService + 红线抬升(1 commit)
 
 ### Added

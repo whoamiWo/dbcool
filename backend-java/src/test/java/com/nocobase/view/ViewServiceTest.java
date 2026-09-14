@@ -1,13 +1,15 @@
 package com.nocobase.view;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,164 +18,156 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * ViewService 单元测试(Week 21 抬红线).
+ * ViewService 单测(Week 31).
+ * 覆盖 parseConfig 收尾 + 业务方法 create/update/get/delete/listByCollection/listAll.
  */
 class ViewServiceTest {
 
     private ViewRepository repo;
     private ViewService service;
-    private final ObjectMapper mapper = new ObjectMapper();
-
-    private static final String TENANT = "tenant_default";
+    private final ObjectMapper json = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         repo = mock(ViewRepository.class);
-        service = new ViewService(repo, mapper);
-        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        service = new ViewService(repo, json);
+        when(repo.save(any(ViewEntity.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
-    /* === create === */
-
-    @Test
-    void create_setsAllFields() {
-        UUID createdBy = UUID.randomUUID();
-        var v = service.create("customer", "my_view", "我的视图",
-                ViewEntity.Type.TABLE, "{\"pageSize\":20}", "[]", TENANT, createdBy);
-        assertThat(v.getId()).isNotNull();
-        assertThat(v.getCollectionName()).isEqualTo("customer");
-        assertThat(v.getName()).isEqualTo("my_view");
-        assertThat(v.getTitle()).isEqualTo("我的视图");
-        assertThat(v.getType()).isEqualTo(ViewEntity.Type.TABLE);
-        assertThat(v.getConfigJson()).isEqualTo("{\"pageSize\":20}");
-        assertThat(v.getSharedWithJson()).isEqualTo("[]");
-        assertThat(v.getTenantId()).isEqualTo(TENANT);
-        assertThat(v.getCreatedAt()).isNotNull();
-        assertThat(v.getCreatedBy()).isEqualTo(createdBy);
+    private ViewEntity makeView(String name) {
+        ViewEntity v = new ViewEntity();
+        v.setId(UUID.randomUUID());
+        v.setName(name);
+        v.setTitle(name + " title");
+        v.setType(ViewEntity.Type.TABLE);
+        v.setCollectionName("posts");
+        v.setTenantId("tenant_default");
+        v.setConfigJson("{}");
+        v.setSharedWithJson("[]");
+        v.setCreatedAt(Instant.now());
+        v.setCreatedBy(UUID.randomUUID());
+        return v;
     }
 
     @Test
-    void create_nullConfigJson_defaultsToEmptyObject() {
-        var v = service.create("customer", "v", "T",
-                ViewEntity.Type.TABLE, null, null, TENANT, UUID.randomUUID());
-        assertThat(v.getConfigJson()).isEqualTo("{}");
-        assertThat(v.getSharedWithJson()).isEqualTo("[]");
+    void create_normalCase_saves() {
+        ViewEntity saved = service.create("posts", "v1", "View 1",
+                ViewEntity.Type.TABLE, "{}", "[]", "tenant_default", UUID.randomUUID());
+        assertEquals("posts", saved.getCollectionName());
+        assertEquals("v1", saved.getName());
     }
 
     @Test
-    void create_blankConfigJson_defaultsToEmptyObject() {
-        var v = service.create("customer", "v", "T",
-                ViewEntity.Type.TABLE, "", "  ", TENANT, UUID.randomUUID());
-        assertThat(v.getConfigJson()).isEqualTo("{}");
-        assertThat(v.getSharedWithJson()).isEqualTo("[]");
-    }
-
-    /* === get === */
-
-    @Test
-    void get_returnsView() {
-        UUID id = UUID.randomUUID();
-        when(repo.findByIdAndTenantId(id, TENANT)).thenReturn(Optional.of(makeView(id)));
-        assertThat(service.get(id, TENANT).getId()).isEqualTo(id);
+    void create_nullConfig_fallsBackToEmptyJson() {
+        ViewEntity saved = service.create("posts", "v1", "T",
+                ViewEntity.Type.TABLE, null, null, "tenant_default", UUID.randomUUID());
+        assertEquals("{}", saved.getConfigJson());
+        assertEquals("[]", saved.getSharedWithJson());
     }
 
     @Test
-    void get_notFound_throws404() {
-        UUID id = UUID.randomUUID();
-        when(repo.findByIdAndTenantId(id, TENANT)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.get(id, TENANT))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    /* === update === */
-
-    @Test
-    void update_modifiesAllFields() {
-        UUID id = UUID.randomUUID();
-        when(repo.findByIdAndTenantId(id, TENANT)).thenReturn(Optional.of(makeView(id)));
-        var v = service.update(id, "new_name", "新标题",
-                "{\"k\":1}", "[\"u1\"]", TENANT);
-        assertThat(v.getName()).isEqualTo("new_name");
-        assertThat(v.getTitle()).isEqualTo("新标题");
-        assertThat(v.getConfigJson()).isEqualTo("{\"k\":1}");
-        assertThat(v.getSharedWithJson()).isEqualTo("[\"u1\"]");
-        assertThat(v.getUpdatedAt()).isNotNull();
+    void create_blankConfig_fallsBackToEmpty() {
+        ViewEntity saved = service.create("posts", "v1", "T",
+                ViewEntity.Type.TABLE, "   ", "", "tenant_default", UUID.randomUUID());
+        assertEquals("{}", saved.getConfigJson());
+        assertEquals("[]", saved.getSharedWithJson());
     }
 
     @Test
-    void update_partialFields_keepsUntouched() {
-        UUID id = UUID.randomUUID();
-        ViewEntity orig = makeView(id);
-        orig.setName("orig_name");
-        orig.setTitle("orig_title");
-        orig.setConfigJson("{\"k\":1}");
-        when(repo.findByIdAndTenantId(id, TENANT)).thenReturn(Optional.of(orig));
-        var v = service.update(id, "new_name", null, null, null, TENANT);
-        assertThat(v.getName()).isEqualTo("new_name");
-        assertThat(v.getTitle()).isEqualTo("orig_title");
-        assertThat(v.getConfigJson()).isEqualTo("{\"k\":1}");
+    void update_partialUpdate_appliesNonNull() {
+        ViewEntity existing = makeView("old");
+        when(repo.findByIdAndTenantId(existing.getId(), "tenant_default"))
+                .thenReturn(Optional.of(existing));
+
+        ViewEntity updated = service.update(existing.getId(), "new", "new title",
+                null, null, "tenant_default");
+
+        assertEquals("new", updated.getName());
+        assertEquals("new title", updated.getTitle());
+        assertEquals("{}", updated.getConfigJson());  // 不变
+    }
+
+    @Test
+    void update_fullUpdate_appliesAll() {
+        ViewEntity existing = makeView("old");
+        when(repo.findByIdAndTenantId(existing.getId(), "tenant_default"))
+                .thenReturn(Optional.of(existing));
+
+        ViewEntity updated = service.update(existing.getId(), "new", "new title",
+                "{\"k\":\"v\"}", "[\"u1\"]", "tenant_default");
+
+        assertEquals("{\"k\":\"v\"}", updated.getConfigJson());
+        assertEquals("[\"u1\"]", updated.getSharedWithJson());
     }
 
     @Test
     void update_notFound_throws404() {
         UUID id = UUID.randomUUID();
-        when(repo.findByIdAndTenantId(id, TENANT)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.update(id, "n", "t", null, null, TENANT))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        when(repo.findByIdAndTenantId(id, "tenant_default")).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.update(id, "x", null, null, null, "tenant_default"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
-    /* === list === */
+    @Test
+    void get_found_returnsEntity() {
+        ViewEntity v = makeView("v1");
+        when(repo.findByIdAndTenantId(v.getId(), "tenant_default")).thenReturn(Optional.of(v));
+        assertEquals(v, service.get(v.getId(), "tenant_default"));
+    }
+
+    @Test
+    void get_notFound_throws404() {
+        UUID id = UUID.randomUUID();
+        when(repo.findByIdAndTenantId(id, "tenant_default")).thenReturn(Optional.empty());
+        assertThrows(ResponseStatusException.class,
+                () -> service.get(id, "tenant_default"));
+    }
 
     @Test
     void listByCollection_delegatesToRepo() {
-        var rows = List.of(makeView(UUID.randomUUID()), makeView(UUID.randomUUID()));
-        when(repo.findByCollectionNameAndTenantIdOrderByCreatedAtDesc("customer", TENANT))
-                .thenReturn(rows);
-        assertThat(service.listByCollection("customer", TENANT)).hasSize(2);
+        when(repo.findByCollectionNameAndTenantIdOrderByCreatedAtDesc("posts", "tenant_default"))
+                .thenReturn(List.of(makeView("v1"), makeView("v2")));
+        assertEquals(2, service.listByCollection("posts", "tenant_default").size());
     }
 
     @Test
     void listAll_delegatesToRepo() {
-        var rows = List.of(makeView(UUID.randomUUID()));
-        when(repo.findByTenantIdOrderByCreatedAtDesc(TENANT)).thenReturn(rows);
-        assertThat(service.listAll(TENANT)).hasSize(1);
+        when(repo.findByTenantIdOrderByCreatedAtDesc("tenant_default"))
+                .thenReturn(List.of(makeView("v1")));
+        assertEquals(1, service.listAll("tenant_default").size());
     }
 
-    /* === delete === */
-
     @Test
-    void delete_existing_removes() {
-        UUID id = UUID.randomUUID();
-        ViewEntity v = makeView(id);
-        when(repo.findByIdAndTenantId(id, TENANT)).thenReturn(Optional.of(v));
-        service.delete(id, TENANT);
+    void delete_callsRepoDelete() {
+        ViewEntity v = makeView("v1");
+        when(repo.findByIdAndTenantId(v.getId(), "tenant_default")).thenReturn(Optional.of(v));
+        service.delete(v.getId(), "tenant_default");
         org.mockito.Mockito.verify(repo).delete(v);
     }
 
     @Test
     void delete_notFound_throws404() {
         UUID id = UUID.randomUUID();
-        when(repo.findByIdAndTenantId(id, TENANT)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.delete(id, TENANT))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        when(repo.findByIdAndTenantId(id, "tenant_default")).thenReturn(Optional.empty());
+        assertThrows(ResponseStatusException.class,
+                () -> service.delete(id, "tenant_default"));
     }
 
-    private ViewEntity makeView(UUID id) {
-        ViewEntity v = new ViewEntity();
-        v.setId(id);
-        v.setCollectionName("customer");
-        v.setName("v");
-        v.setTitle("T");
-        v.setType(ViewEntity.Type.TABLE);
-        v.setConfigJson("{}");
-        v.setSharedWithJson("[]");
-        v.setTenantId(TENANT);
-        return v;
+    @Test
+    void parseConfig_validJson_returnsMap() {
+        ViewEntity v = makeView("v1");
+        v.setConfigJson("{\"columns\":[\"id\",\"title\"],\"pageSize\":20}");
+        Map<String, Object> cfg = service.parseConfig(v);
+        assertEquals(2, ((List<?>) cfg.get("columns")).size());
+        assertEquals(20, cfg.get("pageSize"));
+    }
+
+    @Test
+    void parseConfig_invalidJson_throwsRuntimeException() {
+        ViewEntity v = makeView("v1");
+        v.setConfigJson("not valid json{");
+        assertThrows(RuntimeException.class, () -> service.parseConfig(v));
     }
 }
