@@ -1,3 +1,57 @@
+## [Unreleased] - 2026-09-14 Week 34 Sprint — 安全审计 + E2E 集成测试(方向变更)(1 commit)
+
+### Added
+- **E2ESetupSmokeTest** (`E2ESetupSmokeTest.java`) — 1 test, PASS
+  - 验证 `@SpringBootTest` + H2 `MODE=PostgreSQL` + JPA `create-drop` 上下文能完整加载
+- **CollectionLifecycleE2ETest** (`CollectionLifecycleE2ETest.java`) — 7 tests,全 PASS
+  - **完整集成路径**:登录(admin/admin123 BCrypt)→ JWT 签发 → access_token 解析 → /me 验证
+  - list collections / list views(JPA 查询 metadata 表)
+  - 不存在的 collection name → 404
+  - health 公开端点 + 401 未认证
+  - Bean Validation(blank username → 400)
+- **SecurityAuditTest** (`SecurityAuditTest.java`) — 15 tests,全 PASS
+  - SQL 注入:`admin' OR '1'='1` / `' OR 1=1--` 不导致 500
+  - XSS:`<script>alert('xss')</script>` 不执行
+  - null payload:username/password null → 400
+  - 大 body:10KB username 处理优雅
+  - 错误 HTTP 方法:GET/DELETE on POST 端点 → 405/401
+  - 路径遍历:`/api/health/../../../etc/passwd` → 4xx
+  - Unicode:`用户🔐\u0000` 处理优雅
+  - JSON 注入:`{"role":"admin"}` 多余字段不提升权限
+
+### Changed
+- **测试类型多元化**:从纯单元测试扩展到 **集成测试 + 安全审计**
+- **新测试基础设施**:
+  - H2 `MODE=PostgreSQL` 兼容模式
+  - `@SpringBootTest(webEnvironment=RANDOM_PORT)` + `TestRestTemplate`
+  - `@WebMvcTest + @MockBean(SecurityConfig)` 模式(避免 Spring 默认用户名密码干扰)
+  - `SimpleClientHttpRequestFactory` 替代 JDK HttpURLConnection(避免 401 重试陷阱)
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **463 tests PASS**(440 → 463, **+23**)
+- **10 条包级红线全生效**
+
+### Key technical findings
+- **Hibernate create-drop 自动建表**:必须显式设 NOT NULL 字段(如 `created_at = Instant.now()`)
+- **PG-specific schema 不兼容 H2**:`TIMESTAMPTZ` / `JSONB` / `uuid_generate_v4()` 在 H2 MODE=PostgreSQL 下不工作;**测试策略改为只测 metadata CRUD**
+- **JDK HttpURLConnection 处理 401**:`WWW-Authenticate` 头触发自动重试导致 `HttpRetryException`;用 `SimpleClientHttpRequestFactory` 替代
+- **`@WebMvcTest + @MockBean(SecurityConfig)`**:WebMvcTest 默认启动 filter chain,会生成默认用户名密码;mock SecurityConfig 才能纯净测 controller
+- **`@MockBean PasswordEncoder`** 必须显式声明,否则 SecurityConfig 真实 bean 创建失败
+- **`@AutoConfigureMockMvc(addFilters = false)`** + `@MockBean(SecurityConfig)`:完全禁用 Spring Security filter,只测 controller 自身
+
+### Coverage Trend
+
+| Week | tests | bundle | auth | meta | workflow | notification | config | audit | view | notes |
+|------|-------|--------|------|------|----------|--------------|--------|-------|------|-------|
+| 34 | 463 | 83% | 92% | 58% | 96% | 94% | 28% | 99% | 98% | E2E + 安全审计(方向变更) |
+| 33 | 440 | 83% | 92% | 58% | 96% | 94% | 28% | 99% | 98% | 红线饱和上限 |
+| 32 | 440 | 83% | 92% | 58% | 96% | 94% | 28% | 99% | 98% | UserAdminService + matchCondition |
+| 31 | 405 | 81% | 81% | 58% | 93% | 94% | 28% | 99% | 98% | AuditService+ViewService+JwtService+MessageController |
+| 30 | 390 | 80% | 81% | 58% | 92% | 94% | 28% | 83% | 94% | 3 dispatcher + GlobalEx + RefreshToken |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 33 Sprint — Jacoco 红线饱和上限(最终态)(1 commit)
 
 ### Changed
