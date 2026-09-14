@@ -4,6 +4,34 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 19 Sprint — JaCoCo 覆盖率 + CI 红线(1 commit)
+
+### Added
+- **JaCoCo 覆盖率报告 + 红线** (`9a3635d`)
+  - `jacoco-maven-plugin` 0.8.12
+  - 三执行:prepare-agent / report / check
+  - 红线:全局 ≥5% / auth ≥20% / meta ≥5%
+  - mvn verify 自动检查,失败则 BUILD FAILURE
+  - 已测试红线有效性(auth 设 99% → 0.26 < 0.99 触发 fail)
+
+- **修复反射调用不被 JaCoCo 计入** (`9a3635d`)
+  - `DynamicTableManager.buildOrderBy` private → package-private
+  - `DynamicTableManagerOrderByTest` 改直接方法调用(去掉反射)
+  - DynamicTableManager 实际覆盖率 0% → 29%
+
+### Verified
+- `mvn verify` BUILD SUCCESS
+- 70 tests 全 PASS
+- auth 26% (AclEnforcer 100%) / meta 8% (DynamicTableManager 29%, FieldDef 100%)
+- health 100%
+
+### Known
+- 红线目前低(起步阈值),每周逐步提升
+- 其他包(workflow/view/audit/notification/form/api)暂未测,等补测试
+- GitHub Actions 集成未做(本地红线 vs CI 红线是不同概念)
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 18 Sprint — Java 单元测试 — 阶段 5 提前(1 commit)
 
 ### Added
