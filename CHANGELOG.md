@@ -1,3 +1,31 @@
+## [Unreleased] - 2026-09-14 Week 26 Sprint — 批量补 3 controllers + 红线大跃升(1 commit)
+
+### Added
+- **UserAdminControllerTest** (`UserAdminControllerTest.java`) — 10 tests,全 PASS
+  - list / get(+roles) / create(201)/ create 空白 username→400 / update / resetPassword / delete / assignRole / removeRole / effectivePermissions
+- **FormControllerTest** (`FormControllerTest.java`) — 7 tests,全 PASS
+  - create(201)/ create 空白 collectionName→400 / list(全量)/ list(byCollection)/ get(+parseLayout+parseRules)/ update / delete
+- **RowAclControllerTest** (`RowAclControllerTest.java`) — 8 tests,全 PASS
+  - list(tenant 过滤)/ byCollection / create / update / update 404 / update 跨租户 403 / delete / delete 跨租户 403
+
+### Changed
+- **抬 Jacoco 红线**(Week 26 大跃升):
+  - **BUNDLE** 33% → **38%**
+  - **auth** 25% → **35%**
+  - **acl** 48% → **85%**
+  - **form** 45% → **95%**
+- **auth excludes 移除** `UserAdminController`(已 98% 覆盖)
+- **关键设计**:RowAclControllerTest **不能 @MockBean ObjectMapper**,会让 Spring RouterFunctionMapping 失败 — 让 Spring 注入真实 ObjectMapper
+- **关键设计**:FormControllerTest / RowAclControllerTest 通过 `SecurityContextHolder.setContext()` 手动注入 AuthenticatedUser,不走 @WithMockUser
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **247 tests PASS**(222 → 247,+25)
+- **覆盖率**:auth 38%(↑ 13%)/ form 99%(↑ 50%)/ acl 89%(↑ 41%)/ bundle 40%(↑ 6%)
+- 单类达成:UserAdminController 98% / FormController 99% / RowAclController 90% / AclRowPolicyEntity 100%
+
+---
+
 # Changelog
 
 本项目所有重要变更按时间倒序记录。每次会话的成果可追溯。
@@ -34,6 +62,7 @@
 | 23 | 183 | 10 | 21% |
 | 24 | 204 | 10 | 28% |
 | 25 | 222 | 10 | 33% |
+| **26** | **247** | **10** | **38%** |
 
 ---
 
