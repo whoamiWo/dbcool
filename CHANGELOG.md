@@ -1,3 +1,34 @@
+## [Unreleased] - 2026-09-14 Week 27 Sprint — 批量补 2 个 auth controllers + 红线大跃升(1 commit)
+
+### Added
+- **AuthControllerTest** (`AuthControllerTest.java`) — 12 tests,全 PASS
+  - login 成功/用户不存在(401)/密码错(401)/空 username(400)
+  - refresh 成功/无效 token(401)/用户不存在(401)
+  - changePassword 成功/旧密码错(401)/用户不存在(404)
+  - me 成功带角色/用户不存在(404)
+- **RoleAclControllerTest** (`RoleAclControllerTest.java`) — 17 tests,全 PASS
+  - Roles CRUD: list/create/create dup(409)/create blank(400)/update/update 404/delete
+  - Roles Tree + Inheritance + cycle 检测(走 updateRole path)+ 404
+  - ACL Policies: list by roleId/create/create invalid action(4xx)/update/update 404/delete
+
+### Changed
+- **抬 Jacoco 红线**(Week 27 大跃升):
+  - **BUNDLE** 38% → **47%**
+  - **auth** 35% → **70%**
+- **auth excludes 移除** `AuthController` 和 `RoleAclController`(均已 ~95% 覆盖)
+- **关键设计**:`@MockBean PasswordEncoder` 是 WebMvcTest 必须,默认 SecurityConfig 不装配
+- **关键设计**:`createAcl` 有隐藏前置校验(role 必须存在),需 mock `findByIdAndTenantId`
+- **关键设计**:`cycle` 检测在 `createRole` 不可达(UUID.randomUUID 在 save 前),改用 `updateRole` path id 测
+- **关键设计**:Inheritance chain `depth = nodes.size() - 1`,需 mock `findById` 每个 id 含 self
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **276 tests PASS**(247 → 276,+29)
+- **覆盖率**:auth **79%**(↑ 41%)/ bundle **47%**(↑ 7%)
+- 单类达成:AuthController ~95% / RoleAclController ~95% / UserAdminController 98% / FormController 99% / RowAclController 90%
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 26 Sprint — 批量补 3 controllers + 红线大跃升(1 commit)
 
 ### Added
@@ -51,7 +82,7 @@
 - `mvn clean verify` 222 tests 全 PASS + All coverage checks met
 - 覆盖率:workflow 10%→22% / meta 10%→20% / bundle 28%→34%
 
-### Trend(Week 18 → 25)
+### Trend(Week 18 → 27)
 | 周 | tests | 覆盖包数 | bundle 红线 |
 |----|------|---------|------------|
 | 18 | 70 | 1 | — |
@@ -62,7 +93,8 @@
 | 23 | 183 | 10 | 21% |
 | 24 | 204 | 10 | 28% |
 | 25 | 222 | 10 | 33% |
-| **26** | **247** | **10** | **38%** |
+| 26 | 247 | 10 | 38% |
+| **27** | **276** | **10** | **47%** |
 
 ---
 
