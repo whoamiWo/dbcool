@@ -1,3 +1,59 @@
+## [Unreleased] - 2026-09-14 Week 29 Sprint — WorkflowController + WorkflowTemplateService + workflow 红线大跳(1 commit)
+
+### Added
+- **WorkflowControllerTest** (`WorkflowControllerTest.java`) — 24 tests,全 PASS
+  - list(无 collection / 有 collection)
+  - get(成功 + 解析 JSON nodes/edges/trigger)/ get 坏 JSON 返回空 / get 404
+  - create(201)
+  - trigger: disabled→400 / 404 / completed / needs_approval→202 / failed→500 / bad nodes JSON fallback
+  - listInstances(无 / 按 workflowId)
+  - getInstance(成功 + 关联 tasks)/ getInstance 404
+  - myTasks(返回 assignee + status=PENDING)
+  - approve: 404 / 已处理→400 / 下一节点是 APPROVAL→PENDING / 下一节点是 NOTIFICATION→COMPLETED
+  - reject: marks FAILED + 审计 / 404 / 已处理→400
+- **WorkflowTemplateServiceTest** (`WorkflowTemplateServiceTest.java`) — 5 tests,全 PASS
+  - 未知 template→404
+  - 新 collection→创建 + workflow
+  - 现有 collection→跳过 + workflow
+  - 空 collections→只创建 workflow
+  - 多 collection 部分创建(a 新建 + b 跳过)
+
+### Changed
+- **抬 Jacoco 红线**(Week 29 重点 workflow):
+  - **BUNDLE** 55% → **65%**
+  - **workflow** 45% → **80%**
+- **workflow excludes 移除** `WorkflowController` + `WorkflowTemplateService`(均已测)
+- **workflow 包现在 0 excludes**
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **351 tests PASS**(322 → 351,+29)
+- **覆盖率爆炸**:
+  - **workflow** 51% → **92%** (+41%)
+  - **bundle** 65% → **75%** (+10%)
+
+### Key technical findings
+- **`reject` 签名无 user 参数**:只有 `(UUID taskId, Map<String,String> body)`,**没有** `@AuthenticationPrincipal`,与 `approve` 不一致
+- **`workflowRepository.save` 必须 stub**:controller 的 `create` 直接调 save,不 stub 会 NPE 在 `toDto(saved)`
+- **`trigger` 路径选择逻辑**: `edges.isEmpty() && nodes.isEmpty()` → executeFrom(数组);否则 → executeGraphFrom(图)
+- **`trigger` 结果码差异化**:CONTINUE→0 / NEEDS_APPROVAL→0(HTTP 202)/ FAILED→500
+- **`approve` 推进路径 2 出口**:下一节点 APPROVAL → 创建 task + PENDING;下一节点 NOTIFICATION → COMPLETED
+- **`get` JSON 解析失败**:返回空 list(catch 里 dto.put),不抛
+- **`reject` audit 用 task.getAssignee()** 当 userId,不读 user 参数
+- **`WorkflowTemplateService.install` 成功检测靠异常**:`collectionService.get(name)` 抛 → 不存在;返回 → 已存在
+
+### Coverage Trend
+
+| Week | tests | bundle | auth | meta | workflow | acl | notes |
+|------|-------|--------|------|------|----------|-----|-------|
+| 29 | 351 | 75% | 79% | 58% | **92%** | 89% | WorkflowController + TemplateService + workflow 红线 0.80 |
+| 28 | 322 | 65% | 79% | 58% | 51% | 89% | CollectionController + WorkflowEngine + 红线三连跳 |
+| 27 | 276 | 47% | 79% | 20% | 22% | 89% | AuthController + RoleAclController + 红线大跃升 |
+| 26 | 247 | 38% | 35% | 20% | 22% | 89% | UserAdminController + FormController + RowAclController |
+| 25 | — | 33% | 35% | 20% | 22% | — | (基线) |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 28 Sprint — CollectionController + WorkflowEngine + 红线三连跳(1 commit)
 
 ### Added
