@@ -4,6 +4,30 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 16 Sprint — 字段级 ACL 写路径(1 commit)
+
+### Security(重要)
+- **字段级 ACL 写拦截** (`27ff113`) — ACL 三层矩阵完全闭合
+  - `AclEnforcer.filterWritableFields` + `assertCanWriteFields`
+  - `CollectionController` 在 createRecord/updateRecord 第一行加拦截
+  - 顺序:collection → **field** → row(避免泄露 forbidden 字段存在性)
+  - E2E 6/6 PASS(carol_inherit 临时挂 w16_field_test 角色,hidden=[salary])
+    - T1 PUT salary=99999 → 403
+    - T2 PUT 仅 name → 200
+    - T3 PUT salary=null → 403 (显式清空)
+    - T4 admin PUT salary=777 → 200 (无 FIELD policy)
+    - T5 POST 含 salary → 403
+    - T6 POST 仅 name → 201
+
+### ACL 三层防御纵深现状
+| 层 | Read | Write |
+|----|------|-------|
+| Collection | ✅ US-301 | ✅ US-301 |
+| Row | ✅ Week 14.5 | ✅ Week 14.5 |
+| Field | ✅ 早期 | **✅ Week 16(本次)** |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 15 Sprint — 视图+工作流 P1 收尾(3 commits)
 
 ### Added
