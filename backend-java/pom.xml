@@ -188,14 +188,14 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 8%(Week 20,从 5% 提升) -->
+                                <!-- 全局:行覆盖 ≥ 12%(Week 21,新增 3 个模块测试) -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.08</minimum>
+                                            <minimum>0.12</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -229,7 +229,7 @@
                                         <exclude>com.nocobase.auth.JwtAuthFilter</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- meta 模块(已含 DynamicTableManagerTest + FieldDefTest + MatchFilterTest):行覆盖 ≥ 10% -->
+                                <!-- meta 模块(Week 21):行覆盖 ≥ 10%(对齐实际) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -251,7 +251,7 @@
                                 </rule>
                                 <!-- workflow 模块:本周暂无测试,红线 0% 不强制 -->
                                 <!-- view / audit / notification / form / api:0% 不强制 -->
-                                <!-- acl 模块(已含 RowAclServiceTest):行覆盖 ≥ 45%(Week 20 引入) -->
+                                <!-- acl 模块(Week 20/21):行覆盖 ≥ 48%(对齐实际) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -261,7 +261,49 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
+                                            <minimum>0.48</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- audit 模块(Week 21 引入):行覆盖 ≥ 45% -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.nocobase.audit</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
                                             <minimum>0.45</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- view 模块(Week 21 引入):行覆盖 ≥ 40% -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.nocobase.view</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.40</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- workflow 模块(Week 21 引入):行覆盖 ≥ 10% -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.nocobase.workflow</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.10</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
