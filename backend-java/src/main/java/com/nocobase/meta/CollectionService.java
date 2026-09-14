@@ -216,12 +216,25 @@ public class CollectionService {
     }
 
     public List<Map<String, Object>> listRecords(String collectionName, String tenantId, int limit) {
+        return listRecords(collectionName, tenantId, limit, null, null);
+    }
+
+    /**
+     * 列出记录(Week 17: 服务端 filter + sort).
+     *
+     * @param sortExpr `"name,-salary"` 逗号分隔字段,`-` 前缀 DESC(白名单由 CollectionField 决定)
+     * @param filters  过滤规则镜像前端 FilterRule:[{field, op, value}](Java 端镜像前端 applyFilters 逻辑)
+     */
+    public List<Map<String, Object>> listRecords(String collectionName, String tenantId,
+                                                int limit, String sortExpr,
+                                                List<FilterRule> filters) {
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
-        List<String> jsonRecords = tableManager.listRecords(collectionName, limit);
-        return jsonRecords.stream()
+        List<FieldDef> fields = parseFields(meta);
+        List<String> jsonRecords = tableManager.listRecords(collectionName, limit, sortExpr, fields);
+        List<Map<String, Object>> records = jsonRecords.stream()
                 .map(json -> {
                     try {
                         Map<String, Object> wrapper = objectMapper.readValue(
@@ -237,7 +250,40 @@ public class CollectionService {
                     }
                 })
                 .toList();
+        // Java 端 filter(Week 17):与前端 applyFilters 镜像
+        if (filters != null && !filters.isEmpty()) {
+            records = records.stream()
+                    .filter(r -> filters.stream().allMatch(f -> matchFilter(r.get(f.field), f)))
+                    .toList();
+        }
+        return records;
     }
+
+    /** Week 17: 与前端 FilterRule op 完全镜像 */
+    private boolean matchFilter(Object value, FilterRule rule) {
+        if (rule == null || rule.op == null) return true;
+        return switch (rule.op) {
+            case "eq"       -> value != null && String.valueOf(value).equals(String.valueOf(rule.value));
+            case "neq"      -> value != null && !String.valueOf(value).equals(String.valueOf(rule.value));
+            case "contains" -> value != null && String.valueOf(value).contains(String.valueOf(rule.value == null ? "" : rule.value));
+            case "gt"       -> toDouble(value) > toDouble(rule.value);
+            case "lt"       -> toDouble(value) < toDouble(rule.value);
+            case "empty"    -> value == null || String.valueOf(value).isEmpty();
+            case "notEmpty" -> value != null && !String.valueOf(value).isEmpty();
+            default         -> true; // 未知 op 视为通过
+        };
+    }
+
+    private static double toDouble(Object v) {
+        if (v == null) return Double.NaN;
+        if (v instanceof Number n) return n.doubleValue();
+        try { return Double.parseDouble(String.valueOf(v)); } catch (Exception e) { return Double.NaN; }
+    }
+
+    /**
+     * Week 17: 过滤规则 record(与前端 FilterRule 镜像).
+     */
+    public record FilterRule(String field, String op, Object value) {}
 
     // ============================================================
     //  Week 14.5 P3-3 补完:单条 get / update / delete

@@ -4,8 +4,10 @@ import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -227,11 +229,16 @@ public class CollectionController {
     public Map<String, Object> listRecords(
             @PathVariable String name,
             @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String filter,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
-        List<Map<String, Object>> records = service.listRecords(name, user.tenantId(), limit);
+        // Week 17: 解析 filter query string 为 FilterRule 列表
+        List<com.nocobase.meta.CollectionService.FilterRule> filters = parseFilters(filter);
+        List<Map<String, Object>> records = service.listRecords(
+                name, user.tenantId(), limit, sort, filters);
         // FIELD policy 过滤:对每条记录应用隐藏字段
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
@@ -243,6 +250,37 @@ public class CollectionController {
                 "code", 0, "message", "success",
                 "data", records
         );
+    }
+
+    /**
+     * Week 17: 解析 filter query string。
+     *
+     * <p>语法:`field1:op1:value1,field2:op2:value2`(逗号分隔多个规则,冒号分隔 field/op/value)
+     * <ul>
+     *   <li>op 缺省 = eq</li>
+     *   <li>value 缺省 = null(配合 empty/notEmpty)</li>
+     *   <li>op 白名单:eq/neq/contains/gt/lt/empty/notEmpty</li>
+     * </ul>
+     *
+     * <p>例:`filter=name:contains:Al,age:gt:20,email:empty`
+     */
+    private List<com.nocobase.meta.CollectionService.FilterRule> parseFilters(String filterStr) {
+        if (filterStr == null || filterStr.isBlank()) return List.of();
+        Set<String> ops = Set.of("eq", "neq", "contains", "gt", "lt", "empty", "notEmpty");
+        List<com.nocobase.meta.CollectionService.FilterRule> out = new ArrayList<>();
+        for (String raw : filterStr.split(",")) {
+            String t = raw.trim();
+            if (t.isEmpty()) continue;
+            String[] parts = t.split(":", 3);
+            if (parts.length < 1 || parts[0].isBlank()) continue;
+            String field = parts[0].trim();
+            String op = parts.length >= 2 && !parts[1].isBlank() ? parts[1].trim() : "eq";
+            Object value = parts.length == 3 ? parts[2] : null;
+            if (!ops.contains(op)) continue; // 非法 op 跳过
+            if (!field.matches("[a-zA-Z_][a-zA-Z0-9_]*")) continue; // 字段名安全
+            out.add(new com.nocobase.meta.CollectionService.FilterRule(field, op, value));
+        }
+        return out;
     }
 
     // ============================================================

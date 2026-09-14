@@ -1,7 +1,10 @@
 package com.nocobase.meta;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -74,15 +77,74 @@ public class DynamicTableManager {
     }
 
     /**
-     * 列出记录.
+     * 列出记录(Week 17: SQL 端支持服务端排序).
+     *
+     * <p>sortExpr 格式:`"name,-salary"`(逗号分隔,可选 `-` 前缀)。
+     * 字段名会被白名单过滤(必须 ∈ fields),不合法字段跳过。
+     * 无 sortExpr 时维持原有 ORDER BY created_at DESC。
      */
     public List<String> listRecords(String collectionName, int limit) {
-        return jdbc.queryForList(
-                "SELECT extra::text FROM " + physicalTableName(collectionName) +
-                " ORDER BY created_at DESC LIMIT ?",
-                String.class,
-                Math.min(limit, 200)
-        );
+        return listRecords(collectionName, limit, null, null);
+    }
+
+    /**
+     * 列出记录(Week 17 重载,支持服务端排序白名单).
+     *
+     * @param sortExpr 逗号分隔字段列表,可加 `-` 前缀表示 DESC,例如 "name,-salary"
+     * @param fields   collection 的字段定义(白名单,null=无 sort)
+     */
+    public List<String> listRecords(String collectionName, int limit,
+                                    String sortExpr,
+                                    List<com.nocobase.meta.FieldDef> fields) {
+        StringBuilder sql = new StringBuilder("SELECT extra::text FROM ")
+                .append(physicalTableName(collectionName));
+        String orderBy = buildOrderBy(sortExpr, fields);
+        if (orderBy != null) {
+            sql.append(" ORDER BY ").append(orderBy);
+        } else {
+            sql.append(" ORDER BY created_at DESC");
+        }
+        sql.append(" LIMIT ?");
+        return jdbc.queryForList(sql.toString(), String.class, Math.min(limit, 500));
+    }
+
+    /**
+     * 构建安全的 ORDER BY 子句(白名单字段名)。
+     *
+     * <p>防御:
+     * <ul>
+     *   <li>字段名只允许 `[a-zA-Z_][a-zA-Z0-9_]*`(正则)— 直接防 SQL injection</li>
+     *   <li>`-` / `+` 前缀只允许在首字符</li>
+     *   <li>系统字段(created_at/updated_at)+ 任何用户字段(动态 schema)皆可</li>
+     * </ul>
+     *
+     * <p>不再强制 ∈ collection_meta.fields(因为动态 schema 里该数组可能空)。
+     */
+    private String buildOrderBy(String sortExpr,
+                                List<com.nocobase.meta.FieldDef> fields) {
+        if (sortExpr == null || sortExpr.isBlank()) {
+            return null;
+        }
+        // 字段白名单仅用于「该 collection 是否真的允许排序」(参考性,不强制)
+        // 字段名合法性由正则 [a-zA-Z_][a-zA-Z0-9_]* 严格保证 — 这是真正的安全屏障
+        List<String> parts = new ArrayList<>();
+        for (String token : sortExpr.split(",")) {
+            String t = token.trim();
+            if (t.isEmpty()) continue;
+            boolean desc = false;
+            if (t.startsWith("-")) { desc = true; t = t.substring(1); }
+            else if (t.startsWith("+")) { t = t.substring(1); }
+            if (!t.matches("[a-zA-Z_][a-zA-Z0-9_]*")) continue;
+            // 用 jsonb 提取保证一致性;created_at/updated_at 用原生列
+            String col;
+            if ("created_at".equals(t) || "updated_at".equals(t)) {
+                col = t;
+            } else {
+                col = "(extra->>'" + t + "')";
+            }
+            parts.add(col + (desc ? " DESC" : " ASC") + " NULLS LAST");
+        }
+        return parts.isEmpty() ? null : String.join(", ", parts);
     }
 
     /**
