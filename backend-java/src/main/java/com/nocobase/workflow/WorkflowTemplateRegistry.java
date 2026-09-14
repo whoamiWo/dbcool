@@ -62,12 +62,12 @@ public class WorkflowTemplateRegistry {
                         "leave_request",
                         Map.of("type", "record.created"),
                         List.of(
-                                node("start", "Start", "manual", Map.of(), "end"),
-                                node("notify_applicant", "Notify Applicant", "notification",
+                                // 引擎节点类型大写常量(Week 40 B1 修复)。原 "manual" + "notification" 落到 unknown 分支被跳过。
+                                node("notify_applicant", "Notify Applicant", "NOTIFICATION",
                                         Map.of("title", "申请已提交", "body", "您的请假申请已进入审批"), "end")
                         ),
                         List.of(
-                                edge("start", "notify_applicant"),
+                                // Week 40 B1: start 虚拟节点已删
                                 edge("notify_applicant", "end")
                         )));
     }
@@ -99,14 +99,15 @@ public class WorkflowTemplateRegistry {
                         "expense_report",
                         Map.of("type", "record.created"),
                         List.of(
-                                node("start", "Start", "manual", Map.of(), "review"),
-                                node("review", "Auto Review", "condition",
-                                        Map.of("condition", "amount > 1000"), "notify"),
-                                node("notify", "Notify Finance", "notification",
+                                // 引擎节点类型大写常量(Week 40 B1 修复)。
+                                // condition 节点 config 改为 when:{field,op,value} 格式对齐 matchCondition 入参。
+                                node("review", "Auto Review", "CONDITION",
+                                        Map.of("when", Map.of("field", "amount", "op", "gt", "value", 1000)), "notify"),
+                                node("notify", "Notify Finance", "NOTIFICATION",
                                         Map.of("title", "新报销待审批", "body", "收到新报销"), "end")
                         ),
                         List.of(
-                                edge("start", "review"),
+                                // Week 40 B1: start 虚拟节点已删
                                 edge("review", "notify"),
                                 edge("notify", "end")
                         )));
@@ -138,12 +139,12 @@ public class WorkflowTemplateRegistry {
                         "customer",
                         Map.of("type", "record.created"),
                         List.of(
-                                node("start", "Start", "manual", Map.of(), "notify"),
-                                node("notify", "Notify Sales", "notification",
+                                // 引擎节点类型大写常量(Week 40 B1 修复)。
+                                node("notify", "Notify Sales", "NOTIFICATION",
                                         Map.of("title", "新客户", "body", "请跟进"), "end")
                         ),
                         List.of(
-                                edge("start", "notify"),
+                                // Week 40 B1: start 虚拟节点已删
                                 edge("notify", "end")
                         )));
     }

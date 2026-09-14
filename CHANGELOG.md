@@ -1,3 +1,40 @@
+## Week 41 (2026-09-15) — 技术债批次 1:止血 Step F1 (B1 模板空壳)
+### 修 B1 模板市场空壳(0.5d)
+**根因**:3 个内置模板(leave_approval / expense_report / customer_followup)节点类型用
+小写 "manual" / "notification" / "condition",引擎只认大写 "APPROVAL" / "NOTIFICATION" /
+"CONDITION" / "HTTP",所有节点落到 `unknown node type` 警告被跳过,工作流实际是空壳。
+**附带问题**:expense_report 的 condition config 用字符串表达式 `Map.of("condition", "amount > 1000")`,
+但引擎 `matchCondition` 期望结构化 `Map.of("when", Map.of("field", "amount", "op", "gt", "value", 1000))`。
+### 改动 3 处
+1. **WorkflowEngine.java**:两处分发(数组模式 executeFrom + 图模式 executeGraphFrom)均改为
+   null-safe `equalsIgnoreCase` helper;新增 `private static boolean equalsIgnoreCase(String, String)`
+2. **WorkflowTemplateRegistry.java**:3 个模板对齐引擎约定
+   - 节点类型大写:`notification` → `NOTIFICATION`,`condition` → `CONDITION`
+   - condition config 用 `when:{field, op, value}` 格式(对齐 matchCondition 入参)
+   - 删除 `start` 虚拟节点及对应 edges(引擎无 start 类型)
+3. **WorkflowTemplateRegistryTest.java**:同步更新小写期望为大写
+### 加 6 个回归测试 (新文件 WorkflowTemplateRegistryB1Test)
+- leaveApproval_template_usesUppercaseNodeTypes
+- expenseReport_template_conditionNodeUsesWhenShape
+- customerFollowup_template_usesUppercaseNodeTypes
+- allTemplates_noLowercaseNodeTypes(防御性扫描)
+- engine_lowercaseNotificationStillExecutes(API 防御兼容)
+- engine_uppercaseNotificationStillExecutes(标准路径)
+### 验收标准达成
+- ✅ 安装 3 个内置模板后触发,NOTIFICATION 节点真正执行(messageRepository.save + notificationService.fire)
+- ✅ "unknown node type" 警告日志不再出现(除非确实未知类型)
+- ✅ 新增 6 个集成测试全部通过
+### 回归红线保持
+- 后端: **469/469 PASS**(基线 463 + 新增 6)
+- Jacoco: All coverage checks have been met
+- 前端 vitest: 150/150 PASS,tsc 0 errors
+- 前端 E2E: 17/17 PASS(firefox 真跑)
+- 总测试: 483 + 150 + 34 = 667 tests
+### 批次 1 进度
+- ✅ F1 (B1 模板空壳, 0.5d) — done
+- ⏭️ F2 (B2 PUT/DELETE, 1.5d) — 下一步
+- ⏭️ F3 (B3 dropTable 打通 + D9 getColumns 补测试, 0.5d)
+
 ## Week 40 (2026-09-14) — E3:修 TS 错误 + E1:WorkflowDesigner E2E + 4 个新发现的源码 bug
 ### 修 49 个 TS 错误(tsc 0 errors)
 - FormRuntime.test.tsx: 补 `required` + FormFull 完整字段(8 处)

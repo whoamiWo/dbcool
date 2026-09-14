@@ -36,6 +36,12 @@ public class WorkflowEngine {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowEngine.class);
 
+    /** Null-safe 大小写不敏感比较(避免上游传 null 节点类型时 NPE)。Week 40 B1 修复。 */
+    private static boolean equalsIgnoreCase(String a, String b) {
+        if (a == null) return false;
+        return a.equalsIgnoreCase(b);
+    }
+
     public enum NodeResult { CONTINUE, NEEDS_APPROVAL, FAILED }
 
     private final WorkflowInstanceRepository instanceRepository;
@@ -105,19 +111,19 @@ public class WorkflowEngine {
             String nodeType = (String) node.get("type");
             String next = null;
             String[] handleHolder = {null}; // 用 array 持有 handle 状态(lambda 用 final)
-            if ("APPROVAL".equals(nodeType)) {
+            if (equalsIgnoreCase(nodeType, "APPROVAL")) {
                 createApprovalTask(instance.getId(), current, defaultAssignee);
                 instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                 instanceRepository.save(instance);
                 return NodeResult.NEEDS_APPROVAL;
-            } else if ("NOTIFICATION".equals(nodeType)) {
+            } else if (equalsIgnoreCase(nodeType, "NOTIFICATION")) {
                 logNotification(instance, node);
-            } else if ("CONDITION".equals(nodeType)) {
+            } else if (equalsIgnoreCase(nodeType, "CONDITION")) {
                 // 评估 then/else,带 sourceHandle = "true" / "false"
                 boolean matched = matchCondition(instance, castConfig(castConfig(node.get("config")).get("when")));
                 handleHolder[0] = matched ? "true" : "false";
                 log.info("workflow {} condition {} matched={}", instance.getId(), current, matched);
-            } else if ("HTTP".equals(nodeType)) {
+            } else if (equalsIgnoreCase(nodeType, "HTTP")) {
                 executeHttp(instance, node);
             } else {
                 log.warn("workflow {} unknown node type: {}", instance.getId(), nodeType);
@@ -162,15 +168,15 @@ public class WorkflowEngine {
             instance.setCurrentNodeIndex(i);
             String nodeType = (String) node.get("type");
 
-            if ("APPROVAL".equals(nodeType)) {
+            if (equalsIgnoreCase(nodeType, "APPROVAL")) {
                 createApprovalTask(instance.getId(), (String) node.get("id"), defaultAssignee);
                 instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                 instanceRepository.save(instance);
                 return NodeResult.NEEDS_APPROVAL;
-            } else if ("NOTIFICATION".equals(nodeType)) {
+            } else if (equalsIgnoreCase(nodeType, "NOTIFICATION")) {
                 logNotification(instance, node);
                 i++;
-            } else if ("CONDITION".equals(nodeType)) {
+            } else if (equalsIgnoreCase(nodeType, "CONDITION")) {
                 // 条件节点:评估 then/else,跳到下一个要执行的节点
                 int nextIdx = evaluateCondition(instance, node, nodes, i);
                 if (nextIdx < 0) {
@@ -178,7 +184,7 @@ public class WorkflowEngine {
                     return NodeResult.FAILED;
                 }
                 i = nextIdx;
-            } else if ("HTTP".equals(nodeType)) {
+            } else if (equalsIgnoreCase(nodeType, "HTTP")) {
                 executeHttp(instance, node);
                 i++;
             } else {

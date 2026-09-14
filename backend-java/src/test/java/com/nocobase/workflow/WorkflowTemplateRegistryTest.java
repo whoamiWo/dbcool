@@ -71,14 +71,16 @@ class WorkflowTemplateRegistryTest {
         var t = registry.get("expense_report").orElseThrow();
         var wf = t.workflow();
         assertThat(wf).isNotNull();
-        assertThat(wf.nodes()).anyMatch(n -> "condition".equals(n.get("type")));
+        // Week 40 B1: 模板节点类型已对齐引擎大写常量
+        assertThat(wf.nodes()).anyMatch(n -> "CONDITION".equals(n.get("type")));
     }
 
     @Test
     void customerFollowup_hasNotificationNode() {
         var t = registry.get("customer_followup").orElseThrow();
         var wf = t.workflow();
-        assertThat(wf.nodes()).anyMatch(n -> "notification".equals(n.get("type")));
+        // Week 40 B1: 模板节点类型已对齐引擎大写常量
+        assertThat(wf.nodes()).anyMatch(n -> "NOTIFICATION".equals(n.get("type")));
     }
 
     @Test
