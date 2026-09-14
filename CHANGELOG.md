@@ -1,3 +1,29 @@
+## Week 39 Step C (2026-09-14) — Playwright E2E(9 tests,2 specs)
+- `@playwright/test@1.63.0` 安装 + `playwright.config.ts`
+- 策略: 前端 E2E + API mock(不启 Spring,快/稳/CI 友好)
+- **e2e/login.spec.ts** (5 tests):
+  - 成功登录:跳转 /home + token 写入 localStorage
+  - 登录失败:显示错误消息 + 不跳转
+  - 空表单提交:zod 校验错误提示
+  - 未登录访问 /admin/users:401 → api client 拦截器清 token + 跳 /login
+  - API 返回业务错误消息
+- **e2e/users-crud.spec.ts** (4 tests):
+  - 空列表:显示"暂无用户"
+  - 列表:渲染已有用户 + 显示启停状态
+  - 新建用户:POST 后列表自动增加
+  - 启停用户:PATCH 调用 + UI 更新
+- **CI 新增 job**: `frontend-e2e`(独立于 unit test):
+  - `pnpm exec playwright install --with-deps chromium`
+  - `pnpm build` + `pnpm test:e2e`
+  - 上传 playwright-report + test-results artifact(7 天)
+- **package.json**: `test:e2e` / `test:e2e:ui` / `test:e2e:debug`
+- **沙盒限制**: chromium 装失败(无外网下载),CI 上运行
+
+### E2E 架构决定
+- **不启后端**:已有 463 后端测试覆盖集成,E2E 只测前端流程
+- **mock /api/* via page.route()**: 可控、稳定、快
+- **webServer: pnpm build + preview**: 用 production build 测,而不是 dev server
+
 ## Week 39 Step A+B (2026-09-14) — 0% 覆盖率洼地(57 tests)
 - A. **FormRuntime 测试** (25 tests, 0% → 97.54% 覆盖)
   - 6 种字段类型 (text/number/select/multiSelect/boolean/date) + 默认未知类型

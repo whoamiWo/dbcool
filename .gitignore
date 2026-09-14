@@ -61,3 +61,7 @@ Thumbs.db
 tmp/
 temp/
 tsconfig.tsbuildinfo
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/

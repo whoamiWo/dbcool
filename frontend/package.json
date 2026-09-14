@@ -13,7 +13,10 @@
     "test": "vitest",
     "test:run": "vitest --run",
     "test:coverage": "vitest --run --coverage",
-    "tsc": "tsc --noEmit"
+    "tsc": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -29,6 +32,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^22.7.0",
