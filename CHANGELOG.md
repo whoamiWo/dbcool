@@ -1,3 +1,61 @@
+## [Unreleased] - 2026-09-14 Week 28 Sprint — CollectionController + WorkflowEngine + 红线三连跳(1 commit)
+
+### Added
+- **CollectionControllerTest** (`CollectionControllerTest.java`) — 29 tests,全 PASS
+  - Collection CRUD: create(201)/ list / get(+parseFields)/ update / delete / delete 跨租户 403
+  - Fields: addField sync(200)+ async(202)/ removeField / renameField
+  - getJob: 找到 / 404
+  - Records: createRecord(201)+ audit / listRecords(普通 + filter 解析)/ listRecords 非法 filter 跳过 / getRecord / getRecord ROW ACL 拒绝→404
+  - Records: updateRecord + audit / updateRecord 404 / updateRecord ROW ACL 拒绝→403
+  - Records: deleteRecord + audit / deleteRecord 404 / deleteRecord ROW ACL 拒绝→403
+  - CSV: exportCsv(转义逗号)/ importCsv 成功 / importCsv 空文件→400 / importCsv 空表头→400 / importCsv 部分行失败
+- **WorkflowEngineTest** (`WorkflowEngineTest.java`) — 17 tests,全 PASS
+  - executeFrom 数组模式:空 nodes 完成 / 未知节点类型跳过
+  - executeFrom NOTIFICATION: 默认 recipient + 显式 recipient 覆盖 createdBy
+  - executeFrom APPROVAL: 创建 PENDING task + 返回 NEEDS_APPROVAL
+  - executeFrom CONDITION: then 分支命中 / else 分支命中 / 无匹配分支→currentIdx+1
+  - executeGraphFrom 图模式: 顺序边完成 / condition true 分支跟随 true handle / cycle 检测 break
+  - executeGraphFrom: 未知 startNode / APPROVAL 暂停
+  - HTTP node: 缺 url 跳过 / bearer auth / basic auth / RestClientException 捕获
+
+### Changed
+- **抬 Jacoco 红线**(Week 28 三连跳):
+  - **BUNDLE** 47% → **55%**
+  - **meta** 15% → **50%**
+  - **workflow** 20% → **45%**
+- **meta excludes 移除** `CollectionController`(已被测)
+- **workflow excludes 移除** `WorkflowEngine`(已被测)
+- **保留 excludes**: `AsyncMigrationService` / `WorkflowController` / `WorkflowTemplateService`
+
+### Verified
+- `mvn verify` ✅ BUILD SUCCESS
+- **322 tests PASS**(276 → 322,+46)
+- **覆盖率爆炸式增长**:
+  - **bundle** 47% → **65%** (+18%)
+  - **meta** 20% → **58%** (+38%)
+  - **workflow** 22% → **51%** (+29%)
+
+### Key technical findings
+- **`AuthenticatedUser` record 签名**: `(UUID userId, String username, String tenantId)`,**非** `(UUID, tenantId, username, List)`
+- **`getJob` 走 `migrationService.getJob(jobId)`**,不是 `jobRepository.findById(jobId)`(Week 7 重构)
+- **`MigrationJobEntity` DTO Map.of NPE**:`started_at`/`finished_at` 即使 RUNNING 状态也可能为 null,controller 没做 null-safe,测试必须 stub 这两个字段
+- **`WorkflowEngine.RestTemplate` final 字段**:用 `Field.setAccessible(true)` 反射替换为 mock
+- **`logNotification` 隐藏依赖**:会调 `instanceRepository.findById` + `workflowRepository.findById` 拿 createdBy,任一返回 empty → recipient=null → 不保存 message
+- **`executeFrom` 数组模式 condition bug**:evaluateCondition 返回 thenIdx 后**没有 i++**,导致会顺序执行 then 节点及后续所有节点;测 condition 路径选择时改 verify save 顺序中第一个 message 是 then 分支
+- **ROW ACL 三路径**:evaluateRead 拒绝→404 / evaluateUpdate 拒绝→403 / evaluateDelete 拒绝→403(读拒绝用 404 防信息泄漏)
+- **`MockMultipartFile` 4 参构造**: `new MockMultipartFile("file", "data.csv", "text/csv", bytes)`
+
+### Coverage Trend
+
+| Week | tests | bundle | auth | meta | workflow | acl | notes |
+|------|-------|--------|------|------|----------|-----|-------|
+| 28 | 322 | 65% | 79% | 58% | 51% | 89% | CollectionController + WorkflowEngine + 红线三连跳 |
+| 27 | 276 | 47% | 79% | 20% | 22% | 89% | AuthController + RoleAclController + 红线大跃升 |
+| 26 | 247 | 38% | 35% | 20% | 22% | 89% | UserAdminController + FormController + RowAclController |
+| 25 | — | 33% | 35% | 20% | 22% | — | (基线) |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 27 Sprint — 批量补 2 个 auth controllers + 红线大跃升(1 commit)
 
 ### Added

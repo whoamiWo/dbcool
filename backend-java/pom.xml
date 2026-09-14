@@ -195,7 +195,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.47</minimum>
+                                            <minimum>0.55</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -226,7 +226,7 @@
                                         <exclude>com.nocobase.auth.JwtAuthFilter</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- meta 模块(Week 21/25):行覆盖 ≥ 15%(Week 25 加 ErDiagramController) -->
+                                <!-- meta 模块(Week 21/25/28):行覆盖 ≥ 50%(Week 28 加 CollectionController) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -236,16 +236,15 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.15</minimum>
+                                            <minimum>0.50</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
-                                        <!-- CollectionController / AsyncMigrationService 暂未测;ErDiagramController Week 25 已测 -->
-                                        <exclude>com.nocobase.meta.CollectionController</exclude>
+                                        <!-- AsyncMigrationService 暂未测;CollectionController / ErDiagramController Week 28 已测 -->
                                         <exclude>com.nocobase.meta.AsyncMigrationService</exclude>
                                     </excludes>
                                 </rule>
-                                <!-- workflow 模块(Week 21/25):行覆盖 ≥ 20%(Week 25 加 controller) -->
+                                <!-- workflow 模块(Week 21/25/28):行覆盖 ≥ 45%(Week 28 加 WorkflowEngine) -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
@@ -255,13 +254,12 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.20</minimum>
+                                            <minimum>0.45</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
-                                        <!-- WorkflowController / WorkflowEngine 太大,Week 26+ 后续补 -->
+                                        <!-- WorkflowEngine 已测(Week 28),保留 WorkflowController / WorkflowTemplateService 待补 -->
                                         <exclude>com.nocobase.workflow.WorkflowController</exclude>
-                                        <exclude>com.nocobase.workflow.WorkflowEngine</exclude>
                                         <exclude>com.nocobase.workflow.WorkflowTemplateService</exclude>
                                     </excludes>
                                 </rule>
