@@ -1,0 +1,57 @@
+name: Backend CI
+
+# 触发条件:push 到 main / 任何 PR
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend-java/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend-java/**'
+      - '.github/workflows/backend-ci.yml'
+
+# 取消进行中的旧 run
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (mvn verify + JaCoCo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # 当前所有测试都是 Mockito 单测,不需要 DB/Redis
+    # 集成测试(Testcontainers)引入后再加 services 块
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run mvn verify (Tests + JaCoCo coverage gates)
+        working-directory: backend-java
+        run: mvn -B verify
+
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage-report
+          path: backend-java/target/site/jacoco/
+          retention-days: 30
+
+      - name: Fail if coverage report not generated
+        if: failure()
+        run: |
+          echo "::error::mvn verify failed (likely coverage gate or test failure). See logs above."
+          exit 1

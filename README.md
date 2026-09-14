@@ -8,6 +8,8 @@
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
+[![Backend CI](https://img.shields.io/badge/CI-Backend%20CI-blue)](./.github/workflows/backend-ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-9%25-yellow)](./backend-java/target/site/jacoco/index.html)
 
 ## ✨ 核心能力
 
