@@ -20,9 +20,11 @@ interface Task {
   id: string;
   node_id: string;
   node_type: string;
-  assignee: string;
+  assignee?: string;
   status: string;
+  comment?: string;
   created_at: string;
+  finished_at?: string;
 }
 interface NodeDef { id: string; type: string; config?: Record<string, string>; position?: { x: number; y: number }; }
 interface EdgeDef { id?: string; source: string; target: string; sourceHandle?: string | null; }
@@ -34,6 +36,26 @@ const statusColor: Record<string, string> = {
   FAILED:    '#ef4444',
   REJECTED:  '#a855f7',
 };
+
+/* US-407: 把毫秒时长渲染成人性化字符串 */
+function humanDuration(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s} 秒`;
+  const m = Math.floor(s / 60);
+  const remS = s % 60;
+  if (m < 60) return `${m} 分 ${remS} 秒`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  return `${h} 时 ${remM} 分`;
+}
+
+/* US-407: 把后端 JSON 字符串美化展示(失败则原文) */
+function formatJson(s: string | null | undefined): string {
+  if (!s) return '(空)';
+  try { return JSON.stringify(JSON.parse(s), null, 2); }
+  catch { return s; }
+}
 
 export function WorkflowInstancesPage() {
   return (
@@ -166,17 +188,54 @@ function InstanceDetail({ id }: { id: string }) {
         <div>触发时间: {data.started_at}</div>
         <div>结束时间: {data.finished_at || '—'}</div>
         <div>当前节点: #{currentIdx} ({nodes[currentIdx]?.id} - {nodes[currentIdx]?.type})</div>
-        <div>触发数据: <code style={{ background: '#f1f5f9', padding: 2 }}>{data.trigger_data_json}</code></div>
+        <details style={{ marginTop: 6 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13 }}>触发数据 triggerData</summary>
+          <pre style={{ background: '#1e293b', color: '#e2e8f0', padding: 8, borderRadius: 4,
+                        fontSize: 12, overflow: 'auto', maxHeight: 160, margin: '6px 0 0' }}>
+            {formatJson(data.trigger_data_json)}
+          </pre>
+        </details>
       </div>
 
       {data.tasks && data.tasks.length > 0 && (
         <div style={{ background: 'white', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <h4>审批任务</h4>
-          {data.tasks.map((t) => (
-            <div key={t.id} style={{ padding: 6, borderBottom: '1px solid #e2e8f0' }}>
-              <strong>{t.node_id}</strong> ({t.node_type}) — {t.status}
-            </div>
-          ))}
+          <h4>审批任务({data.tasks.length})</h4>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', color: '#475569' }}>
+                <th style={{ ...th, fontSize: 12 }}>节点</th>
+                <th style={{ ...th, fontSize: 12 }}>类型</th>
+                <th style={{ ...th, fontSize: 12 }}>状态</th>
+                <th style={{ ...th, fontSize: 12 }}>指派</th>
+                <th style={{ ...th, fontSize: 12 }}>创建</th>
+                <th style={{ ...th, fontSize: 12 }}>完成</th>
+                <th style={{ ...th, fontSize: 12 }}>耗时</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.tasks.map((t) => {
+                const dur = t.finished_at && t.created_at
+                  ? humanDuration(new Date(t.finished_at).getTime() - new Date(t.created_at).getTime())
+                  : (t.status === 'PENDING' ? '— 进行中' : '—');
+                return (
+                  <tr key={t.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                    <td style={td}><code>{t.node_id}</code></td>
+                    <td style={td}>{t.node_type}</td>
+                    <td style={td}>
+                      <span style={{ padding: '1px 6px', background: statusColor[t.status] || '#94a3b8',
+                                     color: 'white', borderRadius: 3, fontSize: 11 }}>
+                        {t.status}
+                      </span>
+                    </td>
+                    <td style={td}>{t.assignee?.slice(0, 8) ?? '—'}</td>
+                    <td style={td}>{t.created_at?.replace('T', ' ').slice(0, 19)}</td>
+                    <td style={td}>{t.finished_at?.replace('T', ' ').slice(0, 19) ?? '—'}</td>
+                    <td style={td}>{dur}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

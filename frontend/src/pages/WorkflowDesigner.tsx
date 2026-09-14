@@ -107,6 +107,9 @@ export function WorkflowDesignerPage() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSimulate, setShowSimulate] = useState(false);
+  const [simulateData, setSimulateData] = useState('{\n  "record_id": "test-001"\n}');
+  const [simulateResult, setSimulateResult] = useState<{ instanceId?: string; error?: string } | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project } = useReactFlow();
 
@@ -245,6 +248,36 @@ export function WorkflowDesignerPage() {
     },
   });
 
+  const simulateMutation = useMutation({
+    mutationFn: async () => {
+      // 先保存当前编辑状态,确保触发的是最新版本
+      let workflowId = id;
+      if (!workflowId) {
+        // 新建未保存:先保存
+        const saved = await saveMutation.mutateAsync();
+        workflowId = (saved as { id: string }).id;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(simulateData || '{}');
+      } catch {
+        throw new Error('triggerData 不是合法 JSON');
+      }
+      const res = await apiClient.post<{ data?: { id?: string } }>(
+        `/workflows/${workflowId}/trigger`, parsed);
+      return { workflowId, instanceId: (res as { data?: { id?: string }; id?: string }).data?.id
+              ?? (res as { id?: string }).id };
+    },
+    onSuccess: (r) => {
+      setSimulateResult({ instanceId: r.instanceId });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message
+        : (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? '运行失败';
+      setSimulateResult({ error: msg });
+    },
+  });
+
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
   return (
@@ -291,6 +324,13 @@ export function WorkflowDesignerPage() {
                          color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
           {saveMutation.isPending ? '保存中…' : '💾 保存'}
         </button>
+        {/* US-406: 测试运行 */}
+        <button onClick={() => { setSimulateResult(null); setShowSimulate(true); }}
+                style={{ marginTop: 8, width: '100%', padding: 8,
+                         background: '#3b82f6', color: 'white', border: 'none',
+                         borderRadius: 4, cursor: 'pointer' }}>
+          ▶ 测试运行(模拟数据)
+        </button>
       </aside>
 
       {/* 中:画布 */}
@@ -321,6 +361,62 @@ export function WorkflowDesignerPage() {
           />
         )}
       </aside>
+
+      {/* US-406 测试运行弹窗 */}
+      {showSimulate && (
+        <div role="dialog"
+             style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
+                      display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
+          <div style={{ background: 'white', borderRadius: 8, padding: 24, width: 480,
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ marginTop: 0 }}>▶ 测试运行工作流</h3>
+            <p style={{ color: '#64748b', fontSize: 13 }}>
+              输入模拟的 triggerData,系统将创建一个工作流实例并跳转到详情页。
+              {!id && <strong style={{ color: '#dc2626' }}>(会先自动保存当前编辑)</strong>}
+            </p>
+            <label style={{ display: 'block', fontWeight: 500, fontSize: 13, marginBottom: 4 }}>
+              triggerData (JSON)
+            </label>
+            <textarea value={simulateData} onChange={(e) => setSimulateData(e.target.value)}
+                      style={{ width: '100%', height: 160, fontFamily: 'monospace', fontSize: 12,
+                               padding: 8, border: '1px solid #cbd5e1', borderRadius: 4 }}
+                      placeholder='{"record_id":"test-001","name":"测试"}' />
+            {simulateResult?.instanceId && (
+              <div style={{ marginTop: 12, padding: 8, background: '#dcfce7', color: '#166534',
+                            borderRadius: 4, fontSize: 13 }}>
+                ✅ 实例已创建: <code>{simulateResult.instanceId.slice(0, 8)}…</code>
+                <div style={{ marginTop: 6 }}>
+                  <a href={`/designer/instances/${simulateResult.instanceId}`}
+                     onClick={(e) => { e.preventDefault(); navigate(`/designer/instances/${simulateResult.instanceId}`); setShowSimulate(false); }}
+                     style={{ color: '#1e40af', textDecoration: 'underline' }}>
+                    查看实例详情 →
+                  </a>
+                </div>
+              </div>
+            )}
+            {simulateResult?.error && (
+              <div style={{ marginTop: 12, padding: 8, background: '#fee2e2', color: '#991b1b',
+                            borderRadius: 4, fontSize: 13 }}>
+                ❌ {simulateResult.error}
+              </div>
+            )}
+            <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowSimulate(false)}
+                      style={{ padding: '6px 14px', background: '#e2e8f0', color: '#1e293b',
+                               border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                关闭
+              </button>
+              <button onClick={() => simulateMutation.mutate()}
+                      disabled={simulateMutation.isPending || saveMutation.isPending}
+                      style={{ padding: '6px 14px', background: '#3b82f6', color: 'white',
+                               border: 'none', borderRadius: 4,
+                               cursor: simulateMutation.isPending ? 'not-allowed' : 'pointer' }}>
+                {simulateMutation.isPending ? '运行中…' : '▶ 运行'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
