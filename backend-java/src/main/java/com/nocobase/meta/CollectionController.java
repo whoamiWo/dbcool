@@ -243,6 +243,69 @@ public class CollectionController {
     }
 
     // ============================================================
+    //  Week 14.5 P3-3 补完:单条 get / update / delete + ROW ACL 拦截
+    // ============================================================
+
+    @GetMapping("/{name}/records/{id}")
+    public Map<String, Object> getRecord(
+            @PathVariable String name,
+            @PathVariable String id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        Map<String, Object> record = service.getRecord(name, id, user.tenantId());
+        // ROW ACL 校验
+        if (!rowAclService.evaluateRead(user.tenantId(), name, record, rowAclPrincipal(user))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
+        return Map.of(
+                "code", 0, "message", "success",
+                "data", aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, record)
+        );
+    }
+
+    @PutMapping("/{name}/records/{id}")
+    public Map<String, Object> updateRecord(
+            @PathVariable String name,
+            @PathVariable String id,
+            @RequestBody Map<String, Object> data,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        // 先取旧记录做 ROW ACL 拦截评估
+        Map<String, Object> existing = service.getRecord(name, id, user.tenantId());
+        if (!rowAclService.evaluateUpdate(user.tenantId(), name, existing, rowAclPrincipal(user))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ROW ACL 拒绝:不可更新此记录");
+        }
+        boolean ok = service.updateRecord(name, id, data, user.tenantId());
+        if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "UPDATE", name, id, Map.of("before", existing, "after", data));
+        return Map.of("code", 0, "message", "success", "data", Map.of("id", id, "extra", data));
+    }
+
+    @DeleteMapping("/{name}/records/{id}")
+    public Map<String, Object> deleteRecord(
+            @PathVariable String name,
+            @PathVariable String id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        Map<String, Object> existing = service.getRecord(name, id, user.tenantId());
+        if (!rowAclService.evaluateDelete(user.tenantId(), name, existing, rowAclPrincipal(user))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ROW ACL 拒绝:不可删除此记录");
+        }
+        boolean ok = service.deleteRecord(name, id, user.tenantId());
+        if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "DELETE", name, id, existing);
+        return Map.of("code", 0, "message", "deleted", "data", Map.of("id", id));
+    }
+
+    // ============================================================
     //  CSV Import / Export (Week 14.5)
     // ============================================================
 

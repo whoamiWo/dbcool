@@ -85,6 +85,41 @@ public class DynamicTableManager {
         );
     }
 
+    /**
+     * 按 ID 取单条记录的 extra JSON(Week 14.5 P3-3 补完).
+     */
+    public java.util.Optional<String> getRecord(String collectionName, String id) {
+        var list = jdbc.queryForList(
+                "SELECT extra::text FROM " + physicalTableName(collectionName) +
+                " WHERE id = ?::uuid",
+                String.class,
+                id
+        );
+        return list.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(list.get(0));
+    }
+
+    /**
+     * 更新记录 extra JSON(整段覆盖).
+     */
+    public int updateRecord(String collectionName, String id, String jsonData) {
+        return jdbc.update(
+                "UPDATE " + physicalTableName(collectionName) +
+                " SET extra = ?::jsonb, updated_at = NOW() WHERE id = ?::uuid",
+                jsonData, id
+        );
+    }
+
+    /**
+     * 删除单条记录.
+     */
+    public int deleteRecord(String collectionName, String id) {
+        return jdbc.update(
+                "DELETE FROM " + physicalTableName(collectionName) +
+                " WHERE id = ?::uuid",
+                id
+        );
+    }
+
     // ============================================================
     //  Week 7+:字段变更(US-005)
     // ============================================================

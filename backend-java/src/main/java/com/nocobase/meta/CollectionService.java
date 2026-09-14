@@ -224,13 +224,70 @@ public class CollectionService {
         return jsonRecords.stream()
                 .map(json -> {
                     try {
-                        return objectMapper.readValue(
+                        Map<String, Object> wrapper = objectMapper.readValue(
                                 json,
                                 new TypeReference<Map<String, Object>>() {});
+                        Object inner = wrapper.get("data");
+                        if (inner instanceof Map<?, ?> m) {
+                            return (Map<String, Object>) m;
+                        }
+                        return wrapper;
                     } catch (Exception e) {
                         return Map.<String, Object>of("_raw", json);
                     }
                 })
                 .toList();
+    }
+
+    // ============================================================
+    //  Week 14.5 P3-3 补完:单条 get / update / delete
+    // ============================================================
+
+    public Map<String, Object> getRecord(String collectionName, String id, String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        String json = tableManager.getRecord(collectionName, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在"));
+        try {
+            // DB 里存的是 {"data": {actual fields}};解一层
+            Map<String, Object> wrapper = objectMapper.readValue(json, new TypeReference<>() {});
+            Object inner = wrapper.get("data");
+            if (inner instanceof Map<?, ?> m) {
+                return (Map<String, Object>) m;
+            }
+            return wrapper;
+        } catch (Exception e) {
+            throw new RuntimeException("record 解析失败", e);
+        }
+    }
+
+    public boolean updateRecord(String collectionName, String id,
+                                 Map<String, Object> data, String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        try {
+            // merge:把新 fields 合并到现有 record,避免破坏 created_by 等
+            Map<String, Object> existing = getRecord(collectionName, id, tenantId);
+            Map<String, Object> merged = new java.util.HashMap<>(existing);
+            merged.putAll(data);
+            String json = objectMapper.writeValueAsString(merged);
+            return tableManager.updateRecord(collectionName, id, json) > 0;
+        } catch (org.springframework.web.server.ResponseStatusException rse) {
+            throw rse;
+        } catch (Exception e) {
+            throw new RuntimeException("record 序列化失败", e);
+        }
+    }
+
+    public boolean deleteRecord(String collectionName, String id, String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        return tableManager.deleteRecord(collectionName, id) > 0;
     }
 }

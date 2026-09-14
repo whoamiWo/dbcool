@@ -50,6 +50,41 @@ public class RowAclService {
     }
 
     /**
+     * 对单条记录评估 update 访问(Week 14.5 P3-3 补完).
+     *
+     * <p>默认行为:read policy 通过 ⇒ update 允许.
+     * 若有 update-specific policy,则用 update 求值.
+     */
+    public boolean evaluateUpdate(String tenantId,
+                                   String collection,
+                                   Map<String, Object> record,
+                                   Principal principal) {
+        // 优先看 update policy
+        if (hasActionPolicies(tenantId, collection, "update")) {
+            return evaluate(tenantId, collection, "update", record, principal);
+        }
+        // 否则用 read policy 兜底(可见即可改 — 常见 ACL 习惯)
+        return evaluateRead(tenantId, collection, record, principal);
+    }
+
+    /**
+     * 对单条记录评估 delete 访问(Week 14.5 P3-3 补完).
+     */
+    public boolean evaluateDelete(String tenantId,
+                                   String collection,
+                                   Map<String, Object> record,
+                                   Principal principal) {
+        if (hasActionPolicies(tenantId, collection, "delete")) {
+            return evaluate(tenantId, collection, "delete", record, principal);
+        }
+        return evaluateRead(tenantId, collection, record, principal);
+    }
+
+    private boolean hasActionPolicies(String tenantId, String collection, String action) {
+        return !repository.findApplicable(tenantId, collection, action).isEmpty();
+    }
+
+    /**
      * 过滤可读记录(用于 list API 末尾过滤).
      */
     public List<Map<String, Object>> filterReadable(String tenantId,
