@@ -188,14 +188,14 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 12%(Week 21,新增 3 个模块测试) -->
+                                <!-- 全局:行覆盖 ≥ 14%(Week 22,新增 notification+form) -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.12</minimum>
+                                            <minimum>0.14</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
@@ -304,6 +304,34 @@
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
                                             <minimum>0.10</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- notification 模块(Week 22 引入):行覆盖 ≥ 25% -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.nocobase.notification</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.25</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- form 模块(Week 22 引入):行覆盖 ≥ 45% -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.nocobase.form</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.45</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
