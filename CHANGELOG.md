@@ -4,6 +4,30 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 21 Sprint — 继续抬红线 + 新覆盖 3 包(1 commit)
+
+### Added
+- **AuditServiceTest** (`AuditServiceTest.java`) — 10 tests,全 PASS
+  - log 写入(基础 / null 默认值 / JSON 序列化 / 不可序列化回退 / save 失败静默)
+  - find 限流 500 + count 透传
+- **ViewServiceTest** (`ViewServiceTest.java`) — 12 tests,全 PASS
+  - create / get / update / list / delete 全部 5 公开方法
+  - 全字段 + 部分字段更新 + 404
+- **WorkflowTemplateRegistryTest** (`WorkflowTemplateRegistryTest.java`) — 11 tests,全 PASS
+  - list 3 个内置模板 + 不可变视图
+  - 模板内容合理性(leave/expense/customer + edges 校验)
+
+### Changed
+- **抬 Jacoco 红线**:bundle 8%→12% / acl 45%→48%
+- **新增 3 包规则**:audit ≥45% / view ≥40% / workflow ≥10%
+
+### Verified
+- `mvn clean verify` 145 tests 全 PASS + All coverage checks met
+- 覆盖率:audit 0%→47% / view 0%→44% / workflow 0%→10%
+- 已覆盖包从 4 → 7(13 个生产包的 54%)
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 20 Sprint — 抬红线 + GitHub Actions CI(2 commits)
 
 ### Added
