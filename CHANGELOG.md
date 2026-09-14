@@ -4,6 +4,37 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 24 Sprint — 批量补 3 controllers + 红线(1 commit)
+
+### Added
+- **ViewControllerTest** (`ViewControllerTest.java`) — 8 tests,全 PASS
+  - list(no collection / with collection)/ get / create(成功+2 失败)/ update / delete
+- **AuditControllerTest** (`AuditControllerTest.java`) — 3 tests,全 PASS
+  - logs 无 filters / 带 4 个 filters / 默认 limit
+- **NotificationChannelControllerTest** (`NotificationChannelControllerTest.java`) — 10 tests,全 PASS
+  - 6 端点全覆盖 + 跨 tenant 403 + 不存在 400
+
+### Changed
+- **抬 Jacoco 红线**:bundle 21%→28% / view 40%→90% / audit 45%→80% / notification 25%→50%
+
+### Verified
+- `mvn clean verify` 204 tests 全 PASS + All coverage checks met
+- 覆盖率:view 44%→94% / audit 47%→83% / notification 25%→56%
+- MockMvc 模板 100% 复用 Week 23
+
+### Trend(Week 18 → 24)
+| 周 | tests | 覆盖包数 | bundle 红线 |
+|----|------|---------|------------|
+| 18 | 70 | 1 | — |
+| 19 | 70 | 2 | 5% |
+| 20 | 112 | 4 | 8% |
+| 21 | 145 | 7 | 12% |
+| 22 | 181 | 9 | 14% |
+| 23 | 183 | 10 | 21% |
+| 24 | 204 | 10 | 28% |
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 23 Sprint — UserController MockMvc + 红线(1 commit)
 
 ### Added
