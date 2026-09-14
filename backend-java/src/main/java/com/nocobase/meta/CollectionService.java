@@ -260,7 +260,7 @@ public class CollectionService {
     }
 
     /** Week 17: 与前端 FilterRule op 完全镜像 */
-    private boolean matchFilter(Object value, FilterRule rule) {
+    boolean matchFilter(Object value, FilterRule rule) {
         if (rule == null || rule.op == null) return true;
         return switch (rule.op) {
             case "eq"       -> value != null && String.valueOf(value).equals(String.valueOf(rule.value));
@@ -274,7 +274,7 @@ public class CollectionService {
         };
     }
 
-    private static double toDouble(Object v) {
+    static double toDouble(Object v) {
         if (v == null) return Double.NaN;
         if (v instanceof Number n) return n.doubleValue();
         try { return Double.parseDouble(String.valueOf(v)); } catch (Exception e) { return Double.NaN; }
