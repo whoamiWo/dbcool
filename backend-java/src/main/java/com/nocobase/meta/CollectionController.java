@@ -211,8 +211,9 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.CREATE);
-        // Week 16: 字段级 ACL 写拦截 — hidden 字段显式提供即拒绝
-        aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, data);
+        // Week 17: 按 action=CREATE 精确检查(支持"创建后可改"场景)
+        aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, data,
+                com.nocobase.auth.AclPolicyEntity.Action.CREATE);
         UUID id = service.insertRecord(name, data, user.tenantId());
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "CREATE", name, id.toString(), data);
@@ -276,8 +277,9 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
-        // Week 16: 字段级 ACL 写拦截 — 必须在 ROW ACL 之前,避免泄露 forbidden 字段存在性
-        aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, data);
+        // Week 17: 按 action=UPDATE 精确检查(支持"建表后不能改"场景)
+        aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, data,
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
         // 先取旧记录做 ROW ACL 拦截评估
         Map<String, Object> existing = service.getRecord(name, id, user.tenantId());
         if (!rowAclService.evaluateUpdate(user.tenantId(), name, existing, rowAclPrincipal(user))) {

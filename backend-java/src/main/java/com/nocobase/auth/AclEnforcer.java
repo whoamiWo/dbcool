@@ -134,10 +134,27 @@ public class AclEnforcer {
      *   <li>有 FIELD policy action=CREATE/UPDATE → cfg.hidden 是禁写字段</li>
      * </ul>
      *
-     * <p>CREATE 与 UPDATE 视为同一个禁写集合(Week 16 MVP 范围);
-     * 后续若需细分"只能创建不能修改"可加 action 维度过滤。
+     * <p>Week 17 拆分: CREATE 与 UPDATE 视为同一个禁写集合(向后兼容),
+     * 控制器端需要细分时调用 {@link #filterWritableFields(UUID, String, String, AclPolicyEntity.Action)}。
      */
     public Set<String> filterWritableFields(UUID userId, String tenantId, String collectionName) {
+        return filterWritableFields(userId, tenantId, collectionName, null);
+    }
+
+    /**
+     * Week 17: 按 action 精确过滤禁写字段。
+     *
+     * <p>典型用例:
+     * <ul>
+     *   <li>{@code action=null}: 兼容旧逻辑,CREATE ∪ UPDATE 全部禁写集合</li>
+     *   <li>{@code action=CREATE}: 只看 action=CREATE 的 FIELD policy,允许"创建后可改"</li>
+     *   <li>{@code action=UPDATE}: 只看 action=UPDATE 的 FIELD policy,允许"建表后不能改"</li>
+     * </ul>
+     *
+     * <p>action=DELETE 同理(虽然 controller 端当前没有 DELETE 路径的 data,留扩展)。
+     */
+    public Set<String> filterWritableFields(UUID userId, String tenantId, String collectionName,
+                                            AclPolicyEntity.Action action) {
         List<UUID> roleIds = loadRoleIdsIncludingInheritance(userId, tenantId);
         List<AclPolicyEntity> policies = new ArrayList<>();
         for (UUID rid : roleIds) {
@@ -148,9 +165,14 @@ public class AclEnforcer {
         for (AclPolicyEntity p : policies) {
             if (!collectionName.equals(p.getSubject())) continue;
             if (p.getType() != AclPolicyEntity.Type.FIELD) continue;
-            // CREATE 与 UPDATE 都视为禁写
-            if (p.getAction() != AclPolicyEntity.Action.CREATE
-                    && p.getAction() != AclPolicyEntity.Action.UPDATE) continue;
+            // action 维度过滤:仅 CREATE/UPDATE/DELETE 与请求 action 匹配的 policy 生效
+            AclPolicyEntity.Action pa = p.getAction();
+            if (pa == null) continue;
+            if (pa != AclPolicyEntity.Action.CREATE
+                    && pa != AclPolicyEntity.Action.UPDATE
+                    && pa != AclPolicyEntity.Action.DELETE) continue;
+            // 显式传 action 时要求严格匹配;传 null 时取 CREATE+UPDATE 并集
+            if (action != null && pa != action) continue;
             hasFieldPolicy = true;
             forbidden.addAll(parseHidden(p.getConfigJson()));
         }
@@ -171,8 +193,16 @@ public class AclEnforcer {
      */
     public void assertCanWriteFields(UUID userId, String tenantId, String collectionName,
                                      Map<String, Object> data) {
+        assertCanWriteFields(userId, tenantId, collectionName, data, null);
+    }
+
+    /**
+     * Week 17: 按 action 精确检查 — 支持"只能创建不能修改"或反之。
+     */
+    public void assertCanWriteFields(UUID userId, String tenantId, String collectionName,
+                                     Map<String, Object> data, AclPolicyEntity.Action action) {
         if (data == null || data.isEmpty()) return;
-        Set<String> forbidden = filterWritableFields(userId, tenantId, collectionName);
+        Set<String> forbidden = filterWritableFields(userId, tenantId, collectionName, action);
         if (forbidden == null || forbidden.isEmpty()) return;
         List<String> violations = new ArrayList<>();
         for (String k : data.keySet()) {
@@ -180,7 +210,7 @@ public class AclEnforcer {
         }
         if (!violations.isEmpty()) {
             throw new ResponseStatusException(FORBIDDEN,
-                    "ACL 拒绝: 字段不可写 collection=" + collectionName
+                    "ACL 拒绝: 字段不可写 action=" + action + " collection=" + collectionName
                             + " forbidden=" + violations);
         }
     }
