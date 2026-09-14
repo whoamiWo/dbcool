@@ -4,6 +4,34 @@
 
 ---
 
+## [Unreleased] - 2026-09-14 Week 17 Sprint — 字段级 ACL 细分 + listRecords 服务端 filter/sort(3 commits)
+
+### Added
+- **字段级 ACL 拆分 CREATE/UPDATE 独立 hidden** (`698fe52`) — D 候选
+  - `AclEnforcer.filterWritableFields(action)` 按 action 精确过滤
+  - 支持"创建后可改"(`CREATE hidden=[] UPDATE hidden=[X]`)和"建表后不能改"反向场景
+  - E2E 4/4 PASS
+
+- **listRecords 服务端 filter + sort** (`7a8dc22`) — B 候选,US-202/203 真正完成
+  - 新 query 参数 `?sort=name,-salary&filter=name:contains:A,salary:gt:0`
+  - 7 个 op 与前端 FilterRule 镜像(eq/neq/contains/gt/lt/empty/notEmpty)
+  - 字段名正则防 SQL injection,op 白名单防任意 SQL
+  - DynamicTableManager.buildOrderBy() 严格白名单
+  - E2E 12/12 PASS(含 SQL injection 防御)
+
+- **前端切换服务端 filter+sort** (`792a1a1`)
+  - FilterBar.tsx: `sortToQuery` + `filtersToQuery` 工具函数
+  - TableView.tsx: 调带 query params 端点;移除客户端 applyFilters/applySort
+  - 大数据集合省带宽
+
+### Verified
+- 后端 `mvn compile` 0 错误
+- 前端 `pnpm tsc` 0 新错误
+- DB 完整性(SQLi 测试后 count 21 不变)
+- 与 Week 14.5/16 的 ROW + FIELD ACL 兼容
+
+---
+
 ## [Unreleased] - 2026-09-14 Week 16 Sprint — 字段级 ACL 写路径(1 commit)
 
 ### Security(重要)
