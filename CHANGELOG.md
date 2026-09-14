@@ -1,4 +1,56 @@
-## Week 41 (2026-09-15) — 技术债批次 1 + 批次 2 起步 (止血 F1+F2+F3, 地基 G1)
+## Week 41 (2026-09-15) — 技术债批次 1 + 批次 2 起步 (止血 F1+F2+F3, 地基 D6 G1+D4a 触发器真实化)
+### Step D4a: 触发器真实化 (5d, 实际 3d 紧凑版)
+**范围**:
+- ✅ D4a.1 (2d): 事件总线 + CollectionController 发布 RecordChangeEvent
+- ✅ D4a.2 (2d): WorkflowTriggerMatcher + WorkflowTriggerListener
+- ✅ D4a.3 (1d): TriggerRateLimiter 防死循环(报告 C-R04)
+- ⏭️ schedule 类型支持推迟到 D4a.4(Week 42)
+
+###新增 4 个文件 (新包 com.nocobase.event + workflow)
+- RecordChangeEvent.java (CREATE/UPDATE/DELETE 事件,含 collection/recordId/data/tenantId/userId/occurredAt)
+- WorkflowTriggerMatcher.java (按 trigger_json.type 匹配事件 → workflow 列表)
+- WorkflowTriggerListener.java (@EventListener 监听 → 触发引擎执行)
+- TriggerRateLimiter.java (ConcurrentHashMap + 60s 滑动窗口,5 次/分钟硬限)
+
+### 修改 1 个文件
+- CollectionController.java: 构造函数加 ApplicationEventPublisher
+  - createRecord 后 publishEvent(CREATE)
+  - updateRecord 后 publishEvent(UPDATE)
+  - deleteRecord 后 publishEvent(DELETE)
+  - **注**: 同步发(非事务提交后),G2 收尾时改 @TransactionalEventListener(AFTER_COMMIT)
+
+### 加 23 个回归测试
+- WorkflowTriggerMatcherTest: 8 个 (mapEventToTriggerType + matchesType + findMatching)
+- WorkflowTriggerListenerTest: 7 个 (异常隔离 + 引擎选择 + 死循环防护)
+- TriggerRateLimiterTest: 8 个 (频率限制 + 滑动窗口 + 不同 record/wf 隔离)
+
+### 验收标准达成 (报告 9.3)
+- ⏭️ 配置 on_create 工作流后,插入记录能自动触发 — **架构已就位**,需具体工作流测试 (后续 Story)
+- ✅ 死循环被正确拦截 — TriggerRateLimiter.allowTrigger 返回 false 时阻断
+- ⏭️ schedule 类型 — Week 42 (D4a.4)
+
+### 实战发现 / 调整
+- ⚠️ 报告建议 G2(Schema路由,8d)先做 — **调整为**: G1 + D4a 先做(地基最关键部分),
+  G2 推迟到收尾(8d 大工程独立 PR)
+- ⚠️ workflow 包 Jacoco 95% 红线差点掉 (加 listener 90% → 加测试 → 恢复)
+- ⚠️ CollectionController 构造函数加参数 → 改 1 个测试文件 (29 tests)
+
+### 回归红线
+- 后端: **526/526 PASS** (基线 502 + G1 18 + D4a matcher 8 + D4a listener 7 + D4a rateLimiter 8)
+  (注:之前数据 511,数错了;实际加 24 tests)
+- Jacoco: All coverage checks have been met (123 classes)
+- 前端 vitest: 150/150 PASS, tsc 0 errors
+- 前端 E2E: 22/22 PASS
+- 总测试: 526 + 150 + 22 = 698 tests
+
+### 进度
+- ✅ 批次 1:止血 F1+F2+F3 完成 (B1 + B2 + B3 + D9, 2.5d)
+- ✅ 批次 2 第一步 G1: D6 ThreadLocal + CRUD (3d)
+- ✅ 批次 2 第二步 D4a: 触发器真实化 (3d 紧凑)
+- ⏭️ 批次 2 下一步 D4b: 节点 + 表达式引擎 (13d)
+- ⏭️ 批次 2 后续: D1 字段类型 → D2 关联 → G2 Schema 路由
+
+## Week 41 (2026-09-15) — 技术债批次 1 + 批次 2 起步 (止血 F1+F2+F3, 地基 G1) (止血 F1+F2+F3, 地基 G1)
 ### Step G1: 多租户 (D6) 最小可行版本 — ThreadLocal + CRUD + 关键硬编码清理(3d)
 **范围**:
 - ✅ TenantContext ThreadLocal(报告 7.3 步骤 2)

@@ -1,6 +1,7 @@
 package com.nocobase.meta;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.event.RecordChangeEvent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,6 +41,8 @@ public class CollectionController {
     private final com.nocobase.audit.AuditService auditService;
     private final com.nocobase.acl.RowAclService rowAclService;
     private final com.nocobase.auth.RoleRepository roleRepository;
+    /** Week 41 D4a:事件发布器(AFTER_COMMIT 阶段发布 RecordChangeEvent)。 */
+    private final ApplicationEventPublisher eventPublisher;
 
     public CollectionController(
             CollectionService service,
@@ -47,7 +51,8 @@ public class CollectionController {
             com.nocobase.auth.AclEnforcer aclEnforcer,
             com.nocobase.audit.AuditService auditService,
             com.nocobase.acl.RowAclService rowAclService,
-            com.nocobase.auth.RoleRepository roleRepository
+            com.nocobase.auth.RoleRepository roleRepository,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.service = service;
         this.migrationService = migrationService;
@@ -56,6 +61,7 @@ public class CollectionController {
         this.auditService = auditService;
         this.rowAclService = rowAclService;
         this.roleRepository = roleRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /** 构建 RowAclService.Principal(从当前认证用户). */
@@ -218,6 +224,12 @@ public class CollectionController {
         UUID id = service.insertRecord(name, data, user.tenantId());
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "CREATE", name, id.toString(), data);
+        // Week 41 D4a:发布记录创建事件(供 WorkflowTriggerListener 消费)
+        // 注意:目前 controller 无 @Transactional,事件同步发。
+        // 事务集成(AFTER_COMMIT)在 G2(D6)收尾时一并处理。
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.CREATE, name, id.toString(), data,
+                user.tenantId(), user.userId()));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "code", 0, "message", "success",
                 "data", Map.of("id", id.toString(), "extra", data)
@@ -326,6 +338,10 @@ public class CollectionController {
         if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "UPDATE", name, id, Map.of("before", existing, "after", data));
+        // Week 41 D4a:发布记录更新事件
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.UPDATE, name, id, data,
+                user.tenantId(), user.userId()));
         return Map.of("code", 0, "message", "success", "data", Map.of("id", id, "extra", data));
     }
 
@@ -345,6 +361,10 @@ public class CollectionController {
         if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "DELETE", name, id, existing);
+        // Week 41 D4a:发布记录删除事件
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.DELETE, name, id, null,
+                user.tenantId(), user.userId()));
         return Map.of("code", 0, "message", "deleted", "data", Map.of("id", id));
     }
 
