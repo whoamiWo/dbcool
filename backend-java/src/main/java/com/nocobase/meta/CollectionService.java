@@ -26,6 +26,8 @@ public class CollectionService {
     private final ObjectMapper objectMapper;
     private final ExpressionEvaluator expressionEvaluator;
     private final RelationResolver relationResolver;
+    /** Week 42 D2.2: 自动管理反向关系(belongsTo → hasMany)。 */
+    private final InverseRelationManager inverseManager;
 
     /** 兼容既有测试:自建无状态依赖实例。 */
     public CollectionService(
@@ -36,7 +38,8 @@ public class CollectionService {
     ) {
         this(repository, tableManager, migrationService, objectMapper,
                 new ExpressionEvaluator(),
-                new RelationResolver(repository, tableManager, objectMapper));
+                new RelationResolver(repository, tableManager, objectMapper),
+                new InverseRelationManager(repository, objectMapper));
     }
 
     @Autowired
@@ -46,7 +49,8 @@ public class CollectionService {
             AsyncMigrationService migrationService,
             ObjectMapper objectMapper,
             ExpressionEvaluator expressionEvaluator,
-            RelationResolver relationResolver
+            RelationResolver relationResolver,
+            InverseRelationManager inverseManager
     ) {
         this.repository = repository;
         this.tableManager = tableManager;
@@ -54,6 +58,7 @@ public class CollectionService {
         this.objectMapper = objectMapper;
         this.expressionEvaluator = expressionEvaluator;
         this.relationResolver = relationResolver;
+        this.inverseManager = inverseManager;
     }
 
     @Transactional
@@ -132,6 +137,8 @@ public class CollectionService {
             throw new RuntimeException("fields 序列化失败", e);
         }
         repository.save(meta);
+        // Week 42 D2.2: 自动反向关系 — belongsTo 在 target collection 加 hasMany
+        inverseManager.handleAddedField(meta, field);
         try {
             migrationService.executeSync(name, MigrationJobEntity.Operation.ADD_FIELD,
                     Map.of("name", field.name(), "type", field.type()));
@@ -160,6 +167,8 @@ public class CollectionService {
             throw new RuntimeException("fields 序列化失败", e);
         }
         repository.save(meta);
+        // Week 42 D2.2: 清理反向关系 — 删源 belongsTo 时一并清理 target 的 hasMany
+        inverseManager.handleRemovedField(meta, fieldName);
         try {
             migrationService.executeSync(name, MigrationJobEntity.Operation.DROP_FIELD,
                     Map.of("name", fieldName));
