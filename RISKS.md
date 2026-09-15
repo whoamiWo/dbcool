@@ -11,7 +11,7 @@
 | ID | 风险 | 概率 | 影响 | 缓解措施 | 状态 |
 |---|---|---|---|---|---|
 | R01 | Collection 引擎 ALTER TABLE 性能差 | 高 | 高 | JSONB fallback + 异步迁移 | 🟡 缓解中 |
-| R02 | 工作流引擎复杂度低估 | 中 | 高 | B1 模板空壳已修(Week 41 F1);剩余 D4a 触发器 / D4b 节点扩展 | 🟡 部分缓解 |
+| R02 | 工作流引擎复杂度低估 | 中 | 高 | F1 模板空壳 + D4a 触发器事件总线 + D4b.1 节点策略模式(4 内置 handler) | 🟢 缓解中 |
 | R03 | 拖拽设计器性能瓶颈 | 中 | 中 | 虚拟化 + 防抖 + Web Worker | 🟢 已规划 |
 | R04 | 单兵开发 6 个月太紧 | 高 | 高 | 砍功能而非延期,优先 P0 | 🟡 持续关注 |
 | R05 | 三栈通信接口频繁变更 | 中 | 中 | CONTRACT_DECISIONS.md 强约束 | 🟢 已规划 |
@@ -51,6 +51,14 @@
 - MVP 只做 5 个节点(审批/通知/条件/数据更新/HTTP)
 - 每个节点独立单元测试 + 端到端测试
 - 工作流执行引擎用简单 DAG,不引入 BPMN 完整规范
+- ✅ Week 41 F1: B1 模板市场空壳修复 (commit ba705bc)
+- ✅ Week 41 D4a: 触发器真实化 — EventBus + Matcher + Listener + RateLimiter (commit c490e2f)
+- ✅ Week 41 D4b.1: 节点策略模式 — WorkflowNodeHandler interface + Registry + 4 内置 handler + Engine 重构 (commit 9265533)
+  - 新增节点类型 = 加一个 `@Component` 类,零 Engine 改动
+  - Jacoco workflow pkg 96% (≥ 95% 阈值),581/581 测试通过
+- ⏭️ D4b.4 (5d,Week 42): Aviator 表达式引擎替换 ConditionNodeHandler 简化 eq/neq/gt/lt
+- ⏭️ D4b.2–D4b.3 (Week 42): 循环 / 子流程
+- ⏭️ D4b 验收: 至少 8 种节点类型(APPROVAL/NOTIFICATION/CONDITION/HTTP/EMAIL/SCRIPT/SUBWORKFLOW/LOOP)
 
 ### R04 单兵开发 6 个月太紧
 **详细:**

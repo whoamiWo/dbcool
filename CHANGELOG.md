@@ -1,4 +1,46 @@
-## Week 41 (2026-09-15) — 批次 1 + 批次 2 + D1 字段类型
+## Week 41 (2026-09-15) — 批次 1 + 批次 2 + D1 字段类型 + D4b.1 节点策略化
+
+### Step D4b.1: 节点执行策略模式 (2.5d,本周完成)
+**范围**:
+- ✅ D4b.1 (2.5d): WorkflowNodeHandler interface + Registry + 4 个内置 handler + Engine 重构
+
+**新增 8 个文件** (`com.nocobase.workflow` + `.handler` 子包):
+- `WorkflowNodeHandler.java` (interface: `type()` + `execute(NodeExecutionContext)` + `NodeOutcome`)
+- `NodeExecutionContext.java` (record: instance + node + defaultAssignee + triggeringEvent)
+- `NodeOutcome.java` (enum: CONTINUE / NEEDS_APPROVAL / FAILED / SKIPPED)
+- `WorkflowNodeHandlerRegistry.java` (Spring `@Component` 自动发现 + `find(type)` 查表)
+- `handler/ApprovalNodeHandler.java` (`@Component type=APPROVAL`)
+- `handler/NotificationNodeHandler.java` (`@Component type=NOTIFICATION`)
+- `handler/ConditionNodeHandler.java` (`@Component type=CONDITION` + eq/neq/gt/lt 简化评估)
+- `handler/HttpNodeHandler.java` (`@Component type=HTTP` + RestTemplate 调用)
+
+**修改 1 个文件**:
+- `WorkflowEngine.java`: 增加 `handlerRegistry` ctor 参数;`executeFrom` / `executeGraphFrom` 两处分发点先尝试内置类型(APPROVAL/NOTIFICATION/CONDITION/HTTP) 再 fallback 到 registry。CONDITION 的 `matched` 通过 `node._matched` 跨 handler 边界传递。
+
+**新增 4 个测试** (`com.nocobase.workflow.handler` 包 + `WorkflowNodeHandlerRegistryTest`):
+- NotificationNodeHandlerTest (4 tests)
+- HttpNodeHandlerTest (3 tests)
+- ConditionNodeHandlerTest (12 tests: null when / eq / neq / gt / lt / 嵌套字段 / 缺字段 / 非 Map when / 数值异常 / 未知 op)
+- NodeHandlerIntegrationTest (端到端 Spring 上下文启动)
+- WorkflowNodeHandlerRegistryTest (注册 / 查找 / 重复 type 报错)
+
+**修改 3 个 test** (ctor 加 registry 参数):
+- WorkflowEngineTest (新增 9 个 strategy 路径覆盖测试:CONTINUE / NEEDS_APPROVAL / FAILED / SKIPPED 4 个 outcome × array+graph mode)
+- WorkflowEngineMatchConditionTest
+- WorkflowTemplateRegistryB1Test
+
+### 验收 (报告 9.3 D4b)
+- ✅ Backend 581/581 PASS(本 step 加 29 个测试,从 552 → 581)
+- ✅ Jacoco coverage workflow 包 96% ≥ 95% 阈值
+- ✅ mvn verify BUILD SUCCESS("All coverage checks have been met")
+- ✅ 新增节点类型 = 加一个 `@Component`,零 Engine 改动(策略模式核心收益)
+- ⏭️ D4b.2–D4b.3:循环 / 子流程(Week 42)
+- ⏭️ D4b.4: Aviator 表达式引擎替换 ConditionNodeHandler 简化评估(5d,Week 42)
+
+### 影响与风险
+- **R07 (workflow 完备性)**:⏳ 25% → 50%。APPROVAL 仍走 legacy 路径(简化改造成本),后续 strategy 化需先 audit 审批 task 创建流程。无新增 P0/P1 风险。
+- **R04 (字段类型)**:未变化(D1 已完成 attachment + datetime)。
+
 ### Step D1: 字段类型扩展 — attachment + datetime 子集(2d,公式推迟到 D4b)
 **范围**:
 - ✅ D1.1 (0.5d): FieldDef 类型白名单加 `attachment` + `datetime`(共 11 种)
