@@ -629,4 +629,35 @@ class WorkflowEngineTest {
         WorkflowEngine.NodeResult r = localEngine.executeGraphFrom(ins, nodes, edges, "n1", null);
         assertEquals(WorkflowEngine.NodeResult.FAILED, r);
     }
+
+    @Test
+    void executeGraphFrom_depthLimitExceeded_returnsFailed() {
+        // Week 42 D4b.2: 模拟内部重载被传入超大 depth → 立即 FAILED
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+
+        // 用真实 internal overload,depth=MAX_EXECUTION_DEPTH(50)
+        List<Map<String, Object>> nodes = List.of(node("n1", "OK", Map.of()));
+        List<Map<String, Object>> edges = List.of();
+        WorkflowEngine.NodeResult r = engine.executeGraphFrom(
+                ins, nodes, edges, "n1", null, WorkflowEngine.MAX_EXECUTION_DEPTH);
+        assertEquals(WorkflowEngine.NodeResult.FAILED, r);
+        assertEquals(WorkflowInstanceEntity.Status.FAILED, ins.getStatus());
+        assertNotNull(ins.getErrorMessage());
+        assertTrue(ins.getErrorMessage().contains("执行栈深度超限"));
+    }
+
+    @Test
+    void executeGraphFrom_depthLimitNormalDepth_succeeds() {
+        // depth=49 (低于上限) 应正常执行
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+
+        List<Map<String, Object>> nodes = List.of(node("n1", "OK", Map.of()));
+        List<Map<String, Object>> edges = List.of();
+        WorkflowEngine.NodeResult r = engine.executeGraphFrom(
+                ins, nodes, edges, "n1", null, WorkflowEngine.MAX_EXECUTION_DEPTH - 1);
+        assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
+    }
+
 }

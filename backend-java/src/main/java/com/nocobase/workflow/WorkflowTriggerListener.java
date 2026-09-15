@@ -75,7 +75,18 @@ public class WorkflowTriggerListener {
                             w.getName(), event.getRecordId());
                     continue;
                 }
-                triggerWorkflow(w, event);
+                // Week 42 D4b.2:嵌套触发守卫(报告 R08 死循环防护第 3 道)
+                // 同一 recordId 在调用栈中重复出现时阻断,防止跨 workflow 环
+                if (!NestedTriggerGuard.tryPush(event.getRecordId())) {
+                    log.warn("D4b.2: 工作流 {} 嵌套触发器阻断,recordId={} 已在执行栈中(防跨实例死循环)",
+                            w.getName(), event.getRecordId());
+                    continue;
+                }
+                try {
+                    triggerWorkflow(w, event);
+                } finally {
+                    NestedTriggerGuard.pop();
+                }
             }
         } catch (Exception e) {
             // 监听器异常不应影响主流程(CollectionController 已返回响应)

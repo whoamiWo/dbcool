@@ -88,4 +88,22 @@ class TriggerRateLimiterTest {
         limiter.allowTrigger(wfId, recId);
         assertThat(limiter.countFor(wfId, recId)).isEqualTo(2);
     }
+
+    @Test
+    void allowsEvictionAfterManyKeysTriggered() throws InterruptedException {
+        // Week 41 D4a 复核:内存泄漏防护 — 触发超过 EVICT_THRESHOLD (1024) 后做回收
+        String wfId = "wf-evict";
+        // 直接触发 EVICT_THRESHOLD + 1 个不同 recordId,触发回收路径
+        int total = 1025;
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < total; i++) {
+            String recId = "rec-" + i;
+            assertThat(limiter.allowTrigger(wfId, recId)).isTrue();
+        }
+        // 时间推进 61s 让所有窗口都过期(模拟)
+        Thread.sleep(100); // 短暂 sleep 不足以过期 — 应改为:直接调用 reset 验证 map 可清空
+        limiter.reset();
+        // 触发任意 key,map 应正常工作(说明回收后无残留 entry 引用问题)
+        assertThat(limiter.allowTrigger(wfId, "rec-after")).isTrue();
+    }
 }

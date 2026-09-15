@@ -56,8 +56,11 @@ class WorkflowControllerTest {
         taskRepository = mock(WorkflowTaskRepository.class);
         engine = mock(WorkflowEngine.class);
         auditService = mock(AuditService.class);
+        // Week 42 D4b.2: 真实校验器(mock 时为 no-op)
+        com.nocobase.workflow.WorkflowGraphValidator graphValidator =
+                new com.nocobase.workflow.WorkflowGraphValidator();
         controller = new WorkflowController(workflowRepository, instanceRepository,
-                taskRepository, new ObjectMapper(), engine, auditService);
+                taskRepository, new ObjectMapper(), engine, auditService, graphValidator);
 
         testUser = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");
         SecurityContextHolder.setContext(new SecurityContextImpl(
@@ -193,6 +196,37 @@ class WorkflowControllerTest {
 
         assertEquals(HttpStatus.CREATED, resp.getStatusCode());
         verify(workflowRepository, times(1)).save(any(WorkflowEntity.class));
+    }
+
+    @Test
+    void create_withCycle_returns400() {
+        // Week 42 D4b.2: 含环的工作流 → 静态校验拒绝
+        WorkflowController.CreateWorkflowRequest req = new WorkflowController.CreateWorkflowRequest(
+                "loop", "Loop Flow", "desc", "posts",
+                "{\"type\":\"manual\"}",
+                "[{\"id\":\"n1\"},{\"id\":\"n2\"}]",  // 2 nodes
+                "[{\"source\":\"n1\",\"target\":\"n2\"},{\"source\":\"n2\",\"target\":\"n1\"}]",  // cycle!
+                true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.create(req, testUser));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("工作流图校验失败"));
+    }
+
+    @Test
+    void create_withInvalidJson_returns400() {
+        // Week 42 D4b.2: 节点 JSON 解析失败
+        WorkflowController.CreateWorkflowRequest req = new WorkflowController.CreateWorkflowRequest(
+                "bad", "Bad", "d", "x",
+                "{\"type\":\"manual\"}",
+                "not-valid-json{",  // 非法 JSON
+                "[]", true);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.create(req, testUser));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("JSON 解析失败"));
     }
 
     // ============ trigger ============

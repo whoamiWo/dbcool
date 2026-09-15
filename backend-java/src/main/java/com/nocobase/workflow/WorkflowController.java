@@ -43,6 +43,8 @@ public class WorkflowController {
     private final ObjectMapper objectMapper;
     private final WorkflowEngine engine;
     private final com.nocobase.audit.AuditService auditService;
+    /** Week 42 D4b.2 — R08 死循环防护:静态图校验器。 */
+    private final WorkflowGraphValidator graphValidator;
 
     public WorkflowController(
             WorkflowRepository workflowRepository,
@@ -50,7 +52,8 @@ public class WorkflowController {
             WorkflowTaskRepository taskRepository,
             ObjectMapper objectMapper,
             WorkflowEngine engine,
-            com.nocobase.audit.AuditService auditService
+            com.nocobase.audit.AuditService auditService,
+            WorkflowGraphValidator graphValidator
     ) {
         this.workflowRepository = workflowRepository;
         this.instanceRepository = instanceRepository;
@@ -58,6 +61,7 @@ public class WorkflowController {
         this.objectMapper = objectMapper;
         this.engine = engine;
         this.auditService = auditService;
+        this.graphValidator = graphValidator;
     }
 
     // ============================================================
@@ -96,6 +100,9 @@ public class WorkflowController {
             @RequestBody @Valid CreateWorkflowRequest req,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
+        // Week 42 D4b.2: 静态图校验 — 拒绝保存含环的工作流(R08 死循环防护)
+        validateGraphOrThrow(req.nodes(), req.edges());
+
         WorkflowEntity w = new WorkflowEntity();
         w.setId(UUID.randomUUID());
         w.setName(req.name());
@@ -137,8 +144,15 @@ public class WorkflowController {
         if (req.description() != null) w.setDescription(req.description());
         if (req.collectionName() != null && !req.collectionName().isBlank()) w.setCollectionName(req.collectionName());
         if (req.trigger() != null) w.setTriggerJson(req.trigger());
-        if (req.nodes() != null) w.setNodesJson(req.nodes());
-        if (req.edges() != null) w.setEdgesJson(req.edges());
+        // Week 42 D4b.2: 仅当 nodes/edges 实际被改时校验,避免无意义重读+重序列化
+        if (req.nodes() != null) {
+            w.setNodesJson(req.nodes());
+            validateGraphOrThrow(req.nodes(), w.getEdgesJson());
+        }
+        if (req.edges() != null) {
+            w.setEdgesJson(req.edges());
+            validateGraphOrThrow(w.getNodesJson(), req.edges());
+        }
         if (req.enabled() != null) w.setEnabled(req.enabled());
         WorkflowEntity saved = workflowRepository.save(w);
         auditService.log(user.tenantId(), user.userId(), user.username(),
@@ -416,6 +430,37 @@ public class WorkflowController {
         // Week 41 复核:改用 TenantContext(mustGet 无租户参数,非默认租户此前永远 404)
         return workflowRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "工作流不存在"));
+    }
+
+    /**
+     * Week 42 D4b.2 — R08 死循环防护第 1 道:
+     * <ol>
+     *   <li>解析 JSON,任何节点/边结构异常都会被捕获 → 400</li>
+     *   <li>调用 {@link WorkflowGraphValidator},环/超限/孤儿边 → 400 + 描述</li>
+     * </ol>
+     */
+    private void validateGraphOrThrow(Object nodesJson, Object edgesJson) {
+        java.util.List<java.util.Map<String, Object>> nodes;
+        java.util.List<java.util.Map<String, Object>> edges;
+        try {
+            nodes = nodesJson == null ? java.util.List.of()
+                    : objectMapper.readValue(
+                            nodesJson.toString(),
+                            new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.Map<String, Object>>>() {});
+            edges = edgesJson == null ? java.util.List.of()
+                    : objectMapper.readValue(
+                            edgesJson.toString(),
+                            new com.fasterxml.jackson.core.type.TypeReference<java.util.List<java.util.Map<String, Object>>>() {});
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "节点或边 JSON 解析失败: " + e.getMessage());
+        }
+        try {
+            graphValidator.validate(nodes, edges);
+        } catch (WorkflowGraphValidationException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "工作流图校验失败(R08): " + e.getMessage());
+        }
     }
 
     private Map<String, Object> toDto(WorkflowEntity w) {

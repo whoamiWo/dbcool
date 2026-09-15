@@ -69,7 +69,8 @@ class WorkflowControllerB2Test {
         engine = mock(WorkflowEngine.class);
         auditService = mock(AuditService.class);
         controller = new WorkflowController(workflowRepository, instanceRepository,
-                taskRepository, new ObjectMapper(), engine, auditService);
+                taskRepository, new ObjectMapper(), engine, auditService,
+                new WorkflowGraphValidator());
 
         testUser = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");
         SecurityContextHolder.setContext(new SecurityContextImpl(

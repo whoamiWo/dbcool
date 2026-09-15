@@ -37,6 +37,12 @@ public class WorkflowEngine {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowEngine.class);
 
+    /** Week 42 D4b.2 (R08 死循环防护) — 单次 workflow 执行的最大栈深度。
+     *  超过则终止并标记 instance 失败,防止 condition 分支 + 嵌套 handler 形成递归栈过深。
+     *  静态 DAG 校验由 {@link WorkflowGraphValidator} 完成,本常量是运行时兜底。
+     */
+    static final int MAX_EXECUTION_DEPTH = 50;
+
     /** Null-safe 大小写不敏感比较(避免上游传 null 节点类型时 NPE)。Week 40 B1 修复。 */
     private static boolean equalsIgnoreCase(String a, String b) {
         if (a == null) return false;
@@ -86,6 +92,19 @@ public class WorkflowEngine {
             String startNodeId,
             UUID defaultAssignee
     ) {
+        // 公开入口 — depth = 0
+        return executeGraphFrom(instance, nodes, edges, startNodeId, defaultAssignee, 0);
+    }
+
+    /** 内部重载:跟踪当前执行栈深度,R08 死循环防护运行时兜底。 */
+    NodeResult executeGraphFrom(
+            WorkflowInstanceEntity instance,
+            List<Map<String, Object>> nodes,
+            List<Map<String, Object>> edges,
+            String startNodeId,
+            UUID defaultAssignee,
+            int depth
+    ) {
         // node id → Map
         Map<String, Map<String, Object>> byId = new java.util.HashMap<>();
         for (Map<String, Object> n : nodes) {
@@ -103,6 +122,14 @@ public class WorkflowEngine {
         Set<String> visited = new java.util.HashSet<>();
         String current = startNodeId;
         while (current != null) {
+            if (depth >= MAX_EXECUTION_DEPTH) {
+                // 超过栈深度 — 标记 instance 失败并退出
+                instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+                instance.setErrorMessage("执行栈深度超限(>= " + MAX_EXECUTION_DEPTH + "),违反 R08 死循环防护");
+                instanceRepository.save(instance);
+                log.error("workflow {} execution depth exceeded ({}), terminated", instance.getId(), depth);
+                return NodeResult.FAILED;
+            }
             if (!visited.add(current)) {
                 log.warn("workflow {} cycle detected at {}", instance.getId(), current);
                 break;
