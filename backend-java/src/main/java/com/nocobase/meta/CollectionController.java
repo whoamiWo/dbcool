@@ -43,6 +43,8 @@ public class CollectionController {
     private final com.nocobase.auth.RoleRepository roleRepository;
     /** Week 41 D4a:事件发布器(AFTER_COMMIT 阶段发布 RecordChangeEvent)。 */
     private final ApplicationEventPublisher eventPublisher;
+    /** Week 41 D2:关联字段展开器 — 把 belongsTo/hasMany 替换为 {id, title}。 */
+    private final RelationResolver relationResolver;
 
     public CollectionController(
             CollectionService service,
@@ -52,7 +54,8 @@ public class CollectionController {
             com.nocobase.audit.AuditService auditService,
             com.nocobase.acl.RowAclService rowAclService,
             com.nocobase.auth.RoleRepository roleRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            RelationResolver relationResolver
     ) {
         this.service = service;
         this.migrationService = migrationService;
@@ -62,6 +65,7 @@ public class CollectionController {
         this.rowAclService = rowAclService;
         this.roleRepository = roleRepository;
         this.eventPublisher = eventPublisher;
+        this.relationResolver = relationResolver;
     }
 
     /** 构建 RowAclService.Principal(从当前认证用户). */
@@ -71,6 +75,18 @@ public class CollectionController {
                 user.userId(), user.tenantId());
         return new com.nocobase.acl.RowAclService.Principal(
                 user.userId().toString(), roles);
+    }
+
+    /**
+     * Week 41 D2:取 collection 的字段定义(供关联展开用)。
+     * 解析失败返回 null,让上层跳过 expandRelations(不阻断主流程)。
+     */
+    private List<FieldDef> fieldsOf(String collectionName) {
+        try {
+            return service.parseFields(service.get(collectionName));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ============================================================
@@ -250,6 +266,13 @@ public class CollectionController {
         List<com.nocobase.meta.CollectionService.FilterRule> filters = parseFilters(filter);
         List<Map<String, Object>> records = service.listRecords(
                 name, user.tenantId(), limit, sort, filters);
+        // Week 41 D2:展开 belongsTo/hasMany 关联字段为 {id, title}
+        List<FieldDef> fields = fieldsOf(name);
+        if (fields != null && !fields.isEmpty()) {
+            for (Map<String, Object> r : records) {
+                relationResolver.expandRelations(fields, r, user.tenantId());
+            }
+        }
         // FIELD policy 过滤:对每条记录应用隐藏字段
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
@@ -307,6 +330,11 @@ public class CollectionController {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
         Map<String, Object> record = service.getRecord(name, id, user.tenantId());
+        // Week 41 D2:展开 belongsTo/hasMany 关联字段为 {id, title}
+        List<FieldDef> fields = fieldsOf(name);
+        if (fields != null && !fields.isEmpty()) {
+            relationResolver.expandRelations(fields, record, user.tenantId());
+        }
         // ROW ACL 校验
         if (!rowAclService.evaluateRead(user.tenantId(), name, record, rowAclPrincipal(user))) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");

@@ -56,6 +56,7 @@ class CollectionControllerTest {
     private AuditService auditService;
     private RowAclService rowAclService;
     private RoleRepository roleRepository;
+    private RelationResolver relationResolver;
     private CollectionController controller;
     private ObjectMapper json = new ObjectMapper();
 
@@ -70,12 +71,15 @@ class CollectionControllerTest {
         auditService = mock(AuditService.class);
         rowAclService = mock(RowAclService.class);
         roleRepository = mock(RoleRepository.class);
+        // Week 41 D2:关联字段展开器 mock(默认 no-op;具体测试可定制)
+        relationResolver = mock(RelationResolver.class);
         // Week 41 D4a:事件发布器 mock(用于不触发实际监听器)
         org.springframework.context.ApplicationEventPublisher eventPublisher =
                 mock(org.springframework.context.ApplicationEventPublisher.class);
 
         controller = new CollectionController(service, migrationService, jobRepository,
-                aclEnforcer, auditService, rowAclService, roleRepository, eventPublisher);
+                aclEnforcer, auditService, rowAclService, roleRepository, eventPublisher,
+                relationResolver);
 
         // 默认 ACL 全通过、ROW ACL 全允许
         doNothing().when(aclEnforcer).assertCan(any(), anyString(), anyString(), any());

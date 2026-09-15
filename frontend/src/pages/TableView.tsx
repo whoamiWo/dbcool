@@ -213,5 +213,15 @@ function renderCell(value: unknown, field?: { type?: string }): React.ReactNode 
   if (value == null) return <span style={{ color: '#94a3b8' }}>—</span>;
   if (field?.type === 'boolean') return value === 'true' || value === true ? '✓' : '✗';
   if (field?.type === 'date') return String(value).slice(0, 10);
+  // Week 41 D2:关联字段展开 {id, title} 渲染
+  if (field?.type === 'belongsTo' && typeof value === 'object') {
+    const obj = value as { id?: string; title?: string };
+    return <span title={obj.id ?? ''}>{obj.title ?? obj.id ?? '—'}</span>;
+  }
+  if (field?.type === 'hasMany' && Array.isArray(value)) {
+    const titles = (value as Array<{ title?: string }>)
+      .map((v) => v.title ?? '—').join(', ');
+    return <span title={titles}>{titles || '—'}</span>;
+  }
   return String(value);
 }
