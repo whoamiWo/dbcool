@@ -1,3 +1,145 @@
+## Week 41 第三轮 (2026-09-15) — D5.1 Email 真实化 + D2 关联解析 + D5.3 Webhook 订阅
+
+> 推进附录 C.4 剩余的 P1 核心缺口(D5 集成层 + D2 关联关系)。
+
+### D5.1 Email 真实化
+
+- 引入 `spring-boot-starter-mail`;`EmailDispatcher` 按 channel 配置**动态构建** `JavaMailSender`
+  (SMTP 是按渠道独立配置的,不能用全局 `spring.mail.*` 单例)
+- **安全开关**:真实投递需显式配置 `real_send = true`;未开启时保持既有 `logged-send` 行为 ——
+  既向后兼容,也避免配置失误导致误发邮件
+- 补齐后:此前"配了 `smtp_host` 也只打一行日志"的 mock 行为不再存在
+
+### D2 关联关系解析
+
+- 新增 `meta/RelationResolver`:把 `belongsTo` / `hasMany` 字段从裸 UUID 展开为
+  `{id, title}`,`title` 取目标记录的标题字段(优先 `name` / `title` 字段,其次首个 text 字段)
+- `CollectionService.listRecords` / `getRecord` 读取时调用 —— 表格不再显示裸 UUID
+- **解析失败保留原值**:关联解析是展示增强,绝不影响主流程
+- 新增 `CollectionRepository.findByNameAndTenantId` 支持按租户定位目标 collection
+- ⏭️ 反向关系(创建 `belongsTo` 自动生成反向 `hasMany`)仍未实现
+
+### D5.3 Webhook 出口订阅
+
+- 新增 `V15__webhook_subscriptions.sql` + `com.nocobase.webhook` 包
+  (Entity / Repository / Service / Listener / Controller)
+- 数据变更 → 按 `(tenant, collection, event)` 匹配订阅 → POST 到外部 URL
+- 支持 HMAC-SHA256 签名(`X-Webhook-Signature`),配了 `secret` 时启用
+- 复用既有事件语义:`@Async` + `AFTER_COMMIT` + `fallbackExecution`
+- 管理端点:`GET` / `POST /api/admin/webhooks`、`PUT /{id}/enabled`、`DELETE /{id}`
+- **失败语义**:尽力而为,推送失败仅记日志(重试 / 死信待 Week 42+)
+
+### 验收
+
+- ✅ Backend **620 / 620 PASS**(上轮 604 + 新增 16,**零退化**)
+- ✅ `mvn verify` BUILD SUCCESS + **All coverage checks have been met**
+- ✅ 新增依赖:`spring-boot-starter-mail`
+
+### ⏭️ 本轮之后仍剩余
+
+- **D5.2 API Key 管理**:外部系统凭 key 访问(尚未开始,需改动 SecurityConfig 认证链,风险较高)
+- **D6 收尾**:新建租户时自动创建独立 schema 并初始化表
+- **D4b.2–D4b.3**:循环节点、子工作流
+- **D3 / D7 / D8**:视图扩展、契约补全、协作与版本
+
+---
+
+## Week 41 第二轮 (2026-09-15) — D6 G2 Schema 路由 + D4b 扩展 + D1 收尾 + D4a 收尾
+
+> 承接 `TECH_DEBT_CLEARANCE.md` 附录 C.4 的剩余债务顺序,本轮推进 4 项。
+
+### D6 Step G2:Schema 隔离路由框架(零迁移策略)
+
+- 新增 `TenantIdentifierResolver`(`CurrentTenantIdentifierResolver`)向 Hibernate 暴露当前 schema
+- 新增 `SchemaTenantConnectionProvider`(`MultiTenantConnectionProvider`):
+  取连接时执行 `SET search_path TO <schema>, public`(保留 public 兜底)
+- `TenantContext.currentSchema()`:默认租户 → `public`(**存量数据无需迁移**),其他租户 → 各自 schema
+- `application.yml` 启用 `hibernate.multiTenancy: SCHEMA`
+- `DynamicTableManager` 动态表按 schema 归属:`physicalTableName()` 返回全限定名,
+  `tableExists()` / `getColumns()` 按当前 schema 过滤(新增 `bareTableName()` 供 information_schema 查询)
+- **兼容性**:数据库不支持 `SET search_path`(如 H2)时仅告警并降级,不阻断启动 → 测试环境行为完全不变
+
+### D4b 扩展:表达式引擎 + DATA_UPDATE + 会签
+
+- 新增 `common/ExpressionEvaluator`(Aviator),供条件节点与 formula 字段共用
+  - 安全:表达式长度上限 1000、不注册自定义函数、求值异常一律降级为 null / false(C-R05)
+- `ConditionNodeHandler`:支持 `config.expression` 表达式,同时保留 `when` 结构化比较(向后兼容既有模板)
+- 新增 `handler/DataUpdateNodeHandler`(`DATA_UPDATE`):工作流写回 collection 记录。
+  走 `CollectionService.updateRecord`,因此同样受租户校验约束
+- **多人会签**:`ApprovalNodeHandler` 支持 `config.assignees`,为每个审批人创建独立 task;
+  `WorkflowController#approve` 在同一节点仍存在 PENDING 兄弟任务时不推进工作流。
+  单人审批时该列表为空,**行为与改造前完全一致**
+
+### D1 收尾:formula 求值 + MinIO 存储
+
+- **D1.3 formula**:`CollectionService` 读取记录时按 `options.expression` 求值,
+  变量环境为当前记录(表达式可直接引用同记录其他字段,如 `price * qty`);求值失败置 null、不阻断
+- **D1.4 MinIO**:新增 `MinioStorageService` + `POST /api/attachments/upload`、
+  `GET /api/attachments/{key}/download`(302 重定向到预签名 URL)
+  - **默认禁用**(`app.storage.minio.enabled: false`):未配置时端点返 501,与改造前一致,
+    不会因缺少 MinIO 而导致启动失败
+
+### D4a 收尾:事务性事件 + 定时触发
+
+- 监听器改为 `@TransactionalEventListener(AFTER_COMMIT, fallbackExecution = true)` + `@Async`
+  - `fallbackExecution = true` 是**关键**:记录 CRUD 当前没有 `@Transactional`,
+    若不 fallback,事件在无事务时会被静默丢弃
+  - `@Async` 让工作流执行不再阻塞 HTTP 响应
+- 新增 `WorkflowScheduler`(`@Scheduled`):支持 `{"type":"schedule","intervalMinutes":N}` 定时触发,
+  补齐此前完全缺失的定时能力(此前前端有"⏰ 定时调度"选项但后端无调度器)
+  - 已知限制:上次触发时间记在内存,重启后重置;多实例会重复触发(生产需持久化 + 分布式锁)
+
+### 验收
+
+- ✅ Backend **604 / 604 PASS**(上轮 588 + 新增 16,**零退化**)
+- ✅ `mvn verify` BUILD SUCCESS + **All coverage checks have been met**
+- ✅ 新增依赖:`aviator 5.4.3`、`minio 8.5.17`(首次构建需联网下载)
+
+---
+
+## Week 41 复核修复 (2026-09-15) — 清偿质量复核 + 红/橘/黄三级缺陷修复
+
+> 背景:对 Week 41 清偿做代码级复核,发现"骨架在、未接完"及若干新引入缺陷。
+> 完整审计与进展见 `TECH_DEBT_CLEARANCE.md`(附录 C:Week 41 进展复核)。
+
+### 🔴 修复:生产启动阻断 + 策略分发死代码
+
+1. **`tenant` 表缺 Flyway DDL(生产启动必崩)**
+   - 新增 `V14__tenant.sql`:建表(6 列,严格对齐 `TenantEntity` 的 `nullable=false` 约束)+ 索引 + 默认租户 seed(`ON CONFLICT DO NOTHING` 幂等)
+   - 新增 `TenantSeedRunner.java`(`CommandLineRunner`)挂载 `seedDefaultIfEmpty()`,seed 失败仅记 ERROR、不阻断启动
+   - 修复前:`ddl-auto: validate` 下必抛 `SchemaManagementException: missing table [tenant]`;测试因 `create-drop` + `flyway.enabled=false` 掩盖,18 个租户测试全绿但生产路径从未验证
+
+2. **D4b 策略分发是 100% 死代码**
+   - `WorkflowEngine` 两处分发点(`executeGraphFrom` / `executeFrom`)改为 **registry 优先**,4 个 legacy if/else 降级为兜底
+   - 生产:Spring 注入真实 handler → 内置类型走 handler;测试:空 registry → 回退 legacy,26 个 `WorkflowEngineTest` **零改动通过**
+   - 顺带去重重复的 `handlerRegistry.find()` 调用(原先 `isPresent()` 与 `.get()` 各调一次)
+   - 数组模式 CONDITION 保留 legacy(数组语义是跳 then/else 索引,handler 只能回传 `_matched`,无法表达)
+
+3. **三个 handler 能力缺失(启用即崩 / 丢功能)**
+   - `ApprovalNodeHandler`:补 `setNodeType("APPROVAL")` + `setCreatedAt(...)`(两列均 `nullable=false`,漏设即 not-null 冲突)+ `tenantId` 为空时 NPE 防护
+   - `NotificationNodeHandler`:注入 `MessageRepository` + `NotificationService`,按 legacy `logNotification()` 复刻**站内信 + 多渠道 fire**(初版只有一行日志)
+   - `HttpNodeHandler`:补 `bearer` / `basic` 鉴权、`method.toUpperCase()`(小写 `get` 会抛 `IllegalArgumentException`)、headers 用 `set` 而非 `add`
+   - `ConditionNodeHandler`:补 `contains` 操作符(对齐 legacy 的 5 个 op,初版只有 4 个)
+
+### 🟠 / ⚠️ 修复
+
+4. **清理 `tenant_default` 硬编码 19 处**:`RoleAclController` 13 + `WorkflowController` 5 + `UserAdminService` 1 → 全部改为 `TenantContext.currentTenantId()`
+   - 修复前:非 `tenant_default` 租户的工作流 / 角色 / ACL 全部 404 或 403,**多租户事实上不可用**
+   - `UserAdminService.create()` 保持 3 参签名不变(改签名会破坏既有测试)
+5. **`TriggerRateLimiter` 内存泄漏**:加 `EVICT_THRESHOLD` 惰性全量回收(过期 key 若之后不再被触发,其 entry 会永久驻留导致 `hits` 单调增长)
+6. **模板文案与实现不符**:`leave_approval` / `expense_report` 描述宣称"审批"但无 APPROVAL 节点 → 修正描述,并标注审批节点待 D4b.5 会签能力上线后补齐
+7. **补集成测试** `WorkflowEngineStrategyIntegrationTest`(7 tests):用**真实 handler 实例 + 真实 engine** 锁住分发路径
+   - 既有 strategy 测试只用 `CUSTOM_*` mock 且注入**空 registry**,绕过真实链路,导致上述缺陷在 581 个测试中全部逃逸
+
+### 验收
+
+- ✅ Backend **588 / 588 PASS**(基线 581 + 新增 7,**零退化**)
+- ✅ `mvn verify` BUILD SUCCESS + **All coverage checks have been met**(Jacoco 红线全部保持)
+- ✅ 业务代码 `"tenant_default"` 字面量残留 **0** 处(仅剩 `TenantContext` 常量定义、迁移 seed 数据、说明性注释)
+- ⏭️ 仍计划内推迟(非缺陷):attachment 存储(D1.4)、formula 求值(D1.3)、D6 Schema 隔离(G2)、D4a schedule、D4b.2–D4b.5
+
+---
+
 ## Week 41 (2026-09-15) — 批次 1 + 批次 2 + D1 字段类型 + D4b.1 节点策略化
 
 ### Step D4b.1: 节点执行策略模式 (2.5d,本周完成)
@@ -30,7 +172,10 @@
 - WorkflowTemplateRegistryB1Test
 
 ### 验收 (报告 9.3 D4b)
-- ✅ Backend 581/581 PASS(本 step 加 29 个测试,从 552 → 581)
+- ✅ Backend 581/581 PASS(本 step 加 **39** 个测试,从 **542** → 581)
+  - ⚠️ **数字更正(2026-09-15 复核)**:原记"加 29 个,从 552 → 581"自相矛盾
+    (552 + 29 = 571 ≠ 581)。实际 D1 后为 **542**,本 step 新增 5 个测试文件 30 个
+    + `WorkflowEngineTest` 新增 9 个 = **39** 个,542 + 39 = 581。
 - ✅ Jacoco coverage workflow 包 96% ≥ 95% 阈值
 - ✅ mvn verify BUILD SUCCESS("All coverage checks have been met")
 - ✅ 新增节点类型 = 加一个 `@Component`,零 Engine 改动(策略模式核心收益)
