@@ -17,7 +17,7 @@
 | R05 | 三栈通信接口频繁变更 | 中 | 中 | CONTRACT_DECISIONS.md 强约束 | 🟢 已规划 |
 | R06 | 动态字段类型扩展困难 | 中 | 中 | 字段类型即插件(ADR-008) | 🟢 已规划 |
 | R07 | 多租户数据隔离被绕过 | 低 | 极高 | G1 完成 ThreadLocal+CRUD;G2 完成 Schema 隔离 (Week 42 commit 9a4daaf,multiTenancy: SCHEMA + TenantServiceIntegrator 桥接) | 🟢 已缓解(G1+G2 done) |
-| R08 | 工作流死循环 | 中 | 高 | 节点最大深度限制 + DAG 校验 | 🔴 待设计 |
+| R08 | 工作流死循环 | 中 | 高 | Week 42 D4b.2 4 道防线完整(commit 3e5711f):静态 DAG 校验 + 执行栈深度(50) + 嵌套触发守卫 + 频率限制 | 🟢 已缓解 |
 | R09 | 数据库连接耗尽 | 中 | 高 | pgBouncer + 连接池监控 | 🟢 已规划 |
 | R10 | JWT 密钥泄露 | 低 | 极高 | KMS + 定期轮换 | 🟡 缓解中 |
 | R11 | LLM 调成本失控 | 中 | 中 | 限流 + 缓存 + 用户配额 | 🟢 已规划 |
@@ -76,6 +76,11 @@
 - 烧 CPU + 烧 LLM 配额
 
 **缓解方案:**
+- ✅ Week 42 D4b.2: 4 道防线完整实现(commit 3e5711f)
+  1. 静态 DAG 校验 (`WorkflowGraphValidator`):保存/更新 workflow 时拒绝环、节点超限、孤儿边 → 400
+  2. 执行栈深度限制 (`WorkflowEngine.MAX_EXECUTION_DEPTH=50`):运行时兜底,超限 set FAILED + 错误信息
+  3. 嵌套触发守卫 (`NestedTriggerGuard`):ThreadLocal 栈追踪同一 recordId 路径,跨实例递归时阻断
+  4. 频率限制 (`TriggerRateLimiter`):同 recordId 1min 内最多 5 次,带 evict 内存防护
 - 工作流执行栈深度限制(默认 10)
 - 同节点 1 分钟内只能触发 N 次
 - DAG 静态检测环

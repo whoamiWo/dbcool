@@ -1,4 +1,37 @@
 
+
+## Week 42 第二轮 (2026-09-15) — D4b.2 R08 死循环防护 (1d)
+
+> 唯一红色风险 R08 → 🟢 已缓解。4 道防线完整。
+
+### 第 1 道:静态 DAG 校验
+- `WorkflowGraphValidator` + `WorkflowGraphValidationException`
+- DFS 三色标记检测环,带路径描述
+- 节点最大数 200,边端点存在性检查
+- `WorkflowController.create` / `update` 在保存前调用 `validateGraphOrThrow`
+  (JSON 解析失败也捕获 → 400 + 描述)
+
+### 第 2 道:执行栈深度限制
+- `WorkflowEngine.MAX_EXECUTION_DEPTH = 50`
+- `executeGraphFrom` 重载加 depth 参数(公开入口默认 0)
+- 超过时 setStatus(FAILED) + setErrorMessage + return FAILED
+
+### 第 3 道:嵌套触发守卫 (跨实例防递归)
+- `NestedTriggerGuard` 维护 ThreadLocal 栈
+- 同一 recordId 在栈中重复出现 → 阻断
+- 栈深度超 5 → 阻断
+- `WorkflowTriggerListener` 在 triggerWorkflow 前后 tryPush/pop
+
+### 第 4 道(原有):频率限制完善
+- `TriggerRateLimiter` 1min 5 次上限 + evictEmptyEntries 内存防护
+- 加 evict 路径测试(原 70% → 95%+)
+
+### 验收
+- ✅ Backend **679/679 PASS** (新增 24 个测试)
+- ✅ `mvn verify` BUILD SUCCESS + All coverage checks have been met
+- ✅ R08 状态: 🔴 → 🟢
+
+---
 ## Week 42 (2026-09-15) — G2 Schema 路由完成 (1d 桥接关键)
 
 > Week 41 写好了 `SchemaTenantConnectionProvider` + `TenantIdentifierResolver` 但 yml 直接配会因 Hibernate `Class.forName` 创建实例时 Spring DataSource 尚未注入而失败。本轮用 Hibernate Integrator SPI 桥接解决。
