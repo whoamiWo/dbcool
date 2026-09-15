@@ -32,8 +32,20 @@ public class SchemaTenantConnectionProvider implements MultiTenantConnectionProv
 
     private final DataSource dataSource;
 
+    /**
+     * 静态引用让 Hibernate 通过 {@code Class.forName().newInstance()} 无参构造
+     * 创建实例后,也能拿到 Spring 管理的 DataSource。
+     */
+    private static volatile DataSource sharedDataSource;
+
     public SchemaTenantConnectionProvider(DataSource dataSource) {
         this.dataSource = dataSource;
+        sharedDataSource = dataSource;
+    }
+
+    /** Hibernate 无参构造路径 — 用于 multi_tenant_connection_provider 配置。 */
+    public SchemaTenantConnectionProvider() {
+        this.dataSource = sharedDataSource;
     }
 
     @Override

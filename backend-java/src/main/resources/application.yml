@@ -25,7 +25,12 @@ spring:
         # Week 41 D6 Step G2:ADR-007 Schema 隔离(零迁移策略)
         # schema 由 TenantIdentifierResolver 提供,SET search_path 由
         # SchemaTenantConnectionProvider 执行;默认租户映射 public → 存量数据无需迁移
-        multiTenancy: SCHEMA
+        multiTenancy: SCHEMA  # Week 42 G2 完成后启用(同上下面的 multi_tenant_* 配置)
+        # ⏭️ Week 41 G2 partial — SchemaTenantConnectionProvider + TenantIdentifierResolver
+        # 已写但未启用(Hibernate Class.forName 创建实例时 Spring Bean 尚未注入 DataSource,
+        # 需用 ServiceContributor 桥接,推迟到 Week 42 G2 完成)
+        # multi_tenant_connection_provider: com.nocobase.tenant.SchemaTenantConnectionProvider
+        # multi_tenant_identifier_resolver: com.nocobase.tenant.TenantIdentifierResolver
     show-sql: false
     open-in-view: false
 
