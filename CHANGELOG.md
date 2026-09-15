@@ -2,6 +2,34 @@
 
 
 
+
+## Week 42 第五轮 (2026-09-15) — D2.2 反向关系自动化 (1.5d 关键)
+
+> D2.1 只实现了 hasMany 展开,D2.2 把反向关系也接通 — P1 全部完成。
+
+### 设计
+- 反向字段命名: `<source_collection>_<field_name>` (e.g. posts.author → posts_author)
+- 反向字段 `options` 标记:
+  - `target`: 源 collection 名
+  - `foreignKey`: 源 belongsTo 字段名 (用于 JOIN)
+  - `_inverseOf`: 源 belongsTo 字段名 (用于 delete correlation)
+  - `_inverseSource`: 源 collection 名
+  - `_autoManaged`: true (前端 UI 隐藏删除按钮)
+- 幂等: 同名 + 同 _inverseOf + _inverseSource 跳过添加
+- 跨租户: target 查询用 tenant_id,绝不跨租户写
+- 删除: 扫描 tenant 下所有 collection,匹配 _inverseOf + _inverseSource 精确定位
+
+### 关键文件
+- `meta/InverseRelationManager.java` (@Component): 反向字段生命周期
+- `meta/CollectionService.java`: addField/removeField 集成(同一 @Transactional)
+- `InverseRelationManagerTest`: 12 测试覆盖各分支
+
+### 验收
+- ✅ Backend **734/734 PASS** (上轮 722 + 新 12)
+- ✅ `mvn verify` BUILD SUCCESS + All coverage checks have been met
+- ✅ D2 关联关系(双向自动化) — P1 全部完成
+
+---
 ## Week 42 第四轮 (2026-09-15) — R10 JWT 密钥轮换 (1d)
 
 > 🟡 缓解中 → 🟢 已缓解。KMS 集成基础就位。
