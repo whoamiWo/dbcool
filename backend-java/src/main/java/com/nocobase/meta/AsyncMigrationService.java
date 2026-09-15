@@ -44,12 +44,19 @@ public class AsyncMigrationService {
      */
     @Transactional
     public void executeSync(String collectionName, MigrationJobEntity.Operation op, Map<String, Object> payload) {
-        tableManager.setLockTimeout(lockTimeoutMs);
+        // WeekR01:整段包进 try —否则 setLockTimeout 自身抛错会让 lock_timeout 残留
         try {
+            tableManager.setLockTimeout(lockTimeoutMs);
             applyMutation(collectionName, op, payload);
             tableManager.resetLockTimeout();
         } catch (Exception e) {
-            tableManager.resetLockTimeout();
+            // 任何异常都先重置 lock_timeout,避免连接池复用时被污染
+            try {
+                tableManager.resetLockTimeout();
+            } catch (Exception resetErr) {
+                log.warn("[async-migration] resetLockTimeout 失败(可忽略): {}",
+                        resetErr.getMessage());
+            }
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             if (isLockTimeoutError(msg)) {
                 throw new LockTimeoutException("锁表超时,建议转异步", e);

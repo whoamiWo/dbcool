@@ -21,8 +21,26 @@ public class DynamicTableManager {
 
     private final JdbcTemplate jdbc;
 
+    /**
+     * 默认 lock_timeout(ms)— 防止单连接慢查询持锁阻塞 ALTER.
+     * ALTER 路径在 {@link AsyncMigrationService#executeSync} 中临时覆盖。
+     */
+    public static final int DEFAULT_LOCK_TIMEOUT_MS = 5000;
+
     public DynamicTableManager(DataSource dataSource) {
         this.jdbc = new JdbcTemplate(dataSource);
+    }
+
+    @jakarta.annotation.PostConstruct
+    void applyDefaultLockTimeout() {
+        try {
+            setLockTimeout(DEFAULT_LOCK_TIMEOUT_MS);
+        } catch (Exception e) {
+            // H2 测试环境 SET lock_timeout 可能不支持 — 仅警告,不影响启动
+            org.slf4j.LoggerFactory.getLogger(DynamicTableManager.class)
+                    .warn("[tablemanager] 应用默认 lock_timeout 设置失败(数据库可能不支持): {}",
+                            e.getMessage());
+        }
     }
 
     /**
