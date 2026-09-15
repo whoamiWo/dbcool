@@ -1,5 +1,39 @@
 
 
+
+## Week 42 第三轮 (2026-09-15) — D5.2 API Key 管理 (1d)
+
+> D5 集成层最后一项 P1 完成:外部系统/自动化脚本凭 X-Api-Key 访问 API。
+
+### 新增
+- `apikey/ApiKeyEntity` (UUID id + 前 8 字符 prefix + SHA-256 hash + scopes + tenant_id)
+  - raw key 仅创建时返回一次,db 只存 hash(防 db 泄漏暴露明文)
+  - 前缀展示风格仿 GitHub PAT (`ncb_xxxxxxxx...`)
+  - 软删除 `revoked_at` + 可选 `expires_at` + `last_used_at`
+- `apikey/ApiKeyRepository`: `findByKeyHash` (O(1)) + `findByKeyPrefix` (O(8) 范围)
+- `apikey/ApiKeyService`: create(随机 32 hex + SHA-256) + validate(hash 比对 + tenant 一致性) + revoke
+- `apikey/ApiKeyFilter` (`@Component @Lazy OncePerRequestFilter`):
+  - 优先级先于 JWT — 外部系统用 X-Api-Key
+  - 验证通过设 `ROLE_API` + 绑定 TenantContext
+  - `shouldNotFilter` 跳过公开端点(login/refresh/health/actuator/swagger)
+- `apikey/ApiKeyController`: `GET/POST/DELETE /api/admin/api-keys`,创建时返回 rawKey
+- `SecurityConfig`: ApiKeyFilter 在 JWT 之前
+- `V16__api_key.sql`: Flyway 迁移(UNIQUE on key_hash)
+- `application.yml`: test profile 改 `ddl-auto: create-drop`(H2 无 Flyway 需自动建表)
+
+### 关键技术决策
+- **`@Lazy`** 解决循环初始化:`ApiKeyFilter` → `ApiKeyService` → `ApiKeyRepository`(代理)
+  → `EntityManagerFactory` 完整初始化。若 ApiKeyFilter @Component 立即初始化,
+  SecurityFilterChain 在初始化阶段要求所有依赖 bean 已就绪,但
+  EntityManagerFactory 此时还没生成 Repository 代理 → NoSuchBeanDefinitionException
+  `@Lazy` 让 Spring 在第一次调用 filter 方法时才解析依赖,绕开循环。
+
+### 验收
+- ✅ Backend **702/702 PASS** (新增 23 个测试:4 ApiKeyEntity + 13 ApiKeyService + 6 ApiKeyFilter)
+- ✅ `mvn verify` BUILD SUCCESS + All coverage checks have been met
+- ✅ D5 集成层:Email + Webhook + API Key 三项 P1 全部完成
+
+---
 ## Week 42 第二轮 (2026-09-15) — D4b.2 R08 死循环防护 (1d)
 
 > 唯一红色风险 R08 → 🟢 已缓解。4 道防线完整。
