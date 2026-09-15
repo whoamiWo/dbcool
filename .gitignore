@@ -71,3 +71,4 @@ frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
 frontend/blob-report/
+backend-java/alerts.db

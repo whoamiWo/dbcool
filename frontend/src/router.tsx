@@ -1,32 +1,93 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/Login';
 import { HomePage } from './pages/Home';
-import { SchemaDesignerPage } from './pages/SchemaDesigner';
-import { SchemaEditorPage } from './pages/SchemaEditor';
-import { CollectionsListPage } from './pages/CollectionsList';
-import { CollectionDetailPage } from './pages/CollectionDetail';
-import { FormDesignerPage } from './pages/FormDesigner';
-import { FormRuntimePage } from './pages/FormRuntime';
-import { FormsListPage } from './pages/FormsList';
-import { TableViewPage } from './pages/TableView';
-import { KanbanViewPage } from './pages/KanbanView';
-import { DetailViewPage } from './pages/DetailView';
-import { ViewDesignerPage } from './pages/ViewDesigner';
-import { ViewsListPage } from './pages/ViewsList';
-import { WorkflowsListPage } from './pages/WorkflowsList';
-import { UsersListPage } from './pages/UsersList';
-import { WorkflowDesignerPageWithProvider } from './pages/WorkflowDesigner';
-import { WorkflowInstancesPage } from './pages/WorkflowInstances';
-import { MyTasksPage } from './pages/MyTasks';
-import { ProfilePage } from './pages/Profile';
-import { MessagesInboxPage } from './pages/MessagesInbox';
-import { RolesListPage } from './pages/RolesList';
-import { AclEditorPage } from './pages/AclEditor';
-import { AuditLogsPage } from './pages/AuditLogs';
-import { RowAclAdminPage } from './pages/RowAclAdmin';
-import { NotificationChannelsPage } from './pages/NotificationChannels';
-import { ErDiagramPage } from './pages/ErDiagram';
+
+// R12 代码分割 — React.lazy + 命名导出桥接(不改 29 个页面文件)
+const SchemaDesignerPage = lazy(() =>
+  import('./pages/SchemaDesigner').then(m => ({ default: m.SchemaDesignerPage } as { default: React.ComponentType })),
+);
+const SchemaEditorPage = lazy(() =>
+  import('./pages/SchemaEditor').then(m => ({ default: m.SchemaEditorPage } as { default: React.ComponentType })),
+);
+const CollectionsListPage = lazy(() =>
+  import('./pages/CollectionsList').then(m => ({ default: m.CollectionsListPage } as { default: React.ComponentType })),
+);
+const CollectionDetailPage = lazy(() =>
+  import('./pages/CollectionDetail').then(m => ({ default: m.CollectionDetailPage } as { default: React.ComponentType })),
+);
+const FormDesignerPage = lazy(() =>
+  import('./pages/FormDesigner').then(m => ({ default: m.FormDesignerPage } as { default: React.ComponentType })),
+);
+const FormRuntimePage = lazy(() =>
+  import('./pages/FormRuntime').then(m => ({ default: m.FormRuntimePage } as { default: React.ComponentType })),
+);
+const FormsListPage = lazy(() =>
+  import('./pages/FormsList').then(m => ({ default: m.FormsListPage } as { default: React.ComponentType })),
+);
+const TableViewPage = lazy(() =>
+  import('./pages/TableView').then(m => ({ default: m.TableViewPage } as { default: React.ComponentType })),
+);
+const KanbanViewPage = lazy(() =>
+  import('./pages/KanbanView').then(m => ({ default: m.KanbanViewPage } as { default: React.ComponentType })),
+);
+const DetailViewPage = lazy(() =>
+  import('./pages/DetailView').then(m => ({ default: m.DetailViewPage } as { default: React.ComponentType })),
+);
+const ViewDesignerPage = lazy(() =>
+  import('./pages/ViewDesigner').then(m => ({ default: m.ViewDesignerPage } as { default: React.ComponentType })),
+);
+const ViewsListPage = lazy(() =>
+  import('./pages/ViewsList').then(m => ({ default: m.ViewsListPage } as { default: React.ComponentType })),
+);
+const WorkflowsListPage = lazy(() =>
+  import('./pages/WorkflowsList').then(m => ({ default: m.WorkflowsListPage } as { default: React.ComponentType })),
+);
+const UsersListPage = lazy(() =>
+  import('./pages/UsersList').then(m => ({ default: m.UsersListPage } as { default: React.ComponentType })),
+);
+const WorkflowDesignerPageWithProvider = lazy(() =>
+  import('./pages/WorkflowDesigner').then(m => ({ default: m.WorkflowDesignerPageWithProvider } as { default: React.ComponentType })),
+);
+const WorkflowInstancesPage = lazy(() =>
+  import('./pages/WorkflowInstances').then(m => ({ default: m.WorkflowInstancesPage } as { default: React.ComponentType })),
+);
+const MyTasksPage = lazy(() =>
+  import('./pages/MyTasks').then(m => ({ default: m.MyTasksPage } as { default: React.ComponentType })),
+);
+const ProfilePage = lazy(() =>
+  import('./pages/Profile').then(m => ({ default: m.ProfilePage } as { default: React.ComponentType })),
+);
+const MessagesInboxPage = lazy(() =>
+  import('./pages/MessagesInbox').then(m => ({ default: m.MessagesInboxPage } as { default: React.ComponentType })),
+);
+const RolesListPage = lazy(() =>
+  import('./pages/RolesList').then(m => ({ default: m.RolesListPage } as { default: React.ComponentType })),
+);
+const AclEditorPage = lazy(() =>
+  import('./pages/AclEditor').then(m => ({ default: m.AclEditorPage } as { default: React.ComponentType })),
+);
+const AuditLogsPage = lazy(() =>
+  import('./pages/AuditLogs').then(m => ({ default: m.AuditLogsPage } as { default: React.ComponentType })),
+);
+const RowAclAdminPage = lazy(() =>
+  import('./pages/RowAclAdmin').then(m => ({ default: m.RowAclAdminPage } as { default: React.ComponentType })),
+);
+const NotificationChannelsPage = lazy(() =>
+  import('./pages/NotificationChannels').then(m => ({ default: m.NotificationChannelsPage } as { default: React.ComponentType })),
+);
+const ErDiagramPage = lazy(() =>
+  import('./pages/ErDiagram').then(m => ({ default: m.ErDiagramPage } as { default: React.ComponentType })),
+);
+const AlertCenterPage = lazy(() =>
+  import('./pages/AlertCenter').then(m => ({ default: m.AlertCenterPage } as { default: React.ComponentType })),
+);
+
+/** R12 懒加载占位 */
+function Lazy({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={null}>{children}</Suspense>;
+}
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -38,39 +99,40 @@ export const router = createBrowserRouter([
       { path: 'home', element: <HomePage /> },
 
       // Schema
-      { path: 'designer/schemas', element: <CollectionsListPage /> },
-      { path: 'designer/schemas/new', element: <SchemaDesignerPage /> },
-      { path: 'designer/schemas/:name/edit', element: <SchemaEditorPage /> },
-      { path: 'designer/collections/:name', element: <CollectionDetailPage /> },
+      { path: 'designer/schemas', element: <Lazy><CollectionsListPage /></Lazy> },
+      { path: 'designer/schemas/new', element: <Lazy><SchemaDesignerPage /></Lazy> },
+      { path: 'designer/schemas/:name/edit', element: <Lazy><SchemaEditorPage /></Lazy> },
+      { path: 'designer/collections/:name', element: <Lazy><CollectionDetailPage /></Lazy> },
 
       // Form
-      { path: 'designer/forms', element: <FormsListPage /> },
-      { path: 'designer/forms/:collection/new', element: <FormDesignerPage /> },
-      { path: 'designer/forms/:collection/:id/edit', element: <FormDesignerPage /> },
-      { path: 'forms/:formId/fill', element: <FormRuntimePage /> },
+      { path: 'designer/forms', element: <Lazy><FormsListPage /></Lazy> },
+      { path: 'designer/forms/:collection/new', element: <Lazy><FormDesignerPage /></Lazy> },
+      { path: 'designer/forms/:collection/:id/edit', element: <Lazy><FormDesignerPage /></Lazy> },
+      { path: 'forms/:formId/fill', element: <Lazy><FormRuntimePage /></Lazy> },
 
       // View
-      { path: 'designer/views', element: <ViewsListPage /> },
-      { path: 'designer/views/:collection/new', element: <ViewDesignerPage /> },
-      { path: 'admin/users', element: <UsersListPage /> },
-      { path: 'designer/workflows', element: <WorkflowsListPage /> },
-      { path: 'designer/instances', element: <WorkflowInstancesPage /> },
-      { path: 'designer/instances/:id', element: <WorkflowInstancesPage /> },
-      { path: 'tasks/my', element: <MyTasksPage /> },
-      { path: 'designer/workflows/new', element: <WorkflowDesignerPageWithProvider /> },
-      { path: 'designer/workflows/:id/edit', element: <WorkflowDesignerPageWithProvider /> },
-      { path: 'profile', element: <ProfilePage /> },
-      { path: 'messages', element: <MessagesInboxPage /> },
-      { path: 'admin/roles', element: <RolesListPage /> },
-      { path: 'admin/acl', element: <AclEditorPage /> },
-      { path: 'admin/audit', element: <AuditLogsPage /> },
-      { path: 'admin/row-acl', element: <RowAclAdminPage /> },
-      { path: 'admin/notifications', element: <NotificationChannelsPage /> },
-      { path: 'admin/er', element: <ErDiagramPage /> },
-      { path: 'designer/views/:collection/:id/edit', element: <ViewDesignerPage /> },
-      { path: 'views/:id/run', element: <TableViewPage /> },
-      { path: 'views/:id/kanban', element: <KanbanViewPage /> },
-      { path: 'views/:id/detail/:recordId', element: <DetailViewPage /> },
+      { path: 'designer/views', element: <Lazy><ViewsListPage /></Lazy> },
+      { path: 'designer/views/:collection/new', element: <Lazy><ViewDesignerPage /></Lazy> },
+      { path: 'admin/users', element: <Lazy><UsersListPage /></Lazy> },
+      { path: 'designer/workflows', element: <Lazy><WorkflowsListPage /></Lazy> },
+      { path: 'designer/instances', element: <Lazy><WorkflowInstancesPage /></Lazy> },
+      { path: 'designer/instances/:id', element: <Lazy><WorkflowInstancesPage /></Lazy> },
+      { path: 'tasks/my', element: <Lazy><MyTasksPage /></Lazy> },
+      { path: 'designer/workflows/new', element: <Lazy><WorkflowDesignerPageWithProvider /></Lazy> },
+      { path: 'designer/workflows/:id/edit', element: <Lazy><WorkflowDesignerPageWithProvider /></Lazy> },
+      { path: 'profile', element: <Lazy><ProfilePage /></Lazy> },
+      { path: 'messages', element: <Lazy><MessagesInboxPage /></Lazy> },
+      { path: 'admin/roles', element: <Lazy><RolesListPage /></Lazy> },
+      { path: 'admin/acl', element: <Lazy><AclEditorPage /></Lazy> },
+      { path: 'admin/audit', element: <Lazy><AuditLogsPage /></Lazy> },
+      { path: 'admin/row-acl', element: <Lazy><RowAclAdminPage /></Lazy> },
+      { path: 'admin/notifications', element: <Lazy><NotificationChannelsPage /></Lazy> },
+      { path: 'admin/alerts', element: <Lazy><AlertCenterPage /></Lazy> },
+      { path: 'admin/er', element: <Lazy><ErDiagramPage /></Lazy> },
+      { path: 'designer/views/:collection/:id/edit', element: <Lazy><ViewDesignerPage /></Lazy> },
+      { path: 'views/:id/run', element: <Lazy><TableViewPage /></Lazy> },
+      { path: 'views/:id/kanban', element: <Lazy><KanbanViewPage /></Lazy> },
+      { path: 'views/:id/detail/:recordId', element: <Lazy><DetailViewPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

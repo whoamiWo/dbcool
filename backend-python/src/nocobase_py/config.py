@@ -46,6 +46,19 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
+    # R11: LLM 三层防护可配参数(演示前可放宽灰度)
+    llm_rate_limit_max_requests: int = 30
+    llm_rate_limit_window_seconds: int = 60
+    llm_cache_max_size: int = 256
+    llm_cache_ttl_seconds: int = 300
+    llm_daily_call_limit: int = 100
+    llm_daily_token_limit: int = 50_000
+    llm_monthly_call_limit: int = 2000
+    llm_monthly_token_limit: int = 1_000_000
+
+    # R15: 插件热加载目录
+    plugins_dir: str = "plugins"
+
 
 @lru_cache
 def get_settings() -> Settings:

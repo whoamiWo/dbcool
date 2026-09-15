@@ -30,6 +30,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // R12: 代码分割 — 将大型依赖拆到独立 chunk,首屏只加载 React + Router
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'reactflow-vendor': ['reactflow'],
+          'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'state-vendor': ['zustand', '@tanstack/react-query'],
+          'ui-vendor': ['lucide-react'],
+        },
+      },
+    },
   },
   test: {
     globals: true,

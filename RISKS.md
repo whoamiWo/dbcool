@@ -20,11 +20,26 @@
 | R08 | 工作流死循环 | 中 | 高 | Week 42 D4b.2 4 道防线完整(commit 3e5711f):静态 DAG 校验 + 执行栈深度(50) + 嵌套触发守卫 + 频率限制 | 🟢 已缓解 |
 | R09 | 数据库连接耗尽 | 中 | 高 | HikariCP 加固 + ConnectionPoolMonitor + pgBouncer 部署指南 | 🟢 已缓解 |
 | R10 | JWT 密钥泄露 | 低 | 极高 | Week 42 commit: KeyRing 内存级轮换 + kid header + 撤销(基础就位);KMS 集成推迟到 Week 43+ | 🟢 已缓解(基础) |
-| R11 | LLM 调成本失控 | 中 | 中 | 限流 + 缓存 + 用户配额 | 🟢 已规划 |
+| R11 | LLM 调成本失控 | 中 | 中 | 限流 + 缓存 + 用户配额 | 🟢 已缓解(三层防护) |
+
+---
+
+### R11 LLM 调成本失控
+**详细:**
+- 用户滥用 LLM 端点导致 API 账单暴涨
+
+**缓解方案:**
+- ✅ Week 43 (`backend-python`): 三层防护完整实现 ——
+  1. **限流** (`middleware/rate_limit.py` SlidingWindowRateLimiter): 每用户 60s 内最多 30 次,超限 429
+  2. **缓存** (`services/llm_cache.py` LLMCache): 相同 model+prompt 命中缓存,TTL 5 分钟 + LRU 256 条,零成本复用
+  3. **配额** (`services/quota.py` QuotaService): 每日 100 次 / 50K token、每月 2000 次 / 1M token,超限抛 429
+- ✅ Week 43: `/api/ai/chat` 端点集三层防护 + `/api/ai/quota`(余量查询)+ `/api/ai/cache/stats`(缓存统计)
+- ✅ Week 43 增强: **配置可配化** — `LLM_*` 环境变量驱动(`Settings.llm_*`),演示前可灰度放宽
+- ✅ Week 43 增强: **告警接入** — `services/alerts.py` AlertCollector + `/api/ai/alerts/recent` 监控端点;限流/配额超限自动上报;LLMCache 增加 hit_rate 指标
 | R12 | 前端构建产物体积爆炸 | 中 | 低 | 代码分割 + 懒加载 | 🟢 已规划 |
 | R13 | 演示当天崩 | 中 | 极高 | Week 43 commit: freeze-demo + unfreeze + health/ready + smoke E2E + docs | 🟢 已缓解 |
 | R14 | 团队只有一个人 | 极高 | 中 | 文档先行 + 任务清单化 | 🟢 接受 |
-| R15 | 插件机制被滥用 | 中 | 中 | manifest 必填 + 权限声明 | 🟢 已规划 |
+| R15 | 插件机制被滥用 | 中 | 中 | manifest 必填 + 权限声明 | 🟢 已缓解(PluginRegistry + PluginManifest + PluginFileScanner + PluginHotReloader) |
 
 ---
 
