@@ -16,6 +16,8 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.notification.NotificationService;
+import com.nocobase.workflow.NodeExecutionContext;
+import com.nocobase.workflow.NodeOutcome;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.List;
@@ -58,7 +60,7 @@ class WorkflowEngineTest {
 
         engine = new WorkflowEngine(
                 instanceRepository, taskRepository, workflowRepository,
-                messageRepository, notificationService, objectMapper);
+                messageRepository, notificationService, objectMapper, new WorkflowNodeHandlerRegistry(java.util.List.of()));
 
         // RestTemplate 是 final 字段,用反射替换
         Field f = WorkflowEngine.class.getDeclaredField("restTemplate");
@@ -455,5 +457,176 @@ class WorkflowEngineTest {
 
         assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
         verify(restTemplate).exchange(anyString(), any(), any(), eq(String.class));
+    }
+
+    @Test
+    void executeFrom_strategyHandler_invoked() {
+        // Week 41 D4b.1:策略化分发 — registry 中没有 CUSTOM 时走 unknown 分支
+        WorkflowNodeHandlerRegistry emptyRegistry = new WorkflowNodeHandlerRegistry(java.util.List.of());
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, emptyRegistry);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(node("n1", "CUSTOM_UNKNOWN_TYPE", Map.of()));
+        WorkflowEngine.NodeResult r = localEngine.executeFrom(ins, nodes, 0, null);
+        assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
+        assertEquals(WorkflowInstanceEntity.Status.COMPLETED, ins.getStatus());
+    }
+
+    @Test
+    void executeGraphFrom_strategyHandler_invoked() {
+        // Week 41 D4b.1:策略化分发 — registry 找不到时走 unknown 分支(跳过)
+        WorkflowNodeHandlerRegistry emptyRegistry = new WorkflowNodeHandlerRegistry(java.util.List.of());
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, emptyRegistry);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(node("n1", "CUSTOM", Map.of()));
+        List<Map<String, Object>> edges = List.of(Map.of("source", "n1", "target", "end"));
+        WorkflowEngine.NodeResult r = localEngine.executeGraphFrom(ins, nodes, edges, "n1", null);
+        assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
+    }
+
+    @Test
+    void executeFrom_strategyHandler_continueOutcome() {
+        // Week 41 D4b.1:注册自定义 handler → strategy 路径 → CONTINUE
+        WorkflowNodeHandler mockHandler = mock(WorkflowNodeHandler.class);
+        when(mockHandler.type()).thenReturn("CUSTOM_FOO");
+        when(mockHandler.execute(any(NodeExecutionContext.class))).thenReturn(NodeOutcome.CONTINUE);
+        WorkflowNodeHandlerRegistry reg = new WorkflowNodeHandlerRegistry(java.util.List.of(mockHandler));
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, reg);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(node("n1", "CUSTOM_FOO", Map.of()));
+        WorkflowEngine.NodeResult r = localEngine.executeFrom(ins, nodes, 0, null);
+        assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
+        verify(mockHandler).execute(any(NodeExecutionContext.class));
+    }
+
+    @Test
+    void executeFrom_strategyHandler_needsApprovalOutcome() {
+        // strategy path → outcome=NEEDS_APPROVAL → set PENDING + return NEEDS_APPROVAL
+        WorkflowNodeHandler mockHandler = mock(WorkflowNodeHandler.class);
+        when(mockHandler.type()).thenReturn("CUSTOM_BAR");
+        when(mockHandler.execute(any(NodeExecutionContext.class))).thenReturn(NodeOutcome.NEEDS_APPROVAL);
+        WorkflowNodeHandlerRegistry reg = new WorkflowNodeHandlerRegistry(java.util.List.of(mockHandler));
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, reg);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(node("n1", "CUSTOM_BAR", Map.of()));
+        WorkflowEngine.NodeResult r = localEngine.executeFrom(ins, nodes, 0, null);
+        assertEquals(WorkflowEngine.NodeResult.NEEDS_APPROVAL, r);
+        assertEquals(WorkflowInstanceEntity.Status.PENDING, ins.getStatus());
+    }
+
+    @Test
+    void executeFrom_strategyHandler_failedOutcome() {
+        // strategy path → outcome=FAILED → set FAILED + return FAILED (数组模式不写 errorMessage)
+        WorkflowNodeHandler mockHandler = mock(WorkflowNodeHandler.class);
+        when(mockHandler.type()).thenReturn("CUSTOM_BAZ");
+        when(mockHandler.execute(any(NodeExecutionContext.class))).thenReturn(NodeOutcome.FAILED);
+        WorkflowNodeHandlerRegistry reg = new WorkflowNodeHandlerRegistry(java.util.List.of(mockHandler));
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, reg);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(node("n1", "CUSTOM_BAZ", Map.of()));
+        WorkflowEngine.NodeResult r = localEngine.executeFrom(ins, nodes, 0, null);
+        assertEquals(WorkflowEngine.NodeResult.FAILED, r);
+        assertEquals(WorkflowInstanceEntity.Status.FAILED, ins.getStatus());
+    }
+
+    @Test
+    void executeFrom_strategyHandler_skippedOutcome_setsHandleFalse() {
+        // SKIPPED → handleHolder[0] = "false"
+        WorkflowNodeHandler mockHandler = mock(WorkflowNodeHandler.class);
+        when(mockHandler.type()).thenReturn("CUSTOM_SKIP");
+        when(mockHandler.execute(any(NodeExecutionContext.class))).thenReturn(NodeOutcome.SKIPPED);
+        WorkflowNodeHandlerRegistry reg = new WorkflowNodeHandlerRegistry(java.util.List.of(mockHandler));
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, reg);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        // 多节点: CUSTOM_SKIP 走 false,后面 follow false-handle edge
+        List<Map<String, Object>> nodes = List.of(
+                node("n1", "CUSTOM_SKIP", Map.of()),
+                node("n2", "OK", Map.of()));
+        WorkflowEngine.NodeResult r = localEngine.executeFrom(ins, nodes, 0, null);
+        assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
+    }
+
+    @Test
+    void executeFrom_graphStrategyHandler() {
+        // graph mode 走 strategy 路径
+        WorkflowNodeHandler mockHandler = mock(WorkflowNodeHandler.class);
+        when(mockHandler.type()).thenReturn("CUSTOM_G");
+        when(mockHandler.execute(any(NodeExecutionContext.class))).thenReturn(NodeOutcome.CONTINUE);
+        WorkflowNodeHandlerRegistry reg = new WorkflowNodeHandlerRegistry(java.util.List.of(mockHandler));
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, reg);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(
+                node("n1", "CUSTOM_G", Map.of()),
+                node("n2", "OK", Map.of()));
+        List<Map<String, Object>> edges = List.of(
+                Map.of("source", "n1", "target", "n2", "sourceHandle", "true"));
+        WorkflowEngine.NodeResult r = localEngine.executeGraphFrom(ins, nodes, edges, "n1", null);
+        assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
+        verify(mockHandler).execute(any(NodeExecutionContext.class));
+    }
+
+    @Test
+    void executeFrom_graphStrategyHandler_needsApproval() {
+        // graph + strategy + NEEDS_APPROVAL
+        WorkflowNodeHandler mockHandler = mock(WorkflowNodeHandler.class);
+        when(mockHandler.type()).thenReturn("CUSTOM_G2");
+        when(mockHandler.execute(any(NodeExecutionContext.class))).thenReturn(NodeOutcome.NEEDS_APPROVAL);
+        WorkflowNodeHandlerRegistry reg = new WorkflowNodeHandlerRegistry(java.util.List.of(mockHandler));
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, reg);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(node("n1", "CUSTOM_G2", Map.of()));
+        List<Map<String, Object>> edges = List.of();
+        WorkflowEngine.NodeResult r = localEngine.executeGraphFrom(ins, nodes, edges, "n1", null);
+        assertEquals(WorkflowEngine.NodeResult.NEEDS_APPROVAL, r);
+    }
+
+    @Test
+    void executeFrom_graphStrategyHandler_failed() {
+        // graph + strategy + FAILED
+        WorkflowNodeHandler mockHandler = mock(WorkflowNodeHandler.class);
+        when(mockHandler.type()).thenReturn("CUSTOM_G3");
+        when(mockHandler.execute(any(NodeExecutionContext.class))).thenReturn(NodeOutcome.FAILED);
+        WorkflowNodeHandlerRegistry reg = new WorkflowNodeHandlerRegistry(java.util.List.of(mockHandler));
+        WorkflowEngine localEngine = new WorkflowEngine(
+                instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, reg);
+
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        List<Map<String, Object>> nodes = List.of(node("n1", "CUSTOM_G3", Map.of()));
+        List<Map<String, Object>> edges = List.of();
+        WorkflowEngine.NodeResult r = localEngine.executeGraphFrom(ins, nodes, edges, "n1", null);
+        assertEquals(WorkflowEngine.NodeResult.FAILED, r);
     }
 }

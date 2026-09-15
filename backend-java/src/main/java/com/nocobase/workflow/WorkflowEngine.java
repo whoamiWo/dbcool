@@ -51,6 +51,8 @@ public class WorkflowEngine {
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
+    /** Week 41 D4b.1:节点策略化注册表。 */
+    private final WorkflowNodeHandlerRegistry handlerRegistry;
 
     public WorkflowEngine(
             WorkflowInstanceRepository instanceRepository,
@@ -58,7 +60,8 @@ public class WorkflowEngine {
             WorkflowRepository workflowRepository,
             MessageRepository messageRepository,
             NotificationService notificationService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            WorkflowNodeHandlerRegistry handlerRegistry
     ) {
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
@@ -66,6 +69,7 @@ public class WorkflowEngine {
         this.messageRepository = messageRepository;
         this.notificationService = notificationService;
         this.objectMapper = objectMapper;
+        this.handlerRegistry = handlerRegistry;
     }
 
     /**
@@ -125,6 +129,31 @@ public class WorkflowEngine {
                 log.info("workflow {} condition {} matched={}", instance.getId(), current, matched);
             } else if (equalsIgnoreCase(nodeType, "HTTP")) {
                 executeHttp(instance, node);
+            } else if (handlerRegistry.find(nodeType).isPresent()) {
+                // Week 41 D4b.1:策略化分发 — 新增节点类型走这里
+                NodeExecutionContext nodeCtx = new NodeExecutionContext(
+                        instance, node, defaultAssignee, null);
+                NodeOutcome outcome = handlerRegistry.find(nodeType).get().execute(nodeCtx);
+                if (outcome == NodeOutcome.NEEDS_APPROVAL) {
+                    instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+                    instanceRepository.save(instance);
+                    return NodeResult.NEEDS_APPROVAL;
+                }
+                if (outcome == NodeOutcome.FAILED) {
+                    instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+                    instance.setErrorMessage("Node " + current + " failed");
+                    instanceRepository.save(instance);
+                    return NodeResult.FAILED;
+                }
+                // CONTINUE / SKIPPED 继续
+                if (outcome == NodeOutcome.SKIPPED) {
+                    handleHolder[0] = "false"; // SKIPPED 走 false 分支
+                }
+                // CONDITION handler 把 matched 写到 node._matched,这里读出
+                Object matched = node.get("_matched");
+                if (matched instanceof Boolean b) {
+                    handleHolder[0] = b ? "true" : "false";
+                }
             } else {
                 log.warn("workflow {} unknown node type: {}", instance.getId(), nodeType);
             }
@@ -186,6 +215,24 @@ public class WorkflowEngine {
                 i = nextIdx;
             } else if (equalsIgnoreCase(nodeType, "HTTP")) {
                 executeHttp(instance, node);
+                i++;
+            } else if (handlerRegistry.find(nodeType).isPresent()) {
+                // Week 41 D4b.1:策略化分发 — 新增节点类型走这里
+                NodeExecutionContext nodeCtx = new NodeExecutionContext(
+                        instance, node, defaultAssignee, null);
+                NodeOutcome outcome = handlerRegistry.find(nodeType).get().execute(nodeCtx);
+                if (outcome == NodeOutcome.NEEDS_APPROVAL) {
+                    instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+                    instanceRepository.save(instance);
+                    return NodeResult.NEEDS_APPROVAL;
+                }
+                if (outcome == NodeOutcome.FAILED) {
+                    instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+                    instanceRepository.save(instance);
+                    return NodeResult.FAILED;
+                }
+                // CONDITION handler 把 matched 写到 node._matched,数组模式暂不支持分支
+                // (数组模式无 sourceHandle 概念,条件分支仍走 evaluateCondition)
                 i++;
             } else {
                 // 未知节点类型 → 跳过

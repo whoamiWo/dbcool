@@ -55,7 +55,8 @@ class WorkflowEngineMatchConditionTest {
         restTemplate = mock(RestTemplate.class);
 
         engine = new WorkflowEngine(instanceRepository, taskRepository, workflowRepository,
-                messageRepository, notificationService, new ObjectMapper());
+                messageRepository, notificationService, new ObjectMapper(),
+                new WorkflowNodeHandlerRegistry(java.util.List.of()));
 
         Field f = WorkflowEngine.class.getDeclaredField("restTemplate");
         f.setAccessible(true);

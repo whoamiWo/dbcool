@@ -54,7 +54,7 @@ class WorkflowTemplateRegistryB1Test {
         notificationService = mock(NotificationService.class);
         realMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         engine = new WorkflowEngine(instanceRepository, taskRepository, workflowRepository,
-                messageRepository, notificationService, realMapper);
+                messageRepository, notificationService, realMapper, new WorkflowNodeHandlerRegistry(java.util.List.of()));
         when(instanceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
