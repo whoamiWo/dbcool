@@ -52,6 +52,9 @@ server:
 app:
   jwt:
     secret: ${JWT_SECRET:dev_jwt_secret_at_least_32_characters_long_for_hs256}
+    # Week 42 R10:轮换期间保留上一个签名密钥,旧 kid 仍可验证
+    # 真实部署应由 KMS 注入 — 本地测试可留空
+    previous-secret: ${JWT_PREVIOUS_SECRET:}
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
   cors:
