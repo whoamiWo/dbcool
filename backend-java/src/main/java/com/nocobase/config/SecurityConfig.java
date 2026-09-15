@@ -1,5 +1,6 @@
 package com.nocobase.config;
 
+import com.nocobase.apikey.ApiKeyFilter;
 import com.nocobase.auth.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,9 +25,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    /** Week 42 D5.2: API Key 鉴权过滤器,先于 JWT 尝试。 */
+    private final ApiKeyFilter apiKeyFilter;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.apiKeyFilter = apiKeyFilter;
     }
 
     @Bean
@@ -72,6 +76,8 @@ public class SecurityConfig {
                             res.getWriter().write("{\"code\":1002,\"message\":\"无权限\",\"data\":{}}");
                         })
                 )
+                // Week 42 D5.2: API Key filter 先于 JWT — 外部系统用 X-Api-Key
+                .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

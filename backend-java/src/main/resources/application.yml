@@ -114,6 +114,11 @@ spring:
     driver-class-name: org.h2.Driver
   flyway:
     enabled: false
+  jpa:
+    hibernate:
+      # Week 42 D5.2: H2 测试环境无 Flyway → 用 create-drop 自动建表
+      # (生产 dev profile 仍用 validate + Flyway,保持 schema 一致性)
+      ddl-auto: create-drop
 
 ---
 # Docker profile — 与 dev 一样但日志更克制
