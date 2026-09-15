@@ -11,9 +11,14 @@ import org.springframework.stereotype.Component;
  *
  * <p>3 个内置模板,演示用:
  * <ul>
- *   <li>leave_approval — 请假申请 + 经理审批</li>
- *   <li>expense_report — 报销提交 + 财务审批</li>
+ *   <li>leave_approval — 请假申请 + 提交通知</li>
+ *   <li>expense_report — 报销提交 + 金额条件分支 + 通知</li>
  *   <li>customer_followup — 新增客户 + 自动通知跟进</li>
+ * </ul>
+ *
+ * <p><strong>注意</strong>:三个模板当前均为"通知型"流程,不含 APPROVAL 节点 ——
+ * B1 修复时原小写 {@code manual}/审批节点被移除而非转换。真正的审批节点
+ * 依赖会签能力,待 Week 42+ D4b.5 补齐后再加回(届时描述需同步更新)。
  * </ul>
  */
 @Component
@@ -43,7 +48,7 @@ public class WorkflowTemplateRegistry {
                 "leave_approval",
                 "请假审批",
                 "HR",
-                "员工提交请假申请 → 自动创建审批任务通知经理 → 审批后通知员工",
+                "员工提交请假申请 → 自动通知申请人已提交(审批节点待 D4b.5 会签能力上线后补齐)",
                 "📅",
                 List.of(new WorkflowTemplate.TemplateCollection(
                         "leave_request",
@@ -63,6 +68,7 @@ public class WorkflowTemplateRegistry {
                         Map.of("type", "record.created"),
                         List.of(
                                 // 引擎节点类型大写常量(Week 40 B1 修复)。原 "manual" + "notification" 落到 unknown 分支被跳过。
+                                // 注:当前为"提交即通知"流程,APPROVAL 节点待 D4b.5 补齐(描述已同步修正)
                                 node("notify_applicant", "Notify Applicant", "NOTIFICATION",
                                         Map.of("title", "申请已提交", "body", "您的请假申请已进入审批"), "end")
                         ),
@@ -80,7 +86,7 @@ public class WorkflowTemplateRegistry {
                 "expense_report",
                 "报销审批",
                 "财务",
-                "员工提交报销 → 财务审批 → 通过后通知员工",
+                "员工提交报销 → 金额 > 1000 时通知财务(审批节点待 D4b.5 会签能力上线后补齐)",
                 "💰",
                 List.of(new WorkflowTemplate.TemplateCollection(
                         "expense_report",

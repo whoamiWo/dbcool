@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.notification.NotificationService;
+import com.nocobase.workflow.MessageRepository;
 import com.nocobase.workflow.NodeExecutionContext;
 import com.nocobase.workflow.NodeOutcome;
 import com.nocobase.workflow.WorkflowInstanceEntity;
@@ -15,6 +17,7 @@ import com.nocobase.workflow.WorkflowRepository;
 import com.nocobase.workflow.WorkflowTaskRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +30,8 @@ class NodeHandlerIntegrationTest {
     private WorkflowInstanceRepository instanceRepository;
     private WorkflowTaskRepository taskRepository;
     private WorkflowRepository workflowRepository;
+    private MessageRepository messageRepository;
+    private NotificationService notificationService;
     private WorkflowNodeHandlerRegistry registry;
     private WorkflowInstanceEntity instance;
     private UUID assignee;
@@ -36,12 +41,17 @@ class NodeHandlerIntegrationTest {
         instanceRepository = mock(WorkflowInstanceRepository.class);
         taskRepository = mock(WorkflowTaskRepository.class);
         workflowRepository = mock(WorkflowRepository.class);
+        messageRepository = mock(MessageRepository.class);
+        notificationService = mock(NotificationService.class);
         when(instanceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // 显式声明:未 stub 时解析不出收件人 → 通知节点走跳过分支返回 CONTINUE
+        when(workflowRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
 
         registry = new WorkflowNodeHandlerRegistry(List.of(
                 new ApprovalNodeHandler(instanceRepository, taskRepository),
-                new NotificationNodeHandler(),
+                // Week 41 复核:通知 handler 需注入站内信与多渠道依赖
+                new NotificationNodeHandler(workflowRepository, messageRepository, notificationService),
                 new ConditionNodeHandler(),
                 new HttpNodeHandler()
         ));

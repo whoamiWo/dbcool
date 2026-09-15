@@ -1,17 +1,40 @@
 package com.nocobase.workflow.handler;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.common.ExpressionEvaluator;
 import com.nocobase.workflow.NodeExecutionContext;
 import com.nocobase.workflow.NodeOutcome;
 import com.nocobase.workflow.WorkflowNodeHandler;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+/**
+ * 条件节点 handler。
+ *
+ * <p>Week 41 复核 D4b.4:接入 Aviator 表达式引擎,替换此前只能做单字段比较的
+ * 简化评估(eq/neq/gt/lt/contains),现在支持 {@code &&} / {@code ||}、
+ * 算术、函数调用等完整表达式。
+ */
 @Component
 public class ConditionNodeHandler implements WorkflowNodeHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ConditionNodeHandler.class);
+
+    private final ExpressionEvaluator evaluator;
+
+    /** 兼容既有测试的无参构造(表达式引擎无状态,自建实例即可)。 */
+    public ConditionNodeHandler() {
+        this(new ExpressionEvaluator());
+    }
+
+    @Autowired
+    public ConditionNodeHandler(ExpressionEvaluator evaluator) {
+        this.evaluator = evaluator;
+    }
 
     @Override
     public String type() {
@@ -22,21 +45,34 @@ public class ConditionNodeHandler implements WorkflowNodeHandler {
     public NodeOutcome execute(NodeExecutionContext ctx) {
         @SuppressWarnings("unchecked")
         Map<String, Object> config = (Map<String, Object>) ctx.node().getOrDefault("config", Map.of());
-        Object when = config.get("when");
-        boolean matched = when == null ? true : evaluate(when, ctx);
 
-        // matched 用 ctx.extra 传递分支(Week 41 简化)
+        boolean matched = evaluateCondition(config, ctx);
+
         log.info("[workflow {} node {}] CONDITION matched={}",
                 ctx.instance().getId(), ctx.node().get("id"), matched);
-        // CONDITION 节点不直接决定 CONTINUE/FAILED — 留给 WorkflowEngine 根据 sourceHandle 选分支
-        // matched=true → engine 选 sourceHandle="true" 的边
-        // matched=false → engine 选 sourceHandle="false" 的边
-        // 这里通过 return SKIPPED 让 engine 知道这是分支节点(实际语义由 handleHolder 表达)
-        ctx.node().put("_matched", matched); // 引擎读这个
+        // 分支结果回传给引擎:图模式据此选 sourceHandle="true" / "false" 的边
+        ctx.node().put("_matched", matched);
         return NodeOutcome.CONTINUE;
     }
 
-    /** Week 41 简化评估:eq/neq/gt/lt。Week 42+ 接 Aviator 表达式引擎(报告 4.3.2)。 */
+    /**
+     * 两种判定方式,表达式优先、结构化 {@code when} 兜底(向后兼容既有模板):
+     * <ol>
+     *   <li>{@code config.expression} — Aviator 表达式,
+     *       如 {@code amount > 1000 && status == 'new'}</li>
+     *   <li>{@code config.when = {field, op, value}} — 结构化比较
+     *       (eq / neq / gt / lt / contains),支持点分嵌套路径</li>
+     * </ol>
+     */
+    private boolean evaluateCondition(Map<String, Object> config, NodeExecutionContext ctx) {
+        Object expr = config.get("expression");
+        if (expr instanceof String s && !s.isBlank()) {
+            return evaluator.evaluateBoolean(s, parseTriggerData(ctx));
+        }
+        Object when = config.get("when");
+        return when == null || evaluate(when, ctx);
+    }
+
     @SuppressWarnings("unchecked")
     private boolean evaluate(Object when, NodeExecutionContext ctx) {
         if (!(when instanceof Map)) return true;
@@ -45,7 +81,6 @@ public class ConditionNodeHandler implements WorkflowNodeHandler {
         String op = (String) w.getOrDefault("op", "eq");
         Object expected = w.get("value");
 
-        // 从 triggerDataJson 取实际值 — 简化为 Object equality
         Object actual = extractValue(ctx, field);
         if (actual == null) return false;
         try {
@@ -54,6 +89,7 @@ public class ConditionNodeHandler implements WorkflowNodeHandler {
                 case "neq": return !String.valueOf(actual).equals(String.valueOf(expected));
                 case "gt": return Double.parseDouble(actual.toString()) > Double.parseDouble(expected.toString());
                 case "lt": return Double.parseDouble(actual.toString()) < Double.parseDouble(expected.toString());
+                case "contains": return String.valueOf(actual).contains(String.valueOf(expected));
                 default: return false;
             }
         } catch (Exception e) {
@@ -61,26 +97,27 @@ public class ConditionNodeHandler implements WorkflowNodeHandler {
         }
     }
 
+    /** 解析 triggerData 为 Map,作为表达式求值的变量环境。 */
+    private Map<String, Object> parseTriggerData(NodeExecutionContext ctx) {
+        String json = ctx.instance().getTriggerDataJson();
+        if (json == null || json.isBlank()) return Map.of();
+        try {
+            return new ObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("[workflow {}] triggerData 解析失败,表达式环境为空", ctx.instance().getId());
+            return Map.of();
+        }
+    }
+
+    /** 按点分路径取值(如 {@code data.amount})。 */
     private Object extractValue(NodeExecutionContext ctx, String field) {
         if (field == null) return null;
-        // 简化为从 triggerDataJson 解析查找
-        String json = ctx.instance().getTriggerDataJson();
-        if (json == null || json.isBlank()) return null;
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>> typeRef =
-                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {};
-            Map<String, Object> data = mapper.readValue(json, typeRef);
-            // 支持嵌套字段(如 "data.amount")
-            String[] parts = field.split("\\.");
-            Object cur = data;
-            for (String p : parts) {
-                if (cur instanceof Map) cur = ((Map<String, Object>) cur).get(p);
-                else return null;
-            }
-            return cur;
-        } catch (Exception e) {
-            return null;
+        Map<String, Object> data = parseTriggerData(ctx);
+        Object cur = data;
+        for (String p : field.split("\\.")) {
+            if (cur instanceof Map) cur = ((Map<String, Object>) cur).get(p);
+            else return null;
         }
+        return cur;
     }
 }

@@ -72,6 +72,23 @@ class EmailDispatcherTest {
         assertThat(r.success()).isTrue();
     }
 
+    @Test
+    void send_realSendEnabled_attemptsRealDelivery() {
+        // Week 41 复核 D5.1:real_send=true 时走真实投递路径。
+        // 本地 2525 无 SMTP 服务 → 发送失败 → 返回 error(而不是静默 "logged-send")
+        var ch = makeChannel(Map.of(
+                "smtp_host", "127.0.0.1",
+                "smtp_port", 2525,
+                "username", "noreply",
+                "password", "secret",
+                "from", "noreply@example.com",
+                "real_send", true));
+        var r = dispatcher.send(ch, "user@example.com",
+                Map.of("title", "Subj", "body", "Body"));
+        assertThat(r.success()).isFalse();
+        assertThat(r.detail()).contains("email send failed");
+    }
+
     private NotificationChannelEntity makeChannel(Map<String, Object> config) {
         NotificationChannelEntity ch = new NotificationChannelEntity();
         ch.setConfig(new HashMap<>(config));

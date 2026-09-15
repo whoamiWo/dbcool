@@ -117,6 +117,28 @@
             <version>${mapstruct.version}</version>
         </dependency>
 
+        <!-- Week 41 复核 D4b.4 / D1.3:表达式引擎
+             (工作流条件节点与 formula 字段共用,替换此前硬编码的 5 个比较符) -->
+        <dependency>
+            <groupId>com.googlecode.aviator</groupId>
+            <artifactId>aviator</artifactId>
+            <version>5.4.3</version>
+        </dependency>
+
+        <!-- Week 41 复核 D1.4:附件对象存储(MinIO / S3 兼容) -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.17</version>
+        </dependency>
+
+        <!-- Week 41 复核 D5.1:Email 真实发送
+             (此前配了 smtp_host 也只是打日志,从不真正投递) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- 测试 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

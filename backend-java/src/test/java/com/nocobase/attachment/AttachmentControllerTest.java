@@ -30,7 +30,9 @@ class AttachmentControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new AttachmentController();
+        // Week 41 复核 D1.4:Controller 现在依赖存储服务。
+        // mock 的 isEnabled() 默认 false → upload / download 仍返 501,行为与改造前一致。
+        controller = new AttachmentController(mock(MinioStorageService.class));
         user = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");
         SecurityContextHolder.setContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(user, "n/a",

@@ -45,13 +45,30 @@ public class HttpNodeHandler implements WorkflowNodeHandler {
 
         HttpHeaders headers = new HttpHeaders();
         if (config.get("headers") instanceof Map) {
-            ((Map<String, String>) config.get("headers")).forEach(headers::add);
+            // 用 set 而非 add(对齐 legacy):同名 header 应覆盖而不是追加
+            ((Map<String, String>) config.get("headers")).forEach(headers::set);
+        }
+
+        // 鉴权:config.auth.type = bearer | basic | none
+        // 对齐 legacy WorkflowEngine.executeHttp()(:394-404),Week 41 初版完全没读 auth
+        if (config.get("auth") instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> auth = (Map<String, Object>) config.get("auth");
+            String authType = (String) auth.getOrDefault("type", "none");
+            if ("bearer".equals(authType)) {
+                headers.setBearerAuth(String.valueOf(auth.getOrDefault("token", "")));
+            } else if ("basic".equals(authType)) {
+                headers.setBasicAuth(
+                        String.valueOf(auth.getOrDefault("username", "")),
+                        String.valueOf(auth.getOrDefault("password", "")));
+            }
         }
 
         try {
             HttpEntity<Object> entity = new HttpEntity<>(body, headers);
+            // toUpperCase 对齐 legacy:小写 method(如 "get")会让 HttpMethod.valueOf 抛 IllegalArgumentException
             ResponseEntity<String> response = restTemplate.exchange(
-                    url, HttpMethod.valueOf(method), entity, String.class);
+                    url, HttpMethod.valueOf(method.toUpperCase()), entity, String.class);
             log.info("[workflow {}] HTTP {} {} → {}",
                     ctx.instance().getId(), method, url, response.getStatusCode());
             return NodeOutcome.CONTINUE;

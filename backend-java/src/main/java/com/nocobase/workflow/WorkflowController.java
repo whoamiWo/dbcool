@@ -127,8 +127,9 @@ public class WorkflowController {
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         WorkflowEntity w = mustGet(id);
-        // 租户校验:跨租户不可改(Week 41 仍硬编码 tenant_default,与 D6 多租户债务一致)
-        if (!"tenant_default".equals(w.getTenantId()) || !"tenant_default".equals(user.tenantId())) {
+        // 租户校验:跨租户不可改(Week 41 复核:改用 TenantContext,不再硬编码 tenant_default)
+        String tenant = TenantContext.currentTenantId();
+        if (!tenant.equals(w.getTenantId()) || !tenant.equals(user.tenantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "跨租户不可修改");
         }
         if (req.name() != null && !req.name().isBlank()) w.setName(req.name());
@@ -158,7 +159,8 @@ public class WorkflowController {
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         WorkflowEntity w = mustGet(id);
-        if (!"tenant_default".equals(w.getTenantId()) || !"tenant_default".equals(user.tenantId())) {
+        String tenant = TenantContext.currentTenantId();
+        if (!tenant.equals(w.getTenantId()) || !tenant.equals(user.tenantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "跨租户不可删除");
         }
         // 检查活跃实例
@@ -307,6 +309,21 @@ public class WorkflowController {
         task.setFinishedAt(Instant.now());
         taskRepository.save(task);
 
+        // Week 41 复核 D4b.5 会签:同一审批节点若还有其他人未审批,则不推进工作流。
+        // 单人审批时该列表为空,行为与改造前完全一致(向后兼容)。
+        if (task.getNodeId() != null) {
+            List<WorkflowTaskEntity> pendingSiblings = taskRepository.findByInstanceIdAndNodeIdAndStatus(
+                    task.getInstanceId(), task.getNodeId(), WorkflowTaskEntity.Status.PENDING);
+            if (!pendingSiblings.isEmpty()) {
+                WorkflowInstanceEntity waiting =
+                        instanceRepository.findById(task.getInstanceId()).orElseThrow();
+                return Map.of("code", 0,
+                        "message", "approved, waiting for other approvers ("
+                                + pendingSiblings.size() + " pending)",
+                        "data", instanceToDto(waiting));
+            }
+        }
+
         // 推进实例到下一个节点 — 重新触发 trigger 逻辑(简化)
         WorkflowInstanceEntity instance = instanceRepository.findById(task.getInstanceId()).orElseThrow();
         WorkflowEntity w = workflowRepository.findById(instance.getWorkflowId()).orElseThrow();
@@ -396,7 +413,8 @@ public class WorkflowController {
     // ============================================================
 
     private WorkflowEntity mustGet(UUID id) {
-        return workflowRepository.findByIdAndTenantId(id, "tenant_default")
+        // Week 41 复核:改用 TenantContext(mustGet 无租户参数,非默认租户此前永远 404)
+        return workflowRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "工作流不存在"));
     }
 

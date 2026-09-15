@@ -10,6 +10,9 @@ import org.springframework.stereotype.Repository;
 public interface CollectionRepository extends JpaRepository<CollectionMetaEntity, UUID> {
     Optional<CollectionMetaEntity> findByName(String name);
 
+    /** Week 41 复核 D2:关联解析时按租户精确定位目标 collection。 */
+    Optional<CollectionMetaEntity> findByNameAndTenantId(String name, String tenantId);
+
     List<CollectionMetaEntity> findByTenantId(String tenantId);
 
     boolean existsByName(String name);

@@ -2,11 +2,13 @@ package com.nocobase.meta;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.common.ExpressionEvaluator;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,17 +24,36 @@ public class CollectionService {
     private final DynamicTableManager tableManager;
     private final AsyncMigrationService migrationService;
     private final ObjectMapper objectMapper;
+    private final ExpressionEvaluator expressionEvaluator;
+    private final RelationResolver relationResolver;
 
+    /** 兼容既有测试:自建无状态依赖实例。 */
     public CollectionService(
             CollectionRepository repository,
             DynamicTableManager tableManager,
             AsyncMigrationService migrationService,
             ObjectMapper objectMapper
     ) {
+        this(repository, tableManager, migrationService, objectMapper,
+                new ExpressionEvaluator(),
+                new RelationResolver(repository, tableManager, objectMapper));
+    }
+
+    @Autowired
+    public CollectionService(
+            CollectionRepository repository,
+            DynamicTableManager tableManager,
+            AsyncMigrationService migrationService,
+            ObjectMapper objectMapper,
+            ExpressionEvaluator expressionEvaluator,
+            RelationResolver relationResolver
+    ) {
         this.repository = repository;
         this.tableManager = tableManager;
         this.migrationService = migrationService;
         this.objectMapper = objectMapper;
+        this.expressionEvaluator = expressionEvaluator;
+        this.relationResolver = relationResolver;
     }
 
     @Transactional
@@ -256,6 +277,11 @@ public class CollectionService {
                     .filter(r -> filters.stream().allMatch(f -> matchFilter(r.get(f.field), f)))
                     .toList();
         }
+        // Week 41 复核 D1.3:formula 求值;D2:关联字段展开(此前显示裸 UUID)
+        records.forEach(r -> {
+            applyFormulas(fields, r);
+            relationResolver.expandRelations(fields, r, tenantId);
+        });
         return records;
     }
 
@@ -285,6 +311,31 @@ public class CollectionService {
      */
     public record FilterRule(String field, String op, Object value) {}
 
+    /**
+     * Week 41 复核 D1.3:对 formula 字段求值。
+     *
+     * <p>{@code formula} 此前只有类型名、物理列映射为 TEXT —— 存进去是纯文本,
+     * 不会有任何计算行为。这里在读取时按 {@code options.expression} 求值,
+     * 变量环境为当前记录本身,因此表达式可直接引用同记录的其他字段
+     * (如 {@code price * qty})。
+     *
+     * <p>求值失败时该字段置 {@code null},不阻断整条记录返回。
+     */
+    private void applyFormulas(List<FieldDef> fields, Map<String, Object> record) {
+        if (fields == null || fields.isEmpty() || record == null || record.isEmpty()) return;
+        for (FieldDef f : fields) {
+            if (f == null || !"formula".equals(f.type()) || f.options() == null) continue;
+            Object expr = f.options().get("expression");
+            if (!(expr instanceof String s) || s.isBlank()) continue;
+            try {
+                record.put(f.name(), expressionEvaluator.evaluate(s, record));
+            } catch (UnsupportedOperationException e) {
+                // 不可变 Map(如解析失败时的 _raw 包装),跳过
+                return;
+            }
+        }
+    }
+
     // ============================================================
     //  Week 14.5 P3-3 补完:单条 get / update / delete
     // ============================================================
@@ -300,10 +351,14 @@ public class CollectionService {
             // DB 里存的是 {"data": {actual fields}};解一层
             Map<String, Object> wrapper = objectMapper.readValue(json, new TypeReference<>() {});
             Object inner = wrapper.get("data");
-            if (inner instanceof Map<?, ?> m) {
-                return (Map<String, Object>) m;
-            }
-            return wrapper;
+            Map<String, Object> record = (inner instanceof Map<?, ?> m)
+                    ? (Map<String, Object>) m
+                    : wrapper;
+            List<FieldDef> fields = parseFields(meta);
+            // Week 41 复核 D1.3:formula 求值;D2:关联字段展开
+            applyFormulas(fields, record);
+            relationResolver.expandRelations(fields, record, tenantId);
+            return record;
         } catch (Exception e) {
             throw new RuntimeException("record 解析失败", e);
         }

@@ -1,5 +1,6 @@
 package com.nocobase.meta;
 
+import com.nocobase.tenant.TenantContext;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,9 +59,10 @@ public class DynamicTableManager {
     public boolean tableExists(String collectionName) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables " +
-                "WHERE table_name = ? AND table_schema = 'public'",
+                "WHERE table_name = ? AND table_schema = ?",
                 Integer.class,
-                physicalTableName(collectionName)
+                bareTableName(collectionName),
+                TenantContext.currentSchema()
         );
         return count != null && count > 0;
     }
@@ -237,13 +239,25 @@ public class DynamicTableManager {
     public List<Map<String, Object>> getColumns(String collectionName) {
         return jdbc.queryForList(
                 "SELECT column_name, data_type FROM information_schema.columns " +
-                "WHERE table_name = ? AND table_schema = 'public'",
-                physicalTableName(collectionName)
+                "WHERE table_name = ? AND table_schema = ?",
+                bareTableName(collectionName),
+                TenantContext.currentSchema()
         );
     }
 
-    public static String physicalTableName(String collectionName) {
+    /** 物理表名(不含 schema),用于 information_schema 查询。 */
+    public static String bareTableName(String collectionName) {
         return "data_" + collectionName;
+    }
+
+    /**
+     * 物理表全限定名(含 schema),用于 DDL / DML。
+     *
+     * <p>Week 41 D6 Step G2:动态表按租户 schema 归属 ——
+     * 默认租户落 {@code public}(存量不变),其他租户落各自 schema。
+     */
+    public static String physicalTableName(String collectionName) {
+        return TenantContext.currentSchema() + "." + bareTableName(collectionName);
     }
 
     private static void validateIdentifier(String name) {

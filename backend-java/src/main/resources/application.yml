@@ -22,6 +22,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        # Week 41 D6 Step G2:ADR-007 Schema 隔离(零迁移策略)
+        # schema 由 TenantIdentifierResolver 提供,SET search_path 由
+        # SchemaTenantConnectionProvider 执行;默认租户映射 public → 存量数据无需迁移
+        multiTenancy: SCHEMA
     show-sql: false
     open-in-view: false
 
@@ -47,6 +51,15 @@ app:
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
   cors:
     allowed-origins: http://localhost:5173,http://localhost:3000
+  # Week 41 复核 D1.4:附件对象存储(MinIO / S3 兼容)
+  # 默认关闭 —— 未启用时附件端点返 501,与改造前一致,不会因缺少 MinIO 而启动失败
+  storage:
+    minio:
+      enabled: ${MINIO_ENABLED:false}
+      endpoint: ${MINIO_ENDPOINT:}
+      access-key: ${MINIO_ACCESS_KEY:}
+      secret-key: ${MINIO_SECRET_KEY:}
+      bucket: ${MINIO_BUCKET:nocobase}
 
 # Actuator(健康检查)
 management:

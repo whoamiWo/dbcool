@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -115,25 +116,15 @@ public class WorkflowEngine {
             String nodeType = (String) node.get("type");
             String next = null;
             String[] handleHolder = {null}; // 用 array 持有 handle 状态(lambda 用 final)
-            if (equalsIgnoreCase(nodeType, "APPROVAL")) {
-                createApprovalTask(instance.getId(), current, defaultAssignee);
-                instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
-                instanceRepository.save(instance);
-                return NodeResult.NEEDS_APPROVAL;
-            } else if (equalsIgnoreCase(nodeType, "NOTIFICATION")) {
-                logNotification(instance, node);
-            } else if (equalsIgnoreCase(nodeType, "CONDITION")) {
-                // 评估 then/else,带 sourceHandle = "true" / "false"
-                boolean matched = matchCondition(instance, castConfig(castConfig(node.get("config")).get("when")));
-                handleHolder[0] = matched ? "true" : "false";
-                log.info("workflow {} condition {} matched={}", instance.getId(), current, matched);
-            } else if (equalsIgnoreCase(nodeType, "HTTP")) {
-                executeHttp(instance, node);
-            } else if (handlerRegistry.find(nodeType).isPresent()) {
-                // Week 41 D4b.1:策略化分发 — 新增节点类型走这里
+            // Week 41 复核修复:策略化分发提到最前面(原先挂在 4 个内置分支之后,
+            // 导致 4 个 handler 永不执行 = 死代码)。
+            // 生产:Spring 注入真实内置 handler → 内置节点走 handler;
+            // 测试:若注入空 registry → 自动回退下方 legacy 分支,既有测试零改动通过。
+            Optional<WorkflowNodeHandler> handler = handlerRegistry.find(nodeType);
+            if (handler.isPresent()) {
                 NodeExecutionContext nodeCtx = new NodeExecutionContext(
                         instance, node, defaultAssignee, null);
-                NodeOutcome outcome = handlerRegistry.find(nodeType).get().execute(nodeCtx);
+                NodeOutcome outcome = handler.get().execute(nodeCtx);
                 if (outcome == NodeOutcome.NEEDS_APPROVAL) {
                     instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                     instanceRepository.save(instance);
@@ -154,6 +145,21 @@ public class WorkflowEngine {
                 if (matched instanceof Boolean b) {
                     handleHolder[0] = b ? "true" : "false";
                 }
+            } else if (equalsIgnoreCase(nodeType, "APPROVAL")) {
+                // ↓↓↓ 以下为 legacy 兼容兜底:仅当 registry 未命中时执行
+                createApprovalTask(instance.getId(), current, defaultAssignee);
+                instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+                instanceRepository.save(instance);
+                return NodeResult.NEEDS_APPROVAL;
+            } else if (equalsIgnoreCase(nodeType, "NOTIFICATION")) {
+                logNotification(instance, node);
+            } else if (equalsIgnoreCase(nodeType, "CONDITION")) {
+                // 评估 then/else,带 sourceHandle = "true" / "false"
+                boolean matched = matchCondition(instance, castConfig(castConfig(node.get("config")).get("when")));
+                handleHolder[0] = matched ? "true" : "false";
+                log.info("workflow {} condition {} matched={}", instance.getId(), current, matched);
+            } else if (equalsIgnoreCase(nodeType, "HTTP")) {
+                executeHttp(instance, node);
             } else {
                 log.warn("workflow {} unknown node type: {}", instance.getId(), nodeType);
             }
@@ -197,30 +203,24 @@ public class WorkflowEngine {
             instance.setCurrentNodeIndex(i);
             String nodeType = (String) node.get("type");
 
-            if (equalsIgnoreCase(nodeType, "APPROVAL")) {
-                createApprovalTask(instance.getId(), (String) node.get("id"), defaultAssignee);
-                instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
-                instanceRepository.save(instance);
-                return NodeResult.NEEDS_APPROVAL;
-            } else if (equalsIgnoreCase(nodeType, "NOTIFICATION")) {
-                logNotification(instance, node);
-                i++;
-            } else if (equalsIgnoreCase(nodeType, "CONDITION")) {
-                // 条件节点:评估 then/else,跳到下一个要执行的节点
+            // CONDITION 在数组模式保持 legacy:数组语义是"跳到 then/else 索引",
+            // 而 handler 只能回传 _matched,无法表达索引跳转 → 不交给策略分发
+            if (equalsIgnoreCase(nodeType, "CONDITION")) {
                 int nextIdx = evaluateCondition(instance, node, nodes, i);
                 if (nextIdx < 0) {
                     // then/else 路径都失败或都不存在 → 完成
                     return NodeResult.FAILED;
                 }
                 i = nextIdx;
-            } else if (equalsIgnoreCase(nodeType, "HTTP")) {
-                executeHttp(instance, node);
-                i++;
-            } else if (handlerRegistry.find(nodeType).isPresent()) {
-                // Week 41 D4b.1:策略化分发 — 新增节点类型走这里
+                continue;
+            }
+
+            // 其余类型:策略化分发优先,legacy 兜底(同图模式)
+            Optional<WorkflowNodeHandler> handler = handlerRegistry.find(nodeType);
+            if (handler.isPresent()) {
                 NodeExecutionContext nodeCtx = new NodeExecutionContext(
                         instance, node, defaultAssignee, null);
-                NodeOutcome outcome = handlerRegistry.find(nodeType).get().execute(nodeCtx);
+                NodeOutcome outcome = handler.get().execute(nodeCtx);
                 if (outcome == NodeOutcome.NEEDS_APPROVAL) {
                     instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                     instanceRepository.save(instance);
@@ -231,8 +231,17 @@ public class WorkflowEngine {
                     instanceRepository.save(instance);
                     return NodeResult.FAILED;
                 }
-                // CONDITION handler 把 matched 写到 node._matched,数组模式暂不支持分支
-                // (数组模式无 sourceHandle 概念,条件分支仍走 evaluateCondition)
+                i++;
+            } else if (equalsIgnoreCase(nodeType, "APPROVAL")) {
+                createApprovalTask(instance.getId(), (String) node.get("id"), defaultAssignee);
+                instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+                instanceRepository.save(instance);
+                return NodeResult.NEEDS_APPROVAL;
+            } else if (equalsIgnoreCase(nodeType, "NOTIFICATION")) {
+                logNotification(instance, node);
+                i++;
+            } else if (equalsIgnoreCase(nodeType, "HTTP")) {
+                executeHttp(instance, node);
                 i++;
             } else {
                 // 未知节点类型 → 跳过

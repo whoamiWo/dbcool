@@ -1,6 +1,7 @@
 package com.nocobase.auth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nocobase.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -35,13 +36,13 @@ public class RoleAclController {
     @GetMapping("/roles")
     public Map<String, Object> listRoles() {
         return Map.of("code", 0, "message", "success",
-                "data", roleRepository.findByTenantIdOrderByCreatedAt("tenant_default")
+                "data", roleRepository.findByTenantIdOrderByCreatedAt(TenantContext.currentTenantId())
                         .stream().map(this::roleDto).toList());
     }
 
     @PostMapping("/roles")
     public ResponseEntity<Map<String, Object>> createRole(@RequestBody @Valid CreateRoleRequest req) {
-        if (roleRepository.existsByNameAndTenantId(req.name(), "tenant_default")) {
+        if (roleRepository.existsByNameAndTenantId(req.name(), TenantContext.currentTenantId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "角色名已存在");
         }
         RoleEntity r = new RoleEntity();
@@ -49,7 +50,7 @@ public class RoleAclController {
         r.setName(req.name());
         r.setDescription(req.description());
         r.setParentRoleId(req.parentRoleId());  // US-308
-        r.setTenantId("tenant_default");
+        r.setTenantId(TenantContext.currentTenantId());
         r.setCreatedAt(Instant.now());
         if (req.parentRoleId() != null) {
             assertNoCycle(r.getId(), req.parentRoleId());
@@ -60,7 +61,7 @@ public class RoleAclController {
 
     @PutMapping("/roles/{id}")
     public Map<String, Object> updateRole(@PathVariable UUID id, @RequestBody UpdateRoleRequest req) {
-        RoleEntity r = roleRepository.findByIdAndTenantId(id, "tenant_default")
+        RoleEntity r = roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role 不存在"));
         if (req.name() != null) r.setName(req.name());
         if (req.description() != null) r.setDescription(req.description());
@@ -78,7 +79,7 @@ public class RoleAclController {
             child.setParentRoleId(null);
             roleRepository.save(child);
         }
-        aclRepository.findByRoleIdAndTenantId(id, "tenant_default")
+        aclRepository.findByRoleIdAndTenantId(id, TenantContext.currentTenantId())
                 .forEach(p -> aclRepository.deleteById(p.getId()));
         roleRepository.deleteById(id);
         return Map.of("code", 0, "message", "deleted");
@@ -89,7 +90,7 @@ public class RoleAclController {
      */
     @GetMapping("/roles/tree")
     public Map<String, Object> roleTree() {
-        List<RoleEntity> all = roleRepository.findByTenantIdOrderByCreatedAt("tenant_default");
+        List<RoleEntity> all = roleRepository.findByTenantIdOrderByCreatedAt(TenantContext.currentTenantId());
         Map<UUID, List<RoleEntity>> byParent = all.stream()
                 .filter(r -> r.getParentRoleId() != null)
                 .collect(Collectors.groupingBy(RoleEntity::getParentRoleId));
@@ -105,9 +106,9 @@ public class RoleAclController {
      */
     @GetMapping("/roles/{id}/inheritance")
     public Map<String, Object> inheritanceChain(@PathVariable UUID id) {
-        RoleEntity r = roleRepository.findByIdAndTenantId(id, "tenant_default")
+        RoleEntity r = roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role 不存在"));
-        List<UUID> chain = roleRepository.findSelfAndAncestors(id, "tenant_default");
+        List<UUID> chain = roleRepository.findSelfAndAncestors(id, TenantContext.currentTenantId());
         List<Map<String, Object>> nodes = chain.stream()
                 .map(rid -> roleRepository.findById(rid).orElse(null))
                 .filter(Objects::nonNull)
@@ -127,13 +128,13 @@ public class RoleAclController {
     @GetMapping("/acl")
     public Map<String, Object> listAcl(@RequestParam UUID roleId) {
         return Map.of("code", 0, "message", "success",
-                "data", aclRepository.findByRoleIdAndTenantId(roleId, "tenant_default")
+                "data", aclRepository.findByRoleIdAndTenantId(roleId, TenantContext.currentTenantId())
                         .stream().map(this::aclDto).toList());
     }
 
     @PostMapping("/acl")
     public ResponseEntity<Map<String, Object>> createAcl(@RequestBody @Valid CreateAclRequest req) {
-        roleRepository.findByIdAndTenantId(req.roleId(), "tenant_default")
+        roleRepository.findByIdAndTenantId(req.roleId(), TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role 不存在"));
         AclPolicyEntity p = new AclPolicyEntity();
         p.setId(UUID.randomUUID());
@@ -142,7 +143,7 @@ public class RoleAclController {
         p.setSubject(req.subject());
         if (req.action() != null) p.setAction(AclPolicyEntity.Action.valueOf(req.action().toUpperCase()));
         p.setConfigJson(req.config() != null ? req.config() : "{}");
-        p.setTenantId("tenant_default");
+        p.setTenantId(TenantContext.currentTenantId());
         p.setCreatedAt(Instant.now());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("code", 0, "message", "success", "data", aclDto(aclRepository.save(p))));
@@ -150,7 +151,7 @@ public class RoleAclController {
 
     @PutMapping("/acl/{id}")
     public Map<String, Object> updateAcl(@PathVariable UUID id, @RequestBody UpdateAclRequest req) {
-        AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, "tenant_default")
+        AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ACL 不存在"));
         if (req.config() != null) p.setConfigJson(req.config());
         if (req.action() != null) p.setAction(AclPolicyEntity.Action.valueOf(req.action().toUpperCase()));
@@ -212,7 +213,7 @@ public class RoleAclController {
                     "不能将自己设为 parent(自引用)");
         }
         // candidateParent 的祖先中不能包含 roleId
-        List<UUID> ancestors = roleRepository.findSelfAndAncestors(candidateParentId, "tenant_default");
+        List<UUID> ancestors = roleRepository.findSelfAndAncestors(candidateParentId, TenantContext.currentTenantId());
         if (ancestors.contains(roleId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "parent_role_id 形成循环:目标 parent 已是当前 role 的后代");

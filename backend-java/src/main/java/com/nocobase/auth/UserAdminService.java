@@ -1,5 +1,6 @@
 package com.nocobase.auth;
 
+import com.nocobase.tenant.TenantContext;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +53,9 @@ public class UserAdminService {
         u.setId(UUID.randomUUID());
         u.setUsername(username);
         u.setPasswordHash(passwordEncoder.encode(password));
-        u.setTenantId("tenant_default");
+        // Week 41 复核:改用 TenantContext,不再硬编码。
+        // 保持 3 参签名不变(改签名会破坏 UserAdminServiceTest / UserAdminControllerTest)
+        u.setTenantId(TenantContext.currentTenantId());
         u.setDisplayName(displayName != null ? displayName : username);
         u.setEnabled(true);
         u.setCreatedAt(Instant.now());

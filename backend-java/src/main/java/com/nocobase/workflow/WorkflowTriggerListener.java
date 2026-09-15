@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * 工作流触发器监听器(Week 41 D4a — 触发器真实化).
@@ -46,7 +48,18 @@ public class WorkflowTriggerListener {
         this.rateLimiter = rateLimiter;
     }
 
-    @EventListener
+    /**
+     * Week 41 复核 D4a 收尾 —— 三点改造:
+     * <ul>
+     *   <li>{@code AFTER_COMMIT}:事务提交后才触发,避免工作流读到未提交的记录</li>
+     *   <li>{@code fallbackExecution = true}:<strong>关键</strong>。记录 CRUD 目前没有
+     *       {@code @Transactional},若不加此参数,无事务时事件会被静默丢弃
+     *       (这是直接改用 AFTER_COMMIT 最容易踩的坑)</li>
+     *   <li>{@code @Async}:异步执行,真正不阻塞 HTTP 响应(此前为同步)</li>
+     * </ul>
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onRecordChange(RecordChangeEvent event) {
         try {
             List<WorkflowEntity> matches = matcher.findMatching(event);

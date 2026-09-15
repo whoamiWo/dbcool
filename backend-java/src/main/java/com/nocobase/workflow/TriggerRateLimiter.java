@@ -23,6 +23,15 @@ public class TriggerRateLimiter {
     /** 窗口内最大触发次数 */
     private static final int MAX_TRIGGERS = 5;
 
+    /**
+     * 触发全量回收的 map 大小阈值。
+     *
+     * <p>原实现的清理只在"同一个 key 再次被触发"时发生,若某 key 触发一次后
+     * 再无活动,其 entry 会永久留在 map 中 —— 长期运行导致 hits 单调增长(内存泄漏)。
+     * 故超过该阈值时做一次全量回收。
+     */
+    private static final int EVICT_THRESHOLD = 1024;
+
     /** key = workflowId + "|" + recordId, value = 时间戳队列 */
     private final Map<String, java.util.Deque<Instant>> hits = new ConcurrentHashMap<>();
 
@@ -40,11 +49,28 @@ public class TriggerRateLimiter {
             window.pollFirst();
         }
 
-        if (window.size() >= MAX_TRIGGERS) {
-            return false;
+        boolean allowed = window.size() < MAX_TRIGGERS;
+        if (allowed) {
+            window.addLast(now);
         }
-        window.addLast(now);
-        return true;
+
+        // 内存泄漏防护。必须在 addLast 之后执行 —— 否则刚 computeIfAbsent 出来的
+        // 空窗口会被误删,本次计数将写进一个已从 map 移除的 deque(计数丢失)。
+        if (hits.size() > EVICT_THRESHOLD) {
+            evictEmptyEntries(cutoff);
+        }
+        return allowed;
+    }
+
+    /** 回收所有窗口已空的 entry(这些 key 已不可能再对限流产生影响)。 */
+    private void evictEmptyEntries(Instant cutoff) {
+        hits.entrySet().removeIf(e -> {
+            java.util.Deque<Instant> dq = e.getValue();
+            while (!dq.isEmpty() && dq.peekFirst().isBefore(cutoff)) {
+                dq.pollFirst();
+            }
+            return dq.isEmpty();
+        });
     }
 
     /** 测试 / 清理用:清空所有计数。 */
