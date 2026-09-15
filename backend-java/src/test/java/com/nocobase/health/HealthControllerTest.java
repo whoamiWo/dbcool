@@ -17,14 +17,19 @@ class HealthControllerTest {
 
     private DataSource dataSource;
     private Connection connection;
+    private ConnectionPoolMonitor poolMonitor;
     private HealthController controller;
 
     @BeforeEach
     void setUp() throws Exception {
         dataSource = mock(DataSource.class);
         connection = mock(Connection.class);
+        poolMonitor = mock(ConnectionPoolMonitor.class);
         when(dataSource.getConnection()).thenReturn(connection);
-        controller = new HealthController(dataSource);
+        // R09: 默认连接池健康,不影响原有 ready 断言
+        when(poolMonitor.isHealthy()).thenReturn(true);
+        when(poolMonitor.snapshot()).thenReturn(Map.of("available", true, "active", 1));
+        controller = new HealthController(dataSource, poolMonitor);
     }
 
     @Test
@@ -63,12 +68,36 @@ class HealthControllerTest {
     @Test
     void ready_dbConnectionThrows_returns503() throws Exception {
         when(dataSource.getConnection()).thenThrow(new java.sql.SQLException("refused"));
-        controller = new HealthController(dataSource);
+        controller = new HealthController(dataSource, poolMonitor);
 
         ResponseEntity<Map<String, Object>> resp = controller.ready();
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         @SuppressWarnings("unchecked")
         Map<String, Object> components = (Map<String, Object>) ((Map<String, Object>) resp.getBody()).get("components");
         assertThat(components).containsEntry("database", "down");
+    }
+
+    @Test
+    void ready_poolUnhealthy_returns503() throws Exception {
+        when(connection.isValid(anyInt())).thenReturn(true);
+        ConnectionPoolMonitor degraded = mock(ConnectionPoolMonitor.class);
+        when(degraded.isHealthy()).thenReturn(false);
+        when(degraded.snapshot()).thenReturn(Map.of("available", true, "active", 20, "max", 20,
+                "threadsAwaitingConnection", 5));
+        controller = new HealthController(dataSource, degraded);
+
+        ResponseEntity<Map<String, Object>> resp = controller.ready();
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> components = (Map<String, Object>) ((Map<String, Object>) resp.getBody()).get("components");
+        assertThat(components).containsEntry("database", "ok");
+        assertThat(components).containsEntry("connectionPool", "degraded");
+    }
+
+    @Test
+    void poolStats_returns200WithSnapshot() {
+        ResponseEntity<Map<String, Object>> resp = controller.poolStats();
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).containsEntry("available", true);
     }
 }

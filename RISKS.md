@@ -10,7 +10,7 @@
 
 | ID | 风险 | 概率 | 影响 | 缓解措施 | 状态 |
 |---|---|---|---|---|---|
-| R01 | Collection 引擎 ALTER TABLE 性能差 | 高 | 高 | JSONB fallback + 异步迁移 | 🟡 缓解中 |
+| R01 | Collection 引擎 ALTER TABLE 性能差 | 高 | 高 | JSONB fallback + 异步迁移 + lock_timeout(5s 自动回滚) | 🟢 已缓解 |
 | R02 | 工作流引擎复杂度低估 | 中 | 高 | F1 模板空壳 + D4a 触发器事件总线 + D4b.1 节点策略模式(4 内置 handler) | 🟢 缓解中 |
 | R03 | 拖拽设计器性能瓶颈 | 中 | 中 | 虚拟化 + 防抖 + Web Worker | 🟢 已规划 |
 | R04 | 单兵开发 6 个月太紧 | 高 | 高 | 砍功能而非延期,优先 P0 | 🟡 持续关注 |
@@ -18,7 +18,7 @@
 | R06 | 动态字段类型扩展困难 | 中 | 中 | 字段类型即插件(ADR-008) | 🟢 已规划 |
 | R07 | 多租户数据隔离被绕过 | 低 | 极高 | G1 完成 ThreadLocal+CRUD;G2 完成 Schema 隔离 (Week 42 commit 9a4daaf,multiTenancy: SCHEMA + TenantServiceIntegrator 桥接) | 🟢 已缓解(G1+G2 done) |
 | R08 | 工作流死循环 | 中 | 高 | Week 42 D4b.2 4 道防线完整(commit 3e5711f):静态 DAG 校验 + 执行栈深度(50) + 嵌套触发守卫 + 频率限制 | 🟢 已缓解 |
-| R09 | 数据库连接耗尽 | 中 | 高 | pgBouncer + 连接池监控 | 🟢 已规划 |
+| R09 | 数据库连接耗尽 | 中 | 高 | HikariCP 加固 + ConnectionPoolMonitor + pgBouncer 部署指南 | 🟢 已缓解 |
 | R10 | JWT 密钥泄露 | 低 | 极高 | Week 42 commit: KeyRing 内存级轮换 + kid header + 撤销(基础就位);KMS 集成推迟到 Week 43+ | 🟢 已缓解(基础) |
 | R11 | LLM 调成本失控 | 中 | 中 | 限流 + 缓存 + 用户配额 | 🟢 已规划 |
 | R12 | 前端构建产物体积爆炸 | 中 | 低 | 代码分割 + 懒加载 | 🟢 已规划 |
@@ -40,7 +40,9 @@
 - 真正需要 ALTER 时(如改字段类型):
   - 异步任务后台执行
   - 双写策略(新老字段共存,迁移完成后切换)
-- 设置 `lock_timeout = 5s`,超时自动回滚
+- ✅ Week 43 实现: `lock_timeout = 5s`,超时自动回滚(AsyncMigrationService.executeSync)
+- ✅ Week 43: DynamicTableManager 启动时统一 `SET lock_timeout = '5s'`
+- ✅ Week 43: 连接池级超时控制 + 异常清理(AsyncMigrationServiceTest 5 测试)
 
 ### R02 工作流引擎复杂度
 **详细:**
@@ -56,7 +58,7 @@
 - ✅ Week 41 D4b.1: 节点策略模式 — WorkflowNodeHandler interface + Registry + 4 内置 handler + Engine 重构 (commit 9265533)
   - 新增节点类型 = 加一个 `@Component` 类,零 Engine 改动
   - Jacoco workflow pkg 96% (≥ 95% 阈值),581/581 测试通过
-- ⏭️ D4b.4 (5d,Week 42): Aviator 表达式引擎替换 ConditionNodeHandler 简化 eq/neq/gt/lt
+- ✅ Week 41 复核 D4b.4: Aviator 表达式引擎替换 ConditionNodeHandler — `common/ExpressionEvaluator`(aviator 5.4.3,长度上限 1000、无自定义函数、求值异常降级)+ `ConditionNodeHandler` 支持 `config.expression`(保留结构化 `when` 向后兼容),12 测试覆盖
 - ⏭️ D4b.2–D4b.3 (Week 42): 循环 / 子流程
 - ⏭️ D4b 验收: 至少 8 种节点类型(APPROVAL/NOTIFICATION/CONDITION/HTTP/EMAIL/SCRIPT/SUBWORKFLOW/LOOP)
 
@@ -85,6 +87,18 @@
 - 同节点 1 分钟内只能触发 N 次
 - DAG 静态检测环
 - 监控告警(连续触发告警)
+
+### R09 数据库连接耗尽
+**详细:**
+- HikariCP 默认 20 连接,PG 默认 100 max_connections
+- 连接泄漏 / 长事务 / 突发流量都能耗尽连接
+- 一旦耗尽,新请求 30s 超时排队,健康检查全部 503
+
+**缓解方案:**
+- ✅ Week 43: HikariCP 生产级加固 — `max-lifetime=30min` / `idle-timeout=10min` / `leak-detection-threshold=60s` / `pool-name=nocobase-pool`(application.yml)
+- ✅ Week 43: `ConnectionPoolMonitor` @Component — 读 HikariPoolMXBean,提供 `snapshot()` + `isHealthy()` + 定时高水位 WARN(默认 85%)
+- ✅ Week 43: `/api/health/pool` 端点 + `/api/health/ready` 集成 connectionPool 字段(5 ConnectionPoolMonitor + 6 HealthController 测试覆盖)
+- 📋 Week 44 部署: pgBouncer 接入 — 见 `docs/DEPLOY_PGBOUNCER.md`(Docker Compose 示例 + 关键参数 + 发布检查清单)
 
 ### R13 演示当天崩
 **详细:**

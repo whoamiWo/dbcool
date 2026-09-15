@@ -4,6 +4,42 @@
 
 
 
+## Week 43 (2026-09-15) — R09 数据库连接耗尽缓解
+
+> 🟡 → 🟢 已缓解。连接池监控 + 生产参数硬化 + pgBouncer 部署文档。
+
+### 关键改动
+- **`health/ConnectionPoolMonitor.java` (新增 @Component)**
+  - 读 `HikariPoolMXBean`:`active / idle / total / max / threadsAwaitingConnection / utilizationPct`
+  - `isHealthy()`:无等待线程且活跃未触顶 → true(非 Hikari 优雅降级)
+  - `@Scheduled` 定时扫描:高水位 ≥85% 或 threadsAwaiting>0 → WARN(默认 30s 一次)
+  - 阈值可配:`app.pool-monitor.warn-utilization` / `app.pool-monitor.interval-ms`
+  - `snapshot()`:返回 `available/active/idle/total/max/threadsAwaitingConnection/utilizationPct` 字段
+- **`health/HealthController.java` (扩展)**
+  - 注入 `ConnectionPoolMonitor`
+  - `/api/health/ready` 新增 `connectionPool` (ok / degraded) + `connectionPoolStats`
+  - **新端点 `/api/health/pool`** 返回池快照(200,纯监控用途)
+- **`application.yml` HikariCP 硬化**
+  - `pool-name: nocobase-pool`(便于日志/监控定位)
+  - `maximum-pool-size: ${DB_POOL_MAX:20}` / `minimum-idle: ${DB_POOL_MIN:5}` 可环境变量覆盖
+  - `max-lifetime: 1800000`(30min) / `idle-timeout: 600000`(10min) / `validation-timeout: 5000`
+  - **`leak-detection-threshold: 60000`** — 连接被持有 >60s 记 WARN 堆栈,定位业务层泄漏
+  - `initialization-fail-timeout: 1` — 启动不阻塞
+
+### 新增测试 (7)
+- `ConnectionPoolMonitorTest` (5 测试):Hikari 快照、健康 / 不健康判定、非 Hikari 降级、isHealthy 始终 true
+- `HealthControllerTest` 扩展:原 4 + pool degraded 触发 503 + poolStats 端点返 200 = **6 测试**
+
+### 文档
+- **`docs/DEPLOY_PGBOUNCER.md` (新增)** — 架构图、Docker Compose 示例、关键参数表(`POOL_MODE=transaction` / `DEFAULT_POOL_SIZE=25` / `RESERVE_POOL_SIZE=5`)、发布检查清单、回滚步骤
+
+### 验收
+- ✅ Backend **749/749 PASS**(上一轮 742 + 新 7)
+- ✅ 覆盖率 ≥ 阈值
+- ✅ R09: 🟡 → 🟢 已缓解
+
+---
+
 ## Week 43 (2026-09-15) — R01 lock_timeout 弹性
 
 > 🟡 → 🟢 已缓解。连接池污染风险已消除。

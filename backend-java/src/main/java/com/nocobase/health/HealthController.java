@@ -11,15 +11,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 健康检查端点(R13 — 演示前快速验证用).
+ * 健康检查端点(R13 + R09 — 演示 + 运行时双重保障).
  *
- * <p>提供两个端点:
+ * <p>提供三个端点:
  * <ul>
  *   <li>{@code GET /api/health} — 基础 liveness(进程活着就返 ok,用于 LB)</li>
- *   <li>{@code GET /api/health/ready} — readiness(检查 db 连接、API Key 表、JWT keyring)</li>
+ *   <li>{@code GET /api/health/ready} — readiness(检查 DB 连接、连接池)</li>
+ *   <li>{@code GET /api/health/pool} — 连接池指标快照(用于监控/APM)</li>
  * </ul>
  *
- * <p>ready 端点失败时返 503,演示现场可直接 curl 看到哪个组件挂了。
+ * <p>ready 端点任一组件失败时返 503,curl 即可看到哪个子系统挂了。
  */
 @RestController
 @RequestMapping("/api")
@@ -28,9 +29,12 @@ public class HealthController {
     private static final Logger log = LoggerFactory.getLogger(HealthController.class);
 
     private final DataSource dataSource;
+    private final com.nocobase.health.ConnectionPoolMonitor poolMonitor;
 
-    public HealthController(DataSource dataSource) {
+    public HealthController(DataSource dataSource,
+            com.nocobase.health.ConnectionPoolMonitor poolMonitor) {
         this.dataSource = dataSource;
+        this.poolMonitor = poolMonitor;
     }
 
     /** 基础健康检查 — 进程活着就 ok。 */
@@ -55,6 +59,12 @@ public class HealthController {
         components.put("database", dbOk ? "ok" : "down");
         allOk &= dbOk;
 
+        // 2. 连接池水位 (R09)
+        boolean poolOk = poolMonitor.isHealthy();
+        components.put("connectionPool", poolOk ? "ok" : "degraded");
+        allOk &= poolOk;
+        components.put("connectionPoolStats", poolMonitor.snapshot());
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", allOk ? "ok" : "degraded");
         body.put("components", components);
@@ -66,6 +76,12 @@ public class HealthController {
         log.warn("[health/ready] 组件不健康: {}", components);
         return org.springframework.http.ResponseEntity
             .status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).body(body);
+    }
+
+    /** 连接池指标快照 — 200,数据仅作监控/APM 用,不做 readiness 判定。 */
+    @GetMapping("/health/pool")
+    public org.springframework.http.ResponseEntity<Map<String, Object>> poolStats() {
+        return org.springframework.http.ResponseEntity.ok(poolMonitor.snapshot());
     }
 
     private boolean pingDatabase() {

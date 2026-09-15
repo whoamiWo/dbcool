@@ -11,9 +11,16 @@ spring:
     password: ${POSTGRES_PASSWORD:dev_password}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-      connection-timeout: 30000
+      pool-name: nocobase-pool
+      # R09: 生产级连接池参数(防耗尽 / 防泄漏 / 自动回收)
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+      connection-timeout: 30000          # 获取连接最长等待 30s
+      max-lifetime: 1800000              # 连接最长存活 30min(低于 PG 默认,避免 stale 连接)
+      idle-timeout: 600000               # 空闲 10min 回收
+      validation-timeout: 5000           # 连接有效性校验超时
+      leak-detection-threshold: 60000    # 连接被持有 >60s 记 WARN 堆栈(定位泄漏)
+      initialization-fail-timeout: 1     # 启动不因连接池预热阻塞
 
   jpa:
     hibernate:
@@ -50,6 +57,10 @@ server:
 
 # JWT 配置
 app:
+  # R09: 连接池监控参数
+  pool-monitor:
+    warn-utilization: 0.85     # 活跃连接占比达到 85% 触发 WARN
+    interval-ms: 30000        # 扫描间隔 30s
   jwt:
     secret: ${JWT_SECRET:dev_jwt_secret_at_least_32_characters_long_for_hs256}
     # Week 42 R10:轮换期间保留上一个签名密钥,旧 kid 仍可验证
