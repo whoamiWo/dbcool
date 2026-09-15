@@ -60,6 +60,12 @@ Thumbs.db
 # 临时文件
 tmp/
 temp/
+
+# AI 工具生成产物
+.codebuddy/
+
+# 技术债清单(本地生成产物)
+TECH_DEBT_CLEARANCE.md
 tsconfig.tsbuildinfo
 frontend/coverage/
 frontend/playwright-report/
