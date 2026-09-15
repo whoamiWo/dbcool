@@ -3,6 +3,43 @@
 
 
 
+
+## Week 43 (2026-09-15) — R13 演示加固 (3 道防线)
+
+> 🟡 → 🟢 已缓解。
+
+### 1. scripts/freeze-demo.sh — 一键演示冻结
+- 前置检查:必须在 main + working tree clean
+- **强制 mvn verify 通过** (全绿才允许冻结 — 防带病上线)
+- 创建 git tag `v0.X.Y-demo`
+- 创建/更新 `release/demo` 分支
+- 生成 `docs/RELEASE_NOTES.md` (最近 50 commits)
+
+### 2. scripts/unfreeze-demo.sh — 紧急回滚
+- 备份当前 main → `main-backup-{ts}`
+- `git checkout <tag>` 5 秒回滚
+- 演示结束后恢复指引
+
+### 3. HealthController /api/health/ready
+- DB ping (Connection.isValid, 2s timeout)
+- 200 + components map 成功 / 503 + degraded 失败
+- 现场可直接 curl 看到哪个子系统挂了
+
+### 4. docs/RELEASE_DEMO.md + DEMO_FALLBACK_VIDEO.md
+- 演示前/当天/结束 3 阶段 checklist
+- A/B/C/D 级应急方案 (backend / frontend / db / 全崩)
+- 30秒 + 5分钟 + 错误恢复视频清单(云盘本地双备份)
+
+### 5. frontend/e2e/full-demo-path.spec.ts
+- 3 个 smoke 测试:health / 端到端 CRUD / ready 503 路径
+- 用 page.evaluate + fetch,不依赖真实后端
+
+### 验收
+- ✅ Backend **737/737 PASS**
+- ✅ Frontend **152/152 PASS**
+- ✅ `mvn verify` BUILD SUCCESS + All coverage checks have been met
+
+---
 ## Week 42 第五轮 (2026-09-15) — D2.2 反向关系自动化 (1.5d 关键)
 
 > D2.1 只实现了 hasMany 展开,D2.2 把反向关系也接通 — P1 全部完成。
