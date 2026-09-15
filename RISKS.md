@@ -16,7 +16,7 @@
 | R04 | 单兵开发 6 个月太紧 | 高 | 高 | 砍功能而非延期,优先 P0 | 🟡 持续关注 |
 | R05 | 三栈通信接口频繁变更 | 中 | 中 | CONTRACT_DECISIONS.md 强约束 | 🟢 已规划 |
 | R06 | 动态字段类型扩展困难 | 中 | 中 | 字段类型即插件(ADR-008) | 🟢 已规划 |
-| R07 | 多租户数据隔离被绕过 | 低 | 极高 | G1 完成 ThreadLocal+CRUD;G2 计划 Schema 隔离(Week 41-42 D6 Step G2) | 🟡 部分缓解(G1 done) |
+| R07 | 多租户数据隔离被绕过 | 低 | 极高 | G1 完成 ThreadLocal+CRUD;G2 完成 Schema 隔离 (Week 42 commit 9a4daaf,multiTenancy: SCHEMA + TenantServiceIntegrator 桥接) | 🟢 已缓解(G1+G2 done) |
 | R08 | 工作流死循环 | 中 | 高 | 节点最大深度限制 + DAG 校验 | 🔴 待设计 |
 | R09 | 数据库连接耗尽 | 中 | 高 | pgBouncer + 连接池监控 | 🟢 已规划 |
 | R10 | JWT 密钥泄露 | 低 | 极高 | KMS + 定期轮换 | 🟡 缓解中 |

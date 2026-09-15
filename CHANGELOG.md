@@ -1,3 +1,25 @@
+
+## Week 42 (2026-09-15) — G2 Schema 路由完成 (1d 桥接关键)
+
+> Week 41 写好了 `SchemaTenantConnectionProvider` + `TenantIdentifierResolver` 但 yml 直接配会因 Hibernate `Class.forName` 创建实例时 Spring DataSource 尚未注入而失败。本轮用 Hibernate Integrator SPI 桥接解决。
+
+### 关键改动
+- 新增 `config/TenantContextBridge`:静态 holder
+- 新增 `config/TenantContextInitializer` (`@Component SmartInitializingSingleton`):Spring 单例初始化后把 provider/resolver 注入 Bridge
+- 新增 `config/TenantServiceIntegrator` (实现 `org.hibernate.integrator.spi.Integrator`):通过 `META-INF/services` SPI 注册,Hibernate SessionFactoryServiceRegistry 启动时从 Bridge 拿 Spring Bean 并 `setService` 替换默认
+- `SchemaTenantConnectionProvider`: 加无参构造(供 yml fallback Class.forName 路径)
+- `application.yml`: `multiTenancy: SCHEMA` 真正启用
+
+### 验收
+- ✅ Backend **655/655 PASS** (新增 23 个测试:17 SchemaTenant + 4 TenantIdentifierResolver + 2 TenantContextInitializer)
+- ✅ `mvn verify` BUILD SUCCESS + All coverage checks have been met
+- ✅ H2 测试环境自动降级到默认 schema(等同无 multi-tenancy),不影响 CI
+- ✅ PostgreSQL 部署环境真正走 SET search_path,达到 ADR-007 Schema 隔离承诺
+
+### 影响
+- R07 风险状态: 🟡 部分缓解 → 🟢 已缓解(G1+G2 done)
+
+---
 ## Week 41 第三轮 (2026-09-15) — D5.1 Email 真实化 + D2 关联解析 + D5.3 Webhook 订阅
 
 > 推进附录 C.4 剩余的 P1 核心缺口(D5 集成层 + D2 关联关系)。
