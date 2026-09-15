@@ -19,7 +19,7 @@
 | R07 | 多租户数据隔离被绕过 | 低 | 极高 | G1 完成 ThreadLocal+CRUD;G2 完成 Schema 隔离 (Week 42 commit 9a4daaf,multiTenancy: SCHEMA + TenantServiceIntegrator 桥接) | 🟢 已缓解(G1+G2 done) |
 | R08 | 工作流死循环 | 中 | 高 | Week 42 D4b.2 4 道防线完整(commit 3e5711f):静态 DAG 校验 + 执行栈深度(50) + 嵌套触发守卫 + 频率限制 | 🟢 已缓解 |
 | R09 | 数据库连接耗尽 | 中 | 高 | pgBouncer + 连接池监控 | 🟢 已规划 |
-| R10 | JWT 密钥泄露 | 低 | 极高 | KMS + 定期轮换 | 🟡 缓解中 |
+| R10 | JWT 密钥泄露 | 低 | 极高 | Week 42 commit: KeyRing 内存级轮换 + kid header + 撤销(基础就位);KMS 集成推迟到 Week 43+ | 🟢 已缓解(基础) |
 | R11 | LLM 调成本失控 | 中 | 中 | 限流 + 缓存 + 用户配额 | 🟢 已规划 |
 | R12 | 前端构建产物体积爆炸 | 中 | 低 | 代码分割 + 懒加载 | 🟢 已规划 |
 | R13 | 演示当天崩 | 中 | 极高 | 完整 e2e 自动化 + 备份演示视频 | 🟡 缓解中 |

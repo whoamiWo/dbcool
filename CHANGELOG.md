@@ -1,6 +1,33 @@
 
 
 
+
+## Week 42 第四轮 (2026-09-15) — R10 JWT 密钥轮换 (1d)
+
+> 🟡 缓解中 → 🟢 已缓解。KMS 集成基础就位。
+
+### 关键改动
+- `auth/keystore/KeyRingEntry` (record): kid + secret + status (ACTIVE/RETIRED/REVOKED) + 审计时间戳
+- `auth/keystore/KeyRingService`:
+  - 启动加载 `app.jwt.secret` (active) + `app.jwt.previous-secret` (retired)
+  - `rotate()` 生成新 kid, 旧 ACTIVE → RETIRED, 速率限制 1/min
+  - `revoke(kid)` 显式撤销(紧急废止)
+  - `snapshot()` 列出(secretPreview 脱敏前 6 字符)
+- `JwtService` 重构:
+  - `issueAccessToken` header 加 `kid` 指向 ACTIVE
+  - `parseAccessToken` 先无签名解析 header 拿 kid,根据 kid 找 entry 验证
+  - 兼容: 无 kid header 的老 token 回退到当前 ACTIVE (G1 兼容)
+- `JwtKeyRotationController` (admin 端点):
+  - `GET  /api/admin/jwt-keys` 列出 keyring (脱敏)
+  - `POST /api/admin/jwt-keys/rotate` 触发轮换, 响应带 _warning 提示同步 previous-secret 配置
+- `application.yml`: `app.jwt.previous-secret: ${JWT_PREVIOUS_SECRET:}`, 启动时检测 dev 占位符警告
+
+### 验收
+- ✅ Backend **722/722 PASS** (新增 20 个测试)
+- ✅ `mvn verify` BUILD SUCCESS + All coverage checks have been met
+- ✅ R10 状态: 🟡 → 🟢 已缓解(基础,KMS 真集成推迟 Week 43+)
+
+---
 ## Week 42 第三轮 (2026-09-15) — D5.2 API Key 管理 (1d)
 
 > D5 集成层最后一项 P1 完成:外部系统/自动化脚本凭 X-Api-Key 访问 API。
