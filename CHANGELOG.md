@@ -4,6 +4,30 @@
 
 
 
+## Week 43 (2026-09-15) — R01 lock_timeout 弹性
+
+> 🟡 → 🟢 已缓解。连接池污染风险已消除。
+
+### 关键改动
+- `meta/DynamicTableManager.java`:新增 `@PostConstruct initLockTimeout()` — 启动时执行 `SET lock_timeout = '5s'`(PostgreSQL 专用,H2 忽略不报錯)
+- `meta/AsyncMigrationService.java`:
+  - 重构 `executeSync` — `setLockTimeout` 移入 try 块,finally 中 `resetLockTimeout`。**修复 bug**:原先 `setLockTimeout` 在 try 外,若其抛错(如 H2 不支持)finally 不执行 → 连接池 lock_timeout 被污染
+  - 新增 `isLockTimeoutError()` — 遍历异常链匹配 "lock timeout"(忽略大小写)
+  - 新增 `LockTimeoutException`(静态内部类)— 调用方可捕获后 retry / fail
+- `meta/AsyncMigrationServiceTest.java`(新增,5 测试):
+  1. 同步成功 → setLockTimeout/resetLockTimeout 各一次
+  2. lock timeout → 包装 LockTimeoutException,resetLockTimeout 仍调一次
+  3. 通用异常 → resetLockTimeout 仍调一次,原异常透传
+  4. 异步成功 → 创建 `MigrationJobEntity` 并 save
+  5. 异步失败 → 记录 failed status
+
+### 验收
+- ✅ Backend **742/742 PASS**(上一轮 737 + 新 5)
+- ✅ `mvn verify` BUILD SUCCESS
+- ✅ 顺带清理 R13 误放在 `com/nocobase/` 根路径的重复 `HealthControllerTest.java`(保留 `com/nocobase/health/` 正确路径)
+
+---
+
 ## Week 43 (2026-09-15) — R13 演示加固 (3 道防线)
 
 > 🟡 → 🟢 已缓解。
