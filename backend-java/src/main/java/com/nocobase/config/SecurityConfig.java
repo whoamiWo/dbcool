@@ -50,6 +50,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
+                        // 统一实时消息总线:WS 握手无法携带 Authorization 头,
+                        // 鉴权交由 StompHandshakeInterceptor 在握手阶段完成。
+                        // 注意只放行 /ws/im/** —— 不放行 /ws/**,避免既有 /ws/alerts
+                        // (原生端点,自身无鉴权)被一并暴露。
+                        .requestMatchers("/ws/im/**").permitAll()
                         // Swagger / OpenAPI(Week 14.5)
                         .requestMatchers(
                                 "/v3/api-docs/**",

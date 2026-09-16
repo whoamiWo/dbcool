@@ -63,14 +63,14 @@ public class WorkflowTemplateRegistry {
                         ))),
                 new WorkflowTemplate.TemplateWorkflow(
                         "Leave Approval",
-                        "请假申请自动触发经理审批",
+                        "请假申请提交后自动通知申请人(审批节点待 D4b.5 会签能力上线后补齐)",
                         "leave_request",
                         Map.of("type", "record.created"),
                         List.of(
                                 // 引擎节点类型大写常量(Week 40 B1 修复)。原 "manual" + "notification" 落到 unknown 分支被跳过。
                                 // 注:当前为"提交即通知"流程,APPROVAL 节点待 D4b.5 补齐(描述已同步修正)
                                 node("notify_applicant", "Notify Applicant", "NOTIFICATION",
-                                        Map.of("title", "申请已提交", "body", "您的请假申请已进入审批"), "end")
+                                        Map.of("title", "申请已提交", "body", "您的请假申请已提交"), "end")
                         ),
                         List.of(
                                 // Week 40 B1: start 虚拟节点已删
@@ -101,7 +101,7 @@ public class WorkflowTemplateRegistry {
                         ))),
                 new WorkflowTemplate.TemplateWorkflow(
                         "Expense Approval",
-                        "报销申请自动触发财务审批",
+                        "报销申请按金额条件分支并通知财务(审批节点待 D4b.5 会签能力上线后补齐)",
                         "expense_report",
                         Map.of("type", "record.created"),
                         List.of(
