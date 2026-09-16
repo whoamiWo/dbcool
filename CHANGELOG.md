@@ -44,6 +44,16 @@
 | 组件测试补齐 | 新增 `MessageList.test.tsx`(10)与 `ChannelList.test.tsx`(10),落实 `IM_REWORK.md` 第五节要求 |
 | 浏览器冒烟验证 | Playwright 真实浏览器 10 项检查点全通过(登录/路由/WS/三栏/发送/双账号实时/未读/表情/cursor/软删除/登出),见 `IM_SMOKETEST_REAL_RESULTS.md` |
 
+### 5. 稳定对账(2026-09-16)
+
+根治"声明与实跑不符"问题。据代码实据审计 49 个用户故事完成度,校正 `ROADMAP.md` 阶段/周次,回填 `USER_STORIES.md` 状态矩阵。
+
+- **验证复核**:后端 `mvn -o verify` 891/891 PASS、前端 tsc/vite/vitest 全绿、Playwright 10/10 浏览器冒烟全通过
+- **修复缺陷**:`Home.tsx` 构建阻断回归(少 `.data`)、假脚本 `im_e2e_test.mjs` 废弃
+- **用户故事完成度**:P0 完全 done 18/33(54.5%),partial 14 个,not-started 1 个(US-504)
+- **提交保护**:按 `[java]`/`[js]`/`[docs]` 分三次提交,共 63 文件 / +6147 行
+- **详见**:`RECONCILE_WEEK43.md`
+
 ---
 
 ## Week 43 (2026-09-16) — 统一实时消息总线 + 自研 IM 基础
