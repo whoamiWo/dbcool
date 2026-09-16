@@ -1,5 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
+import { disconnectStomp } from '@/lib/stompClient';
 
 export function AppLayout() {
   const { user, clear } = useAuthStore();
@@ -7,6 +8,7 @@ export function AppLayout() {
   const location = useLocation();
 
   const handleLogout = () => {
+    disconnectStomp(); // 先断开 WS,避免旧 token 连接残留
     clear();
     navigate('/login');
   };
@@ -25,6 +27,7 @@ export function AppLayout() {
     { path: '/swagger', label: 'API 文档', external: 'http://localhost:8080/swagger-ui/index.html' },
     { path: '/designer/workflows', label: '工作流' },
     { path: '/messages', label: '站内信' },
+    { path: '/im', label: '即时消息' },
     { path: '/profile', label: '我的' },
   ];
 

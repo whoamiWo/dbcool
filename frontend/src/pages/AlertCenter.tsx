@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { subscribeToAlerts } from '@/lib/stompClient';
 
 /**
  * R11 / R15 告警监控中心 — 运维可观测性页面.
@@ -235,6 +236,31 @@ export function AlertCenterPage() {
       }
     };
   }, [qc, ackBy]);
+
+  // 任务 6:订阅统一实时消息总线(Java 侧 STOMP /ws/im)。
+  //
+  // 采用「并存」而非「替换」:上方 Python 直连 WS 保留为过渡通道。因为当前
+  // 告警数据实际来自 Python 侧(/ai/alerts/recent),Java AlertCollector 尚未
+  // 接管,若直接移除原通道会丢失现有推送。待 Python 告警统一回推 Java 总线后,
+  // 再删除上面的直连 WS effect 即可。
+  //
+  // 陷阱 2:Java 侧 collector.emit() 在生产代码暂无调用,故本通道当前可能
+  // 收不到数据属预期现象,不是缺陷。
+  useEffect(() => {
+    const unsubscribe = subscribeToAlerts((payload) => {
+      try {
+        const msg = JSON.parse(payload) as Partial<AlertEvent>;
+        // 总线直接投递告警事件本身(含 id/kind),不再有 {type:'alert'} 外层包装
+        if (msg && (msg.kind || msg.id)) {
+          qc.invalidateQueries({ queryKey: ['alerts'] });
+          qc.invalidateQueries({ queryKey: ['ai', 'cache', 'stats'] });
+        }
+      } catch {
+        // 忽略解析失败
+      }
+    });
+    return unsubscribe;
+  }, [qc]);
 
   const alertsQuery = useQuery({
     queryKey: ['alerts', 'recent', showResolved],

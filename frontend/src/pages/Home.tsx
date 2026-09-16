@@ -9,28 +9,29 @@ interface MessagePreview { id: string; title: string; is_read: boolean; created_
 interface TaskPreview { id: string; workflow_title: string; node_id: string; status: string; instance_id: string; created_at: string; }
 interface InstancePreview { id: string; workflow_title: string; status: string; started_at: string; }
 interface AuditPreview { id: string; action: string; resource: string; resource_id: string | null; username: string | null; created_at: string; }
+interface ApiEnvelope<T> { code: number; message: string; data: T; }
 
 export function HomePage() {
   const { user } = useAuthStore();
 
-  const meQuery = useQuery({ queryKey: ['me'], queryFn: () => apiClient.get<UserInfo>('/users/me') });
-  const colsQuery = useQuery({ queryKey: ['collections'], queryFn: () => apiClient.get<CollectionMeta[]>('/collections') });
-  const wfQuery = useQuery({ queryKey: ['workflows'], queryFn: () => apiClient.get<unknown[]>('/workflows') });
+  const meQuery = useQuery({ queryKey: ['me'], queryFn: () => apiClient.get<ApiEnvelope<UserInfo>>('/users/me') });
+  const colsQuery = useQuery({ queryKey: ['collections'], queryFn: () => apiClient.get<ApiEnvelope<CollectionMeta[]>>('/collections') });
+  const wfQuery = useQuery({ queryKey: ['workflows'], queryFn: () => apiClient.get<ApiEnvelope<unknown[]>>('/workflows') });
   const unreadQuery = useQuery({
     queryKey: ['messages', 'unread'],
-    queryFn: () => apiClient.get<{ unread_count: number; messages: MessagePreview[] }>('/messages?limit=5&unreadOnly=true'),
+    queryFn: () => apiClient.get<ApiEnvelope<{ unread_count: number; messages: MessagePreview[] }>>('/messages?limit=5&unreadOnly=true'),
   });
   const tasksQuery = useQuery({
     queryKey: ['my-tasks'],
-    queryFn: () => apiClient.get<TaskPreview[]>('/workflows/tasks/my'),
+    queryFn: () => apiClient.get<ApiEnvelope<TaskPreview[]>>('/workflows/tasks/my'),
   });
   const instancesQuery = useQuery({
     queryKey: ['wf-instances'],
-    queryFn: () => apiClient.get<InstancePreview[]>('/workflows/instances'),
+    queryFn: () => apiClient.get<ApiEnvelope<InstancePreview[]>>('/workflows/instances'),
   });
 
-  const pendingTasks = (tasksQuery.data ?? []).filter((t) => t.status === 'PENDING');
-  const runningInstances = (instancesQuery.data ?? []).filter((i) => i.status === 'RUNNING' || i.status === 'PENDING');
+  const pendingTasks = (tasksQuery.data?.data ?? []).filter((t) => t.status === 'PENDING');
+  const runningInstances = (instancesQuery.data?.data ?? []).filter((i) => i.status === 'RUNNING' || i.status === 'PENDING');
 
   return (
     <div style={{ padding: 16 }}>
@@ -38,11 +39,11 @@ export function HomePage() {
 
       {/* 摘要卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
-        <SummaryCard color="#3b82f6" icon="📋" label="未读站内信" value={unreadQuery.data?.unread_count} link="/messages" />
+        <SummaryCard color="#3b82f6" icon="📋" label="未读站内信" value={unreadQuery.data?.data?.unread_count} link="/messages" />
         <SummaryCard color="#f59e0b" icon="📝" label="待我审批" value={pendingTasks.length} link="/tasks/my" />
         <SummaryCard color="#10b981" icon="📊" label="运行中工作流" value={runningInstances.length} link="/designer/instances" />
-        <SummaryCard color="#8b5cf6" icon="📐" label="Collection 数" value={colsQuery.data?.length} link="/designer/schemas" />
-        <SummaryCard color="#0ea5e9" icon="🔧" label="工作流数" value={wfQuery.data?.length} link="/designer/workflows" />
+        <SummaryCard color="#8b5cf6" icon="📐" label="Collection 数" value={colsQuery.data?.data?.length} link="/designer/schemas" />
+        <SummaryCard color="#0ea5e9" icon="🔧" label="工作流数" value={wfQuery.data?.data?.length} link="/designer/workflows" />
       </div>
 
       {/* 待办 + 运行中 */}
@@ -75,8 +76,8 @@ export function HomePage() {
       {/* 未读站内信 + 最近审计 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
         <Panel title="📨 未读站内信" link="/messages" linkText="查看全部">
-          {(unreadQuery.data?.messages ?? []).length === 0 && <Empty text="无未读消息" />}
-          {(unreadQuery.data?.messages ?? []).map((m) => (
+          {(unreadQuery.data?.data?.messages ?? []).length === 0 && <Empty text="无未读消息" />}
+          {(unreadQuery.data?.data?.messages ?? []).map((m) => (
             <div key={m.id} style={itemLink}>
               <span style={{ fontWeight: 500 }}>{m.title}</span>
               <span style={{ color: '#94a3b8', fontSize: 11 }}>{(m.created_at || '').slice(0, 16)}</span>

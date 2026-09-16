@@ -4,6 +4,10 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  // sockjs-client 在浏览器引用 Node 全局变量 global,需 polyfill
+  define: {
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -24,6 +28,13 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ai/, '/api/ai'),
+      },
+      // 统一实时消息总线(STOMP over WebSocket)
+      // ws:true 必须显式开启 —— 否则开发环境 WebSocket 升级请求无法通过代理
+      '/ws': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true,
       },
     },
   },

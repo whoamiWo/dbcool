@@ -83,6 +83,9 @@ const ErDiagramPage = lazy(() =>
 const AlertCenterPage = lazy(() =>
   import('./pages/AlertCenter').then(m => ({ default: m.AlertCenterPage } as { default: React.ComponentType })),
 );
+const ImChatPage = lazy(() =>
+  import('./features/im/ImLayout').then(m => ({ default: m.ImChatPage } as { default: React.ComponentType })),
+);
 
 /** R12 懒加载占位 */
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -133,6 +136,8 @@ export const router = createBrowserRouter([
       { path: 'views/:id/run', element: <Lazy><TableViewPage /></Lazy> },
       { path: 'views/:id/kanban', element: <Lazy><KanbanViewPage /></Lazy> },
       { path: 'views/:id/detail/:recordId', element: <Lazy><DetailViewPage /></Lazy> },
+      { path: 'im', element: <Lazy><ImChatPage /></Lazy> },
+      { path: 'im/:channelId', element: <Lazy><ImChatPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

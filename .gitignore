@@ -72,3 +72,12 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/blob-report/
 backend-java/alerts.db
+
+# IM 联调遗留:本地 SQLite 产物 + 调试脚本(一次性,不入库)
+/alerts.db
+frontend/im_*.cjs
+frontend/debug_*.cjs
+frontend/test_thread_click.cjs
+# 假验证脚本(从未跑通,详见文件头横幅),仅本地留痕
+/im_e2e_test.mjs
+# 保留真实回归脚本:frontend/im_full_smoke.mjs、im_headless_verify.mjs

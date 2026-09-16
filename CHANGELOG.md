@@ -1,3 +1,103 @@
+## Week 43 (2026-09-16) — IM 收尾:构建修复 + 未读角标 + 告警接入总线
+
+> 接手 Cline 两轮返工后的收尾(Cline 第二轮代码 `pnpm build` 失败,5 个 TS 错误)。
+
+### 1. 构建修复
+
+| 项 | 说明 |
+|---|---|
+| `ImLayout.tsx` 构建失败 | `useInfiniteQuery` 缺 **`initialPageParam`**(react-query v5 必传)。这是唯一根因——缺失导致泛型推导失败,连锁产生 `lastPage`/`p` 为 `unknown` 的 3 个错误。**补参数后 5 个错误全部消解**,验证了「连锁反应而非独立缺陷」的判断 |
+| `ChannelList` Props 不对齐 | Props 只声明 4 个,调用方却传 7 个(TS 遇首个不匹配即停止报告,只报了 `onRefresh`)。**扩展至 7 个**并真正实现**未读角标**——此前 `getUnreadCount` 已传入但组件从未接收,这正是二审时"有导入却无展示"的根因 |
+
+`apiClient` 的响应拦截器返回 `response.data`(已解包一层),故取未读数应为 `res.data.unread_count`,写成 `res.data.data` 会多一层。
+
+### 2. 任务 6:告警接入统一总线
+
+- 新增 **`AlertStompForwarder`**(实现 `AlertCollector.Listener`),把告警投到
+  `RedisStompBridge.broadcast(StompDestinations.alertsTopic(tenantId), event.toMap())`,
+  替代原单 JVM 内存 `AlertBroadcaster`(仅单实例生效)。构造时注册,使
+  `AlertBroadcastInitializer` 的 `listenerCount()==0` 保护不再挂载旧
+  `RoutedAlertBroadcaster` —— 实现**替代**而非双份推送
+- `AlertCenter` 新增总线订阅,但**保留**原有 Python 直连 WS 作为过渡:当前告警数据
+  实际来自 Python REST(`/ai/alerts/recent`),贸然移除会丢失现有推送
+- ⚠️ 陷阱 2:Java `collector.emit()` 生产代码零调用,切换后无数据属**预期**,非缺陷
+
+### 3. 测试
+
+| 文件 | 数量 | 覆盖 |
+|---|---|---|
+| `AlertStompForwarderTest` | 4 | 注册、租户段 topic、payload 字段、null 防御 |
+| `stompClient.test.ts` | 4 | 用假 Client 复现 stompjs v7「未连接 subscribe 抛 TypeError」行为,**锁住曾经的页面白屏缺陷**;另测单例复用与登出清理 |
+| `api.test.ts` | 3 | 路径正确性,**防止 `/api` 双重前缀复发** |
+
+### 验收
+
+- ✅ 前端 `pnpm build` 通过(`✓ built in 2.68s`,478 modules)
+- ✅ 前端 **21 文件 / 179 测试** PASS(基线 17/152,新增 27)
+- ✅ 后端 **891 / 891** PASS + All coverage met(基线 887,新增 4)
+
+### 4. 复核修正(2026-09-16)
+
+| 项 | 说明 |
+|---|---|
+| `Home.tsx` 构建阻断回归 | 第 79-80 行 `unreadQuery.data?.messages` 少一层 `.data`(应为 `.data?.data?.messages`,与第 42 行一致)。导致 `tsc -b` 报 3 个 TS 错误,`pnpm build` 实际无法通过;同时首页"未读站内信"面板永远显示"无未读消息"。**已修复** |
+| 组件测试补齐 | 新增 `MessageList.test.tsx`(10)与 `ChannelList.test.tsx`(10),落实 `IM_REWORK.md` 第五节要求 |
+| 浏览器冒烟验证 | Playwright 真实浏览器 10 项检查点全通过(登录/路由/WS/三栏/发送/双账号实时/未读/表情/cursor/软删除/登出),见 `IM_SMOKETEST_REAL_RESULTS.md` |
+
+---
+
+## Week 43 (2026-09-16) — 统一实时消息总线 + 自研 IM 基础
+
+> 为整合 Slack / Rocket.Chat 类即时通讯能力,先建**统一实时消息总线**
+> (IM、看板协同、告警推送的共同地基),再在其上落地**自研 IM 基础**。
+
+### 1. 统一实时消息总线(新增 `com.nocobase.realtime`)
+
+- **`StompDestinations`** — destination 约定,所有目标带租户段 `/topic/t-<tenantId>.…`
+- **`StompHandshakeInterceptor`** — JWT 握手鉴权(token 走 `?token=`,因浏览器 WebSocket 无法自定义请求头);
+  握手时显式 `TenantContext.set/clear` —— WS 线程不经过 `JwtAuthFilter`,不绑定会取到默认租户
+- **`TenantSubscriptionInterceptor`** — SUBSCRIBE 时校验 destination 租户段与身份一致,**防跨租户订阅**
+- **`RedisStompBridge`** — Redis pub/sub 跨实例广播,解决原 `AlertBroadcaster` 单 JVM 内存集合
+  导致多副本丢消息的问题;用 `instanceId` 丢弃自己发出的回环消息
+- **`ImWebSocketConfig`** — STOMP over WebSocket + SockJS,端点 `/ws/im`
+  (与既有原生端点 `/ws/alerts` 区分,避免前缀冲突)
+
+**关键决策**:Redis 不是标准 STOMP broker,且约束"不引入新中间件" →
+采用 **Spring simple broker + 自研 Redis 桥接**,而非引入 RabbitMQ。
+
+**安全处理**:SecurityConfig 只放行 `/ws/im/**`,**不放行 `/ws/**`** ——
+后者会把现有无鉴权的 `/ws/alerts`(`user_id` 取自 URL query,可冒充)一并暴露。
+
+### 2. 自研 IM 基础(新增 `com.nocobase.im`)
+
+- **迁移**:`V17__im_channel.sql`(频道/成员)、`V18__im_message.sql`(消息/表情回应/已读回执/附件)
+- **服务**:
+  - `ChannelService` — 频道 CRUD、加入/离开、成员管理;直聊用 `directKey` 去重(保证 A→B 与 B→A 同一会话)
+  - `MessageService` — 游标分页(避免深翻页)、线程回复、**软删除**(保留线程完整性)、搜索、未读计数
+  - `ReactionService` — 表情回应(幂等)
+  - `PresenceService` — Redis 在线状态,TTL 自动过期(异常断连可自动收敛)
+- **API**:`ImChannelController` / `ImMessageController`,遵循既有 `{code,message,data}` 约定
+- **配套**:`vite.config.ts` 补 `/ws` 代理并显式开启 `ws: true`(否则开发环境 WS 升级请求无法通过代理)
+
+### 3. Week 41 复核遗留项(本次一并修复)
+
+| 项 | 修复 |
+|---|---|
+| `TriggerRateLimiter` 内存泄漏 | 加 `EVICT_THRESHOLD` 惰性全量回收 —— 原实现只在同 key 再次触发时清理,若 key 不再活动则 entry 永久驻留 |
+| 模板文案与实现不符 | `leave_approval` / `expense_report` 描述宣称"审批"但无 APPROVAL 节点 → 修正描述与通知正文,标注待 D4b.5 补齐 |
+
+> **约束说明**:模板**名称**(`请假审批` / `报销审批`)被 `WorkflowTemplateRegistryTest:43` 与
+> `WorkflowTemplateControllerTest:79` 断言引用,为避免破坏测试**保持不变**,仅修正描述与通知正文。
+
+### 验收
+
+- ✅ Backend **887 / 887 PASS**(零退化)
+- ✅ `mvn verify` BUILD SUCCESS + **All coverage checks have been met**
+- ✅ 覆盖率由 0.81 达标:补齐 IM 两个控制器测试(22 个),**未用 `excludes` 规避**
+- ✅ 修复过程中发现并修复 1 个真实缺陷:`MessageService` 在 `save` 返回 null 时广播 NPE
+
+---
+
 ## Week 43 (2026-09-15) — R11 + R15 第七次增强(Java WebSocket 实时推送 + 订阅路由)
 
 ### R11 — Java 端 WebSocket 实时告警
