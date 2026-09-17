@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
@@ -34,6 +34,21 @@ export function SchemaEditorPage() {
       setFields(metaData.fields ?? []);
     }
   }, [metaData]);
+
+  /**
+   * US-004: 加载全部 collection,供关联字段(belongsTo/hasMany)选择目标表。
+   * 后端 RelationResolver.expandRelations 依赖 options.target 展开关联,
+   * 此前前端无任何入口设置它 —— 关联字段实际不可用。
+   */
+  const { data: collectionsData } = useQuery({
+    queryKey: ['collections'],
+    queryFn: async () => {
+      const r = await apiClient.get<CollectionMeta[]>('/collections');
+      // 兼容 vitest mock 直接返数组 + 真后端 envelope
+      return (Array.isArray(r) ? r : (r as unknown as { data?: CollectionMeta[] })?.data) ?? [];
+    },
+  });
+  const collections: CollectionMeta[] = collectionsData ?? [];
 
   const jobQuery = useQuery({
     queryKey: ['migration-job', pollingJob],
@@ -92,6 +107,16 @@ export function SchemaEditorPage() {
   const handleTypeChange = (index: number, newType: FieldDef['type']) => {
     const updated = [...fields];
     updated[index] = { ...updated[index], type: newType };
+    setFields(updated);
+  };
+
+  /** US-004: 设置字段 options(如关联字段的 target 目标表)。 */
+  const handleOptionChange = (index: number, key: string, value: string) => {
+    const updated = [...fields];
+    updated[index] = {
+      ...updated[index],
+      options: { ...(updated[index].options ?? {}), [key]: value },
+    };
     setFields(updated);
   };
 
@@ -223,8 +248,14 @@ export function SchemaEditorPage() {
             </tr>
           </thead>
           <tbody>
-            {fields.map((f, i) => (
-              <tr key={i} style={{ borderTop: '1px solid #e2e8f0' }}>
+            {fields.map((f, i) => {
+              const isRelation = f.type === 'belongsTo' || f.type === 'hasMany';
+              const targetName = String(
+                (f.options as Record<string, unknown> | undefined)?.target ?? ''
+              );
+              return (
+              <Fragment key={i}>
+              <tr style={{ borderTop: '1px solid #e2e8f0' }}>
                 <td style={{ padding: 8 }}>
                   <input
                     value={f.name}
@@ -280,7 +311,35 @@ export function SchemaEditorPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+              {/* US-004: 关联字段额外配置行 —— 选择目标表并显示对方字段 */}
+              {isRelation && (
+                <tr>
+                  <td colSpan={4} style={{ padding: '4px 8px 12px', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, color: '#475569' }}>关联表(target):</span>
+                      <select
+                        value={targetName}
+                        onChange={(e) => handleOptionChange(i, 'target', e.target.value)}
+                        aria-label={`字段 ${f.name} 关联表`}
+                        style={{ padding: 4, fontSize: 12 }}
+                      >
+                        <option value="">-- 选择关联表 --</option>
+                        {collections
+                          .filter((c) => c.name !== name)
+                          .map((c) => (
+                            <option key={c.name} value={c.name}>
+                              {c.title || c.name}
+                            </option>
+                          ))}
+                      </select>
+                      <TargetFieldsPreview collectionName={targetName} />
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
+              );
+            })}
           </tbody>
         </table>
 
@@ -304,5 +363,33 @@ export function SchemaEditorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * US-004: 展示关联目标表的字段 —— 验收要求「选关联表时显示对方字段」。
+ */
+function TargetFieldsPreview({ collectionName }: { collectionName: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['collection', collectionName],
+    queryFn: async () => {
+      const r = await apiClient.get<CollectionMeta>(`/collections/${collectionName}`);
+      return (r as unknown as { data?: CollectionMeta })?.data ?? r ?? null;
+    },
+    enabled: !!collectionName,
+  });
+
+  if (!collectionName) return null;
+  if (isLoading) return <span style={{ fontSize: 11, color: '#94a3b8' }}>加载字段…</span>;
+
+  const targetFields = data?.fields ?? [];
+  if (targetFields.length === 0) {
+    return <span style={{ fontSize: 11, color: '#94a3b8' }}>该表暂无字段</span>;
+  }
+  return (
+    <span style={{ fontSize: 11, color: '#64748b' }}>
+      对方字段({targetFields.length}):{' '}
+      {targetFields.map((f) => f.label ?? f.name).join('、')}
+    </span>
   );
 }
