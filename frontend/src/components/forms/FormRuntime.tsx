@@ -107,11 +107,21 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
     }
   };
 
+  /**
+   * US-102:读取字段 options 中的展示配置。
+   * 复用既有 options Map 承载 placeholder / helpText,避免改动后端 FieldDef 签名。
+   */
+  const optStr = (f: FieldDef, key: string): string | undefined => {
+    const v = f.options?.[key];
+    return typeof v === 'string' && v.length > 0 ? v : undefined;
+  };
+
   const renderField = (item: FormLayoutItem) => {
     const f = fieldMap.get(item.field);
     if (!f) return null;
     if (!isVisible(f.name)) return null;
     const span = item.span ?? 24;
+    const helpText = optStr(f, 'helpText');
 
     return (
       <div key={f.name} style={{ gridColumn: `span ${span}`, marginBottom: 12 }}>
@@ -121,6 +131,11 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
           <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 8 }}>({f.type})</span>
         </label>
         {renderInput(f)}
+        {helpText && (
+          <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
+            {helpText}
+          </div>
+        )}
         {errors[f.name] && (
           <div style={{ color: '#dc2626', fontSize: 12, marginTop: 2 }}>
             {errors[f.name]}
@@ -141,7 +156,7 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
             value={value}
             onChange={(e) => onChange(e.target.value)}
             style={{ ...inputStyle, width: '100%' }}
-            placeholder={f.label ?? f.name}
+            placeholder={optStr(f, 'placeholder') ?? f.label ?? f.name}
           />
         );
       case 'number':
@@ -151,6 +166,7 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
             value={value}
             onChange={(e) => onChange(e.target.value)}
             style={{ ...inputStyle, width: '100%' }}
+            placeholder={optStr(f, 'placeholder') ?? f.label ?? f.name}
           />
         );
       case 'boolean':

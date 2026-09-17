@@ -163,10 +163,19 @@ export function FormDesignerPage() {
   const isFieldRequired = (fieldName: string) =>
     rules.validation?.[fieldName]?.some((v) => v.type === 'required') ?? false;
 
-  /** US-003: 切换字段属性(primaryKey/unique/defaultValue)。 */
-  const toggleFieldProp = (fieldName: string, prop: 'primaryKey' | 'unique' | 'defaultValue', value: boolean | string) => {
+  /** US-003: 切换字段属性(primaryKey/unique/defaultValue/label)。 */
+  const toggleFieldProp = (fieldName: string, prop: 'primaryKey' | 'unique' | 'defaultValue' | 'label', value: boolean | string) => {
     setFields(fields.map((f) =>
       f.name === fieldName ? { ...f, [prop]: value } : f
+    ));
+  };
+
+  /** US-102: 更新字段 options 内的展示配置(placeholder/helpText)。 */
+  const toggleOptionProp = (fieldName: string, key: string, value: string) => {
+    setFields(fields.map((f) =>
+      f.name === fieldName
+        ? { ...f, options: { ...(f.options ?? {}), [key]: value } }
+        : f
     ));
   };
 
@@ -427,6 +436,34 @@ export function FormDesignerPage() {
                   type="text"
                   value={fields.find((f) => f.name === activeField)?.defaultValue ?? ''}
                   onChange={(e) => toggleFieldProp(activeField, 'defaultValue', e.target.value)}
+                  style={{ padding: 4, width: '100%', fontSize: 12 }}
+                />
+              </div>
+              {/* US-102: 标签 / 占位符 / 帮助文本 */}
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 12, color: '#64748b' }}>标签(label)</label>
+                <input
+                  type="text"
+                  value={fields.find((f) => f.name === activeField)?.label ?? ''}
+                  onChange={(e) => toggleFieldProp(activeField, 'label', e.target.value)}
+                  style={{ padding: 4, width: '100%', fontSize: 12 }}
+                />
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 12, color: '#64748b' }}>占位符(placeholder)</label>
+                <input
+                  type="text"
+                  value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.placeholder ?? '')}
+                  onChange={(e) => toggleOptionProp(activeField, 'placeholder', e.target.value)}
+                  style={{ padding: 4, width: '100%', fontSize: 12 }}
+                />
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 12, color: '#64748b' }}>帮助文本(helpText)</label>
+                <input
+                  type="text"
+                  value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.helpText ?? '')}
+                  onChange={(e) => toggleOptionProp(activeField, 'helpText', e.target.value)}
                   style={{ padding: 4, width: '100%', fontSize: 12 }}
                 />
               </div>

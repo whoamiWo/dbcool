@@ -318,3 +318,40 @@ describe('FormRuntime — 提交流程', () => {
     });
   });
 
+  /**
+   * US-102:展示配置(placeholder / helpText)—— 验证真实渲染生效,
+   * 避免"仅加配置项但渲染端不消费"的假完成。
+   */
+  describe('FormRuntime — US-102 展示配置', () => {
+    it('options.placeholder 覆盖 label 作为占位符', () => {
+      wrap({ fields: [{ ...textField, options: { placeholder: '请输入真实姓名' } }] });
+      expect(screen.getByPlaceholderText('请输入真实姓名')).toBeInTheDocument();
+    });
+
+    it('无 options.placeholder 时回退用 label', () => {
+      wrap({ fields: [textField] }); // label = '姓名'
+      expect(screen.getByPlaceholderText('姓名')).toBeInTheDocument();
+    });
+
+    it('options.helpText 渲染为帮助文本', () => {
+      wrap({ fields: [{ ...textField, options: { helpText: '请填写身份证上的姓名' } }] });
+      expect(screen.getByText('请填写身份证上的姓名')).toBeInTheDocument();
+    });
+
+    it('number 字段同样支持 placeholder', () => {
+      wrap({ fields: [{ ...numberField, options: { placeholder: '请输入年龄' } }] });
+      expect(screen.getByPlaceholderText('请输入年龄')).toBeInTheDocument();
+    });
+
+    it('同时配置 placeholder 与 helpText 时两者都生效', () => {
+      wrap({
+        fields: [{
+          ...textField,
+          options: { placeholder: '占位提示', helpText: '辅助说明' },
+        }],
+      });
+      expect(screen.getByPlaceholderText('占位提示')).toBeInTheDocument();
+      expect(screen.getByText('辅助说明')).toBeInTheDocument();
+    });
+  });
+
