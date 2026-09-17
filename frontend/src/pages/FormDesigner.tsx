@@ -5,6 +5,7 @@ import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 import type { FormFull, FormLayoutItem, FormRules, ValidationRule } from '@/types/form';
 import { FormRuntime } from '@/components/forms/FormRuntime';
+import { FieldRulesEditor } from '@/components/forms/FieldRulesEditor';
 
 const FIELD_ICON: Record<FieldType, string> = {
   text: '📝',
@@ -467,8 +468,15 @@ export function FormDesignerPage() {
                   style={{ padding: 4, width: '100%', fontSize: 12 }}
                 />
               </div>
+              {/* US-103 显隐规则 + US-104 校验规则 */}
+              <FieldRulesEditor
+                fieldName={activeField}
+                allFields={fields}
+                rules={rules}
+                onChange={setRules}
+              />
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
-                💡 可拖拽画布字段重排序。显隐规则、校验规则、提交动作见下方。
+                💡 可拖拽画布字段重排序。规则在下方实时预览中立即生效。
               </p>
             </div>
           )}
