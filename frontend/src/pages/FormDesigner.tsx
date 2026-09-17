@@ -34,6 +34,8 @@ export function FormDesignerPage() {
   const [activeField, setActiveField] = useState<string | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [fields, setFields] = useState<FieldDef[]>([]);
+  /** US-105:预览是否只读(禁用输入、显示全部字段、隐藏提交)。 */
+  const [previewReadOnly, setPreviewReadOnly] = useState(false);
 
   const { data: collectionData } = useQuery({
     queryKey: ['collection', collection],
@@ -543,7 +545,19 @@ export function FormDesignerPage() {
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <h2>👀 实时预览</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <h2 style={{ margin: 0 }}>👀 实时预览</h2>
+          <label
+            style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, color: '#475569' }}
+          >
+            <input
+              type="checkbox"
+              checked={previewReadOnly}
+              onChange={(e) => setPreviewReadOnly(e.target.checked)}
+            />
+            只读模式(US-105:禁用输入并显示完整布局)
+          </label>
+        </div>
         <div style={{ padding: 24, background: '#f8fafc', borderRadius: 8 }}>
           {layout.length > 0 ? (
             <FormRuntime
@@ -551,6 +565,7 @@ export function FormDesignerPage() {
               fields={fields}
               onSubmit={() => alert('预览模式,不会真的提交')}
               submitLabel="预览提交"
+              readOnly={previewReadOnly}
             />
           ) : (
             <p style={{ color: '#94a3b8', textAlign: 'center' }}>添加字段后看预览</p>

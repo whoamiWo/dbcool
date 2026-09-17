@@ -11,6 +11,11 @@ interface FormRuntimeProps {
    * 由调用方注入(而非组件内部直接调 apiClient),保持组件可测试。
    */
   onTriggerWorkflow?: (workflowId: string, data: Record<string, unknown>) => Promise<void> | void;
+  /**
+   * US-105:只读预览模式。
+   * 启用后:禁用全部输入、显示所有字段(忽略显隐规则以便检查完整布局)、隐藏提交按钮。
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -26,6 +31,7 @@ export function FormRuntime({
   onSubmit,
   submitLabel = '提交',
   onTriggerWorkflow,
+  readOnly = false,
 }: FormRuntimeProps) {
   const [data, setData] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -159,7 +165,8 @@ export function FormRuntime({
   const renderField = (item: FormLayoutItem) => {
     const f = fieldMap.get(item.field);
     if (!f) return null;
-    if (!isVisible(f.name)) return null;
+    // US-105:只读预览时忽略显隐规则,展示完整布局以便上线前检查
+    if (!readOnly && !isVisible(f.name)) return null;
     const span = item.span ?? 24;
     const helpText = optStr(f, 'helpText');
 
@@ -308,30 +315,39 @@ export function FormRuntime({
       {form.description && (
         <p style={{ color: '#64748b', marginTop: 0 }}>{form.description}</p>
       )}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(24, 1fr)',
-          gap: 12,
-        }}
+      {/* US-105: fieldset[disabled] 一次性禁用内部所有表单控件(含各类型 input 与按钮) */}
+      <fieldset
+        disabled={readOnly}
+        style={{ border: 'none', padding: 0, margin: 0, minWidth: 0 }}
       >
-        {form.layout.map(renderField)}
-      </div>
-      <button
-        type="submit"
-        disabled={submitting}
-        style={{
-          marginTop: 16,
-          padding: '10px 24px',
-          background: submitting ? '#94a3b8' : '#1e293b',
-          color: 'white',
-          border: 'none',
-          borderRadius: 4,
-          cursor: submitting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {submitting ? '提交中…' : submitLabel}
-      </button>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(24, 1fr)',
+            gap: 12,
+          }}
+        >
+          {form.layout.map(renderField)}
+        </div>
+      </fieldset>
+      {/* US-105: 只读预览无需提交 */}
+      {!readOnly && (
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{
+            marginTop: 16,
+            padding: '10px 24px',
+            background: submitting ? '#94a3b8' : '#1e293b',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            cursor: submitting ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {submitting ? '提交中…' : submitLabel}
+        </button>
+      )}
       {/* US-106: 提交后动作提示(stay / workflow) */}
       {submitMessage && (
         <div
