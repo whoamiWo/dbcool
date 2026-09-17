@@ -32,14 +32,13 @@ export function FormDesignerPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [fields, setFields] = useState<FieldDef[]>([]);
 
   const { data: collectionData } = useQuery({
     queryKey: ['collection', collection],
     queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collection}`),
     enabled: !!collection,
   });
-
-  const fields: FieldDef[] = collectionData?.fields ?? [];
 
   const { data: formData } = useQuery({
     queryKey: ['form', id],
@@ -57,6 +56,13 @@ export function FormDesignerPage() {
     }
   }, [formData]);
 
+  /** 当 collectionData 字段变化时同步到可编辑状态。 */
+  useEffect(() => {
+    if (collectionData?.fields) {
+      setFields(collectionData.fields);
+    }
+  }, [collectionData?.fields]);
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -64,6 +70,7 @@ export function FormDesignerPage() {
         description,
         layout: JSON.stringify(layout),
         rules: JSON.stringify(rules),
+        fields: fields,  // US-003: 提交字段属性(primaryKey/unique/defaultValue)
       };
       if (id) {
         return apiClient.put<FormFull>(`/forms/${id}`, payload);
@@ -155,6 +162,13 @@ export function FormDesignerPage() {
 
   const isFieldRequired = (fieldName: string) =>
     rules.validation?.[fieldName]?.some((v) => v.type === 'required') ?? false;
+
+  /** US-003: 切换字段属性(primaryKey/unique/defaultValue)。 */
+  const toggleFieldProp = (fieldName: string, prop: 'primaryKey' | 'unique' | 'defaultValue', value: boolean | string) => {
+    setFields(fields.map((f) =>
+      f.name === fieldName ? { ...f, [prop]: value } : f
+    ));
+  };
 
   if (!collection) {
     return <p>缺少 collection 参数</p>;
@@ -390,8 +404,34 @@ export function FormDesignerPage() {
                 />
                 必填
               </label>
+              {/* US-003: 主键/唯一/默认值 */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={fields.find((f) => f.name === activeField)?.primaryKey ?? false}
+                  onChange={(e) => toggleFieldProp(activeField, 'primaryKey', e.target.checked)}
+                />
+                主键
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={fields.find((f) => f.name === activeField)?.unique ?? false}
+                  onChange={(e) => toggleFieldProp(activeField, 'unique', e.target.checked)}
+                />
+                唯一
+              </label>
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 12, color: '#64748b' }}>默认值</label>
+                <input
+                  type="text"
+                  value={fields.find((f) => f.name === activeField)?.defaultValue ?? ''}
+                  onChange={(e) => toggleFieldProp(activeField, 'defaultValue', e.target.value)}
+                  style={{ padding: 4, width: '100%', fontSize: 12 }}
+                />
+              </div>
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
-                💡 可拖拽画布字段重排序。Week 8+ 加显隐规则、默认值。
+                💡 可拖拽画布字段重排序。显隐规则、校验规则、提交动作见下方。
               </p>
             </div>
           )}

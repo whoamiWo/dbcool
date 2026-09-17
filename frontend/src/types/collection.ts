@@ -19,6 +19,9 @@ export interface FieldDef {
   required: boolean;
   label?: string;
   options?: Record<string, unknown>;
+  primaryKey?: boolean;
+  unique?: boolean;
+  defaultValue?: string;
 }
 
 export interface CollectionMeta {
