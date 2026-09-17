@@ -235,14 +235,62 @@ public class CollectionService {
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
+        // US-003:字段约束(默认值填充 + 必填/唯一/主键校验)
+        Map<String, Object> effective = applyFieldConstraints(meta, data, null);
         UUID id = UUID.randomUUID();
         try {
-            String json = objectMapper.writeValueAsString(data);
+            String json = objectMapper.writeValueAsString(effective);
             tableManager.insertRecord(collectionName, id.toString(), json);
             return id;
         } catch (Exception e) {
             throw new RuntimeException("record 序列化失败", e);
         }
+    }
+
+    /**
+     * US-003:应用字段约束 —— 默认值填充、必填校验、唯一校验、主键(=必填+唯一)。
+     *
+     * <p>语义说明:
+     * <ul>
+     *   <li><b>defaultValue</b>:字段缺失或为空时自动填充</li>
+     *   <li><b>required / primaryKey</b>:填充后仍为空 → 400</li>
+     *   <li><b>unique / primaryKey</b>:值非 null 且库中已存在同值 → 409(遵循 SQL NULL 语义,null 不参与唯一性判定)</li>
+     * </ul>
+     *
+     * @param excludeId 非空时排除该记录(更新场景,避免与自身冲突)
+     * @return 应用默认值后的有效数据(新 Map,不改动入参)
+     */
+    Map<String, Object> applyFieldConstraints(CollectionMetaEntity meta,
+                                              Map<String, Object> data,
+                                              String excludeId) {
+        List<FieldDef> fields = parseFields(meta);
+        Map<String, Object> out = new java.util.HashMap<>(data == null ? Map.of() : data);
+
+        for (FieldDef f : fields) {
+            if (f == null) continue;
+            Object v = out.get(f.name());
+            boolean blank = (v == null) || (v instanceof String s && s.isBlank());
+
+            // 1) 默认值填充
+            if (blank && f.defaultValue() != null && !f.defaultValue().isBlank()) {
+                out.put(f.name(), f.defaultValue());
+                v = f.defaultValue();
+                blank = false;
+            }
+
+            // 2) 必填 / 主键非空
+            if ((f.required() || f.primaryKey()) && blank) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "字段必填: " + f.name());
+            }
+
+            // 3) 唯一 / 主键唯一性(null 不参与)
+            if ((f.unique() || f.primaryKey()) && !blank) {
+                if (tableManager.existsByFieldValue(meta.getName(), f.name(), String.valueOf(v), excludeId)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "字段值已存在(唯一约束): " + f.name());
+                }
+            }
+        }
+        return out;
     }
 
     public List<Map<String, Object>> listRecords(String collectionName, String tenantId, int limit) {
@@ -384,7 +432,9 @@ public class CollectionService {
             Map<String, Object> existing = getRecord(collectionName, id, tenantId);
             Map<String, Object> merged = new java.util.HashMap<>(existing);
             merged.putAll(data);
-            String json = objectMapper.writeValueAsString(merged);
+            // US-003:字段约束(排除自身 id,避免与自身唯一值冲突)
+            Map<String, Object> effective = applyFieldConstraints(meta, merged, id);
+            String json = objectMapper.writeValueAsString(effective);
             return tableManager.updateRecord(collectionName, id, json) > 0;
         } catch (org.springframework.web.server.ResponseStatusException rse) {
             throw rse;

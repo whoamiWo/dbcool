@@ -171,6 +171,39 @@ public class DynamicTableManager {
     }
 
     /**
+     * US-003:按字段值统计记录数(用于 unique 约束校验)。
+     *
+     * <p>记录正文存于 {@code extra} JSONB 列,字段值用 {@code extra->>'field'} 提取。
+     *
+     * <p><b>防注入</b>:字段名必须匹配 {@code [a-zA-Z_][a-zA-Z0-9_]*},否则直接返回 false
+     * (与 {@link #buildOrderBy} 同一安全策略)。值一律走 {@code ?} 绑定参数。
+     *
+     * @param excludeId 非空时排除该记录(更新场景避免与自身冲突)
+     */
+    public boolean existsByFieldValue(String collectionName, String fieldName,
+                                      String value, String excludeId) {
+        if (fieldName == null || !fieldName.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+            return false; // 非法字段名视为无法判定(不误报冲突)
+        }
+        StringBuilder sql = new StringBuilder("SELECT COUNT(1) FROM ")
+                .append(physicalTableName(collectionName))
+                .append(" WHERE extra->>'").append(fieldName).append("' = ?");
+        List<Object> args = new ArrayList<>();
+        args.add(value);
+        if (excludeId != null && !excludeId.isBlank()) {
+            sql.append(" AND id <> ?::uuid");
+            args.add(excludeId);
+        }
+        try {
+            Integer count = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
+            return count != null && count > 0;
+        } catch (Exception e) {
+            // 表不存在 / 列缺失等:不阻断写入,交由上层决定
+            return false;
+        }
+    }
+
+    /**
      * 按 ID 取单条记录的 extra JSON(Week 14.5 P3-3 补完).
      */
     public java.util.Optional<String> getRecord(String collectionName, String id) {
