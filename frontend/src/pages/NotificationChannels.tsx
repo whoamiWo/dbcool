@@ -233,6 +233,39 @@ export function NotificationChannelsPage() {
               <input value={editing.name || ''} onChange={(e) => setEditing({ ...editing, name: e.target.value })} style={input} />
             </Field>
 
+            {editing.type === 'EMAIL' && (
+              <div style={{ padding: 8, background: '#f8fafc', borderRadius: 4, marginTop: 8 }}>
+                <strong style={{ fontSize: 12 }}>SMTP 配置</strong>
+                {[
+                  { k: 'host', label: 'SMTP 主机' },
+                  { k: 'port', label: '端口', type: 'number' as const },
+                  { k: 'username', label: '用户名' },
+                  { k: 'password', label: '密码', type: 'password' as const },
+                  { k: 'encryption', label: '加密', type: 'select' as const, options: ['none', 'starttls', 'ssl'] },
+                  { k: 'from', label: '发件人' },
+                ].map(({ k, label, type, options }) => (
+                  <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <span style={{ fontSize: 11, width: 64, color: '#64748b' }}>{label}</span>
+                    {type === 'select' ? (
+                      <select
+                        value={(editing.config?.[k] as string) ?? ''}
+                        onChange={(e) => setEditing({ ...editing, config: { ...editing.config, [k]: e.target.value } })}
+                        style={input}
+                      >
+                        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type={type}
+                        value={(editing.config?.[k] as string) ?? ''}
+                        onChange={(e) => setEditing({ ...editing, config: { ...editing.config, [k]: e.target.value } })}
+                        style={input}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             <Field label={`Config(JSON / ${editing.type})`}>
               <textarea
                 value={JSON.stringify(editing.config || {}, null, 2)}
