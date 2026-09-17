@@ -159,7 +159,10 @@ export function AclEditorPage() {
       )}
 
       <p style={{ fontSize: 12, color: '#64748b', marginTop: 16 }}>
-        💡 Week 10 简化版:ACL 仅配置不强制执行(Week 12+ 接入 CollectionController 拦截器)
+        💡 ACL 已强制执行:读操作经 <code>AclEnforcer.filterReadableFields/filterRecord</code> 移除 hidden 字段,
+        写操作经 <code>filterWritableFields/assertCanWriteFields</code> 拒绝写入 hidden 字段
+        (原「仅配置不强制执行」为 Week 10 旧注记,现已过时并更正)。
+        配置中的 <code>hidden</code> 同时表示该字段对当前角色不可见且不可编辑。
       </p>
     </div>
   );
