@@ -103,14 +103,16 @@ public class WikiPageService {
         }
         if (title != null) entity.setTitle(title);
         if (content != null) {
+            // 先保存旧版本快照
+            createVersion(entity, entity.getContent(), "更新", updatedBy, entity.getVersion());
             entity.setContent(content);
-            // 创建版本
-            createVersion(entity, content, "更新", updatedBy);
             entity.setVersion(entity.getVersion() + 1);
         }
         entity.setUpdatedBy(updatedBy);
         entity.setUpdatedAt(Instant.now());
-        return pageRepository.save(entity);
+        pageRepository.saveAndFlush(entity);
+        pageRepository.bumpVersion(entity.getId());
+        return entity;
     }
 
     @Transactional
@@ -147,11 +149,11 @@ public class WikiPageService {
     }
 
     @Transactional
-    public WikiVersionEntity createVersion(WikiPageEntity page, String content, String summary, UUID createdBy) {
+    public WikiVersionEntity createVersion(WikiPageEntity page, String content, String summary, UUID createdBy, int versionNumber) {
         WikiVersionEntity version = new WikiVersionEntity();
         version.setId(UUID.randomUUID());
         version.setWikiPageId(page.getId());
-        version.setVersion(page.getVersion());
+        version.setVersion(versionNumber);
         version.setContent(content);
         version.setSummary(summary);
         version.setCreatedBy(createdBy);
@@ -176,7 +178,7 @@ public class WikiPageService {
         }
         WikiVersionEntity versionEntity = getVersion(pageId, version);
         page.setContent(versionEntity.getContent());
-        page.setVersion(versionEntity.getVersion());
+        // 版本号不变，仅内容回滚
         page.setUpdatedBy(updatedBy);
         page.setUpdatedAt(Instant.now());
         return pageRepository.save(page);
