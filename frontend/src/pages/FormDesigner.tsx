@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
-import type { FormFull, FormLayoutItem, FormRules, ValidationRule } from '@/types/form';
+import type { FormFull, FormLayoutItem, FormRules, SubmitAction, ValidationRule } from '@/types/form';
 import { FormRuntime } from '@/components/forms/FormRuntime';
 import { FieldRulesEditor } from '@/components/forms/FieldRulesEditor';
 
@@ -372,6 +372,65 @@ export function FormDesignerPage() {
               />
             </div>
           )}
+
+          {/* US-106: 提交后动作(表单级规则) */}
+          <div style={{ marginTop: 16, borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+            <strong style={{ fontSize: 13 }}>提交后动作</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <select
+                value={rules.submit?.action ?? 'stay'}
+                onChange={(e) =>
+                  setRules({
+                    ...rules,
+                    submit: { action: e.target.value as SubmitAction },
+                  })
+                }
+                style={{ padding: 6, fontSize: 12, borderRadius: 4, border: '1px solid #cbd5e1' }}
+                aria-label="提交后动作"
+              >
+                <option value="stay">停留并显示提示</option>
+                <option value="redirect">跳转到 URL</option>
+                <option value="workflow">触发工作流</option>
+              </select>
+            </div>
+
+            {rules.submit?.action === 'redirect' && (
+              <input
+                type="text"
+                value={rules.submit.url ?? ''}
+                onChange={(e) => setRules({ ...rules, submit: { ...rules.submit!, url: e.target.value } })}
+                placeholder="跳转地址,如 /thanks"
+                aria-label="跳转地址"
+                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid #cbd5e1' }}
+              />
+            )}
+
+            {rules.submit?.action === 'workflow' && (
+              <input
+                type="text"
+                value={rules.submit.workflowId ?? ''}
+                onChange={(e) =>
+                  setRules({ ...rules, submit: { ...rules.submit!, workflowId: e.target.value } })
+                }
+                placeholder="工作流 ID"
+                aria-label="工作流 ID"
+                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid #cbd5e1' }}
+              />
+            )}
+
+            {rules.submit?.action && rules.submit.action !== 'redirect' && (
+              <input
+                type="text"
+                value={rules.submit.message ?? ''}
+                onChange={(e) =>
+                  setRules({ ...rules, submit: { ...rules.submit!, message: e.target.value } })
+                }
+                placeholder={rules.submit.action === 'workflow' ? '触发后提示(可选)' : '提交后提示文案'}
+                aria-label="提交后提示"
+                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid #cbd5e1' }}
+              />
+            )}
+          </div>
 
           <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
             <button

@@ -6,6 +6,11 @@ interface FormRuntimeProps {
   fields: FieldDef[];
   onSubmit: (data: Record<string, unknown>) => Promise<void> | void;
   submitLabel?: string;
+  /**
+   * US-106:提交动作为 workflow 时的触发器。
+   * 由调用方注入(而非组件内部直接调 apiClient),保持组件可测试。
+   */
+  onTriggerWorkflow?: (workflowId: string, data: Record<string, unknown>) => Promise<void> | void;
 }
 
 /**
@@ -15,10 +20,18 @@ interface FormRuntimeProps {
  * - 支持 validation 校验
  * - 提交时调用 onSubmit
  */
-export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: FormRuntimeProps) {
+export function FormRuntime({
+  form,
+  fields,
+  onSubmit,
+  submitLabel = '提交',
+  onTriggerWorkflow,
+}: FormRuntimeProps) {
   const [data, setData] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  /** US-106:提交后动作(stay/workflow)展示给用户的提示。 */
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
   const fieldMap = new Map(fields.map((f) => [f.name, f]));
 
@@ -90,12 +103,39 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
     return Object.keys(newErrors).length === 0;
   };
 
+  /**
+   * US-106:执行提交后动作(rules.submit)。
+   *
+   * <p>三种动作:
+   * <ul>
+   *   <li><b>stay</b>:停留并显示提示 message</li>
+   *   <li><b>redirect</b>:跳转到 url</li>
+   *   <li><b>workflow</b>:触发工作流 —— 通过 onTriggerWorkflow 回调执行,
+   *       保持本组件不直接依赖 apiClient(便于测试注入)</li>
+   * </ul>
+   */
+  const runSubmitRule = async (payload: Record<string, unknown>) => {
+    const rule = form.rules.submit;
+    if (!rule) return;
+    if (rule.action === 'stay') {
+      setSubmitMessage(rule.message ?? '提交成功');
+    } else if (rule.action === 'redirect' && rule.url) {
+      window.location.href = rule.url;
+    } else if (rule.action === 'workflow' && rule.workflowId) {
+      await onTriggerWorkflow?.(rule.workflowId, payload);
+      setSubmitMessage(rule.message ?? '已触发工作流');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
+    setSubmitMessage(null);
     try {
       await onSubmit(data);
+      // US-106: 提交成功后执行配置的后续动作
+      await runSubmitRule(data);
       setData({});
     } catch (err) {
       // 静默失败:onSubmit 通常自己处理错误并显示给用户
@@ -292,6 +332,22 @@ export function FormRuntime({ form, fields, onSubmit, submitLabel = '提交' }: 
       >
         {submitting ? '提交中…' : submitLabel}
       </button>
+      {/* US-106: 提交后动作提示(stay / workflow) */}
+      {submitMessage && (
+        <div
+          role="status"
+          style={{
+            marginTop: 12,
+            padding: '8px 12px',
+            background: '#ecfdf5',
+            color: '#065f46',
+            borderRadius: 4,
+            fontSize: 13,
+          }}
+        >
+          {submitMessage}
+        </div>
+      )}
     </form>
   );
 }

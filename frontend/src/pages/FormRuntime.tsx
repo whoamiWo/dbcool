@@ -34,6 +34,17 @@ export function FormRuntimePage() {
     enabled: !!formData?.collection_name,
   });
 
+  /** US-106:提交动作为 workflow 时触发后端工作流。 */
+  const triggerWorkflow = async (workflowId: string, payload: Record<string, unknown>) => {
+    try {
+      await apiClient.post(`/workflows/${workflowId}/trigger`, payload);
+    } catch (err) {
+      // 记录已提交成功但工作流触发失败,不阻断用户(数据已入库)
+      // eslint-disable-next-line no-console
+      console.error('触发工作流失败:', err);
+    }
+  };
+
   const submitMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       const collectionName = formData?.collection_name;
@@ -47,6 +58,17 @@ export function FormRuntimePage() {
       return Array.isArray(r) ? r : (r.data);
     },
     onSuccess: () => {
+      // US-106:redirect 动作由 FormRuntime 内部执行(window.location.href),
+      // 此处不能再 navigate,否则会覆盖配置的跳转目标
+      let rule: { submit?: { action?: string } } = {};
+      try {
+        rule = JSON.parse(formData?.rules_json ?? '{}');
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('rules_json parse failed', e);
+      }
+      if (rule.submit?.action === 'redirect') return;
+
       alert('提交成功!');
       navigate(`/designer/collections/${formData?.collection_name}`);
     },
@@ -92,6 +114,7 @@ export function FormRuntimePage() {
           fields={collectionData.fields ?? []}
           onSubmit={(data) => { submitMutation.mutate(data); }}
           submitLabel={submitMutation.isPending ? '提交中…' : '提交'}
+          onTriggerWorkflow={triggerWorkflow}
         />
       </div>
     </div>
