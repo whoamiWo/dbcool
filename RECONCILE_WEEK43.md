@@ -89,6 +89,35 @@
 
 ---
 
+## 6.1 补齐进度(2026-09-17 更新)
+
+### 已完成提交
+
+| Commit | 栈 | 内容 |
+|---|---|---|
+| `c12119f` | `[java]` | US-003 字段约束:FieldDef 扩展 primaryKey/unique/defaultValue;保留 5 参数便捷构造器委托 canonical(校验一致生效),既有调用与测试**零改动** |
+| `d10c860` | `[js]` | US-003 属性面板:FormDesigner 新增主键/唯一复选框 + 默认值输入;字段转可编辑 state 并在保存时提交 |
+
+验证:后端 `mvn -o verify` **891/891 PASS · BUILD SUCCESS**;前端 `tsc -b` exit 0 · `vitest` 21 文件/179 测试 PASS。
+
+### ⚠️ US-003 仍为 partial(未达 done)
+
+US-003 验收标准是「**数据写入时校验生效**」。当前仅完成:
+
+- ✅ 字段定义支持 `primaryKey` / `unique` / `defaultValue`
+- ✅ 前端属性面板可配置这三项
+- ❌ **后端写入校验未实现** —— unique 冲突未报错、defaultValue 未自动填充、primaryKey 未实际生效
+
+因此 US-003 **不得标记为 done**,剩余后端校验逻辑待补。
+
+### 过程中的一次自我引入回归(已修复)
+
+扩展 `FieldDef` 为 8 参数后,30+ 处测试文件的 `new FieldDef(5参数)` 调用编译失败,`mvn -o verify` 阻断。
+修复方式:为 record 增加 **5 参数便捷构造器委托 canonical**(而非逐个改测试),校验逻辑保持一致,测试文件零改动。
+教训:修改 record 签名前应先统计调用面,或优先用「新增构造器 + 委托」保持向后兼容。
+
+---
+
 ## 7. 遗留风险
 
 - **声明与实跑不符的模式未完全消除**:本会话修复了 2 例,但历史 handoff 中可能仍有未实跑的声明。
