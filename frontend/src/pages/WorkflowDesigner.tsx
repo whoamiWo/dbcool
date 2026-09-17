@@ -21,7 +21,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import apiClient from '@/api/client';
 
-type NodeKind = 'APPROVAL' | 'NOTIFICATION' | 'CONDITION' | 'HTTP';
+type NodeKind = 'APPROVAL' | 'NOTIFICATION' | 'CONDITION' | 'HTTP' | 'DATA_UPDATE';
 
 interface WorkflowNodeData {
   kind: NodeKind;
@@ -35,6 +35,7 @@ const nodeKindMeta: Record<NodeKind, { label: string; icon: string; color: strin
   NOTIFICATION: { label: '通知',     icon: '🔔', color: '#8b5cf6' },
   CONDITION:    { label: '条件',     icon: '🔀', color: '#f59e0b' },
   HTTP:         { label: 'HTTP',    icon: '🌐', color: '#10b981' },
+  DATA_UPDATE:  { label: '数据更新', icon: '✏️', color: '#0ea5e9' },
 };
 
 function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolean }) {
@@ -59,6 +60,7 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
         {data.kind === 'NOTIFICATION' && (data.config.message?.slice(0, 40) || '(未设置)')}
         {data.kind === 'HTTP' && `${data.config.method || 'GET'} ${(data.config.url || '').slice(0, 30)}`}
         {data.kind === 'CONDITION' && `if ${data.config.field || '?'} ${data.config.op || '?'} ${data.config.value || '?'}`}
+        {data.kind === 'DATA_UPDATE' && `${data.config.collection || '?'} / ${data.config.recordId || '?'}`}
         {data.kind === 'APPROVAL' && '(单审批人)'}
       </div>
       {/* 左边:输入 handle(所有节点) */}
@@ -471,6 +473,21 @@ function NodeConfigEditor({ node, onChange }: { node: Node<WorkflowNodeData>; on
           <input value={cfg.value || ''} onChange={(e) => setCfg('value', e.target.value)} style={inp} />
         </>
       )}
+      {node.data.kind === 'DATA_UPDATE' && (
+        <>
+          <label style={lbl}>Collection</label>
+          <input value={cfg.collection || ''} onChange={(e) => setCfg('collection', e.target.value)} style={inp} />
+          <label style={lbl}>recordId(留空=触发事件的 recordId)</label>
+          <input value={cfg.recordId || ''} onChange={(e) => setCfg('recordId', e.target.value)} style={inp} />
+          <label style={lbl}>data(JSON —— 要写入/合并的字段)</label>
+          <textarea
+            value={cfg.data || ''}
+            onChange={(e) => setCfg('data', e.target.value)}
+            style={{ ...inp, height: 80, fontFamily: 'monospace', fontSize: 12 }}
+            placeholder='{"status": "approved"}'
+          />
+        </>
+      )}
       {node.data.kind === 'APPROVAL' && (
         <p style={{ color: '#64748b', fontSize: 13 }}>(审批节点使用当前用户作为审批人,无配置项)</p>
       )}
@@ -482,6 +499,7 @@ function defaultConfig(kind: NodeKind): Record<string, string> {
   if (kind === 'NOTIFICATION') return { title: '通知', message: '' };
   if (kind === 'HTTP') return { method: 'GET', url: '' };
   if (kind === 'CONDITION') return { field: '', op: 'eq', value: '' };
+  if (kind === 'DATA_UPDATE') return { collection: '', recordId: '', data: '' };
   return {};
 }
 
