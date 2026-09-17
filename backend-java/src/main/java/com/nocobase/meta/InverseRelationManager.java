@@ -121,7 +121,10 @@ public class InverseRelationManager {
                         KEY_INVERSE_OF, addedField.name(),
                         KEY_INVERSE_SOURCE, sourceMeta.getName(),
                         KEY_AUTO_MANAGED, true
-                )
+                ),
+                false, // primaryKey
+                false, // unique
+                null   // defaultValue
         );
 
         // 追加到 target

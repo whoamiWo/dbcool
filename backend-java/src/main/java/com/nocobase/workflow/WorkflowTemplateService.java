@@ -67,7 +67,11 @@ public class WorkflowTemplateService {
                                 (String) f.get("type"),
                                 false,
                                 (String) f.get("label"),
-                                null))
+                                null,
+                                false, // primaryKey
+                                false, // unique
+                                null   // defaultValue
+                        ))
                         .toList();
                 collectionService.create(c.name(), c.title(), c.description(),
                         fields, tenantId, installedBy);

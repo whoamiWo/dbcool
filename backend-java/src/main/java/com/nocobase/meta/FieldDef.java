@@ -18,14 +18,22 @@ import java.util.Map;
  * 用户定义的"动态字段"存到 JSONB 的 extra 字段里.
  *
  * <p>attachment 字段的物理列映射: TEXT(存文件 key 或 JSON 元数据,Week 41 D1)。
+ *
+ * <p>US-003:新增 primaryKey / unique / defaultValue 三个约束字段。
+ * 为保持向后兼容,保留 5 参数便捷构造器(缺省 primaryKey=false, unique=false, defaultValue=null),
+ * 既有调用方(含大量测试)无需修改。
  */
 public record FieldDef(
         String name,
         String type,
         boolean required,
         String label,
-        Map<String, Object> options
+        Map<String, Object> options,
+        boolean primaryKey,
+        boolean unique,
+        String defaultValue
 ) {
+    /** Canonical 构造器(8 参数) — 含字段合法性校验。 */
     public FieldDef {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("field.name 不能为空");
@@ -38,6 +46,15 @@ public record FieldDef(
         }
     }
 
+    /**
+     * 5 参数便捷构造器(兼容既有调用):缺省 primaryKey=false, unique=false, defaultValue=null。
+     * 委托给 canonical 构造器,校验逻辑一致生效。
+     */
+    public FieldDef(String name, String type, boolean required, String label, Map<String, Object> options) {
+        this(name, type, required, label, options, false, false, null);
+    }
+
+    /** 验证字段类型是否合法。 */
     public static boolean isValidType(String type) {
         return switch (type) {
             // 基础
@@ -52,5 +69,10 @@ public record FieldDef(
             case "attachment" -> true;
             default -> false;
         };
+    }
+
+    /** 静态工厂:等价 5 参数构造器,供偏好静态风格处使用。 */
+    public static FieldDef of(String name, String type, boolean required, String label, Map<String, Object> options) {
+        return new FieldDef(name, type, required, label, options);
     }
 }

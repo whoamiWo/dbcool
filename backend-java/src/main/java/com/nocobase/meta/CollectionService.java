@@ -205,7 +205,7 @@ public class CollectionService {
         for (int i = 0; i < fields.size(); i++) {
             if (fields.get(i).name().equals(oldName)) {
                 FieldDef old = fields.get(i);
-                fields.set(i, new FieldDef(newName, old.type(), old.required(), old.label(), old.options()));
+                fields.set(i, new FieldDef(newName, old.type(), old.required(), old.label(), old.options(), old.primaryKey(), old.unique(), old.defaultValue()));
                 break;
             }
         }
