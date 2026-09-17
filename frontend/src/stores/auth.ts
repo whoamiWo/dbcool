@@ -13,6 +13,8 @@ interface AuthState {
   user: User | null;
   setAuth: (token: string, user: User) => void;
   clear: () => void;
+  /** US-504: 切换应用(租户) */
+  switchTenant: (tenantId: string) => void;
 }
 
 /**
@@ -33,6 +35,12 @@ export const useAuthStore = create<AuthState>()(
       clear: () => {
         localStorage.removeItem('nocobase_access_token');
         set({ accessToken: null, user: null });
+      },
+      /** US-504: 切换应用(租户) —— 仅更新 user.tenant_id, persist 中间件自动同步 localStorage */
+      switchTenant: (tenantId) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, tenant_id: tenantId } : null,
+        }));
       },
     }),
     {
