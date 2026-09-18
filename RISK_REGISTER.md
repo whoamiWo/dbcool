@@ -35,9 +35,9 @@
 |------|-----|
 | **风险等级** | 🟡 中 |
 | **影响范围** | 告警系统无数据来源 |
-| **根因** | `AlertStore` 游离 SQLite，生产代码零调用 |
-| **缓解策略** | 接入 Python `AlertStore` 替代空实现 |
-| **状态** | ⏳ 待处理 |
+| **根因** | `AlertStore` 游离 SQLite，生产代码零调用 —— **已于 Week 44 修正**：Java 端 `AlertBroadcaster` / `AlertController` 经构造函数注入调用；Python 端 `ai.py` 调用 `get_collector()` / `get_store()` |
+| **缓解策略** | 已接入生产代码（双栈调用） |
+| **状态** | ✅ 已修复 |
 
 ### TD-04: 插件 SPI 空壳
 
@@ -45,9 +45,9 @@
 |------|-----|
 | **风险等级** | 🟡 中 |
 | **影响范围** | 集成市场无法扩展 |
-| **根因** | ADR-008 揭示 0 生产调用，`PluginRegistry` 无实际实现 |
-| **缓解策略** | Phase 3 实现 OAuth2 SPI + 生命周期钩子 |
-| **状态** | ⏳ 待启动 |
+| **根因** | ADR-008 揭示 0 生产调用，`PluginRegistry` 无实际实现 —— **已于 Week 44 修正**:`IntegrationMarketService` 经构造函数注入调用 `snapshot()` / `get()` / `size()`，插件注册表已接入真实业务路径 |
+| **缓解策略** | 已接入：`IntegrationMarketService` 经构造函数注入调用 `snapshot()` / `get()` / `size()` |
+| **状态** | ✅ 已修复 |
 
 ### TD-05: 前端 MUI v5/v9 混用
 
@@ -95,8 +95,8 @@
 | **质量门禁** | mvn verify + tsc + vitest + build 全绿才能合并 | CI | 持续 |
 | **文档同步代码** | 每次提交更新对应 .md 文档 | 全员 | 持续 |
 | **Prime 三栈并行** | Phase 6 启动后 java/python/js 并行优化 | Cline + Prime | Phase 6 |
-| **告警数据源接入** | Python AlertStore 替代空实现 | Python | Week 5 |
-| **插件 SPI 实现** | OAuth2 SPI + 生命周期钩子 | 后端 | Week 6 |
+| **告警数据源接入** | ✅ 已完成 — Java `AlertBroadcaster`/`AlertController` + Python `ai.py` 双栈调用 | Python | 已完成 |
+| **插件 SPI 实现** | ✅ 已完成 — `IntegrationMarketService` 经构造函数注入调用 `PluginRegistry.snapshot()` | 后端 | 已完成 |
 
 ---
 
@@ -106,8 +106,8 @@
 |------|------|------|------|----------|
 | 混合 UI 策略技术债累积 | 高 | 中 | 🟡 中 | 记录 TECH_DEBT.md |
 | API Key 外部系统认证失效 | 高 | 高 | 🔴 高 | ✅ 已修复 |
-| 告警数据源缺失 | 中 | 中 | 🟡 中 | ⏳ 待处理 |
-| 插件 SPI 空壳 | 高 | 中 | 🟡 中 | ⏳ 待启动 |
+| 告警数据源缺失 | 中 | 中 | 🟡 中 | ✅ 已修复 |
+| 插件 SPI 空壳 | 高 | 中 | 🟡 中 | ✅ 已修复 |
 | MUI v5/v9 混用类型报错 | 中 | 中 | 🟡 中 | ⏳ 执行中 |
 | 钉钉审核延迟 | 中 | 高 | 🟡 中 | 预留缓冲时间 |
 | 单兵开发进度紧张 | 高 | 高 | 🟡 中 | 砍功能优先 |

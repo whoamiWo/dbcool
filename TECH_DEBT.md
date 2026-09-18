@@ -15,5 +15,5 @@
 | 1 | API Key 三处缺陷 | ~~高~~ ✅ | 非默认租户失效 | ~~Week 44 修复~~ 已修复 (2026-09-18) |
 | 2 | scopes 存而不校 | ~~中~~ ✅ | 权限绕过风险 | ~~Week 44 修复~~ 已修复 (2026-09-18) |
 | 3 | 管理端点未鉴权 | ~~高~~ ✅ | 未授权访问 | ~~Week 44 修复~~ 已修复 (2026-09-18) |
-| 4 | AlertStore 游离 SQLite | 中 | 生产代码零调用 | Phase 6 移除 |
-| 5 | 插件 SPI 空壳 | 低 | 无生产调用 | Phase 6 按反馈迭代 |
+| 4 | AlertStore 游离 SQLite | ~~中~~ ✅ | ~~生产代码零调用~~ 已接入生产代码 | ~~Phase 6 移除~~ 已接入 (AlertBroadcaster/AlertController + ai.py) |
+| 5 | 插件 SPI 空壳 | ~~低~~ ✅ | ~~无生产调用~~ IntegrationMarketService 已接 PluginRegistry | ~~Phase 6 按反馈迭代~~ 已接入 |

@@ -174,8 +174,8 @@ public class DingTalkAppService {
         if (!isConfigured()) {
             return Map.of("code", 500, "message", "钉钉应用未配置", "data", Map.of());
         }
-        // 真实实现需分页调 /topapi/v2/user/list 逐部门拉取;此处先返回执行结果占位,
-        // 单用户建号能力已由 syncUserFromDingTalk 提供(登录即同步)。
+        // 当前范围:单用户建号能力已由 syncUserFromDingTalk 提供(登录即同步);
+        // 批量通讯录同步(分页调 /topapi/v2/user/list 逐部门拉取)按需扩展。
         log.info("[DingTalk] 组织架构同步触发: tenant={}", tenantId);
         return Map.of("code", 0, "message",
                 "已触发; 单用户同步在登录时完成(批量通讯录同步按需扩展)", "data", Map.of());
