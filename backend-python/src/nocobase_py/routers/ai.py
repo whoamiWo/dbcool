@@ -230,6 +230,54 @@ async def store_stats(user: AuthUser = Depends(get_current_user)) -> dict:
         return {"error": str(e)}
 
 
+async def _invoke_llm(
+    model: str,
+    prompt: str,
+    max_tokens: int,
+    user_id: str,
+) -> tuple[str, int]:
+    """调用 LLM,返回 (响应文本, 消耗 token 数).
+
+    - 配置了 llm_api_key + llm_base_url → 真实调用(OpenAI 兼容 /chat/completions);
+    - 未配置 → 回退 simulated 响应(便于无密钥环境联调与既有测试)。
+
+    真实调用失败时异常向上抛,由调用方(Java AiAssistantService)降级处理。
+    """
+    s = get_settings()
+
+    if not (s.llm_api_key and s.llm_base_url):
+        estimated = min(max_tokens, len(prompt) // 4 + 100)
+        _quota.consume(user_id, tokens=estimated)
+        return f"[simulated] Model={model}, prompt_length={len(prompt)}", estimated
+
+    import httpx  # 延迟导入:未配置 LLM 时无需该依赖参与启动
+
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }
+    headers = {
+        "Authorization": f"Bearer {s.llm_api_key}",
+        "Content-Type": "application/json",
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            f"{s.llm_base_url.rstrip('/')}/chat/completions",
+            json=payload,
+            headers=headers,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    text = data["choices"][0]["message"]["content"]
+    used = data.get("usage", {}).get("total_tokens") or min(
+        max_tokens, len(prompt) // 4 + 100
+    )
+    _quota.consume(user_id, tokens=used)
+    return text, used
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     req: ChatRequest,
@@ -256,19 +304,21 @@ async def chat(
             quota=_quota.remaining(user.user_id),
         )
 
-    # 3. 模拟 LLM 调用(真实实现替换此处; 消耗预估 token)
-    estimated_tokens = min(req.max_tokens, len(req.prompt) // 4 + 100)
-    _quota.consume(user.user_id, tokens=estimated_tokens)
-
-    simulated_response = f"[simulated] Model={req.model}, prompt_length={len(req.prompt)}"
-    _llm_cache.put(model=req.model, prompt=req.prompt, response=simulated_response)
+    # 3. 调用 LLM(真实模型或 simulated 回退; 消耗 token 由 _invoke_llm 记账)
+    response_text, tokens_used = await _invoke_llm(
+        model=req.model,
+        prompt=req.prompt,
+        max_tokens=req.max_tokens,
+        user_id=user.user_id,
+    )
+    _llm_cache.put(model=req.model, prompt=req.prompt, response=response_text)
 
     return ChatResponse(
         model=req.model,
         prompt=req.prompt,
-        response=simulated_response,
+        response=response_text,
         cached=False,
-        tokens_used=estimated_tokens,
+        tokens_used=tokens_used,
         quota=_quota.remaining(user.user_id),
     )
 

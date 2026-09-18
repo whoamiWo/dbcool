@@ -38,6 +38,21 @@ public final class StompDestinations {
         return tenantPrefix(tenantId) + "alerts";
     }
 
+    /** 协同编辑广播 topic(多人同时编辑同一文档时接收增量)。 */
+    public static String collabTopic(String tenantId, String docId) {
+        return tenantPrefix(tenantId) + "collab." + docId;
+    }
+
+    /**
+     * 协同编辑客户端发送增量更新的应用目的地。
+     *
+     * <p>客户端 send 到 {@code /app/<...>.collab.<docId>.update},
+     * 服务端收到后广播至 {@link #collabTopic(String, String)}。
+     */
+    public static String collabUpdateApp(String tenantId, String docId) {
+        return APP_PREFIX + "/t-" + tenantId + ".collab." + docId + ".update";
+    }
+
     /** 用户私有队列(点对点推送,如提及/未读提醒)。 */
     public static String userQueue(String tenantId, UUID userId) {
         return "/queue/t-" + tenantId + ".user." + userId;

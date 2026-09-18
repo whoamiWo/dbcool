@@ -102,6 +102,56 @@ export function subscribeToAlerts(onAlert: (payload: string) => void): () => voi
 }
 
 /**
+ * 订阅协同编辑主题。
+ * destination:/topic/t-<tenantId>.collab.<docId>
+ */
+export function subscribeToCollab(
+  docId: string,
+  onUpdate: (payload: string) => void,
+): () => void {
+  const client = getStompClient();
+  const user = useAuthStore.getState().user;
+  const tenantId = user?.tenant_id ?? 'tenant_default';
+  const destination = `/topic/t-${tenantId}.collab.${docId}`;
+
+  let sub: StompSubscription | null = null;
+  if (client.connected) {
+    sub = client.subscribe(destination, (m) => onUpdate(m.body));
+  }
+  const entry = { destination, cb: onUpdate };
+  pendingSubs.push(entry);
+
+  return () => {
+    sub?.unsubscribe();
+    const i = pendingSubs.indexOf(entry);
+    if (i >= 0) pendingSubs.splice(i, 1);
+  };
+}
+
+/** 发送协同增量(Yjs update 的 Base64)到服务端广播。 */
+export function sendCollabUpdate(docId: string, updateBase64: string): void {
+  getStompClient().publish({
+    destination: '/app/collab/update',
+    body: JSON.stringify({ docId, update: updateBase64 }),
+  });
+}
+
+/** 加入/离开协作房间(用于在线协作者展示)。 */
+export function sendCollabJoin(docId: string): void {
+  getStompClient().publish({
+    destination: '/app/collab/join',
+    body: JSON.stringify({ docId }),
+  });
+}
+
+export function sendCollabLeave(docId: string): void {
+  getStompClient().publish({
+    destination: '/app/collab/leave',
+    body: JSON.stringify({ docId }),
+  });
+}
+
+/**
  * 断开 STOMP 连接(登出时调用,避免旧 token 连接残留)。
  * 即使未连接也清引用与待订阅队列。
  */

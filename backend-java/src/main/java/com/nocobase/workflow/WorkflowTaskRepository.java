@@ -11,6 +11,7 @@ public interface WorkflowTaskRepository extends JpaRepository<WorkflowTaskEntity
     List<WorkflowTaskEntity> findByInstanceId(UUID instanceId);
     List<WorkflowTaskEntity> findByAssigneeAndStatus(UUID assignee, WorkflowTaskEntity.Status status);
     Optional<WorkflowTaskEntity> findByIdAndInstanceId(UUID id, UUID instanceId);
+    List<WorkflowTaskEntity> findByInstanceIdAndStatus(UUID instanceId, WorkflowTaskEntity.Status status);
 
     /**
      * 同一实例、同一节点下仍处于 PENDING 的任务(Week 41 复核 D4b.5 会签)。

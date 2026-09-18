@@ -109,8 +109,14 @@ public class ApiKeyService {
             e = direct.get();
         } else {
             // prefix 检索(应该 0 或 1 命中,极少)
-            List<ApiKeyEntity> candidates = repository
-                    .findByKeyPrefixAndTenantIdAndRevokedAtIsNull(prefix, tenantId);
+            List<ApiKeyEntity> candidates;
+            if (tenantId == null || tenantId.isBlank()) {
+                // 无 tenant 上下文:全库按 prefix 检索候选,再 hash 比对定位
+                candidates = repository.findByKeyPrefixAndRevokedAtIsNull(prefix);
+            } else {
+                candidates = repository
+                        .findByKeyPrefixAndTenantIdAndRevokedAtIsNull(prefix, tenantId);
+            }
             e = candidates.stream()
                     .filter(c -> hash.equals(c.getKeyHash()))
                     .findFirst()
@@ -118,7 +124,10 @@ public class ApiKeyService {
             if (e == null) return Optional.empty();
         }
 
-        if (!e.getTenantId().equals(tenantId)) return Optional.empty();
+        // tenant 一致性检查:tenantId 非空时严格比对;为 null 时跳过(外部系统不带 tenant 上下文)
+        if (tenantId != null && !tenantId.isBlank() && !e.getTenantId().equals(tenantId)) {
+            return Optional.empty();
+        }
         if (!e.isValid(Instant.now())) return Optional.empty();
 
         e.setLastUsedAt(Instant.now());

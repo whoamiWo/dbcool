@@ -86,6 +86,42 @@ const AlertCenterPage = lazy(() =>
 const ImChatPage = lazy(() =>
   import('./features/im/ImLayout').then(m => ({ default: m.ImChatPage } as { default: React.ComponentType })),
 );
+const KnowledgeBaseListPage = lazy(() =>
+  import('./pages/wiki/KnowledgeBaseList').then(m => ({ default: m.KnowledgeBaseListPage } as { default: React.ComponentType })),
+);
+const WikiPageListPage = lazy(() =>
+  import('./pages/wiki/WikiPageList').then(m => ({ default: m.WikiPageListPage } as { default: React.ComponentType })),
+);
+const WikiPageReadPage = lazy(() =>
+  import('./pages/wiki/WikiPageRead').then(m => ({ default: m.WikiPageReadPage } as { default: React.ComponentType })),
+);
+const WikiPageEditPage = lazy(() =>
+  import('./pages/wiki/WikiPageEdit').then(m => ({ default: m.WikiPageEditPage } as { default: React.ComponentType })),
+);
+const WikiVersionHistoryPage = lazy(() =>
+  import('./pages/wiki/WikiVersionHistory').then(m => ({ default: m.WikiVersionHistoryPage } as { default: React.ComponentType })),
+);
+const WikiSearchPage = lazy(() =>
+  import('./pages/wiki/WikiSearch').then(m => ({ default: m.WikiSearchPage } as { default: React.ComponentType })),
+);
+const WikiCategoryManagementPage = lazy(() =>
+  import('./pages/wiki/WikiCategoryManagement').then(m => ({ default: m.WikiCategoryManagementPage } as { default: React.ComponentType })),
+);
+const BiReportPage = lazy(() =>
+  import('./features/bi/BiReportPage').then(m => ({ default: m.default } as { default: React.ComponentType })),
+);
+const ProjectPage = lazy(() =>
+  import('./features/project/ProjectPage').then(m => ({ default: m.default } as { default: React.ComponentType })),
+);
+const CollabPage = lazy(() =>
+  import('./features/realtime/CollabPage').then(m => ({ default: m.default } as { default: React.ComponentType })),
+);
+const WorkbenchPage = lazy(() =>
+  import('./pages/Workbench').then(m => ({ default: m.default } as { default: React.ComponentType })),
+);
+const DingTalkPage = lazy(() =>
+  import('./pages/dingtalk/DingTalkPage').then(m => ({ default: m.DingTalkPage } as { default: React.ComponentType })),
+);
 
 /** R12 懒加载占位 */
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -98,7 +134,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: <Navigate to="/home" replace /> },
+      { index: true, element: <Navigate to="/workbench" replace /> },
       { path: 'home', element: <HomePage /> },
 
       // Schema
@@ -136,8 +172,22 @@ export const router = createBrowserRouter([
       { path: 'views/:id/run', element: <Lazy><TableViewPage /></Lazy> },
       { path: 'views/:id/kanban', element: <Lazy><KanbanViewPage /></Lazy> },
       { path: 'views/:id/detail/:recordId', element: <Lazy><DetailViewPage /></Lazy> },
+      { path: 'workbench', element: <Lazy><WorkbenchPage /></Lazy> },
       { path: 'im', element: <Lazy><ImChatPage /></Lazy> },
       { path: 'im/:channelId', element: <Lazy><ImChatPage /></Lazy> },
+
+      // Wiki
+      { path: 'wiki/kb', element: <Lazy><KnowledgeBaseListPage /></Lazy> },
+      { path: 'wiki/kb/:id', element: <Lazy><WikiPageListPage /></Lazy> },
+      { path: 'wiki/:slug', element: <Lazy><WikiPageReadPage /></Lazy> },
+      { path: 'wiki/:slug/edit', element: <Lazy><WikiPageEditPage /></Lazy> },
+      { path: 'wiki/:slug/versions', element: <Lazy><WikiVersionHistoryPage /></Lazy> },
+      { path: 'wiki/search', element: <Lazy><WikiSearchPage /></Lazy> },
+      { path: 'wiki/kb/:kbId/categories', element: <Lazy><WikiCategoryManagementPage /></Lazy> },
+      { path: 'bi', element: <Lazy><BiReportPage /></Lazy> },
+      { path: 'projects', element: <Lazy><ProjectPage /></Lazy> },
+      { path: 'collab/:docId', element: <Lazy><CollabPage /></Lazy> },
+      { path: 'dingtalk', element: <Lazy><DingTalkPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

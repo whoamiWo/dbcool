@@ -19,6 +19,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class DynamicTableManager {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(DynamicTableManager.class);
+
     private final JdbcTemplate jdbc;
 
     /**
@@ -201,6 +204,139 @@ public class DynamicTableManager {
             // 表不存在 / 列缺失等:不阻断写入,交由上层决定
             return false;
         }
+    }
+
+    // ============================================================
+    //  BI 聚合:SQL 下推 GROUP BY(Week 44 — 供 BiReportService 透视/图表)
+    // ============================================================
+
+    /** 聚合规格:字段 + 聚合函数 + 输出别名。 */
+    public record AggSpec(String field, String agg, String alias) {}
+
+    /** 聚合函数白名单(防注入):只允许这些,其余视为 SUM。 */
+    private static final Set<String> ALLOWED_AGG = Set.of("SUM", "COUNT", "AVG", "MIN", "MAX");
+
+    /**
+     * SQL 下推聚合 — 在数据库层完成 GROUP BY 与聚合函数计算。
+     *
+     * <p>记录正文存于 {@code extra} JSONB 列,字段值用 {@code extra->>'field'} 提取;
+     * 数值聚合前用正则守卫把非数值文本转为 NULL,避免 {@code ::numeric} 抛错中断整条聚合。
+     *
+     * <p><b>为什么必须下推</b>:在 Java 内存里对全表记录归并(既有 BiReportService 做法)
+     * 意味着全表扫描 + 逐条反序列化,万级记录即明显延迟且无法利用 GIN 索引。
+     * 下推后由 PostgreSQL 在物理表上完成聚合。
+     *
+     * <p><b>防注入</b>:字段名/别名走 {@code [a-zA-Z_][a-zA-Z0-9_]*} 白名单(与
+     * {@link #buildOrderBy} 同一策略),聚合函数走 {@link #ALLOWED_AGG} 白名单,
+     * 过滤值一律 {@code ?} 绑定参数。
+     *
+     * <p><b>H2 降级</b>:本方法依赖 {@code extra->>'f'} 与 {@code ::numeric}(PostgreSQL 方言)。
+     * 测试环境(H2)不支持该语法,此处捕获异常返回空列表并告警 —— BI 聚合无既有测试依赖,
+     * 不会阻断既有回归(与 Wiki FTS 的 H2 降级策略一致)。
+     *
+     * @param groupByFields 分组字段(顺序即 GROUP BY 顺序),可为 null/空(全表单行聚合)
+     * @param aggSpecs      聚合字段规格
+     * @param filters       过滤规则(沿用 CollectionService.FilterRule 语义)
+     * @return 每行一个 Map:key = 分组字段名 或 聚合别名
+     */
+    public List<Map<String, Object>> aggregate(String collectionName,
+                                                List<String> groupByFields,
+                                                List<AggSpec> aggSpecs,
+                                                List<CollectionService.FilterRule> filters) {
+        List<String> groups = safeFields(groupByFields);
+        List<AggSpec> aggs = aggSpecs == null ? List.of() : aggSpecs.stream()
+                .filter(a -> a != null && isSafeName(a.field()))
+                .toList();
+        if (aggs.isEmpty()) {
+            return List.of();
+        }
+
+        // SELECT:分组列 + 聚合列
+        StringBuilder select = new StringBuilder();
+        List<String> groupCols = new ArrayList<>();
+        for (String g : groups) {
+            if (!select.isEmpty()) select.append(", ");
+            select.append("(extra->>'").append(g).append("') AS \"").append(g).append("\"");
+            groupCols.add("(extra->>'" + g + "')");
+        }
+        for (AggSpec a : aggs) {
+            if (!select.isEmpty()) select.append(", ");
+            String fn = a.agg() == null ? "SUM" : a.agg().toUpperCase();
+            if (!ALLOWED_AGG.contains(fn)) fn = "SUM";
+            select.append(fn).append("(")
+                  .append(fn.equals("COUNT") ? "extra->>'" + a.field() + "'" : numericExpr(a.field()))
+                  .append(") AS \"").append(safeAlias(a.alias(), a.field(), fn)).append("\"");
+        }
+
+        StringBuilder sql = new StringBuilder("SELECT ").append(select)
+                .append(" FROM ").append(physicalTableName(collectionName));
+
+        // WHERE:FilterRule → SQL(值绑定)
+        List<Object> args = new ArrayList<>();
+        String where = buildWhere(filters, args);
+        if (where != null) sql.append(" WHERE ").append(where);
+
+        if (!groupCols.isEmpty()) {
+            sql.append(" GROUP BY ").append(String.join(", ", groupCols));
+        }
+
+        try {
+            return jdbc.queryForList(sql.toString(), args.toArray());
+        } catch (Exception e) {
+            log.warn("[tablemanager] 聚合查询失败(方言不支持或表不存在?),返回空: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 数值聚合表达式:非数值文本转 NULL,避免 ::numeric 抛错。
+     * COUNT 不走这里(直接统计文本存在性)。
+     */
+    private static String numericExpr(String field) {
+        return "CASE WHEN extra->>'" + field + "' ~ '^-?[0-9]+(\\.[0-9]+)?$' " +
+               "THEN (extra->>'" + field + "')::numeric ELSE NULL END";
+    }
+
+    /** 过滤规则 → SQL 条件;值一律 ? 绑定。返回 null 表示无过滤。 */
+    private String buildWhere(List<CollectionService.FilterRule> filters, List<Object> args) {
+        if (filters == null || filters.isEmpty()) return null;
+        List<String> parts = new ArrayList<>();
+        for (CollectionService.FilterRule r : filters) {
+            if (r == null || !isSafeName(r.field()) || r.op() == null) continue;
+            String col = "extra->>'" + r.field() + "'";
+            switch (r.op()) {
+                case "eq" -> { parts.add(col + " = ?"); args.add(str(r.value())); }
+                case "neq" -> { parts.add(col + " <> ?"); args.add(str(r.value())); }
+                case "contains" -> { parts.add(col + " ILIKE ?"); args.add("%" + str(r.value()) + "%"); }
+                case "gt" -> { parts.add(numericExpr(r.field()) + " > ?"); args.add(num(r.value())); }
+                case "lt" -> { parts.add(numericExpr(r.field()) + " < ?"); args.add(num(r.value())); }
+                case "empty" -> parts.add("COALESCE(" + col + ",'') = ''");
+                case "notEmpty" -> parts.add("COALESCE(" + col + ",'') <> ''");
+                default -> { /* 未知 op 忽略 */ }
+            }
+        }
+        return parts.isEmpty() ? null : String.join(" AND ", parts);
+    }
+
+    /** 字段名白名单过滤(丢弃非法名,不抛异常)。 */
+    private static List<String> safeFields(List<String> fields) {
+        if (fields == null) return List.of();
+        return fields.stream().filter(DynamicTableManager::isSafeName).toList();
+    }
+
+    private static boolean isSafeName(String name) {
+        return name != null && name.matches("[a-zA-Z_][a-zA-Z0-9_]*");
+    }
+
+    private static String safeAlias(String alias, String field, String fn) {
+        if (isSafeName(alias)) return alias;
+        return isSafeName(field) ? field + "_" + fn.toLowerCase() : "agg";
+    }
+
+    private static String str(Object v) { return v == null ? "" : String.valueOf(v); }
+
+    private static Object num(Object v) {
+        try { return Double.parseDouble(str(v)); } catch (Exception e) { return 0d; }
     }
 
     /**

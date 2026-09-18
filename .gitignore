@@ -44,6 +44,7 @@ backend-python/*.egg-info/
 backend-python/.uv-cache/
 
 # Node
+/node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/build/

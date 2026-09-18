@@ -369,6 +369,24 @@ public class CollectionService {
     public record FilterRule(String field, String op, Object value) {}
 
     /**
+     * Week 44:BI 聚合通道 — SQL 下推 GROUP BY(供 BiReportService 透视/图表)。
+     *
+     * <p>聚合由 PostgreSQL 在 {@code data_<collection>} 物理表上完成,
+     * 而非把全量记录拉到 Java 内存里归并 —— 后者万级记录即明显延迟且无法利用 GIN 索引。
+     * 先做租户归属校验(与 listRecords 一致),再委托 DynamicTableManager 执行下推。
+     */
+    public List<Map<String, Object>> aggregate(String collectionName, String tenantId,
+                                               List<String> groupByFields,
+                                               List<DynamicTableManager.AggSpec> aggSpecs,
+                                               List<FilterRule> filters) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        return tableManager.aggregate(collectionName, groupByFields, aggSpecs, filters);
+    }
+
+    /**
      * Week 41 复核 D1.3:对 formula 字段求值。
      *
      * <p>{@code formula} 此前只有类型名、物理列映射为 TEXT —— 存进去是纯文本,

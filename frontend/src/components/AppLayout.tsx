@@ -1,14 +1,26 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useMediaQuery } from '@mui/material';
 import { useAuthStore } from '@/stores/auth';
 import { disconnectStomp } from '@/lib/stompClient';
 
+
+/** 移动端底部导航 — 固定 5 个高频入口。 */
+const MOBILE_BOTTOM_NAV = [
+  { path: '/workbench', label: '工作台', icon: '🏠' },
+  { path: '/im', label: '消息', icon: '💬' },
+  { path: '/wiki/kb', label: '知识库', icon: '📚' },
+  { path: '/projects', label: '项目', icon: '📋' },
+  { path: '/profile', label: '我的', icon: '👤' },
+];
 
 export function AppLayout() {
   const { user, clear, switchTenant } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [switching, setSwitching] = useState(false);
+  // 响应式:768px 以下切换为移动端底部导航,顶部导航收起
+  const isMobile = useMediaQuery('(max-width:768px)');
 
   const handleLogout = () => {
     disconnectStomp(); // 先断开 WS,避免旧 token 连接残留
@@ -124,9 +136,37 @@ export function AppLayout() {
           </button>
         </div>
       </header>
-      <main style={{ flex: 1, padding: 24, background: '#f8fafc' }}>
+      <main style={{ flex: 1, padding: isMobile ? 12 : 24, background: '#f8fafc', paddingBottom: isMobile ? 72 : 24 }}>
         <Outlet />
       </main>
+
+      {/* 移动端底部导航 (768px 以下) */}
+      {isMobile && (
+        <nav style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+          display: 'flex', justifyContent: 'space-around', alignItems: 'center',
+          background: '#1e293b', color: 'white', padding: '6px 0',
+          borderTop: '1px solid #334155',
+        }}>
+          {MOBILE_BOTTOM_NAV.map((item) => {
+            const active = location.pathname.startsWith(item.path);
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                style={{
+                  flex: 1, background: 'none', border: 'none', color: active ? '#60a5fa' : '#94a3b8',
+                  cursor: 'pointer', padding: '4px 0', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 2, fontSize: 10, fontWeight: active ? 600 : 400,
+                }}
+              >
+                <span style={{ fontSize: 20 }}>{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {/* US-504: 应用切换弹窗 */}
       {switching && user && (

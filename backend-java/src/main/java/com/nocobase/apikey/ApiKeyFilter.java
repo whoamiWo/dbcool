@@ -54,10 +54,12 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 从 TenantContext 取当前 tenantId(必须先经过 JWT 设置)
-        // 但本过滤器在 JWT 之前 — 改用请求路径无法获取 tenant,留 null
-        // 实际 service.validate 内部会做 tenant 一致性检查
-        String tenantId = TenantContext.currentTenantId();
+        // 优先从 X-Tenant-ID header 取 tenantId(外部系统调用不带 JWT);
+        // 若无则回退到 TenantContext(若已由前置过滤器设置)。
+        String tenantId = request.getHeader("X-Tenant-ID");
+        if (tenantId == null || tenantId.isBlank()) {
+            tenantId = TenantContext.currentTenantId();
+        }
 
         try {
             Optional<ApiKeyEntity> opt = apiKeyService.validate(header.trim(), tenantId);
@@ -68,14 +70,26 @@ public class ApiKeyFilter extends OncePerRequestFilter {
                         "apikey:" + key.getKeyPrefix(),
                         key.getTenantId()
                 );
+                // scopes 转为 GrantedAuthority:每个 scope → SCOPE_{scope}(如 SCOPE_read:posts)
+                // 这样 @PreAuthorize("@apiKeyService.hasScope(...)") 或 hasAuthority('SCOPE_...')
+                // 可在受保护端点上做细粒度授权
+                List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+                authorities.add(new SimpleGrantedAuthority("ROLE_API"));
+                if (key.getScopes() != null && !key.getScopes().isBlank()) {
+                    for (String scope : key.getScopes().split(",")) {
+                        String trimmed = scope.trim();
+                        if (!trimmed.isEmpty()) {
+                            authorities.add(new SimpleGrantedAuthority("SCOPE_" + trimmed));
+                        }
+                    }
+                }
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         principal,
                         null,
-                        List.of(new SimpleGrantedAuthority("ROLE_API"))
+                        authorities
                 );
                 SecurityContextHolder.getContext().setAuthentication(auth);
-                // Week 42 D5.2: API Key 内含 tenantId,绑定到 TenantContext
-                // 即使 JWT 失败也能保证 schema 路由正确
+                // 绑定 tenantId,保证后续 schema 路由正确
                 TenantContext.set(key.getTenantId());
             }
             // else: 不抛 — 留给后续 JWT / 认证入口

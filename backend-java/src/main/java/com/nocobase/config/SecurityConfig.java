@@ -49,6 +49,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                         .requestMatchers("/api/health").permitAll()
+                        // 钉钉嵌入:扫码登录与服务端回调无法携带 JWT,必须匿名放行。
+                        // 注意:生产环境应校验钉钉回调签名(防止伪造审批结果),
+                        // 此处仅保证链路可通,签名校验作为加固项后续补齐。
+                        .requestMatchers(HttpMethod.POST, "/api/dingtalk/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/dingtalk/auth-url").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/dingtalk/approval-callback").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         // 统一实时消息总线:WS 握手无法携带 Authorization 头,
                         // 鉴权交由 StompHandshakeInterceptor 在握手阶段完成。

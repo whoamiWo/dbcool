@@ -13,6 +13,9 @@ public interface ApiKeyRepository extends JpaRepository<ApiKeyEntity, UUID> {
      *  真正的匹配在 service 层做 hash 比较(防止 prefix collision 误判)。 */
     List<ApiKeyEntity> findByKeyPrefixAndTenantIdAndRevokedAtIsNull(String keyPrefix, String tenantId);
 
+    /** 无 tenant 上下文时:全库按 keyPrefix 检索候选(Week 44 D1 修复)。 */
+    List<ApiKeyEntity> findByKeyPrefixAndRevokedAtIsNull(String keyPrefix);
+
     /** 通过 hash 查(主键查 — O(1) if no collision)。 */
     Optional<ApiKeyEntity> findByKeyHash(String keyHash);
 

@@ -6,6 +6,7 @@ import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.event.RecordChangeEvent;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -17,9 +18,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -37,6 +40,8 @@ public class WikiController {
     private final WikiCategoryService categoryService;
     private final WikiSearchService searchService;
     private final AclEnforcer aclEnforcer;
+    private final WikiPermissionService permissionService;
+    private final WikiAttachmentService attachmentService;
     private final AuditService auditService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -46,6 +51,8 @@ public class WikiController {
             WikiCategoryService categoryService,
             WikiSearchService searchService,
             AclEnforcer aclEnforcer,
+            WikiPermissionService permissionService,
+            WikiAttachmentService attachmentService,
             AuditService auditService,
             ApplicationEventPublisher eventPublisher
     ) {
@@ -54,6 +61,8 @@ public class WikiController {
         this.categoryService = categoryService;
         this.searchService = searchService;
         this.aclEnforcer = aclEnforcer;
+        this.permissionService = permissionService;
+        this.attachmentService = attachmentService;
         this.auditService = auditService;
         this.eventPublisher = eventPublisher;
     }

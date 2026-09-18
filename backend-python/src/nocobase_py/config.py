@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     llm_monthly_call_limit: int = 2000
     llm_monthly_token_limit: int = 1_000_000
 
+    # LLM provider(OpenAI 兼容协议: OpenAI / DeepSeek / 通义 / 本地 Ollama 等)
+    # 配置 llm_api_key + llm_base_url 后 /api/ai/chat 走真实模型;
+    # 未配置时回退为 simulated 响应(便于无密钥环境联调)。
+    llm_api_key: str = ""
+    llm_base_url: str = ""
+    llm_model: str = "gpt-4o"
+
     # R15: 插件热加载目录
     plugins_dir: str = "plugins"
 

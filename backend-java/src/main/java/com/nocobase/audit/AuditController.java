@@ -4,13 +4,14 @@ import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 审计日志查询端点 — admin 角色可看全量. */
+/** 审计日志查询端点 — admin 角色可看全量(Week 44 D1 修复:原无鉴权,任何已认证用户可读)。 */
 @RestController
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Audit", description = "审计日志")
 @RequestMapping("/api/audit")
@@ -23,6 +24,7 @@ public class AuditController {
     }
 
     @GetMapping("/logs")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> list(
             @RequestParam(required = false) String resource,
             @RequestParam(required = false) String action,

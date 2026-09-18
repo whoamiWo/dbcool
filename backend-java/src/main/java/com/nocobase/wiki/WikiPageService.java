@@ -2,6 +2,8 @@ package com.nocobase.wiki;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -10,13 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * 文档页面服务 — CRUD + 版本管理 + 发布/归档。
+ * 文档页面服务 — CRUD + 版本管理 + 发布/归档 + 权限过滤。
  *
  * <p>状态流转: DRAFT → PUBLISHED → ARCHIVED
  * <ul>
  *   <li>每次更新自动创建版本记录</li>
  *   <li>发布时更新 content_html</li>
  *   <li>归档软删除(状态变更)</li>
+ *   <li>权限过滤: 复用 ACL 系统实现字段级/记录级控制</li>
  * </ul>
  */
 @Service
@@ -25,16 +28,19 @@ public class WikiPageService {
     private final WikiPageRepository pageRepository;
     private final WikiVersionRepository versionRepository;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final WikiPermissionService permissionService;
 
     @Autowired
     public WikiPageService(
             WikiPageRepository pageRepository,
             WikiVersionRepository versionRepository,
-            KnowledgeBaseService knowledgeBaseService
+            KnowledgeBaseService knowledgeBaseService,
+            WikiPermissionService permissionService
     ) {
         this.pageRepository = pageRepository;
         this.versionRepository = versionRepository;
         this.knowledgeBaseService = knowledgeBaseService;
+        this.permissionService = permissionService;
     }
 
     @Transactional
@@ -91,6 +97,10 @@ public class WikiPageService {
             UUID id, String title, String content, String slug, UUID updatedBy, String tenantId
     ) {
         WikiPageEntity entity = get(id);
+        // 记录级权限检查: 确认操作用户有权修改该页面
+        permissionService.assertPagePermission(updatedBy, tenantId, entity.getId(), 
+                WikiPermissionService.Action.UPDATE);
+        
         if (!entity.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权修改该页面");
         }
@@ -118,6 +128,8 @@ public class WikiPageService {
     @Transactional
     public void delete(UUID id, String tenantId) {
         WikiPageEntity entity = get(id);
+        permissionService.assertPagePermission(entity.getUpdatedBy(), tenantId, entity.getId(), 
+                WikiPermissionService.Action.DELETE);
         if (!entity.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除该页面");
         }
@@ -127,6 +139,8 @@ public class WikiPageService {
     @Transactional
     public WikiPageEntity publish(UUID id, UUID updatedBy, String tenantId) {
         WikiPageEntity entity = get(id);
+        permissionService.assertPagePermission(updatedBy, tenantId, entity.getId(), 
+                WikiPermissionService.Action.UPDATE);
         if (!entity.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权发布该页面");
         }
@@ -139,6 +153,8 @@ public class WikiPageService {
     @Transactional
     public WikiPageEntity archive(UUID id, UUID updatedBy, String tenantId) {
         WikiPageEntity entity = get(id);
+        permissionService.assertPagePermission(updatedBy, tenantId, entity.getId(), 
+                WikiPermissionService.Action.UPDATE);
         if (!entity.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权归档该页面");
         }
@@ -182,5 +198,16 @@ public class WikiPageService {
         page.setUpdatedBy(updatedBy);
         page.setUpdatedAt(Instant.now());
         return pageRepository.save(page);
+    }
+
+    /** 过滤页面 DTO 的可写字段（根据 ACL FIELD policy） */
+    public Set<String> filterWritableFields(UUID userId, String tenantId, UUID pageId) {
+        return permissionService.filterWritableFields(userId, tenantId, "wiki_page", 
+                WikiPermissionService.Action.UPDATE);
+    }
+
+    /** 过滤页面记录（隐藏不可读字段） */
+    public Map<String, Object> filterPageRecord(UUID userId, String tenantId, Map<String, Object> record) {
+        return permissionService.filterPageRecord(userId, tenantId, record);
     }
 }
