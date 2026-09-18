@@ -172,4 +172,53 @@ class ApiKeyServiceTest {
         assertThat(ApiKeyService.randomHex(32).length()).isEqualTo(32);
         assertThat(ApiKeyService.randomHex(16).length()).isEqualTo(16);
     }
+
+    @Test
+    void hasScope_returnsTrueWhenScopePresent() {
+        // 模拟 SecurityContext 中有 SCOPE_read:posts
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "principal", "creds",
+                java.util.List.of(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_API"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("SCOPE_read:posts"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("SCOPE_write:posts")
+                )
+        );
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+        try {
+            assertThat(service.hasScope("read:posts")).isTrue();
+            assertThat(service.hasScope("write:posts")).isTrue();
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void hasScope_returnsFalseWhenScopeMissing() {
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "principal", "creds",
+                java.util.List.of(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_API"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("SCOPE_read:posts")
+                )
+        );
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+        try {
+            assertThat(service.hasScope("write:posts")).isFalse();
+            assertThat(service.hasScope("admin")).isFalse();
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void hasScope_returnsTrueWhenNoAuthentication() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        try {
+            // 无认证上下文时,hasScope 返回 false(而非抛异常)
+            assertThat(service.hasScope("read:posts")).isFalse();
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
 }

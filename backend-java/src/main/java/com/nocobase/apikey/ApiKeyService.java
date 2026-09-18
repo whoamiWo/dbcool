@@ -180,4 +180,22 @@ public class ApiKeyService {
 
     /** 创建结果:rawKey 仅可见一次。 */
     public record CreatedKey(String rawKey, ApiKeyEntity entity) {}
+
+    /**
+     * 检查当前认证主体是否持有指定 scope(Week 44 D2 修复 — scopes 存而不校)。
+     *
+     * <p>供 {@code @PreAuthorize("@apiKeyService.hasScope('read:posts')")} 在受保护端点使用。
+     * scope 列表以逗号分隔存储,此处做子串匹配(逗号边界分隔)。
+     */
+    public boolean hasScope(String requiredScope) {
+        if (requiredScope == null || requiredScope.isBlank()) return true;
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        // 从 authorities 中提取 SCOPE_ 前缀的 scope
+        return auth.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .filter(a -> a.startsWith("SCOPE_"))
+                .map(a -> a.substring(6))
+                .anyMatch(s -> s.equals(requiredScope));
+    }
 }

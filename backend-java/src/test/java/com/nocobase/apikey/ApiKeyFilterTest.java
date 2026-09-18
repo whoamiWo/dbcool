@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -73,7 +74,7 @@ class ApiKeyFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        verify(service).validate(eq("ncb_invalid"), anyString());
+        verify(service).validate(eq("ncb_invalid"), isNull());
         verify(chain).doFilter(request, response);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
@@ -89,7 +90,7 @@ class ApiKeyFilterTest {
         e.setTenantId("acme");
         e.setCreatedBy(UUID.randomUUID());
         e.setCreatedAt(java.time.Instant.now());
-        when(service.validate(eq(rawKey), anyString())).thenReturn(Optional.of(e));
+        when(service.validate(eq(rawKey), isNull())).thenReturn(Optional.of(e));
         // 让 TenantContext.currentTenantId() 不抛 — 模拟请求已带 JWT tenant
         TenantContext.set("default-tenant");
 

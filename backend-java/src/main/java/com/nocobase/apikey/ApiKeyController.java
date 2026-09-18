@@ -43,6 +43,7 @@ public class ApiKeyController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody CreateKeyRequest req,
             @AuthenticationPrincipal AuthenticatedUser user
@@ -74,6 +75,7 @@ public class ApiKeyController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> revoke(@PathVariable UUID id) {
         boolean ok = service.revoke(id, TenantContext.currentTenantId());
         if (!ok) {

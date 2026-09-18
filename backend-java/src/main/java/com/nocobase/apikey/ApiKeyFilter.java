@@ -55,10 +55,11 @@ public class ApiKeyFilter extends OncePerRequestFilter {
         }
 
         // 优先从 X-Tenant-ID header 取 tenantId(外部系统调用不带 JWT);
-        // 若无则回退到 TenantContext(若已由前置过滤器设置)。
+        // 若未提供则不限制 tenant — API key 自身标识租户,validate() 会按 key 的 tenantId 匹配。
+        // 回退 TenantContext 会导致非默认租户 key 被错误过滤(Week 44 D1 修复)。
         String tenantId = request.getHeader("X-Tenant-ID");
         if (tenantId == null || tenantId.isBlank()) {
-            tenantId = TenantContext.currentTenantId();
+            tenantId = null;
         }
 
         try {
