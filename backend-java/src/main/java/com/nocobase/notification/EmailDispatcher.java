@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  * }</pre>
  *
  * <p>Week 41 复核 D5.1:此前<strong>即使配了 smtp_host 也只打一行日志</strong>,
- * 真实发送一直是 TODO。现补完 —— 按 channel 配置动态构建 {@code JavaMailSender},
+ * 真实发送一直是 TODO。现已补完 —— 按 channel 配置动态构建 {@code JavaMailSender},
  * 不依赖全局 {@code spring.mail.*} 配置(因为 SMTP 是按渠道动态配置的)。
  *
  * <p><strong>安全开关</strong>:真实投递需显式配置 {@code real_send = true}。

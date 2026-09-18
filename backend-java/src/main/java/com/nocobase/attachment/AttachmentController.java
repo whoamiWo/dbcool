@@ -22,16 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * 附件 API 契约(Week 41 D1.2).
+ * 附件 API 契约(Week 41 D1.2) + 文件存储(Week 42+ D1.4 MinIO 集成).
  *
- * <p>Week 41 范围 — 仅定义契约 + 校验,实际文件存储推迟到 D1.4:
+ * <p>已实现端点:
  * <ul>
- *   <li>POST /api/attachments/metadata — 创建附件元数据(返回 storageKey 占位)</li>
- *   <li>GET  /api/attachments/{storageKey} — 获取附件元数据(Week 41 返 501,提示 D1.4 未实现)</li>
- * </ul>
- *
- * <p>生产端点(Week 42+ D1.4 实现 MinIO 集成):
- * <ul>
+ *   <li>POST /api/attachments/metadata — 创建附件元数据(需提供 storageKey)</li>
+ *   <li>GET  /api/attachments/{storageKey} — 获取附件元数据(501,待扩展)</li>
  *   <li>POST /api/attachments/upload — multipart 上传 → MinIO → 返回 metadata</li>
  *   <li>GET  /api/attachments/{key}/download — 302 重定向到预签名 URL</li>
  * </ul>
@@ -50,8 +46,8 @@ public class AttachmentController {
     /**
      * 创建附件 metadata。
      *
-     * <p>Week 41 版本: 接收 metadata JSON → 校验 → 返同 metadata(实际文件存储 Week 42+)。
-     * 调用方需要先用某种 storage adapter 获得 storageKey,然后注册 metadata 到系统。
+     * <p>接收 metadata JSON → 校验 → 返回 metadata。
+     * 调用方可通过 /upload 端点先上传文件获得真实 storageKey,再注册 metadata。
      */
     @PostMapping("/metadata")
     public Map<String, Object> createMetadata(

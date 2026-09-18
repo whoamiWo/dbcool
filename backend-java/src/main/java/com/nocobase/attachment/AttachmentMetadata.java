@@ -11,7 +11,7 @@ import java.util.UUID;
  *
  * <p>字段:
  * <ul>
- *   <li>storageKey — 对象存储 key(如 MinIO bucket 路径) — Week 41 用简单字符串作占位</li>
+ *   <li>storageKey — 对象存储 key(如 MinIO bucket 路径),由 /upload 端点生成</li>
  *   <li>originalName — 上传时的原始文件名</li>
  *   <li>contentType — MIME type</li>
  *   <li>size — 字节数</li>
@@ -19,9 +19,8 @@ import java.util.UUID;
  *   <li>uploadedBy — 上传者 UUID</li>
  * </ul>
  *
- * <p>注意:Week 41 仅实现数据模型 + 校验,实际文件存储(S3/MinIO)推迟到 D1.4
- * (报告 C-R06)。本 Step G1 / D1.2 范围内,storageKey 是不可访问的占位值
- * (如 "placeholder-{uuid}"),用于 API 契约 + ACL 校验。
+ * <p>Week 41 仅实现数据模型 + 校验(storageKey 为占位值);Week 42+ D1.4 接入 MinIO 后,
+ * storageKey 由 /upload 端点生成真实对象存储路径,用于 ACL 校验与下载。
  */
 public record AttachmentMetadata(
         String storageKey,
