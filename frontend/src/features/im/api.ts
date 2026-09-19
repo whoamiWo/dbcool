@@ -217,15 +217,34 @@ export async function searchCrossChannel(keyword: string, limit = 20) {
   );
 }
 
-/** 文件上传 */
-export async function uploadAttachment(file: File, channelId: string) {
+/**
+ * 文件上传 → 真实端点 POST /api/attachments/upload（MinIO）。
+ *
+ * 断链修复：此前指向不存在的 /im/messages/attachments。
+ * 后端返回 storageKey，下载链接走 GET /api/attachments/{storageKey}/download（302 预签名 URL）。
+ */
+export async function uploadAttachment(file: File) {
   const fd = new FormData();
-  fd.append('file', file);
-  fd.append('channelId', channelId);
-  return apiClient.post<{ code: number; data: { url: string; filename: string; size: number } }>(
-    '/im/messages/attachments',
-    fd,
-  );
+  fd.append('file', file); // 后端 @RequestPart("file")
+  const res = await apiClient.post<{
+    code: number;
+    data: {
+      storageKey: string;
+      originalName: string;
+      contentType: string;
+      size: number;
+    };
+  }>('/attachments/upload', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return {
+    ...res,
+    data: {
+      ...res.data,
+      url: `/api/attachments/${res.data.storageKey}/download`,
+      filename: res.data.originalName,
+    },
+  };
 }
 
 /** Slash 命令 */

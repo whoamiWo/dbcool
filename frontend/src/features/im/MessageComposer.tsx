@@ -180,7 +180,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
         continue;
       }
       try {
-        const res = await uploadAttachment(file, channelId);
+        const res = await uploadAttachment(file);
         if (res.code === 0 && res.data?.url) {
           onAttachment?.(res.data.url, file.name, file.size);
         }
@@ -251,7 +251,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             onChange={(e) => {
               const files = Array.from(e.target.files || []);
               for (const file of files) {
-                uploadAttachment(file, channelId)
+                uploadAttachment(file)
                   .then((res) => {
                     if (res.code === 0 && res.data?.url) onAttachment?.(res.data.url, file.name, file.size);
                   })
