@@ -16,6 +16,9 @@ import {
   History as HistoryIcon,
   Home as HomeIcon,
 } from '@mui/icons-material';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { wikiApi } from '@/api/wiki';
 import type { WikiPage } from '@/types/wiki';
 
@@ -85,9 +88,52 @@ export function WikiPageReadPage() {
         <Divider sx={{ mb: 3 }} />
 
         <Box sx={{ mb: 4 }}>
-          <Typography variant="body1" component="div" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-            {page.content}
-          </Typography>
+          <Box
+            sx={{
+              '& h1': { fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0 0.5rem' },
+              '& h2': { fontSize: '1.5rem', fontWeight: 'bold', margin: '0.75rem 0 0.5rem' },
+              '& h3': { fontSize: '1.25rem', fontWeight: 'bold', margin: '0.5rem 0' },
+              '& p': { margin: '0.5rem 0', lineHeight: 1.8 },
+              '& ul': { paddingLeft: 2, margin: '0.5rem 0' },
+              '& ol': { paddingLeft: 2, margin: '0.5rem 0' },
+              '& li': { margin: '0.25rem 0' },
+              '& code': {
+                background: '#f5f5f5', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace',
+              },
+              '& pre': {
+                background: '#1e1e1e', padding: 1.5, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
+              },
+              '& blockquote': {
+                borderLeft: '4px solid #ccc', paddingLeft: 1, margin: 0.5, color: '#666',
+              },
+              '& table': { borderCollapse: 'collapse', width: '100%', margin: '0.5rem 0' },
+              '& th, &td': { border: '1px solid #ddd', padding: 8, textAlign: 'left' },
+              '& a': { color: '#1976d2' },
+            }}
+          >
+            <ReactMarkdown
+              components={{
+                code({ node, className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  const isInline = !match && !className;
+                  if (isInline) {
+                    return <code {...props}>{children}</code>;
+                  }
+                  return (
+                    <SyntaxHighlighter
+                      style={oneDark}
+                      language={match ? match[1] : 'text'}
+                      PreTag="div"
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  );
+                },
+              }}
+            >
+              {page.content}
+            </ReactMarkdown>
+          </Box>
         </Box>
 
         <Divider sx={{ mb: 3 }} />
