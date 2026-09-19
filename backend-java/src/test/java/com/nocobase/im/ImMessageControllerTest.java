@@ -26,6 +26,7 @@ class ImMessageControllerTest {
 
     private MessageService messageService;
     private ReactionService reactionService;
+    private PinService pinService;
     private ImMessageController controller;
 
     private final UUID userId = UUID.randomUUID();
@@ -36,7 +37,8 @@ class ImMessageControllerTest {
     void setUp() {
         messageService = mock(MessageService.class);
         reactionService = mock(ReactionService.class);
-        controller = new ImMessageController(messageService, reactionService);
+        pinService = mock(PinService.class);
+        controller = new ImMessageController(messageService, reactionService, pinService);
     }
 
     @Test

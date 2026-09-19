@@ -1,6 +1,7 @@
 package com.nocobase.wiki;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -209,5 +210,86 @@ public class WikiPageService {
     /** 过滤页面记录（隐藏不可读字段） */
     public Map<String, Object> filterPageRecord(UUID userId, String tenantId, Map<String, Object> record) {
         return permissionService.filterPageRecord(userId, tenantId, record);
+    }
+
+    // ============================================================
+    //  Notion 剩余能力（Week 46）
+    // ============================================================
+
+    /** 解析内容中的 [[页面名]] 双向链接，返回链接目标列表。 */
+    public List<String> parseBacklinks(String content) {
+        if (content == null) return List.of();
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\[\\[([^\\]]+)\\]\\]");
+        java.util.regex.Matcher m = p.matcher(content);
+        List<String> result = new ArrayList<>();
+        while (m.find()) result.add(m.group(1).trim());
+        return result;
+    }
+
+    /** 反向引用查询：找出所有引用了指定 slug 的页面。 */
+    public List<WikiPageEntity> listBacklinks(String slug, String tenantId) {
+        return pageRepository.listBacklinks("%[[" + slug + "]]%", tenantId);
+    }
+
+    /** 标记页面为模板。 */
+    @Transactional
+    public WikiPageEntity markTemplate(UUID id, boolean isTemplate) {
+        WikiPageEntity e = get(id);
+        e.setIsTemplate(isTemplate);
+        return pageRepository.save(e);
+    }
+
+    /** 列出所有模板页面。 */
+    public List<WikiPageEntity> listTemplates(String tenantId) {
+        return pageRepository.findByIsTemplateTrueAndTenantId(tenantId);
+    }
+
+    /** 从模板创建新页面。 */
+    @Transactional
+    public WikiPageEntity createFromTemplate(UUID templateId, UUID kbId, UUID parentId,
+                                             String title, String slug, UUID createdBy, String tenantId) {
+        WikiPageEntity tpl = get(templateId);
+        return create(kbId, parentId, title, slug, tpl.getContent(), createdBy, tenantId);
+    }
+
+    /** 软删除（进入回收站，30 天可恢复）。 */
+    @Transactional
+    public WikiPageEntity softDelete(UUID id) {
+        WikiPageEntity e = get(id);
+        e.setDeletedAt(Instant.now());
+        e.setStatus("TRASH");
+        return pageRepository.save(e);
+    }
+
+    /** 恢复软删除的页面。 */
+    @Transactional
+    public WikiPageEntity restore(UUID id) {
+        WikiPageEntity e = get(id);
+        e.setDeletedAt(null);
+        e.setStatus("DRAFT");
+        return pageRepository.save(e);
+    }
+
+    /** 列出回收站中的页面（按 deletedAt 降序）。 */
+    public List<WikiPageEntity> listTrash(String tenantId) {
+        return pageRepository.findByDeletedAtIsNotNullAndTenantIdOrderByDeletedAtDesc(tenantId);
+    }
+
+    /** 生成分享链接 token（免登录只读访问）。 */
+    @Transactional
+    public WikiPageEntity share(UUID id, boolean regenerate) {
+        WikiPageEntity e = get(id);
+        if (regenerate || e.getShareToken() == null) {
+            e.setShareToken(UUID.randomUUID().toString().substring(0, 32));
+        }
+        return pageRepository.save(e);
+    }
+
+    /** 撤销分享链接。 */
+    @Transactional
+    public WikiPageEntity unshare(UUID id) {
+        WikiPageEntity e = get(id);
+        e.setShareToken(null);
+        return pageRepository.save(e);
     }
 }

@@ -44,6 +44,15 @@ public class WorkflowTaskEntity {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    @Column(name = "title", length = 256)
+    private String title;
+
+    @Column(name = "due_at")
+    private Instant dueAt;
+
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder = 0;
+
     public WorkflowTaskEntity() {}
 
     public UUID getId() { return id; }
@@ -64,4 +73,10 @@ public class WorkflowTaskEntity {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getFinishedAt() { return finishedAt; }
     public void setFinishedAt(Instant finishedAt) { this.finishedAt = finishedAt; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public Instant getDueAt() { return dueAt; }
+    public void setDueAt(Instant dueAt) { this.dueAt = dueAt; }
+    public Integer getSortOrder() { return sortOrder; }
+    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
 }

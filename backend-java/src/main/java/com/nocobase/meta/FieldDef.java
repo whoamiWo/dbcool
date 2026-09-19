@@ -65,6 +65,8 @@ public record FieldDef(
             case "belongsTo", "hasMany" -> true;
             // 派生
             case "formula" -> true;
+            case "rollup" -> true;
+            case "lookup" -> true;
             // 文件 (Week 41 D1)
             case "attachment" -> true;
             default -> false;

@@ -3,11 +3,16 @@ package com.nocobase.meta;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.common.ExpressionEvaluator;
+import com.nocobase.meta.formula.FormulaEngine;
+import com.nocobase.meta.rollup.RollupEngine;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,10 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Collection 服务 — Week 7 扩展支持 update / addField / removeField.
+ * Collection 服务 — Week 7 扩展支持 update / addField / removeField。
+ *
+ * <p>Week 42:读取时计算 formula / rollup / lookup 派生字段。
  */
 @Service
 public class CollectionService {
+
+    private static final Logger log = LoggerFactory.getLogger(CollectionService.class);
 
     private final CollectionRepository repository;
     private final DynamicTableManager tableManager;
@@ -335,8 +344,10 @@ public class CollectionService {
                     .toList();
         }
         // Week 41 复核 D1.3:formula 求值;D2:关联字段展开(此前显示裸 UUID)
+        // Week 42:rollup/lookup 派生字段求值
         records.forEach(r -> {
             applyFormulas(fields, r);
+            applyRollupAndLookup(fields, r, tenantId);
             relationResolver.expandRelations(fields, r, tenantId);
         });
         return records;
@@ -403,12 +414,67 @@ public class CollectionService {
             Object expr = f.options().get("expression");
             if (!(expr instanceof String s) || s.isBlank()) continue;
             try {
-                record.put(f.name(), expressionEvaluator.evaluate(s, record));
+                // Phase 48:formula 字段改走 FormulaEngine(Airtable 方言,
+                // 支持 {field} 引用与 IF/CONCAT/LEFT/... 函数,委托 Aviator 求值)
+                record.put(f.name(), FormulaEngine.evaluate(s, record));
             } catch (UnsupportedOperationException e) {
                 // 不可变 Map(如解析失败时的 _raw 包装),跳过
                 return;
             }
         }
+    }
+
+    private void applyRollupAndLookup(List<FieldDef> fields, Map<String, Object> record, String tenantId) {
+        if (fields == null || fields.isEmpty() || record == null || record.isEmpty()) return;
+        for (FieldDef f : fields) {
+            if (f == null || f.options() == null) continue;
+            if ("rollup".equals(f.type())) {
+                try {
+                    String relationField = String.valueOf(f.options().get("relationField"));
+                    String targetField = String.valueOf(f.options().get("targetField"));
+                    String agg = String.valueOf(f.options().getOrDefault("agg", "SUM"));
+                    Object relatedRaw = record.get(relationField);
+                    if (relatedRaw == null) continue;
+                    List<Map<String, Object>> related = resolveRelatedRecords(relationField, relatedRaw, tenantId);
+                    if (related.isEmpty()) continue;
+                    record.put(f.name(), RollupEngine.aggregate(related, agg, targetField));
+                } catch (Exception e) {
+                    log.warn("[rollup] 字段 {} 求值失败: {}", f.name(), e.getMessage());
+                }
+            } else if ("lookup".equals(f.type())) {
+                try {
+                    String relationField = String.valueOf(f.options().get("relationField"));
+                    String targetField = String.valueOf(f.options().get("targetField"));
+                    Object relatedRaw = record.get(relationField);
+                    if (relatedRaw == null) continue;
+                    List<Map<String, Object>> related = resolveRelatedRecords(relationField, relatedRaw, tenantId);
+                    if (related.isEmpty()) continue;
+                    record.put(f.name(), RollupEngine.lookup(related, targetField));
+                } catch (Exception e) {
+                    log.warn("[lookup] 字段 {} 求值失败: {}", f.name(), e.getMessage());
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> resolveRelatedRecords(String relationField, Object relatedRaw, String tenantId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (relatedRaw instanceof Map map) {
+            String id = String.valueOf(map.get("id"));
+            if (id != null && !id.isBlank()) {
+                result.add(Map.of("id", id, "title", map.getOrDefault("title", id)));
+            }
+        } else if (relatedRaw instanceof Collection list) {
+            for (Object o : list) {
+                if (o instanceof Map m) {
+                    result.add(Map.of("id", String.valueOf(m.get("id")), "title", m.getOrDefault("title", "")));
+                } else {
+                    result.add(Map.of("id", String.valueOf(o), "title", String.valueOf(o)));
+                }
+            }
+        }
+        return result;
     }
 
     // ============================================================
@@ -432,6 +498,7 @@ public class CollectionService {
             List<FieldDef> fields = parseFields(meta);
             // Week 41 复核 D1.3:formula 求值;D2:关联字段展开
             applyFormulas(fields, record);
+            applyRollupAndLookup(fields, record, tenantId);
             relationResolver.expandRelations(fields, record, tenantId);
             return record;
         } catch (Exception e) {

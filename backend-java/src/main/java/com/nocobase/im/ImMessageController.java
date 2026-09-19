@@ -4,6 +4,7 @@ import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.im.dto.ImMessageDto;
 import com.nocobase.im.entity.ImMessageEntity;
 import com.nocobase.im.entity.ImMessageReactionEntity;
+import com.nocobase.im.entity.ImPinEntity;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
@@ -30,10 +31,52 @@ public class ImMessageController {
 
     private final MessageService messageService;
     private final ReactionService reactionService;
+    private final PinService pinService;
 
-    public ImMessageController(MessageService messageService, ReactionService reactionService) {
+    public ImMessageController(MessageService messageService, ReactionService reactionService,
+                               PinService pinService) {
         this.messageService = messageService;
         this.reactionService = reactionService;
+        this.pinService = pinService;
+    }
+
+    /** 置顶消息列表(按置顶时间倒序)。 */
+    @GetMapping("/pins")
+    public Map<String, Object> listPins(
+            @RequestParam UUID channelId,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        List<ImPinEntity> pins = pinService.listActive(user.tenantId(), channelId);
+        return Map.of("code", 0, "message", "success", "data", Map.of("pins", pins));
+    }
+
+    /** 置顶某条消息。 */
+    @PostMapping("/pins")
+    public Map<String, Object> pin(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        UUID channelId = UUID.fromString(String.valueOf(body.get("channelId")));
+        UUID messageId = UUID.fromString(String.valueOf(body.get("messageId")));
+        ImPinEntity p = pinService.pin(user.tenantId(), channelId, messageId, user.userId());
+        return Map.of("code", 0, "message", "success", "data", Map.of(
+                "id", p.getId().toString(),
+                "messageId", p.getMessageId().toString(),
+                "pinnedAt", p.getPinnedAt().toString()
+        ));
+    }
+
+    /** 取消置顶。 */
+    @DeleteMapping("/pins")
+    public Map<String, Object> unpin(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        UUID channelId = UUID.fromString(String.valueOf(body.get("channelId")));
+        UUID messageId = UUID.fromString(String.valueOf(body.get("messageId")));
+        pinService.unpin(user.tenantId(), channelId, messageId);
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("channelId", channelId.toString(), "messageId", messageId.toString()));
     }
 
     /** 游标分页拉取主消息。cursor 传上一页最后一条的 createdAt(ISO-8601)。 */

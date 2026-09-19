@@ -39,4 +39,18 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
     List<ImMessageEntity> search(@Param("channelId") UUID channelId,
                                  @Param("kw") String kw,
                                  Pageable pageable);
+
+    /** 跨频道搜索(频道可空,按租户+关键词过滤)。 */
+    @Query("select m from ImMessageEntity m where m.tenantId = :tenantId "
+            + "and m.deletedAt is null "
+            + "and lower(m.content) like lower(concat('%', :kw, '%')) "
+            + "and (:channelId is null or m.channelId = :channelId) "
+            + "order by m.createdAt desc")
+    List<ImMessageEntity> searchCrossChannel(@Param("tenantId") String tenantId,
+                                             @Param("channelId") UUID channelId,
+                                             @Param("kw") String kw,
+                                             Pageable pageable);
+
+    /** 查询已过期且未删除的消息(用于 Burn-on-Read 清理)。 */
+    List<ImMessageEntity> findByExpiresAtBeforeAndDeletedAtIsNull(Instant now);
 }

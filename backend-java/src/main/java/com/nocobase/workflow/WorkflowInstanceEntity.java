@@ -47,6 +47,9 @@ public class WorkflowInstanceEntity {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    @Column(name = "channel_id")
+    private UUID channelId;
+
     @Column(name = "tenant_id", nullable = false, length = 64)
     private String tenantId;
 
@@ -70,6 +73,8 @@ public class WorkflowInstanceEntity {
     public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
     public Instant getFinishedAt() { return finishedAt; }
     public void setFinishedAt(Instant finishedAt) { this.finishedAt = finishedAt; }
+    public UUID getChannelId() { return channelId; }
+    public void setChannelId(UUID channelId) { this.channelId = channelId; }
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 }

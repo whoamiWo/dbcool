@@ -1,5 +1,6 @@
 package com.nocobase.wiki;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +30,21 @@ public interface WikiPageRepository extends JpaRepository<WikiPageEntity, UUID> 
     List<WikiPageEntity> findByKnowledgeBaseIdAndParentIdAndTenantIdOrderByCreatedAtAsc(UUID knowledgeBaseId, UUID parentId, String tenantId);
 
     List<WikiPageEntity> findByParentIdOrderByUpdatedAtDesc(UUID parentId);
+
+    List<WikiPageEntity> findByIsTemplateTrueAndTenantId(String tenantId);
+
+    List<WikiPageEntity> findByDeletedAtIsNotNullAndTenantIdOrderByDeletedAtDesc(String tenantId);
+
+    Optional<WikiPageEntity> findByShareToken(String shareToken);
+
+    /** 反向引用：找出所有引用了指定 slug 的页面（按内容 LIKE 匹配 [[slug]]）。 */
+    @Query(value = """
+        SELECT p FROM WikiPageEntity p
+        WHERE p.tenantId = :tenantId
+          AND p.content LIKE :pattern
+        ORDER BY p.updatedAt DESC
+        """)
+    List<WikiPageEntity> listBacklinks(@Param("pattern") String pattern, @Param("tenantId") String tenantId);
 
     boolean existsBySlugAndTenantId(String slug, String tenantId);
 

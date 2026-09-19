@@ -69,6 +69,15 @@ public class WikiPageEntity {
     @Column(name = "content_tsv", columnDefinition = "TEXT")
     private String contentTsv;
 
+    @Column(name = "is_template", nullable = false)
+    private Boolean isTemplate = false;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "share_token", length = 64, unique = true)
+    private String shareToken;
+
     public WikiPageEntity() {}
 
     public UUID getId() { return id; }
@@ -115,4 +124,10 @@ public class WikiPageEntity {
 
     public String getContentTsv() { return contentTsv; }
     public void setContentTsv(String contentTsv) { this.contentTsv = contentTsv; }
+    public Boolean getIsTemplate() { return isTemplate; }
+    public void setIsTemplate(Boolean isTemplate) { this.isTemplate = isTemplate; }
+    public Instant getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+    public String getShareToken() { return shareToken; }
+    public void setShareToken(String shareToken) { this.shareToken = shareToken; }
 }

@@ -40,6 +40,12 @@ public class ImMessageEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
+    @Column(name = "burn_after_read", nullable = false)
+    private Boolean burnAfterRead = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -64,6 +70,10 @@ public class ImMessageEntity {
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Instant getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
+    public Boolean getBurnAfterRead() { return burnAfterRead; }
+    public void setBurnAfterRead(Boolean burnAfterRead) { this.burnAfterRead = burnAfterRead; }
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
 }

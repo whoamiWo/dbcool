@@ -27,7 +27,7 @@ import org.hibernate.type.SqlTypes;
 public class ViewEntity {
 
     public enum Type {
-        TABLE, KANBAN, DETAIL
+        TABLE, KANBAN, DETAIL, GALLERY, CALENDAR
     }
 
     @Id
