@@ -18,6 +18,8 @@ const FIELD_ICON: Record<FieldType, string> = {
   belongsTo: '🔗',
   hasMany: '🔗',
   formula: '🧮',
+  rollup: '📊',
+  lookup: '🔍',
   number: '🔢',
 };
 

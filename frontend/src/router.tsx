@@ -29,6 +29,12 @@ const FormsListPage = lazy(() =>
 const TableViewPage = lazy(() =>
   import('./pages/TableView').then(m => ({ default: m.TableViewPage } as { default: React.ComponentType })),
 );
+const GalleryViewPage = lazy(() =>
+  import('./pages/GalleryView').then(m => ({ default: m.GalleryViewPage } as { default: React.ComponentType })),
+);
+const CalendarViewPage = lazy(() =>
+  import('./pages/CalendarView').then(m => ({ default: m.CalendarViewPage } as { default: React.ComponentType })),
+);
 const KanbanViewPage = lazy(() =>
   import('./pages/KanbanView').then(m => ({ default: m.KanbanViewPage } as { default: React.ComponentType })),
 );
@@ -122,6 +128,15 @@ const WorkbenchPage = lazy(() =>
 const DingTalkPage = lazy(() =>
   import('./pages/dingtalk/DingTalkPage').then(m => ({ default: m.DingTalkPage } as { default: React.ComponentType })),
 );
+const AgentChatPage = lazy(() =>
+  import('./pages/agent/AgentChatPage').then(m => ({ default: m.AgentChatPage } as { default: React.ComponentType })),
+);
+const PlaybookListPage = lazy(() =>
+  import('./pages/playbook/PlaybookList').then(m => ({ default: m.PlaybookListPage } as { default: React.ComponentType })),
+);
+const PlaybookRunPage = lazy(() =>
+  import('./pages/playbook/PlaybookRun').then(m => ({ default: m.PlaybookRunPage } as { default: React.ComponentType })),
+);
 
 /** R12 懒加载占位 */
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -171,6 +186,8 @@ export const router = createBrowserRouter([
       { path: 'designer/views/:collection/:id/edit', element: <Lazy><ViewDesignerPage /></Lazy> },
       { path: 'views/:id/run', element: <Lazy><TableViewPage /></Lazy> },
       { path: 'views/:id/kanban', element: <Lazy><KanbanViewPage /></Lazy> },
+      { path: 'views/:id/gallery', element: <Lazy><GalleryViewPage /></Lazy> },
+      { path: 'views/:id/calendar', element: <Lazy><CalendarViewPage /></Lazy> },
       { path: 'views/:id/detail/:recordId', element: <Lazy><DetailViewPage /></Lazy> },
       { path: 'workbench', element: <Lazy><WorkbenchPage /></Lazy> },
       { path: 'im', element: <Lazy><ImChatPage /></Lazy> },
@@ -188,6 +205,11 @@ export const router = createBrowserRouter([
       { path: 'projects', element: <Lazy><ProjectPage /></Lazy> },
       { path: 'collab/:docId', element: <Lazy><CollabPage /></Lazy> },
       { path: 'dingtalk', element: <Lazy><DingTalkPage /></Lazy> },
+
+      // Playbooks
+      { path: 'playbooks', element: <Lazy><PlaybookListPage /></Lazy> },
+      { path: 'playbooks/:id', element: <Lazy><PlaybookRunPage /></Lazy> },
+      { path: 'agent', element: <Lazy><AgentChatPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

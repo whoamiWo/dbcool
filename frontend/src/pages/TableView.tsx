@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import type { CollectionMeta } from '@/types/collection';
@@ -29,6 +29,27 @@ export function TableViewPage() {
   });
 
   const queryClient = useQueryClient();
+  const [editing, setEditing] = React.useState<{ id: string; field: string } | null>(null);
+
+  const updateField = useMutation({
+    mutationFn: ({ id, field, value }: { id: string; field: string; value: unknown }) =>
+      apiClient.put(`/collections/${collectionName}/records/${id}`, { [field]: value }),
+    onMutate: async ({ id, field, value }) => {
+      await queryClient.cancelQueries({ queryKey: ['records', collectionName] });
+      const prev = queryClient.getQueryData<RecordRow[]>(['records', collectionName]);
+      queryClient.setQueryData<RecordRow[]>(['records', collectionName], (old) =>
+        old ? old.map((r) => (r.id === id ? { ...r, [field]: value } : r)) : old
+      );
+      return { prev, id, field };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) queryClient.setQueryData(['records', collectionName], context.prev);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['records', collectionName] });
+    },
+  });
+
   const { data: recordsData, isLoading } = useQuery({
     queryKey: ['records', collectionName, filters, sort],
     queryFn: () => {
@@ -181,8 +202,36 @@ export function TableViewPage() {
                       const f = fieldMap.get(c.field);
                       const val = r[c.field];
                       return (
-                        <td key={c.field} style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {renderCell(val, f)}
+                        <td
+                          key={c.field}
+                          style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                          onDoubleClick={() => {
+                            setEditing({ id: r.id, field: c.field });
+                          }}
+                        >
+                          {editing?.id === r.id && editing?.field === c.field ? (
+                            <input
+                              autoFocus
+                              defaultValue={String(val ?? '')}
+                              onBlur={(e) => {
+                                const newVal = e.currentTarget.value;
+                                updateField.mutate({ id: r.id, field: c.field, value: newVal });
+                                setEditing(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const newVal = (e.currentTarget as HTMLInputElement).value;
+                                  updateField.mutate({ id: r.id, field: c.field, value: newVal });
+                                  setEditing(null);
+                                }
+                                if (e.key === 'Escape') setEditing(null);
+                              }}
+                              style={{ width: '100%', border: '1px solid #3b82f6', borderRadius: 4, padding: 2, fontSize: 13, outline: 'none' }}
+                            />
+                          ) : (
+                            renderCell(val, f)
+                          )}
                         </td>
                       );
                     })}

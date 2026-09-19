@@ -58,6 +58,12 @@ export interface ImMessage {
   createdAt: string;
   editedAt?: string;
   deletedAt?: string;
+  /** F4：阅后即焚到期时间 */
+  expiresAt?: string;
+  /** F4：阅后即焚标记 */
+  burnAfterRead?: boolean;
+  /** F4：置顶标记 */
+  pinned?: boolean;
 }
 
 /** 消息分页响应 */
@@ -169,4 +175,70 @@ export async function removeReaction(messageId: string, emoji: string) {
 /** 获取表情列表 */
 export async function getReactions(messageId: string) {
   return apiClient.get<{ code: number; data: MessageReaction[] }>(`/im/messages/${messageId}/reactions`);
+}
+
+/** F4 IM 增强：ImMessage 新增字段 */
+export interface EnhancedImMessage extends ImMessage {
+  expiresAt?: string;
+  burnAfterRead?: boolean;
+  pinned?: boolean;
+  mentions?: string[];
+}
+
+/** 置顶相关 API */
+export interface ImPin {
+  id: string;
+  messageId: string;
+  channelId: string;
+  pinnedBy: string;
+  pinnedAt: string;
+  /** F4：该消息是否被置顶（用于 PinList 取消置顶按钮） */
+  pinned?: boolean;
+}
+export async function listPins(channelId: string) {
+  return apiClient.get<{ code: number; data: ImPin[] }>(
+    `/im/messages/pins?channelId=${channelId}`,
+  );
+}
+export async function pinMessage(messageId: string) {
+  return apiClient.post<{ code: number; data: ImPin }>(`/im/messages/${messageId}/pin`);
+}
+export async function unpinMessage(messageId: string) {
+  return apiClient.delete<{ code: number; data: any }>(`/im/messages/${messageId}/pin`);
+}
+
+/** 跨频道搜索（带 tenantId + 频道成员过滤，防越权） */
+export async function searchCrossChannel(keyword: string, limit = 20) {
+  const params = new URLSearchParams();
+  params.set('keyword', keyword);
+  params.set('limit', String(limit));
+  return apiClient.get<{ code: number; data: MessagePage }>(
+    `/im/messages/search/cross?${params.toString()}`,
+  );
+}
+
+/** 文件上传 */
+export async function uploadAttachment(file: File, channelId: string) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('channelId', channelId);
+  return apiClient.post<{ code: number; data: { url: string; filename: string; size: number } }>(
+    '/im/messages/attachments',
+    fd,
+  );
+}
+
+/** Slash 命令 */
+export interface SlashCommand {
+  name: string;
+  description: string;
+  args?: string;
+}
+export async function listSlashCommands() {
+  return apiClient.get<{ code: number; data: SlashCommand[] }>('/im/slash/commands');
+}
+
+/** 阅后即焚：标记消息已读（触发清理） */
+export async function markBurnRead(messageId: string) {
+  return apiClient.post<{ code: number; data: any }>(`/im/messages/${messageId}/burn/read`);
 }

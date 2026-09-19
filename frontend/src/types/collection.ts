@@ -11,7 +11,9 @@ export type FieldType =
   | 'attachment' // Week 41 D1.2: 文件,Week 42+ 接 MinIO
   | 'belongsTo'
   | 'hasMany'
-  | 'formula';
+  | 'formula'
+  | 'rollup'
+  | 'lookup';
 
 export interface FieldDef {
   name: string;

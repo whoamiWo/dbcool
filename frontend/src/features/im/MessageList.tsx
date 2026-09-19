@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   addReaction,
   removeReaction,
@@ -16,6 +16,10 @@ interface MessageListProps {
   onLoadMore?: () => void;
   onEditMessage?: (messageId: string, content: string) => void;
   onDeleteMessage?: (messageId: string) => void;
+  /** F4：置顶消息 id 集合，命中后在消息条顶部显示置顶图标 */
+  pinnedMessageIds?: Set<string>;
+  /** F4：阅后即焚到期回调（到期后转不可读态） */
+  onBurnExpired?: (messageId: string) => void;
 }
 export function MessageList({
   currentUserId,
@@ -26,6 +30,8 @@ export function MessageList({
   onLoadMore,
   onEditMessage,
   onDeleteMessage,
+  pinnedMessageIds,
+  onBurnExpired,
 }: MessageListProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -57,6 +63,87 @@ export function MessageList({
         .catch((e) => console.error("添加表情失败", e));
     }
   };
+  /** F4：Mention 高亮渲染 — @用户ID 药丸主色高亮 */
+  const renderContent = (content: string, isBurned: boolean) => {
+    if (isBurned) {
+      return <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>该消息已焚毁</span>;
+    }
+    const parts = content.split(/(@[A-Za-z0-9_\-]+)/);
+    return (
+      <span>
+        {parts.map((part, i) =>
+          part.startsWith('@') ? (
+            <span
+              key={i}
+              style={{
+                background: '#dbeafe',
+                color: '#1d4ed8',
+                padding: '1px 6px',
+                borderRadius: 10,
+                fontWeight: 500,
+              }}
+            >
+              {part}
+            </span>
+          ) : (
+            <span key={i}>{part}</span>
+          ),
+        )}
+      </span>
+    );
+  };
+
+  /** F4：阅后即焚倒计时 — 到期后回调并转不可读态 */
+  const [burnRemaining, setBurnRemaining] = useState<Record<string, number>>({});
+  const burnTimersRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const now = Date.now();
+    const active = new Map<string, number>();
+    for (const m of messages) {
+      if (m.expiresAt) {
+        const ms = new Date(m.expiresAt).getTime() - now;
+        if (ms > 0) active.set(m.id, ms);
+      }
+    }
+    setBurnRemaining((prev) => {
+      void prev;
+      const next: Record<string, number> = {};
+      for (const [id, ms] of active) next[id] = ms;
+      return next;
+    });
+    // 清理过期计时器
+    for (const [id, t] of burnTimersRef.current) {
+      if (!active.has(id)) {
+        window.clearTimeout(t);
+        burnTimersRef.current.delete(id);
+      }
+    }
+    // 新增倒计时
+    for (const [id, ms] of active) {
+      if (burnTimersRef.current.has(id)) continue;
+      const t = window.setTimeout(() => {
+        onBurnExpired?.(id);
+        burnTimersRef.current.delete(id);
+        setBurnRemaining((p) => { const n = { ...p }; delete n[id]; return n; });
+      }, ms);
+      burnTimersRef.current.set(id, t);
+    }
+    return () => {
+      for (const t of burnTimersRef.current.values()) window.clearTimeout(t);
+      burnTimersRef.current.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, onBurnExpired]);
+
+  const formatBurnTime = (ms: number) => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    if (s < 60) return `${s}秒`;
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}分${r}秒`;
+  };
+
   const formatTime = (time: string) => {
     const d = new Date(time);
     return d.toLocaleString("zh-CN", {
@@ -114,6 +201,21 @@ export function MessageList({
               position: "relative",
             }}
           >
+            {pinnedMessageIds?.has(msg.id) && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#d97706',
+                  padding: '2px 8px',
+                  marginBottom: 4,
+                  background: '#fef3c7',
+                  borderRadius: 4,
+                  width: 'fit-content',
+                }}
+              >
+                📌 已置顶
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               {showAvatar && (
                 <div
@@ -213,7 +315,12 @@ export function MessageList({
                         color: isDeleted ? "#94a3b8" : "#0f172a",
                       }}
                     >
-                      {isDeleted ? "该消息已删除" : msg.content}
+                      {renderContent(isDeleted ? "该消息已删除" : msg.content, !!msg.expiresAt && burnRemaining[msg.id] === 0)}
+                      {msg.expiresAt && burnRemaining[msg.id] !== undefined && burnRemaining[msg.id] > 0 && (
+                        <span style={{ marginLeft: 8, fontSize: 11, color: '#ef4444' }}>
+                          🔥 {formatBurnTime(burnRemaining[msg.id])}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
