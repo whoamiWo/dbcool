@@ -104,7 +104,7 @@ public class AgentService {
             String toolName = (String) decision.get("tool");
             @SuppressWarnings("unchecked")
             Map<String, Object> params = (Map<String, Object>) decision.getOrDefault("params", Map.of());
-            Map<String, Object> result = executeTool(agent, toolName, params, tenantId);
+            Map<String, Object> result = executeTool(agent, toolName, params, tenantId, userId, channelId);
             executedTools.add(toolName + "(" + safeToString(params) + ")");
             observation = safeToString(result);
             messages.add(Map.of("role", "assistant", "content",
@@ -226,7 +226,8 @@ public class AgentService {
     }
 
     private Map<String, Object> executeTool(AiAgentEntity agent, String toolName,
-                                             Map<String, Object> params, String tenantId) {
+                                             Map<String, Object> params, String tenantId,
+                                             UUID userId, UUID channelId) {
         AgentTool tool = toolRegistry.get(toolName);
         if (tool == null) {
             return Map.of("error", "工具不存在: " + toolName);
@@ -236,7 +237,8 @@ public class AgentService {
             if (!allowed.contains(toolName) && !allowed.isEmpty()) {
                 return Map.of("error", "工具不在允许列表: " + toolName);
             }
-            return tool.execute(params);
+            AgentToolContext ctx = new AgentToolContext(tenantId, userId, channelId);
+            return tool.execute(params, ctx);
         } catch (Exception e) {
             log.warn("[Agent] 工具 {} 执行异常: {}", toolName, e.getMessage());
             return Map.of("error", e.getMessage());
