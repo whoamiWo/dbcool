@@ -1,6 +1,6 @@
-# Week 1-4 详细执行清单 - DBCool 综合平台
+# Week 1-4 详细执行清单 - DBCool 综合平台（已归档）
 
-> Phase 4 MVP 实施的第一阶段，精确到文件路径的可执行任务清单
+> ⚠️ **过时**：本文档原为 Phase 4 Week 1-4 起步假设，已于 2026-09-19 Phase 48 归档。当前进度见 [MEMORY.md](../../MEMORY.md) 与 [WEEK_47_HANDOFF.md](../../WEEK_47_HANDOFF.md)。Phase 1-7 与 Phase 48 全部完成，P0 33/33 = 100%。
 
 ---
 

@@ -50,7 +50,7 @@
 
 - **验证复核**:后端 `mvn -o verify` 891/891 PASS、前端 tsc/vite/vitest 全绿、Playwright 10/10 浏览器冒烟全通过
 - **修复缺陷**:`Home.tsx` 构建阻断回归(少 `.data`)、假脚本 `im_e2e_test.mjs` 废弃
-- **用户故事完成度**:P0 完全 done 18/33(54.5%),partial 14 个,not-started 1 个(US-504)
+- **用户故事完成度**:P0 完全 done 33/33(100%) ✅。详见 MEMORY.md + PHASE48_GLM53_PROMPT.md。
 - **提交保护**:按 `[java]`/`[js]`/`[docs]` 分三次提交,共 63 文件 / +6147 行
 - **详见**:`RECONCILE_WEEK43.md`
 
