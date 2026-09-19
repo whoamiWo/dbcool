@@ -120,4 +120,45 @@ describe('ChannelList', () => {
     expect(screen.getByText('临时话题')).toBeInTheDocument();
     expect(screen.getByText('未命名频道')).toBeInTheDocument();
   });
+
+  it('R3:按频道类型渲染分组头(公开频道/私有频道)', () => {
+    const props = baseProps();
+    props.channels = [
+      channel({ id: 'c1', name: '产品组', type: 'PUBLIC' }),
+      channel({ id: 'c2', name: '小张', type: 'PRIVATE' }),
+    ];
+    render(<ChannelList {...props} />);
+    expect(screen.getByText('公开频道 (1)')).toBeInTheDocument();
+    expect(screen.getByText('私有频道 (1)')).toBeInTheDocument();
+  });
+
+  it('R3:点击分组头折叠后再展开,频道可见性随之切换', () => {
+    const props = baseProps();
+    props.channels = [channel({ id: 'c1', name: '折叠测试频道', type: 'PUBLIC' })];
+    render(<ChannelList {...props} />);
+
+    // 默认展开
+    expect(screen.getByText('折叠测试频道')).toBeInTheDocument();
+
+    const groupHeader = screen.getByText('公开频道 (1)');
+    fireEvent.click(groupHeader);
+    // 折叠后频道隐藏
+    expect(screen.queryByText('折叠测试频道')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('公开频道 (1)'));
+    // 再次点击恢复展开
+    expect(screen.getByText('折叠测试频道')).toBeInTheDocument();
+  });
+
+  it('R3:折叠分组不影响其他分组的频道显示', () => {
+    const props = baseProps();
+    props.channels = [
+      channel({ id: 'c1', name: '公开频道A', type: 'PUBLIC' }),
+      channel({ id: 'c2', name: '私有频道B', type: 'PRIVATE' }),
+    ];
+    render(<ChannelList {...props} />);
+    fireEvent.click(screen.getByText('公开频道 (1)'));
+    expect(screen.queryByText('公开频道A')).not.toBeInTheDocument();
+    expect(screen.getByText('私有频道B')).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
@@ -11,6 +11,8 @@ import {
   createChannel,
   deleteMessage as deleteMsg,
   editMessage as editMsgFn,
+  sendMessage,
+  listPins,
   type ImChannel,
   type ImMessage,
 } from './api';
@@ -18,6 +20,8 @@ import { subscribeToChannel, disconnectStomp } from '@/lib/stompClient';
 import { ChannelList } from './ChannelList';
 import { MessageComposer } from './MessageComposer';
 import { MessageList } from './MessageList';
+import { PinList } from './PinList';
+import { SearchResults } from './SearchResults';
 import { ThreadPanel } from './ThreadPanel';
 
 /** IM 聊天主布局，三栏：频道列表 | 消息流 | 线程面板 */
@@ -29,6 +33,8 @@ export function ImChatPage() {
   const [threadMessage, setThreadMessage] = useState<ImMessage | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  /** R2：跨频道搜索关键词，非空时展示搜索结果面板 */
+  const [searchKeyword, setSearchKeyword] = useState('');
 
   const { data: channelsData, refetch: refetchChannels } = useQuery({
     queryKey: ['im-channels'],
@@ -60,6 +66,17 @@ export function ImChatPage() {
   });
 
   const messages = messagesData?.pages.flatMap((p) => p.data.messages) ?? [];
+
+  // R2/R4：置顶消息 → 供 MessageList 渲染置顶标记
+  const { data: pinsData, refetch: refetchPins } = useQuery({
+    queryKey: ['im-pins', currentChannel?.id],
+    queryFn: () => listPins(currentChannel!.id),
+    enabled: !!currentChannel,
+  });
+  const pinnedMessageIds = useMemo(
+    () => new Set((pinsData?.data ?? []).map((p) => p.messageId)),
+    [pinsData],
+  );
 
   useEffect(() => {
     if (channels.length > 0 && !currentChannel) {
@@ -122,6 +139,38 @@ export function ImChatPage() {
       console.error('删除消息失败', e);
     }
   }, [currentChannel, refetchMessages]);
+
+  // R4：阅后即焚到期 → 刷新消息列表使其转为不可读态
+  const handleBurnExpired = useCallback(() => {
+    refetchMessages();
+  }, [refetchMessages]);
+
+  // R4：附件上传成功 → 以 FILE 消息回显到频道
+  const handleAttachment = useCallback(
+    async (url: string, filename: string, _size: number) => {
+      if (!currentChannel) return;
+      try {
+        await sendMessage(currentChannel.id, `[附件] ${filename}\n${url}`, 'FILE');
+        refetchMessages();
+      } catch (e) {
+        console.error('发送附件消息失败', e);
+      }
+    },
+    [currentChannel, refetchMessages],
+  );
+
+  // R2：点击搜索结果 → 切到该消息所属频道
+  const handleSearchResultClick = useCallback(
+    (messageId: string, channelId: string) => {
+      const target = channels.find((c) => c.id === channelId);
+      if (target) {
+        handleChannelSelect(target);
+        setSearchKeyword('');
+      }
+      void messageId;
+    },
+    [channels, handleChannelSelect],
+  );
 
   // 新建频道
   const handleCreateChannel = useCallback(async () => {
@@ -216,8 +265,33 @@ export function ImChatPage() {
               {currentChannel?.topic || ''}
             </div>
           </div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>在线</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder="搜索消息…"
+              aria-label="搜索消息"
+              style={{
+                padding: '6px 10px',
+                border: '1px solid #e2e8f0',
+                borderRadius: 6,
+                fontSize: 12,
+                width: 160,
+                outline: 'none',
+              }}
+            />
+            <div style={{ fontSize: 12, color: '#64748b' }}>在线</div>
+          </div>
         </div>
+
+        {/* R2：置顶区块（接入 PinList，消除死代码） */}
+        {currentChannel && (
+          <PinList
+            channelId={currentChannel.id}
+            channel={currentChannel}
+            onChanged={refetchPins}
+          />
+        )}
 
         <div
           style={{
@@ -227,7 +301,15 @@ export function ImChatPage() {
             minHeight: 0,
           }}
         >
-          {currentChannel && user?.id ? (
+          {searchKeyword.trim() ? (
+            /* R2：跨频道搜索结果面板（接入 SearchResults，消除死代码） */
+            <div style={{ flex: 1, overflowY: 'auto', background: '#ffffff' }}>
+              <SearchResults
+                keyword={searchKeyword}
+                onMessageClick={handleSearchResultClick}
+              />
+            </div>
+          ) : currentChannel && user?.id ? (
             <MessageList
               currentUserId={user.id}
               messages={messages}
@@ -237,6 +319,8 @@ export function ImChatPage() {
               onLoadMore={() => fetchNextPage()}
               onEditMessage={handleEditMessage}
               onDeleteMessage={handleDeleteMessage}
+              pinnedMessageIds={pinnedMessageIds}
+              onBurnExpired={handleBurnExpired}
             />
           ) : (
             <div
@@ -263,6 +347,7 @@ export function ImChatPage() {
                 }
               }}
               disabled={!user}
+              onAttachment={handleAttachment}
             />
           )}
         </div>

@@ -4,7 +4,8 @@ import { searchCrossChannel, type MessagePage } from './api';
 interface SearchResultsProps {
   keyword: string;
   limit?: number;
-  onMessageClick?: (messageId: string) => void;
+  /** 点击结果跳转原消息：回传消息 id 与所属频道 id，供调用方切频道定位 */
+  onMessageClick?: (messageId: string, channelId: string) => void;
 }
 
 export function SearchResults({ keyword, limit = 20, onMessageClick }: SearchResultsProps) {
@@ -72,7 +73,7 @@ export function SearchResults({ keyword, limit = 20, onMessageClick }: SearchRes
             return (
               <div
                 key={msg.id}
-                onClick={() => onMessageClick?.(msg.id)}
+                onClick={() => onMessageClick?.(msg.id, msg.channelId)}
                 style={{
                   padding: '10px 12px',
                   borderBottom: '1px solid #f1f5f9',

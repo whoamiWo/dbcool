@@ -5,9 +5,11 @@ import { ImChannel } from './api';
 interface PinListProps {
   channelId: string;
   channel: ImChannel | null;
+  /** 置顶状态变化回调，供父级同步置顶标记 */
+  onChanged?: () => void;
 }
 
-export function PinList({ channelId, channel }: PinListProps) {
+export function PinList({ channelId, channel, onChanged }: PinListProps) {
   const [pins, setPins] = useState<ImPin[]>([]);
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(false);
@@ -40,6 +42,7 @@ export function PinList({ channelId, channel }: PinListProps) {
         await pinMessage(messageId);
       }
       await load();
+      onChanged?.();
     } catch (err) {
       console.error('置顶操作失败', err);
     }

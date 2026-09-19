@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getUnreadCount as getUnreadCountApi, type ImChannel } from './api';
 import type { User } from '@/stores/auth';
 
@@ -13,6 +13,12 @@ interface ChannelListProps {
   getUnreadCount: typeof getUnreadCountApi;
 }
 
+/** R3：按频道属性分组（组标题与卡片内「群聊/私聊」文案刻意区分，避免文本歧义） */
+const GROUP_DEFS = [
+  { key: 'PUBLIC', label: '公开频道' },
+  { key: 'PRIVATE', label: '私有频道' },
+] as const;
+
 export function ChannelList({
   channels,
   selectedChannel,
@@ -23,6 +29,8 @@ export function ChannelList({
   getUnreadCount,
 }: ChannelListProps) {
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
+  /** R3：分组折叠状态，默认全部展开 */
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   // 拉取各频道未读数。getUnreadCount 是 api 顶层函数、引用稳定,不会造成循环请求。
   useEffect(() => {
@@ -47,6 +55,77 @@ export function ChannelList({
       cancelled = true;
     };
   }, [channels, getUnreadCount]);
+
+  const groups = useMemo(
+    () =>
+      GROUP_DEFS.map((def) => ({
+        ...def,
+        items: channels.filter((c) =>
+          def.key === 'PRIVATE' ? c.type === 'PRIVATE' : c.type !== 'PRIVATE',
+        ),
+      })).filter((g) => g.items.length > 0),
+    [channels],
+  );
+
+  const toggleGroup = (key: string) => {
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const renderChannel = (channel: ImChannel) => {
+    const active = selectedChannel?.id === channel.id;
+    const display = channel.name || channel.topic || '未命名频道';
+    const unread = unreadMap[channel.id] ?? 0;
+    return (
+      <div
+        key={channel.id}
+        onClick={() => onSelect(channel)}
+        style={{
+          padding: '8px 12px',
+          borderRadius: 4,
+          cursor: 'pointer',
+          background: active ? '#e0f2fe' : 'transparent',
+          borderLeft: active ? '3px solid #3b82f6' : '3px solid transparent',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: active ? 600 : 400,
+              color: active ? '#0f172a' : '#475569',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {display}
+          </span>
+          {unread > 0 && (
+            <span
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                borderRadius: 9,
+                minWidth: 18,
+                height: 18,
+                padding: '0 6px',
+                fontSize: 11,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+          {channel.type === 'PRIVATE' ? '私聊' : '群聊'}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -97,58 +176,40 @@ export function ChannelList({
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {channels.map((channel) => {
-          const active = selectedChannel?.id === channel.id;
-          const display = channel.name || channel.topic || '未命名频道';
-          const unread = unreadMap[channel.id] ?? 0;
+        {groups.map((group) => {
+          const isCollapsed = collapsed[group.key] ?? false;
           return (
-            <div
-              key={channel.id}
-              onClick={() => onSelect(channel)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: 4,
-                cursor: 'pointer',
-                background: active ? '#e0f2fe' : 'transparent',
-                borderLeft: active ? '3px solid #3b82f6' : '3px solid transparent',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: active ? 600 : 400,
-                    color: active ? '#0f172a' : '#475569',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {display}
+            <div key={group.key}>
+              {/* R3：分组头，点击折叠/展开 */}
+              <button
+                onClick={() => toggleGroup(group.key)}
+                aria-expanded={!isCollapsed}
+                title={isCollapsed ? '展开分组' : '折叠分组'}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  width: '100%',
+                  padding: '4px 8px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  color: '#64748b',
+                  textAlign: 'left',
+                  borderRadius: 4,
+                }}
+              >
+                <span style={{ fontSize: 10 }}>{isCollapsed ? '▶' : '▼'}</span>
+                <span>
+                  {group.label} ({group.items.length})
                 </span>
-                {unread > 0 && (
-                  <span
-                    style={{
-                      background: '#ef4444',
-                      color: '#ffffff',
-                      borderRadius: 9,
-                      minWidth: 18,
-                      height: 18,
-                      padding: '0 6px',
-                      fontSize: 11,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                {channel.type === 'PRIVATE' ? '私聊' : '群聊'}
-              </div>
+              </button>
+              {!isCollapsed && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4 }}>
+                  {group.items.map(renderChannel)}
+                </div>
+              )}
             </div>
           );
         })}
