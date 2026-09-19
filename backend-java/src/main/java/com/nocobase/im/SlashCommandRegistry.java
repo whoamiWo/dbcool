@@ -1,5 +1,6 @@
 package com.nocobase.im;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -13,9 +14,18 @@ import java.util.function.BiConsumer;
 public class SlashCommandRegistry {
 
     private final Map<String, BiConsumer<String, Map<String, Object>>> commands = new ConcurrentHashMap<>();
+    /** 命令描述（与 commands 同步维护，供 GET /api/im/slash/commands 暴露）。 */
+    private final Map<String, String> descriptions = new ConcurrentHashMap<>();
 
     public void register(String command, BiConsumer<String, Map<String, Object>> handler) {
         commands.put(command.toLowerCase(), handler);
+    }
+
+    public void register(String command, String description,
+                         BiConsumer<String, Map<String, Object>> handler) {
+        String key = command.toLowerCase();
+        commands.put(key, handler);
+        descriptions.put(key, description);
     }
 
     public boolean has(String command) {
@@ -28,27 +38,36 @@ public class SlashCommandRegistry {
 
     public void clear() {
         commands.clear();
+        descriptions.clear();
+    }
+
+    /** 已注册命令列表（名称 + 描述），供前端 Slash 面板展示。 */
+    public List<Map<String, String>> listCommands() {
+        return commands.keySet().stream()
+                .sorted()
+                .map(k -> Map.of(
+                        "name", "/" + k,
+                        "description", descriptions.getOrDefault(k, "")))
+                .toList();
     }
 
     /** 初始化默认 5 个内置命令。 */
     public static SlashCommandRegistry defaultRegistry() {
         SlashCommandRegistry reg = new SlashCommandRegistry();
-        reg.register("remind", (content, ctx) -> {
-            // /remind 10 分钟后提醒
-            String msg = content.replace("/remind", "").trim();
-            // 实际实现应调用通知服务设置定时提醒
+        reg.register("remind", "设置定时提醒（/remind 内容）", (content, ctx) -> {
+            // /remind：由调用方接真实提醒调度
         });
-        reg.register("poll", (content, ctx) -> {
-            // /poll 创建投票
+        reg.register("poll", "发起投票（/poll 问题）", (content, ctx) -> {
+            // /poll：由调用方接投票服务
         });
-        reg.register("code", (content, ctx) -> {
-            // /code 生成代码片段
+        reg.register("code", "插入代码块（/code 语言）", (content, ctx) -> {
+            // /code：由调用方接代码渲染
         });
-        reg.register("invite", (content, ctx) -> {
-            // /invite 邀请用户到频道
+        reg.register("invite", "邀请成员加入频道（/invite 用户）", (content, ctx) -> {
+            // /invite：由调用方接频道成员服务
         });
-        reg.register("ai", (content, ctx) -> {
-            // /ai 触发 AI Agent
+        reg.register("ai", "触发 AI Agent 处理（/ai 提示词）", (content, ctx) -> {
+            // /ai：由调用方接 AgentService
         });
         return reg;
     }

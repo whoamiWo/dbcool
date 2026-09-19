@@ -117,6 +117,33 @@ public class MessageService {
         return messageRepository.search(channelId, keyword, PageRequest.of(0, safeLimit));
     }
 
+    /**
+     * 跨频道搜索（带租户 + 频道成员过滤，防越权读取他频道消息）。
+     *
+     * <p>SQL 侧已按 tenantId 过滤；此处再叠加「仅返回当前用户已加入频道的消息」，
+     * 避免搜到同租户下用户非成员的私频道内容。
+     *
+     * @param channelId 可选，指定时只搜该频道（仍校验成员身份）
+     */
+    public List<ImMessageEntity> searchCrossChannel(String tenantId, UUID userId,
+                                                     UUID channelId, String keyword, int limit) {
+        if (keyword == null || keyword.isBlank()) return List.of();
+        int safeLimit = Math.max(1, Math.min(limit, 50));
+        // 指定频道时先校验成员身份，非成员直接返回空
+        if (channelId != null && !memberRepository.existsByChannelIdAndUserId(channelId, userId)) {
+            return List.of();
+        }
+        List<UUID> joined = memberRepository.findByTenantIdAndUserId(tenantId, userId).stream()
+                .map(ImChannelMemberEntity::getChannelId)
+                .toList();
+        if (joined.isEmpty()) return List.of();
+        return messageRepository
+                .searchCrossChannel(tenantId, channelId, keyword, PageRequest.of(0, safeLimit))
+                .stream()
+                .filter(m -> joined.contains(m.getChannelId()))
+                .toList();
+    }
+
     /** 未读主消息数:以成员的 lastReadMessageId 对应时间为游标。 */
     public long unreadCount(UUID channelId, UUID userId) {
         Optional<ImChannelMemberEntity> m =

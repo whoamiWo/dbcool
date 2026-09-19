@@ -64,6 +64,37 @@ class ImMessageControllerTest {
         verify(messageService).list(eq(channelId), any(), eq(100));
     }
 
+    /**
+     * 断链修复契约测试：GET /api/im/messages/search/cross 必须存在，
+     * 且把 tenantId + userId 下传给 Service 做成员过滤（防越权）。
+     */
+    @Test
+    void searchCross_delegatesWithTenantAndUser() {
+        when(messageService.searchCrossChannel(eq("tenant_default"), eq(userId),
+                eq(null), eq("预算"), anyInt())).thenReturn(List.of(message()));
+
+        Map<String, Object> resp = controller.searchCross("预算", null, 20, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat((List<?>) data.get("messages")).hasSize(1);
+        // 必须带租户与用户身份，否则搜到非成员频道内容
+        verify(messageService).searchCrossChannel(eq("tenant_default"), eq(userId),
+                eq(null), eq("预算"), eq(20));
+    }
+
+    /** 指定 channelId 时原样下传（Service 侧校验成员身份）。 */
+    @Test
+    void searchCross_withChannelId() {
+        when(messageService.searchCrossChannel(anyString(), any(), eq(channelId),
+                anyString(), anyInt())).thenReturn(List.of());
+
+        controller.searchCross("预算", channelId, 20, user);
+
+        verify(messageService).searchCrossChannel("tenant_default", userId, channelId, "预算", 20);
+    }
+
     @Test
     void send_returnsCreated() {
         when(messageService.send(anyString(), eq(channelId), eq(userId),

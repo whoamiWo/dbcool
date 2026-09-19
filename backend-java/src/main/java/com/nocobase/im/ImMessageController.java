@@ -160,6 +160,24 @@ public class ImMessageController {
         return Map.of("code", 0, "message", "success", "data", Map.of("messages", hits));
     }
 
+    /**
+     * 跨频道搜索（带租户 + 频道成员过滤）。
+     *
+     * <p>channelId 可选：不传时搜当前用户已加入的全部频道，传时只搜该频道（仍校验成员身份）。
+     */
+    @GetMapping("/search/cross")
+    public Map<String, Object> searchCross(
+            @RequestParam String keyword,
+            @RequestParam(required = false) UUID channelId,
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        List<ImMessageDto> hits = messageService.searchCrossChannel(
+                        user.tenantId(), user.userId(), channelId, keyword, limit).stream()
+                .map(ImMessageDto::from).toList();
+        return Map.of("code", 0, "message", "success", "data", Map.of("messages", hits));
+    }
+
     @GetMapping("/unread")
     public Map<String, Object> unread(
             @RequestParam UUID channelId,
