@@ -117,20 +117,58 @@ R1（接口改造 → 6 工具接真 → 测试）→ R2 → R4 → R3 → 全�
 
 ---
 
-## 八、实际执行结果（2026-09-19）
+## 八、补充：自查发现的 3 处前后端断链（后续追加修复）
+
+完成 R1-R4 后做反向自查（用审计别人的方法审计自己），发现 F4 阶段新增的前端接口
+同样调了不存在的后端端点——与 R1 批评的「形似接真」同类问题：
+
+| 前端调用 | 后端实际情况 |
+|---|---|
+| `/im/messages/search/cross` | ❌ 无端点。`ImMessageRepository.searchCrossChannel` 存在，Controller 未暴露 |
+| `/im/messages/attachments` | ❌ 无端点。真实端点是 `POST /api/attachments/upload`（MinIO，返回 `storageKey`） |
+| `/im/slash/commands` | ❌ 无端点。`SlashCommandRegistry` 仅 SPI 容器，无 Controller |
+
+### 修复要点
+- `MessageService.searchCrossChannel(tenantId, userId, channelId, keyword, limit)`
+  —— **必须叠加频道成员过滤**：原 SQL 只按 `tenantId` 过滤，直接暴露会越权读到
+  同租户下用户非成员的私频道消息
+- `ImMessageController` 暴露 `GET /api/im/messages/search/cross`，下传 `tenantId + userId`
+- `SlashCommandRegistry` 补 `descriptions` + `listCommands()`，端点返回**真实注册表**而非硬编码
+- 新增 `ImSlashController` **+ `SlashCommandConfig`**：`SlashCommandRegistry` 无 `@Component`，
+  不显式声明 `@Bean` 会导致注入失败（`NoSuchBeanDefinitionException`）
+- 前端 `uploadAttachment` 改指 `/attachments/upload`，返回
+  `url = /api/attachments/{storageKey}/download`；`MessageComposer` 两处调用同步去参
+
+### 契约测试（关键经验）
+断链此前逃过所有测试：前端单测 mock 了 api，后端单测不覆盖 Controller 路径。
+故显式锁定路径防漂移：
+- 后端 `ImMessageControllerTest` +2（断言 `tenantId/userId` 下传，防越权回归）
+- 后端 `ImSlashControllerTest` +2（含「注册表变化时端点跟着变」用例，证明非硬编码）
+- 前端 `api.test.ts` +3（锁定三个端点路径）
+
+---
+
+## 九、实际执行结果（2026-09-19 最终）
 
 | 项 | 结果 |
 |---|---|
-| 后端 `mvn test` | **1052 PASS** / 0 Failures / 0 Errors（原基线 1036，新增 AgentToolTest 16 例） |
+| 后端 `mvn test` | **1056 PASS** / 0 Failures / 0 Errors（基线 1036；+16 AgentToolTest，+4 契约测试） |
 | `AgentToolTest` | 16 例全通过，覆盖 6 工具真实返回值与失败路径 |
 | TODO 残留 | `ai/tools/` 目录 **0 命中** |
 | `ChannelList.test.tsx` | **13/13 通过**（10 既有 + 3 折叠新增，无回归） |
-| 前端 vitest | 38 测试文件全通过，0 失败 |
+| `api.test.ts` | 6/6（含 3 条端点契约） |
+| 前端 vitest | **236 PASS**（38 文件，0 失败，≥233 达标） |
 | `npx tsc --noEmit` | **0 error** |
-| `npx vite build` | 成功（12.31s） |
+| `npx vite build` | 成功（12.34s） |
 
 ### 关键实现要点（供后续维护）
 1. `AgentToolContext` 是工具层做租户隔离的关键，新增工具必须遵循
 2. `SendDingTool` 曾因 `Map.of("reason", null)` NPE（`Map.of` 不接受 null 值），改用 `"ok"` 占位
 3. 断言工具返回值时注意类型：`rows`/`messageCount` 返回 Integer 而非 Long，断言用 `1` 而非 `1L`
 4. `ChannelList` 组标题与频道类型文案必须区分，否则 `getByText` 会因多命中报错
+5. 前后端路径必须加契约测试：单测 mock 会掩盖断链，只有显式断言端点路径才能防漂移
+6. 跨频道/跨资源查询务必确认是否叠加了成员（权限）过滤，仅靠 tenantId 过滤仍会越权
+
+### 遗留
+`SlashCommandRegistry` 的 5 个内置命令（`/remind /poll /code /invite /ai`）handler 体仍为空
+——面板能列出命令但选中后不执行任何动作，属同类假代码，待后续接真。
