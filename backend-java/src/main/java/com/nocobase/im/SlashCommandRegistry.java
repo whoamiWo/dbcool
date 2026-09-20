@@ -51,24 +51,14 @@ public class SlashCommandRegistry {
                 .toList();
     }
 
-    /** 初始化默认 5 个内置命令。 */
+    /** 初始化默认 5 个内置命令（handler 体由 {@link SlashCommandInitializer} 启动后注入）。 */
     public static SlashCommandRegistry defaultRegistry() {
         SlashCommandRegistry reg = new SlashCommandRegistry();
-        reg.register("remind", "设置定时提醒（/remind 内容）", (content, ctx) -> {
-            // /remind：由调用方接真实提醒调度
-        });
-        reg.register("poll", "发起投票（/poll 问题）", (content, ctx) -> {
-            // /poll：由调用方接投票服务
-        });
-        reg.register("code", "插入代码块（/code 语言）", (content, ctx) -> {
-            // /code：由调用方接代码渲染
-        });
-        reg.register("invite", "邀请成员加入频道（/invite 用户）", (content, ctx) -> {
-            // /invite：由调用方接频道成员服务
-        });
-        reg.register("ai", "触发 AI Agent 处理（/ai 提示词）", (content, ctx) -> {
-            // /ai：由调用方接 AgentService
-        });
+        reg.register("remind", "设置定时提醒（/remind 内容）", (content, ctx) -> { /* 占位 */ });
+        reg.register("poll", "发起投票（/poll 问题）", (content, ctx) -> { /* 占位 */ });
+        reg.register("code", "插入代码块（/code 语言）", (content, ctx) -> { /* 占位 */ });
+        reg.register("invite", "邀请成员加入频道（/invite 用户）", (content, ctx) -> { /* 占位 */ });
+        reg.register("ai", "触发 AI Agent 处理（/ai 提示词）", (content, ctx) -> { /* 占位 */ });
         return reg;
     }
 }

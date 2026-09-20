@@ -4,7 +4,6 @@ import { useMediaQuery } from '@mui/material';
 import { useAuthStore } from '@/stores/auth';
 import { disconnectStomp } from '@/lib/stompClient';
 
-
 /** 移动端底部导航 — 固定 5 个高频入口。 */
 const MOBILE_BOTTOM_NAV = [
   { path: '/workbench', label: '工作台', icon: '🏠' },
@@ -19,11 +18,10 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [switching, setSwitching] = useState(false);
-  // 响应式:768px 以下切换为移动端底部导航,顶部导航收起
   const isMobile = useMediaQuery('(max-width:768px)');
 
   const handleLogout = () => {
-    disconnectStomp(); // 先断开 WS,避免旧 token 连接残留
+    disconnectStomp();
     clear();
     navigate('/login');
   };
@@ -48,18 +46,9 @@ export function AppLayout() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <header
-        style={{
-          padding: '12px 24px',
-          background: '#1e293b',
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+      <header className="app-header">
         <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-          <strong style={{ fontSize: 18 }}>🛠 NocoBase</strong>
+          <strong style={{ fontSize: 18, letterSpacing: '0.5px' }}>🛠 NocoBase</strong>
           {navItems.map((item) => {
             const active = !item.external && location.pathname.startsWith(item.path);
             if (item.external) {
@@ -70,13 +59,20 @@ export function AppLayout() {
                   target="_blank"
                   rel="noreferrer"
                   style={{
-                    color: 'white',
+                    color: 'var(--color-text-primary)',
                     textDecoration: 'none',
                     padding: '4px 8px',
-                    borderRadius: 4,
+                    borderRadius: 'var(--radius-sm)',
                     background: 'transparent',
-                    borderLeft: '2px solid #475569',
+                    borderLeft: '2px solid var(--color-bg-tertiary)',
                     marginLeft: 8,
+                    transition: 'all var(--transition-fast)',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
                   }}
                 >
                   {item.label} ↗
@@ -88,11 +84,13 @@ export function AppLayout() {
                 key={item.path}
                 to={item.path}
                 style={{
-                  color: 'white',
+                  color: 'var(--color-text-primary)',
                   textDecoration: 'none',
                   padding: '4px 8px',
-                  borderRadius: 4,
-                  background: active ? '#334155' : 'transparent',
+                  borderRadius: 'var(--radius-sm)',
+                  background: active ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                  transition: 'all var(--transition-fast)',
+                  borderBottom: active ? '2px solid var(--color-primary-500)' : '2px solid transparent',
                 }}
               >
                 {item.label}
@@ -101,21 +99,29 @@ export function AppLayout() {
           })}
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ fontSize: 13 }}>
+          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
             {user?.username ?? '游客'}({user?.roles.join(', ') ?? 'no role'})
           </span>
-          {/* US-504: 应用切换 */}
           {user && (
             <button
               onClick={() => setSwitching(true)}
               style={{
-                padding: '4px 12px',
-                background: '#0ea5e9',
-                color: 'white',
+                padding: '6px 14px',
+                background: 'var(--color-primary-500)',
+                color: 'var(--color-text-primary)',
                 border: 'none',
-                borderRadius: 4,
+                borderRadius: 'var(--radius-sm)',
                 cursor: 'pointer',
                 fontSize: 12,
+                fontWeight: 500,
+                transition: 'all var(--transition-fast)',
+                boxShadow: 'var(--shadow-glow)',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--color-primary-600)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--color-primary-500)';
               }}
             >
               🔄 切换应用({user.tenant_id})
@@ -124,30 +130,34 @@ export function AppLayout() {
           <button
             onClick={handleLogout}
             style={{
-              padding: '4px 12px',
-              background: '#dc2626',
-              color: 'white',
+              padding: '6px 14px',
+              background: 'var(--color-error)',
+              color: 'var(--color-text-primary)',
               border: 'none',
-              borderRadius: 4,
+              borderRadius: 'var(--radius-sm)',
               cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 500,
+              transition: 'all var(--transition-fast)',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.opacity = '0.85';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.opacity = '1';
             }}
           >
             登出
           </button>
         </div>
       </header>
-      <main style={{ flex: 1, padding: isMobile ? 12 : 24, background: '#f8fafc', paddingBottom: isMobile ? 72 : 24 }}>
+      <main className="app-main">
         <Outlet />
       </main>
 
       {/* 移动端底部导航 (768px 以下) */}
       {isMobile && (
-        <nav style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-          display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-          background: '#1e293b', color: 'white', padding: '6px 0',
-          borderTop: '1px solid #334155',
-        }}>
+        <nav className="app-footer">
           {MOBILE_BOTTOM_NAV.map((item) => {
             const active = location.pathname.startsWith(item.path);
             return (
@@ -155,9 +165,19 @@ export function AppLayout() {
                 key={item.path}
                 onClick={() => navigate(item.path)}
                 style={{
-                  flex: 1, background: 'none', border: 'none', color: active ? '#60a5fa' : '#94a3b8',
-                  cursor: 'pointer', padding: '4px 0', display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', gap: 2, fontSize: 10, fontWeight: active ? 600 : 400,
+                  flex: 1,
+                  background: 'none',
+                  border: 'none',
+                  color: active ? 'var(--color-primary-400)' : 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                  fontSize: 10,
+                  fontWeight: active ? 600 : 400,
+                  transition: 'all var(--transition-fast)',
                 }}
               >
                 <span style={{ fontSize: 20 }}>{item.icon}</span>
@@ -168,23 +188,24 @@ export function AppLayout() {
         </nav>
       )}
 
-      {/* US-504: 应用切换弹窗 */}
+      {/* 应用切换弹窗 */}
       {switching && user && (
         <div
           role="dialog"
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15,23,42,0.5)',
+            background: 'rgba(15,23,42,0.7)',
+            backdropFilter: 'blur(8px)',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            zIndex: 100,
+            zIndex: 1000,
           }}
         >
-          <div style={{ background: 'white', borderRadius: 8, padding: 24, width: 400, boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ marginTop: 0 }}>🔄 切换应用</h3>
-            <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>
+          <div className="glass-strong" style={{ padding: 24, width: 400 }}>
+            <h3 style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>🔄 切换应用</h3>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: 0 }}>
               选择要切换的应用(租户)。切换后将刷新页面以加载新应用上下文。
             </p>
             <TenantSwitcher
@@ -216,13 +237,10 @@ function TenantSwitcher({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-
-  // 加载当前用户可切换的租户列表
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        // 先尝试用户级 API(US-504 新端点)
         const token = localStorage.getItem('nocobase_access_token');
         const headers: Record<string, string> = {};
         if (token) headers.Authorization = `Bearer ${token}`;
@@ -241,14 +259,14 @@ function TenantSwitcher({
   return (
     <div style={{ marginTop: 12 }}>
       {error && (
-        <div style={{ padding: 8, background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontSize: 12 }}>
+        <div style={{ padding: 8, background: 'rgba(239,68,68,0.2)', color: '#fca5a5', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
           {error}
         </div>
       )}
       {loading ? (
-        <p style={{ color: '#64748b', fontSize: 13 }}>加载中…</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>加载中…</p>
       ) : tenants.length === 0 ? (
-        <p style={{ color: '#64748b', fontSize: 13 }}>暂无可切换的应用</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>暂无可切换的应用</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tenants.map((t) => (
@@ -257,24 +275,25 @@ function TenantSwitcher({
               onClick={() => onSelect(t.id)}
               style={{
                 padding: '8px 12px',
-                background: t.id === currentTenantId ? '#dbeafe' : '#f8fafc',
-                color: t.id === currentTenantId ? '#1e40af' : '#334155',
-                border: '1px solid ' + (t.id === currentTenantId ? '#93c5fd' : '#e2e8f0'),
-                borderRadius: 6,
+                background: t.id === currentTenantId ? 'rgba(99,102,241,0.2)' : 'var(--glass-bg-light)',
+                color: t.id === currentTenantId ? 'var(--color-primary-300)' : 'var(--color-text-primary)',
+                border: `1px solid ${t.id === currentTenantId ? 'var(--color-primary-500)' : 'var(--color-border-light)'}`,
+                borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
                 textAlign: 'left',
                 fontSize: 13,
+                transition: 'all var(--transition-fast)',
               }}
             >
               {t.id === currentTenantId ? '✓ ' : ''}
               <strong>{t.name}</strong>
-              <span style={{ color: '#64748b', marginLeft: 8, fontSize: 11 }}>({t.id})</span>
+              <span style={{ color: 'var(--color-text-muted)', marginLeft: 8, fontSize: 11 }}>({t.id})</span>
             </button>
           ))}
         </div>
       )}
       <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '6px 14px', background: '#e2e8f0', color: '#1e293b', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+        <button onClick={onClose} style={{ padding: '6px 14px', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
           关闭
         </button>
       </div>

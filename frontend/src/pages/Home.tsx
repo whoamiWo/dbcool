@@ -34,16 +34,18 @@ export function HomePage() {
   const runningInstances = (instancesQuery.data?.data ?? []).filter((i) => i.status === 'RUNNING' || i.status === 'PENDING');
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>👋 欢迎,{(user as { display_name?: string })?.display_name ?? user?.username ?? '游客'}</h1>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+        👋 欢迎,{(user as { display_name?: string })?.display_name ?? user?.username ?? '游客'}
+      </h1>
 
       {/* 摘要卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
-        <SummaryCard color="#3b82f6" icon="📋" label="未读站内信" value={unreadQuery.data?.data?.unread_count} link="/messages" />
-        <SummaryCard color="#f59e0b" icon="📝" label="待我审批" value={pendingTasks.length} link="/tasks/my" />
-        <SummaryCard color="#10b981" icon="📊" label="运行中工作流" value={runningInstances.length} link="/designer/instances" />
-        <SummaryCard color="#8b5cf6" icon="📐" label="Collection 数" value={colsQuery.data?.data?.length} link="/designer/schemas" />
-        <SummaryCard color="#0ea5e9" icon="🔧" label="工作流数" value={wfQuery.data?.data?.length} link="/designer/workflows" />
+        <SummaryCard color="var(--color-info)" icon="📋" label="未读站内信" value={unreadQuery.data?.data?.unread_count} link="/messages" />
+        <SummaryCard color="var(--color-warning)" icon="📝" label="待我审批" value={pendingTasks.length} link="/tasks/my" />
+        <SummaryCard color="var(--color-success)" icon="📊" label="运行中工作流" value={runningInstances.length} link="/designer/instances" />
+        <SummaryCard color="var(--color-secondary-500)" icon="📐" label="Collection 数" value={colsQuery.data?.data?.length} link="/designer/schemas" />
+        <SummaryCard color="var(--color-primary-500)" icon="🔧" label="工作流数" value={wfQuery.data?.data?.length} link="/designer/workflows" />
       </div>
 
       {/* 待办 + 运行中 */}
@@ -53,8 +55,8 @@ export function HomePage() {
           {pendingTasks.slice(0, 5).map((t) => (
             <Link key={t.id} to={`/designer/instances/${t.instance_id}`} style={itemLink}>
               <span style={{ fontWeight: 500 }}>{t.workflow_title}</span>
-              <span style={{ color: '#94a3b8', fontSize: 11 }}>{t.node_id}</span>
-              <span style={{ color: '#64748b', fontSize: 11 }}>{(t.created_at || '').slice(0, 16)}</span>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{t.node_id}</span>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{(t.created_at || '').slice(0, 16)}</span>
             </Link>
           ))}
         </Panel>
@@ -64,10 +66,10 @@ export function HomePage() {
           {runningInstances.slice(0, 5).map((i) => (
             <Link key={i.id} to={`/designer/instances/${i.id}`} style={itemLink}>
               <span style={{ fontWeight: 500 }}>{i.workflow_title}</span>
-              <span style={{ color: i.status === 'PENDING' ? '#f59e0b' : '#3b82f6', fontSize: 11, fontWeight: 600 }}>
+              <span style={{ color: i.status === 'PENDING' ? 'var(--color-warning)' : 'var(--color-info)', fontSize: 11, fontWeight: 600 }}>
                 {i.status}
               </span>
-              <span style={{ color: '#64748b', fontSize: 11 }}>{(i.started_at || '').slice(0, 16)}</span>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{(i.started_at || '').slice(0, 16)}</span>
             </Link>
           ))}
         </Panel>
@@ -80,7 +82,7 @@ export function HomePage() {
           {(unreadQuery.data?.data?.messages ?? []).map((m) => (
             <div key={m.id} style={itemLink}>
               <span style={{ fontWeight: 500 }}>{m.title}</span>
-              <span style={{ color: '#94a3b8', fontSize: 11 }}>{(m.created_at || '').slice(0, 16)}</span>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{(m.created_at || '').slice(0, 16)}</span>
             </div>
           ))}
         </Panel>
@@ -88,9 +90,9 @@ export function HomePage() {
       </div>
 
       {/* 系统状态 */}
-      <div style={{ marginTop: 16, padding: 12, background: 'white', borderRadius: 8, color: '#64748b', fontSize: 12 }}>
+      <div style={{ marginTop: 16, padding: 12, background: 'rgba(30, 41, 59, 0.5)', borderRadius: 'var(--radius-md)', color: 'var(--color-text-muted)', fontSize: 12, backdropFilter: 'blur(10px)' }}>
         系统状态: {meQuery.isError ? '❌ 鉴权失败' : '✅ 已认证'} |{' '}
-        tenant: <strong>{user?.tenant_id ?? '-'}</strong> |{' '}
+        tenant: <strong style={{ color: 'var(--color-text-primary)' }}>{user?.tenant_id ?? '-'}</strong> |{' '}
         <a href="/api/health" target="_blank" rel="noreferrer">API 健康</a>
       </div>
     </div>
@@ -102,10 +104,26 @@ function SummaryCard({ color, icon, label, value, link }: {
 }) {
   return (
     <Link to={link} style={{
-      padding: 14, background: 'white', borderRadius: 8, borderLeft: `4px solid ${color}`,
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)', textDecoration: 'none', color: '#1e293b',
-    }}>
-      <div style={{ fontSize: 12, color: '#64748b' }}>{icon} {label}</div>
+      padding: 14,
+      background: 'rgba(30, 41, 59, 0.7)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: 'var(--radius-lg)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      boxShadow: 'var(--shadow-md)',
+      textDecoration: 'none',
+      color: 'var(--color-text-primary)',
+      transition: 'all var(--transition-normal)',
+    }}
+    onMouseEnter={(e) => {
+      (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+      (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+    }}
+    onMouseLeave={(e) => {
+      (e.currentTarget as HTMLElement).style.background = 'rgba(30, 41, 59, 0.7)';
+      (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+    }}
+    >
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{icon} {label}</div>
       <div style={{ fontSize: 28, fontWeight: 600, color, marginTop: 4 }}>
         {value === undefined ? '…' : value}
       </div>
@@ -117,10 +135,10 @@ function Panel({ title, link, linkText, children }: {
   title: string; link: string; linkText: string; children: React.ReactNode;
 }) {
   return (
-    <div style={{ background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+    <div className="glass-card" style={{ padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14 }}>{title}</h3>
-        <Link to={link} style={{ fontSize: 11, color: '#3b82f6' }}>{linkText} →</Link>
+        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-primary)' }}>{title}</h3>
+        <Link to={link} style={{ fontSize: 11, color: 'var(--color-primary-400)' }}>{linkText} →</Link>
       </div>
       <div>{children}</div>
     </div>
@@ -128,40 +146,39 @@ function Panel({ title, link, linkText, children }: {
 }
 
 function Empty({ text }: { text: string }) {
-  return <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8' }}>{text}</div>;
+  return <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-text-muted)' }}>{text}</div>;
 }
 
 const itemLink: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center',
-  padding: 6, borderBottom: '1px solid #f1f5f9', color: '#1e293b', textDecoration: 'none', fontSize: 13,
+  padding: 6, borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--color-text-primary)', textDecoration: 'none', fontSize: 13,
+  borderRadius: 'var(--radius-sm)',
+  transition: 'all var(--transition-fast)',
 };
 
 function AuditWidget() {
   const { data, isLoading } = useQuery({
     queryKey: ['audit-recent'],
     queryFn: async () => {
-      // apiClient.get<T> 返回 Promise<T>(拦截器已解包)
-      // 后端返回 { code, message, data: { logs, total } }
-      // 拦截器解包后 r 直接是 { logs, total }
       return apiClient.get<{ logs: AuditPreview[]; total: number }>(
         '/audit/logs?limit=8');
     },
-    refetchInterval: 30000,  // 30s 自动刷新
+    refetchInterval: 30000,
   });
   const logs = data?.logs ?? [];
   return (
-    <div style={{ background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+    <div className="glass-card" style={{ padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14 }}>🔍 最近审计 ({data?.total ?? '…'})</h3>
-        <Link to="/admin/audit" style={{ fontSize: 11, color: '#3b82f6' }}>查看全部 →</Link>
+        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-primary)' }}>🔍 最近审计 ({data?.total ?? '…'})</h3>
+        <Link to="/admin/audit" style={{ fontSize: 11, color: 'var(--color-primary-400)' }}>查看全部 →</Link>
       </div>
       {isLoading && <Empty text="加载中…" />}
       {!isLoading && logs.length === 0 && <Empty text="暂无审计记录" />}
       {logs.map((l: AuditPreview) => {
-        const color = l.action.startsWith('CREATE') || l.action === 'APPROVE' ? '#10b981'
-          : l.action.startsWith('DELETE') || l.action === 'REJECT' ? '#ef4444'
-          : l.action === 'TRIGGER' ? '#8b5cf6'
-          : '#3b82f6';
+        const color = l.action.startsWith('CREATE') || l.action === 'APPROVE' ? 'var(--color-success)'
+          : l.action.startsWith('DELETE') || l.action === 'REJECT' ? 'var(--color-error)'
+          : l.action === 'TRIGGER' ? 'var(--color-secondary-500)'
+          : 'var(--color-info)';
         return (
           <div key={l.id} style={itemLink}>
             <span style={{ fontWeight: 500, fontSize: 12 }}>
@@ -170,9 +187,9 @@ function AuditWidget() {
             </span>
             <span style={{
               fontSize: 10, padding: '1px 6px', borderRadius: 3,
-              background: color + '20', color,
+              background: `${color}20`, color,
             }}>{l.action}</span>
-            <span style={{ color: '#94a3b8', fontSize: 11 }}>{l.created_at.slice(11, 19)}</span>
+            <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{l.created_at.slice(11, 19)}</span>
           </div>
         );
       })}

@@ -9,7 +9,6 @@ interface ChannelListProps {
   onRefresh: () => void;
   onCreateChannel: () => void;
   currentUser: User | null;
-  // 直接复用 api 函数签名,避免手写复杂返回值类型产生偏差
   getUnreadCount: typeof getUnreadCountApi;
 }
 
@@ -32,7 +31,6 @@ export function ChannelList({
   /** R3：分组折叠状态，默认全部展开 */
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  // 拉取各频道未读数。getUnreadCount 是 api 顶层函数、引用稳定,不会造成循环请求。
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -40,20 +38,15 @@ export function ChannelList({
         channels.map(async (c) => {
           try {
             const res = await getUnreadCount(c.id);
-            // 注意:client.ts 响应拦截器返回 response.data,故此处 res 已是 {code,data},
-            // 只需一层 .data(写成 res.data.data 会多一层)
             return [c.id, res.data?.unread_count ?? 0] as const;
           } catch {
-            // 单个频道未读拉取失败不应拖垮整个列表
             return [c.id, 0] as const;
           }
         }),
       );
       if (!cancelled) setUnreadMap(Object.fromEntries(entries));
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [channels, getUnreadCount]);
 
   const groups = useMemo(
@@ -79,12 +72,9 @@ export function ChannelList({
       <div
         key={channel.id}
         onClick={() => onSelect(channel)}
+        className={`channel-item ${active ? 'channel-item-active' : ''}`}
         style={{
-          padding: '8px 12px',
-          borderRadius: 4,
-          cursor: 'pointer',
-          background: active ? '#e0f2fe' : 'transparent',
-          borderLeft: active ? '3px solid #3b82f6' : '3px solid transparent',
+          transition: 'all var(--transition-fast)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
@@ -92,7 +82,7 @@ export function ChannelList({
             style={{
               fontSize: 13,
               fontWeight: active ? 600 : 400,
-              color: active ? '#0f172a' : '#475569',
+              color: active ? 'var(--color-primary-400)' : 'var(--color-text-secondary)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -103,9 +93,9 @@ export function ChannelList({
           {unread > 0 && (
             <span
               style={{
-                background: '#ef4444',
-                color: '#ffffff',
-                borderRadius: 9,
+                background: 'var(--color-error)',
+                color: 'var(--color-text-primary)',
+                borderRadius: 'var(--radius-full)',
                 minWidth: 18,
                 height: 18,
                 padding: '0 6px',
@@ -114,13 +104,14 @@ export function ChannelList({
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
+                boxShadow: 'var(--shadow-sm)',
               }}
             >
               {unread > 99 ? '99+' : unread}
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
           {channel.type === 'PRIVATE' ? '私聊' : '群聊'}
         </div>
       </div>
@@ -128,17 +119,9 @@ export function ChannelList({
   };
 
   return (
-    <div
-      style={{
-        width: 240,
-        borderRight: '1px solid #e2e8f0',
-        overflowY: 'auto',
-        background: '#ffffff',
-        padding: 12,
-      }}
-    >
+    <div className="im-sidebar">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <strong style={{ fontSize: 14 }}>对话</strong>
+        <strong style={{ fontSize: 14, color: 'var(--color-text-primary)' }}>对话</strong>
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             onClick={onRefresh}
@@ -147,8 +130,13 @@ export function ChannelList({
               background: 'transparent',
               cursor: 'pointer',
               fontSize: 12,
-              color: '#64748b',
+              color: 'var(--color-text-muted)',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'all var(--transition-fast)',
             }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-primary)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-muted)'; }}
             title="刷新"
           >
             刷新
@@ -160,8 +148,13 @@ export function ChannelList({
               background: 'transparent',
               cursor: 'pointer',
               fontSize: 12,
-              color: '#2563eb',
+              color: 'var(--color-primary-400)',
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'all var(--transition-fast)',
             }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.1)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             title="新建频道"
           >
             新建
@@ -170,8 +163,8 @@ export function ChannelList({
       </div>
 
       {currentUser && (
-        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
-          当前:{currentUser.username}
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 8, padding: '4px 8px', background: 'var(--glass-bg-light)', borderRadius: 'var(--radius-sm)' }}>
+          🧑 当前: {currentUser.username}
         </div>
       )}
 
@@ -180,7 +173,6 @@ export function ChannelList({
           const isCollapsed = collapsed[group.key] ?? false;
           return (
             <div key={group.key}>
-              {/* R3：分组头，点击折叠/展开 */}
               <button
                 onClick={() => toggleGroup(group.key)}
                 aria-expanded={!isCollapsed}
@@ -190,20 +182,21 @@ export function ChannelList({
                   alignItems: 'center',
                   gap: 6,
                   width: '100%',
-                  padding: '4px 8px',
+                  padding: '6px 8px',
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
                   fontSize: 11,
-                  color: '#64748b',
+                  color: 'var(--color-text-muted)',
                   textAlign: 'left',
-                  borderRadius: 4,
+                  borderRadius: 'var(--radius-sm)',
+                  transition: 'all var(--transition-fast)',
                 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
               >
                 <span style={{ fontSize: 10 }}>{isCollapsed ? '▶' : '▼'}</span>
-                <span>
-                  {group.label} ({group.items.length})
-                </span>
+                <span>{group.label} ({group.items.length})</span>
               </button>
               {!isCollapsed && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4 }}>
@@ -214,7 +207,7 @@ export function ChannelList({
           );
         })}
         {channels.length === 0 && (
-          <div style={{ padding: 12, fontSize: 12, color: '#94a3b8' }}>
+          <div style={{ padding: 12, fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center' }}>
             暂无频道
           </div>
         )}

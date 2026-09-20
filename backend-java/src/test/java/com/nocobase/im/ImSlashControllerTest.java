@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -49,5 +50,35 @@ class ImSlashControllerTest {
         // 端点应反映注册表，而非固定 5 个 —— 证明没有硬编码
         assertThat(commands).hasSize(1);
         assertThat(commands.get(0).get("name")).isEqualTo("/standup");
+    }
+
+    @Test
+    void execute_runsRealHandler() {
+        SlashCommandRegistry reg = new SlashCommandRegistry();
+        reg.register("test", "测试命令",
+                (content, ctx) -> ctx.put("echo", "ran:" + content));
+        ImSlashController c = new ImSlashController(reg);
+
+        // 模拟已登录用户
+        com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user =
+                new com.nocobase.auth.JwtAuthFilter.AuthenticatedUser(
+                        UUID.randomUUID(), "tester", "tenant-test");
+        var auth = new org.springframework.security.authentication
+                .UsernamePasswordAuthenticationToken(user, "token");
+        org.springframework.security.core.context.SecurityContextHolder
+                .getContext().setAuthentication(auth);
+
+        Map<String, Object> body = Map.of(
+                "command", "test",
+                "content", "hello",
+                "channelId", "00000000-0000-0000-0000-000000000000");
+        Map<String, Object> resp = c.execute(body).getBody();
+
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat(resp.get("code")).isEqualTo(0);
+        assertThat(data.get("echo")).isEqualTo("ran:hello");
     }
 }

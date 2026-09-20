@@ -29,12 +29,12 @@ export default function WorkbenchPage() {
   }, [collectionsResp]);
 
   const cards = [
-    { icon: Storage, title: '数据模型', desc: '动态 Collection + 表单/视图设计器', color: '#1976D2', path: '/designer/schemas', count: collections.length, meta: '低代码底座' },
-    { icon: AutoGraph, title: 'BI 报表', desc: '数据透视与图表可视化', color: '#FF9800', path: '/bi', count: 0, meta: '数据分析' },
-    { icon: TaskAlt, title: '项目协同', desc: '任务看板与甘特图', color: '#4CAF50', path: '/projects', count: 0, meta: '项目管理' },
-    { icon: MessageIcon, title: '即时消息', desc: '频道、线程、在线状态', color: '#9C27B0', path: '/im', count: 0, meta: '团队协作' },
-    { icon: Workspaces, title: '工作流', desc: '审批/通知/数据更新/HTTP', color: '#F44336', path: '/designer/workflows', count: 0, meta: '流程引擎' },
-    { icon: FolderOpen, title: 'Wiki 知识库', desc: '文档编辑、版本历史、全文检索', color: '#1565C0', path: '/wiki/kb', count: 0, meta: '知识管理' },
+    { icon: Storage, title: '数据模型', desc: '动态 Collection + 表单/视图设计器', path: '/designer/schemas', count: collections.length, meta: '低代码底座', color: '#3b82f6' },
+    { icon: AutoGraph, title: 'BI 报表', desc: '数据透视与图表可视化', path: '/bi', count: 0, meta: '数据分析', color: '#f59e0b' },
+    { icon: TaskAlt, title: '项目协同', desc: '任务看板与甘特图', path: '/projects', count: 0, meta: '项目管理', color: '#10b981' },
+    { icon: MessageIcon, title: '即时消息', desc: '频道、线程、在线状态', path: '/im', count: 0, meta: '团队协作', color: '#a855f7' },
+    { icon: Workspaces, title: '工作流', desc: '审批/通知/数据更新/HTTP', path: '/designer/workflows', count: 0, meta: '流程引擎', color: '#ef4444' },
+    { icon: FolderOpen, title: 'Wiki 知识库', desc: '文档编辑、版本历史、全文检索', path: '/wiki/kb', count: 0, meta: '知识管理', color: '#3b82f6' },
   ];
 
   const filtered = cards.filter((c) =>
@@ -60,23 +60,42 @@ export default function WorkbenchPage() {
         {filtered.map((c) => (
           <Grid key={c.title} size={{ xs: 12, sm: 6, md: 4 }}>
             <Card
+              onClick={() => navigate(c.path)}
               sx={{
                 height: '100%',
-                borderLeft: `4px solid ${c.color}`,
-                transition: 'box-shadow 150ms ease',
-                '&:hover': { boxShadow: 4 },
                 cursor: 'pointer',
+                background: 'rgba(30, 41, 59, 0.7)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                borderRadius: '12px',
+                transition: 'all 200ms ease',
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '3px',
+                  background: c.color,
+                },
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  boxShadow: '0 12px 48px rgba(0, 0, 0, 0.5)',
+                  transform: 'translateY(-4px)',
+                },
               }}
-              onClick={() => navigate(c.path)}
             >
               <CardContent>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
-                  <Box sx={{ p: 1, borderRadius: 1, bgcolor: `${c.color}15` }}>
+                  <Box sx={{ p: 1, borderRadius: 1, bgcolor: `${c.color}20`, backdropFilter: 'blur(8px)' }}>
                     <c.icon sx={{ color: c.color, fontSize: 28 }} />
                   </Box>
                   <Box sx={{ flex: 1 }}>
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{c.title}</Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>{c.title}</Typography>
                       {c.count > 0 && (
                         <Chip size="small" label={c.count} sx={{ bgcolor: c.color, color: '#fff', height: 20 }} />
                       )}
@@ -84,7 +103,7 @@ export default function WorkbenchPage() {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       {c.desc}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">{c.meta}</Typography>
+                    <Typography variant="caption" color="text.disabled">{c.meta}</Typography>
                   </Box>
                 </Stack>
               </CardContent>
@@ -93,8 +112,8 @@ export default function WorkbenchPage() {
         ))}
       </Grid>
 
-      <Box sx={{ mt: 4, p: 2, bgcolor: '#FAFAFA', borderRadius: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>快速入口</Typography>
+      <Box sx={{ mt: 4, p: 3, background: 'rgba(30, 41, 59, 0.5)', backdropFilter: 'blur(10px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: 'text.primary' }}>快速入口</Typography>
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           {[
             { label: '知识库列表', path: '/wiki/kb' },

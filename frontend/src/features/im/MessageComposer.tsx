@@ -5,11 +5,9 @@ interface MessageComposerProps {
   channelId: string;
   onSent: (message: any) => void;
   disabled?: boolean;
-  /** F4：拖拽上传回调（返回上传后的 attachment URL） */
   onAttachment?: (url: string, filename: string, size: number) => void;
 }
 
-/** F4：Slash 命令面板 */
 const SlashPanel = ({
   commands, onSelect, onClose, position,
 }: {
@@ -32,6 +30,7 @@ const SlashPanel = ({
       ref={listRef}
       role="listbox"
       aria-label="Slash 命令列表"
+      className="glass-strong"
       style={{
         position: 'fixed',
         top: position.top,
@@ -39,13 +38,9 @@ const SlashPanel = ({
         zIndex: 1000,
         minWidth: 240,
         maxWidth: 320,
-        background: '#fff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 8,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-        padding: 8,
         maxHeight: 240,
         overflowY: 'auto',
+        padding: 8,
       }}
     >
       <input
@@ -53,18 +48,11 @@ const SlashPanel = ({
         value={filter}
         onChange={(e) => setFilter(e.currentTarget.value)}
         placeholder="搜索命令..."
-        style={{
-          width: '100%',
-          padding: '6px 8px',
-          border: '1px solid #e2e8f0',
-          borderRadius: 4,
-          fontSize: 13,
-          marginBottom: 4,
-          outline: 'none',
-        }}
+        className="input-glass"
+        style={{ width: '100%', padding: '6px 8px', marginBottom: 4 }}
       />
       {filtered.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#94a3b8', padding: '8px 0' }}>无匹配命令</div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: '8px 0' }}>无匹配命令</div>
       ) : (
         filtered.map((cmd) => (
           <div
@@ -76,23 +64,22 @@ const SlashPanel = ({
             style={{
               padding: '8px 10px',
               cursor: 'pointer',
-              borderRadius: 4,
+              borderRadius: 'var(--radius-sm)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               fontSize: 13,
+              transition: 'all var(--transition-fast)',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = '#f1f5f9'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
           >
-            <span style={{ fontWeight: 500, color: '#1d4ed8' }}>{cmd.name}</span>
-            <span style={{ color: '#64748b', fontSize: 12 }}>{cmd.description}</span>
+            <span style={{ fontWeight: 500, color: 'var(--color-primary-400)' }}>{cmd.name}</span>
+            <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>{cmd.description}</span>
           </div>
         ))
       )}
-      <div
-        style={{ fontSize: 11, color: '#94a3b8', padding: '4px 8px', borderTop: '1px solid #e2e8f0', marginTop: 4 }}
-      >
+      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: '4px 8px', borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 4 }}>
         ↑↓ 选择 · Enter 确认 · Esc 关闭
       </div>
     </div>
@@ -108,7 +95,6 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // F4：加载 Slash 命令列表
   if (!slashCommands.length) {
     listSlashCommands()
       .then((res) => { if (res.code === 0) setSlashCommands(res.data ?? []); })
@@ -144,7 +130,6 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
     target.style.height = 'auto';
     target.style.height = target.scrollHeight + 'px';
 
-    // F4：检测到斜杠弹出命令面板
     if (e.target.value === '/') {
       const rect = target.getBoundingClientRect();
       setSlashPos({ top: rect.bottom + 4, left: rect.left });
@@ -152,7 +137,6 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
     }
   };
 
-  // F4：点击外部关闭 Slash 面板
   const panelRef = useRef<HTMLDivElement>(null);
   useRef(() => {
     const handler = (e: MouseEvent) => {
@@ -170,7 +154,6 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
     if (textareaRef.current) textareaRef.current.focus();
   };
 
-  // F4：文件拖拽上传
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files);
@@ -208,8 +191,9 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
         onDrop={handleDrop}
         style={{
           padding: 12,
-          borderTop: '1px solid #e2e8f0',
-          background: '#f8fafc',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(15, 23, 42, 0.5)',
+          backdropFilter: 'blur(10px)',
           minHeight: 80,
         }}
       >
@@ -219,25 +203,18 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             gap: 8,
             alignItems: 'flex-end',
             padding: 12,
-            background: '#ffffff',
-            borderRadius: 8,
-            border: '1px solid #e2e8f0',
+            background: 'rgba(30, 41, 59, 0.6)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          {/* F4：拖拽上传按钮 */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="拖拽或点击上传文件（≤50MB）"
-            style={{
-              padding: '8px 12px',
-              background: '#f1f5f9',
-              border: '1px solid #e2e8f0',
-              borderRadius: 6,
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              fontSize: 13,
-              color: '#475569',
-            }}
+            className="glass-button"
+            style={{ padding: '8px 12px', fontSize: 13 }}
             disabled={disabled}
           >
             📎
@@ -267,27 +244,15 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             onKeyDown={handleKeyDown}
             placeholder={disabled ? '请选择频道以发送消息' : '输入消息...  (输入 / 打开命令面板)'}
             disabled={disabled}
-            style={{
-              flex: 1,
-              minHeight: 40,
-              maxHeight: 120,
-              resize: 'none',
-              border: 'none',
-              outline: 'none',
-              fontSize: 14,
-              fontFamily: 'inherit',
-              background: 'transparent',
-            }}
+            className="textarea-glass"
           />
           <button
             onClick={handleSend}
             disabled={!content.trim() || isSending || disabled}
+            className="glass-button-primary"
             style={{
               padding: '8px 16px',
-              background: !content.trim() || isSending || disabled ? '#cbd5e1' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
+              opacity: !content.trim() || isSending || disabled ? 0.5 : 1,
               cursor: !content.trim() || isSending || disabled ? 'not-allowed' : 'pointer',
               fontSize: 13,
               fontWeight: 500,
@@ -296,7 +261,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             {isSending ? '发送中...' : '发送'}
           </button>
         </div>
-        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, textAlign: 'right' }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, textAlign: 'right' }}>
           按 Enter 发送，Shift + Enter 换行 · 拖拽文件到此处上传
         </div>
       </div>

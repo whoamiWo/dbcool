@@ -16,9 +16,7 @@ interface MessageListProps {
   onLoadMore?: () => void;
   onEditMessage?: (messageId: string, content: string) => void;
   onDeleteMessage?: (messageId: string) => void;
-  /** F4：置顶消息 id 集合，命中后在消息条顶部显示置顶图标 */
   pinnedMessageIds?: Set<string>;
-  /** F4：阅后即焚到期回调（到期后转不可读态） */
   onBurnExpired?: (messageId: string) => void;
 }
 export function MessageList({
@@ -63,10 +61,9 @@ export function MessageList({
         .catch((e) => console.error("添加表情失败", e));
     }
   };
-  /** F4：Mention 高亮渲染 — @用户ID 药丸主色高亮 */
   const renderContent = (content: string, isBurned: boolean) => {
     if (isBurned) {
-      return <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>该消息已焚毁</span>;
+      return <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>该消息已焚毁</span>;
     }
     const parts = content.split(/(@[A-Za-z0-9_\-]+)/);
     return (
@@ -76,8 +73,8 @@ export function MessageList({
             <span
               key={i}
               style={{
-                background: '#dbeafe',
-                color: '#1d4ed8',
+                background: 'rgba(99, 102, 241, 0.2)',
+                color: 'var(--color-primary-300)',
                 padding: '1px 6px',
                 borderRadius: 10,
                 fontWeight: 500,
@@ -93,7 +90,6 @@ export function MessageList({
     );
   };
 
-  /** F4：阅后即焚倒计时 — 到期后回调并转不可读态 */
   const [burnRemaining, setBurnRemaining] = useState<Record<string, number>>({});
   const burnTimersRef = useRef<Map<string, number>>(new Map());
 
@@ -112,14 +108,12 @@ export function MessageList({
       for (const [id, ms] of active) next[id] = ms;
       return next;
     });
-    // 清理过期计时器
     for (const [id, t] of burnTimersRef.current) {
       if (!active.has(id)) {
         window.clearTimeout(t);
         burnTimersRef.current.delete(id);
       }
     }
-    // 新增倒计时
     for (const [id, ms] of active) {
       if (burnTimersRef.current.has(id)) continue;
       const t = window.setTimeout(() => {
@@ -162,22 +156,15 @@ export function MessageList({
   };
   return (
     <div
-      style={{ flex: 1, overflowY: "auto", padding: 16, background: "#ffffff" }}
+      style={{ flex: 1, overflowY: "auto", padding: 16, background: 'rgba(15, 23, 42, 0.3)' }}
     >
       {canLoadMore && (
         <div style={{ textAlign: "center", margin: "8px 0" }}>
           <button
             onClick={onLoadMore}
             disabled={isLoadingMore}
-            style={{
-              padding: "6px 16px",
-              background: "#f1f5f9",
-              border: "1px solid #e2e8f0",
-              borderRadius: 6,
-              fontSize: 12,
-              color: "#475569",
-              cursor: isLoadingMore ? "wait" : "pointer",
-            }}
+            className="glass-button"
+            style={{ padding: "6px 16px", fontSize: 12, opacity: isLoadingMore ? 0.6 : 1 }}
           >
             {isLoadingMore ? "加载中..." : "加载更早消息"}
           </button>
@@ -205,12 +192,13 @@ export function MessageList({
               <div
                 style={{
                   fontSize: 11,
-                  color: '#d97706',
+                  color: 'var(--color-warning)',
                   padding: '2px 8px',
                   marginBottom: 4,
-                  background: '#fef3c7',
-                  borderRadius: 4,
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  borderRadius: 'var(--radius-sm)',
                   width: 'fit-content',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
                 }}
               >
                 📌 已置顶
@@ -223,13 +211,15 @@ export function MessageList({
                     width: 32,
                     height: 32,
                     borderRadius: "50%",
-                    background: isSelf ? "#3b82f6" : "#64748b",
+                    background: isSelf ? 'var(--color-primary-500)' : 'var(--color-bg-tertiary)',
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
                     fontSize: 12,
+                    fontWeight: 600,
                     flexShrink: 0,
+                    boxShadow: 'var(--shadow-sm)',
                   }}
                 >
                   {msg.senderId.substring(0, 2).toUpperCase()}
@@ -239,85 +229,53 @@ export function MessageList({
                 {!showAvatar && <div style={{ height: 20 }} />}
                 <div
                   onClick={() => onMessageClick?.(msg)}
+                  className={`message-bubble ${isSelf ? 'message-bubble-self' : ''} ${isReply ? 'message-bubble-replied' : ''}`}
                   style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    background: isSelf ? "#dbeafe" : "#f1f5f9",
                     maxWidth: "fit-content",
                     marginLeft: isSelf ? "auto" : 0,
-                    border: isReply ? "1px dashed #fcd34d" : "none",
-                    cursor: onMessageClick ? "pointer" : "default",
                   }}
                 >
                   <div
-                    style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}
+                    style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}
                   >
                     用户 {msg.senderId.substring(0, 8)}
                     {isReply && (
-                      <span style={{ marginLeft: 8, color: "#f59e0b" }}>
+                      <span style={{ marginLeft: 8, color: 'var(--color-warning)' }}>
                         回复
                       </span>
                     )}
                   </div>
                   {isEditing && !isDeleted ? (
-                    <div
-                      style={{ display: "flex", gap: 6, alignItems: "center" }}
-                    >
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <input
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
-                        style={{
-                          flex: 1,
-                          padding: "4px 8px",
-                          border: "1px solid #3b82f6",
-                          borderRadius: 4,
-                          fontSize: 13,
-                          minWidth: 160,
-                          outline: "none",
-                        }}
+                        className="input-glass"
+                        style={{ flex: 1, padding: "4px 8px", fontSize: 13, minWidth: 160 }}
                       />
                       <button
                         onClick={() => {
                           onEditMessage?.(msg.id, editContent);
                           setEditingId(null);
                         }}
-                        style={{
-                          padding: "4px 8px",
-                          background: "#3b82f6",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 4,
-                          fontSize: 12,
-                          cursor: "pointer",
-                        }}
+                        className="glass-button-primary"
+                        style={{ padding: "4px 8px", fontSize: 12 }}
                       >
                         保存
                       </button>
                       <button
                         onClick={() => setEditingId(null)}
-                        style={{
-                          padding: "4px 8px",
-                          background: "#e2e8f0",
-                          color: "#475569",
-                          border: "none",
-                          borderRadius: 4,
-                          fontSize: 12,
-                          cursor: "pointer",
-                        }}
+                        className="glass-button"
+                        style={{ padding: "4px 8px", fontSize: 12 }}
                       >
                         取消
                       </button>
                     </div>
                   ) : (
-                    <div
-                      style={{
-                        fontSize: 14,
-                        color: isDeleted ? "#94a3b8" : "#0f172a",
-                      }}
-                    >
+                    <div style={{ fontSize: 14, color: isDeleted ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }}>
                       {renderContent(isDeleted ? "该消息已删除" : msg.content, !!msg.expiresAt && burnRemaining[msg.id] === 0)}
                       {msg.expiresAt && burnRemaining[msg.id] !== undefined && burnRemaining[msg.id] > 0 && (
-                        <span style={{ marginLeft: 8, fontSize: 11, color: '#ef4444' }}>
+                        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-error)' }}>
                           🔥 {formatBurnTime(burnRemaining[msg.id])}
                         </span>
                       )}
@@ -326,14 +284,7 @@ export function MessageList({
                 </div>
                 {reactionsByMsg[msg.id] &&
                   reactionsByMsg[msg.id].length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 4,
-                        marginTop: 4,
-                      }}
-                    >
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                       {groupReactions(reactionsByMsg[msg.id]).map(
                         ([emoji, count]) => (
                           <button
@@ -341,14 +292,8 @@ export function MessageList({
                             onClick={() =>
                               toggleReaction(msg.id, emoji, currentUserId)
                             }
-                            style={{
-                              border: "1px solid #e2e8f0",
-                              background: "#f8fafc",
-                              borderRadius: 12,
-                              padding: "1px 8px",
-                              fontSize: 12,
-                              cursor: "pointer",
-                            }}
+                            className="glass-button"
+                            style={{ padding: "1px 8px", fontSize: 12 }}
                           >
                             {emoji} {count}
                           </button>
@@ -357,14 +302,7 @@ export function MessageList({
                     </div>
                   )}
                 {!isDeleted && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 4,
-                      marginTop: 2,
-                      alignItems: "center",
-                    }}
-                  >
+                  <div style={{ display: "flex", gap: 4, marginTop: 2, alignItems: "center" }}>
                     <button
                       onClick={() => {
                         ensureReactions(msg.id);
@@ -375,7 +313,7 @@ export function MessageList({
                         background: "transparent",
                         cursor: "pointer",
                         fontSize: 12,
-                        color: "#64748b",
+                        color: 'var(--color-text-muted)',
                         padding: 0,
                       }}
                       title="加表情"
@@ -395,7 +333,7 @@ export function MessageList({
                             background: "transparent",
                             cursor: "pointer",
                             fontSize: 12,
-                            color: "#64748b",
+                            color: 'var(--color-text-muted)',
                             padding: 0,
                           }}
                           title="编辑"
@@ -413,7 +351,7 @@ export function MessageList({
                             background: "transparent",
                             cursor: "pointer",
                             fontSize: 12,
-                            color: "#dc2626",
+                            color: 'var(--color-error)',
                             padding: 0,
                           }}
                           title="删除"
@@ -431,14 +369,8 @@ export function MessageList({
                               toggleReaction(msg.id, emoji, currentUserId);
                               setPickerFor(null);
                             }}
-                            style={{
-                              border: "1px solid #e2e8f0",
-                              background: "#fff",
-                              borderRadius: 4,
-                              cursor: "pointer",
-                              fontSize: 14,
-                              padding: "0 4px",
-                            }}
+                            className="glass-button"
+                            style={{ padding: "0 6px", fontSize: 14 }}
                           >
                             {emoji}
                           </button>
@@ -447,7 +379,7 @@ export function MessageList({
                     )}
                   </div>
                 )}
-                <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>
                   {formatTime(msg.createdAt)}
                 </div>
               </div>

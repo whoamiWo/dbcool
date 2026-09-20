@@ -33,7 +33,6 @@ export function ImChatPage() {
   const [threadMessage, setThreadMessage] = useState<ImMessage | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
-  /** R2：跨频道搜索关键词，非空时展示搜索结果面板 */
   const [searchKeyword, setSearchKeyword] = useState('');
 
   const { data: channelsData, refetch: refetchChannels } = useQuery({
@@ -44,7 +43,6 @@ export function ImChatPage() {
 
   const channels = channelsData?.data || [];
 
-  // Infinite query for cursor pagination
   const {
     data: messagesData,
     fetchNextPage,
@@ -55,8 +53,6 @@ export function ImChatPage() {
     queryKey: ['im-messages', currentChannel?.id],
     queryFn: ({ pageParam }) =>
       getChannelMessages(currentChannel!.id, pageParam as string | undefined, 50),
-    // react-query v5 起 initialPageParam 为必传;缺失会导致泛型无法推导,
-    // 使 getNextPageParam 的 lastPage 与后续 pages 元素退化成 unknown(连锁报错)。
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {
       if (!lastPage.data.has_more) return undefined;
@@ -67,7 +63,6 @@ export function ImChatPage() {
 
   const messages = messagesData?.pages.flatMap((p) => p.data.messages) ?? [];
 
-  // R2/R4：置顶消息 → 供 MessageList 渲染置顶标记
   const { data: pinsData, refetch: refetchPins } = useQuery({
     queryKey: ['im-pins', currentChannel?.id],
     queryFn: () => listPins(currentChannel!.id),
@@ -88,7 +83,6 @@ export function ImChatPage() {
     }
   }, [channels, routeChannelId, currentChannel]);
 
-  // 当频道切换时重置消息并标记已读
   useEffect(() => {
     if (currentChannel && messages.length > 0) {
       const last = messages[messages.length - 1];
@@ -98,7 +92,6 @@ export function ImChatPage() {
     }
   }, [currentChannel?.id, messages.length]);
 
-  // 在线心跳
   useEffect(() => {
     if (!user) return;
     setPresenceHeartbeat();
@@ -109,16 +102,14 @@ export function ImChatPage() {
   const handleChannelSelect = useCallback((channel: ImChannel) => {
     setCurrentChannel(channel);
     setThreadMessage(null);
-    navigate(`/im/${channel.id}`); // 用 navigate 替代 pushState
+    navigate(`/im/${channel.id}`);
   }, [navigate]);
 
   const handleMessageClick = useCallback((message: ImMessage) => {
-    // 仅主消息可打开线程
     if (message.parentId) return;
     setThreadMessage(prev => (prev?.id === message.id ? null : message));
   }, []);
 
-  // 编辑消息
   const handleEditMessage = useCallback(async (messageId: string, content: string) => {
     if (!currentChannel) return;
     try {
@@ -129,7 +120,6 @@ export function ImChatPage() {
     }
   }, [currentChannel, refetchMessages]);
 
-  // 删除消息
   const handleDeleteMessage = useCallback(async (messageId: string) => {
     if (!currentChannel) return;
     try {
@@ -140,12 +130,10 @@ export function ImChatPage() {
     }
   }, [currentChannel, refetchMessages]);
 
-  // R4：阅后即焚到期 → 刷新消息列表使其转为不可读态
   const handleBurnExpired = useCallback(() => {
     refetchMessages();
   }, [refetchMessages]);
 
-  // R4：附件上传成功 → 以 FILE 消息回显到频道
   const handleAttachment = useCallback(
     async (url: string, filename: string, _size: number) => {
       if (!currentChannel) return;
@@ -159,7 +147,6 @@ export function ImChatPage() {
     [currentChannel, refetchMessages],
   );
 
-  // R2：点击搜索结果 → 切到该消息所属频道
   const handleSearchResultClick = useCallback(
     (messageId: string, channelId: string) => {
       const target = channels.find((c) => c.id === channelId);
@@ -172,7 +159,6 @@ export function ImChatPage() {
     [channels, handleChannelSelect],
   );
 
-  // 新建频道
   const handleCreateChannel = useCallback(async () => {
     if (!newChannelName.trim()) return;
     try {
@@ -185,50 +171,30 @@ export function ImChatPage() {
     }
   }, [newChannelName, refetchChannels]);
 
-  // WebSocket 实时订阅
   useEffect(() => {
     if (!user || !currentChannel) return;
-
     const unsub = subscribeToChannel(currentChannel.id, (payload) => {
       try {
         const msg = JSON.parse(payload) as ImMessage;
-        // 如果是软删除更新,直接 refetch
         if (msg.deletedAt) {
           refetchMessages();
           return;
         }
-        // 避免重复
         setThreadMessage?.((prev) => prev?.id === msg.id ? null : prev);
-        // 将实时消息合并到当前列表(避免闪烁,后续可优化为局部更新)
         refetchMessages();
       } catch (e) {
         console.error('解析消息失败', e);
       }
     });
-
-    return () => {
-      unsub();
-    };
+    return () => { unsub(); };
   }, [currentChannel?.id, user?.id, refetchMessages, setThreadMessage]);
 
-  // 清理 WS 连接(页面卸载时)
   useEffect(() => {
-    return () => {
-      disconnectStomp();
-    };
+    return () => { disconnectStomp(); };
   }, []);
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: 'calc(100vh - 80px)',
-        background: '#ffffff',
-        borderRadius: 8,
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      }}
-    >
+    <div className="im-layout">
       <ChannelList
         channels={channels}
         selectedChannel={currentChannel}
@@ -239,29 +205,13 @@ export function ImChatPage() {
         getUnreadCount={getUnreadCount}
       />
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-          minWidth: 0,
-        }}
-      >
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e2e8f0',
-            background: '#f8fafc',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+      <div className="im-main">
+        <div className="im-header">
           <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
               {currentChannel?.name || '选择频道'}
             </h3>
-            <div style={{ fontSize: 12, color: '#64748b' }}>
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
               {currentChannel?.topic || ''}
             </div>
           </div>
@@ -271,20 +221,16 @@ export function ImChatPage() {
               onChange={(e) => setSearchKeyword(e.target.value)}
               placeholder="搜索消息…"
               aria-label="搜索消息"
-              style={{
-                padding: '6px 10px',
-                border: '1px solid #e2e8f0',
-                borderRadius: 6,
-                fontSize: 12,
-                width: 160,
-                outline: 'none',
-              }}
+              className="input-glass"
+              style={{ width: 160 }}
             />
-            <div style={{ fontSize: 12, color: '#64748b' }}>在线</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--color-success)', marginRight: 4 }} />
+              在线
+            </div>
           </div>
         </div>
 
-        {/* R2：置顶区块（接入 PinList，消除死代码） */}
         {currentChannel && (
           <PinList
             channelId={currentChannel.id}
@@ -293,17 +239,9 @@ export function ImChatPage() {
           />
         )}
 
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
-          }}
-        >
+        <div className="im-content">
           {searchKeyword.trim() ? (
-            /* R2：跨频道搜索结果面板（接入 SearchResults，消除死代码） */
-            <div style={{ flex: 1, overflowY: 'auto', background: '#ffffff' }}>
+            <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(15, 23, 42, 0.5)' }}>
               <SearchResults
                 keyword={searchKeyword}
                 onMessageClick={handleSearchResultClick}
@@ -329,7 +267,7 @@ export function ImChatPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#94a3b8',
+                color: 'var(--color-text-muted)',
                 fontSize: 14,
               }}
             >
@@ -341,7 +279,6 @@ export function ImChatPage() {
             <MessageComposer
               channelId={currentChannel.id}
               onSent={(message) => {
-                // MessageComposer 已自己调用 sendMessage，这里只需追加到列表
                 if (message?.id) {
                   refetchMessages();
                 }
@@ -361,10 +298,12 @@ export function ImChatPage() {
 
       {showCreateDialog && (
         <div
+          role="dialog"
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.4)',
+            background: 'rgba(15,23,42,0.7)',
+            backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -374,55 +313,35 @@ export function ImChatPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#ffffff',
-              borderRadius: 8,
-              padding: 20,
-              width: 320,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            }}
+            className="glass-strong"
+            style={{ padding: 20, width: 320 }}
           >
-            <h3 style={{ margin: '0 0 12px', fontSize: 15 }}>新建频道</h3>
+            <h3 style={{ margin: '0 0 12px', fontSize: 15, color: 'var(--color-text-primary)' }}>新建频道</h3>
             <input
               value={newChannelName}
               onChange={(e) => setNewChannelName(e.target.value)}
               placeholder="频道名称"
               autoFocus
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '8px 12px',
-                border: '1px solid #e2e8f0',
-                borderRadius: 6,
-                fontSize: 13,
-                outline: 'none',
-              }}
+              className="input-glass"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', fontSize: 13 }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowCreateDialog(false)}
-                style={{
-                  padding: '6px 12px',
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  fontSize: 12,
-                }}
+                className="glass-button"
+                style={{ padding: '6px 12px', fontSize: 12 }}
               >
                 取消
               </button>
               <button
                 onClick={handleCreateChannel}
                 disabled={!newChannelName.trim()}
+                className="glass-button-primary"
                 style={{
                   padding: '6px 12px',
-                  background: newChannelName.trim() ? '#3b82f6' : '#cbd5e1',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  cursor: newChannelName.trim() ? 'pointer' : 'not-allowed',
                   fontSize: 12,
+                  opacity: newChannelName.trim() ? 1 : 0.5,
+                  cursor: newChannelName.trim() ? 'pointer' : 'not-allowed',
                 }}
               >
                 创建

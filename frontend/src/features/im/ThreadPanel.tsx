@@ -48,46 +48,29 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
 
   if (!parentMessage) {
     return (
-      <div
-        style={{
-          width: 280,
-          borderLeft: '1px solid #e2e8f0',
-          background: '#f8fafc',
-          padding: 16,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#94a3b8',
-          fontSize: 13,
-          textAlign: 'center',
-        }}
-      >
-        选择一条消息查看线程回复
+      <div className="im-thread-panel" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ textAlign: 'center', padding: 16 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
+          <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
+            选择一条消息查看线程回复
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        width: 280,
-        borderLeft: '1px solid #e2e8f0',
-        background: '#ffffff',
+    <div className="im-thread-panel">
+      <div style={{
+        padding: 12,
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        background: 'rgba(15, 23, 42, 0.5)',
+        backdropFilter: 'blur(10px)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <div
-        style={{
-          padding: 12,
-          borderBottom: '1px solid #e2e8f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <strong style={{ fontSize: 13 }}>线程回复</strong>
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <strong style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>线程回复</strong>
         <button
           onClick={onClose}
           style={{
@@ -95,32 +78,44 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
             background: 'transparent',
             cursor: 'pointer',
             fontSize: 16,
-            color: '#64748b',
+            color: 'var(--color-text-muted)',
+            padding: '4px 8px',
+            borderRadius: 'var(--radius-sm)',
+            transition: 'all var(--transition-fast)',
           }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-primary)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--color-text-muted)'; }}
         >
           ×
         </button>
       </div>
 
-      <div style={{ padding: 12, borderBottom: '1px solid #e2e8f0', background: '#f1f5f9' }}>
-        <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>原消息</div>
-        <div style={{ fontSize: 13, color: '#0f172a' }}>
+      <div style={{
+        padding: 12,
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        background: 'rgba(30, 41, 59, 0.5)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: 'var(--radius-md)',
+        margin: '0 12px',
+      }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>原消息</div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
           {parentMessage.deletedAt ? '该消息已删除' : parentMessage.content}
         </div>
-        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 4 }}>
           {formatTime(parentMessage.createdAt)}
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
         {isLoading && (
-          <div style={{ textAlign: 'center', padding: 20, fontSize: 12, color: '#64748b' }}>
+          <div style={{ textAlign: 'center', padding: 20, fontSize: 12, color: 'var(--color-text-muted)' }}>
             加载中...
           </div>
         )}
 
         {!isLoading && threadMessages.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 20, fontSize: 12, color: '#94a3b8' }}>
+          <div style={{ textAlign: 'center', padding: 20, fontSize: 12, color: 'var(--color-text-muted)' }}>
             暂无回复
           </div>
         )}
@@ -128,20 +123,22 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
         {threadMessages.map((msg) => (
           <div key={msg.id} style={{ marginBottom: 12 }}>
             <div
+              className="message-bubble"
               style={{
                 padding: 8,
-                borderRadius: 6,
-                background: '#f8fafc',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(30, 41, 59, 0.5)',
+                backdropFilter: 'blur(10px)',
               }}
             >
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 2 }}>
                 用户 {msg.senderId.substring(0, 8)}
               </div>
-              <div style={{ fontSize: 13, color: '#0f172a' }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
                 {msg.deletedAt ? '该消息已删除' : msg.content}
               </div>
             </div>
-            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
+            <div style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>
               {formatTime(msg.createdAt)}
             </div>
           </div>
@@ -149,22 +146,22 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
       </div>
 
       {/* 线程回复输入框 */}
-      <div
-        style={{
-          padding: 12,
-          borderTop: '1px solid #e2e8f0',
-          background: '#f8fafc',
-        }}
-      >
+      <div style={{
+        padding: 12,
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+        background: 'rgba(15, 23, 42, 0.5)',
+        backdropFilter: 'blur(10px)',
+      }}>
         <div
           style={{
             display: 'flex',
             gap: 8,
             alignItems: 'flex-end',
             padding: 8,
-            background: '#ffffff',
-            borderRadius: 8,
-            border: '1px solid #e2e8f0',
+            background: 'rgba(30, 41, 59, 0.6)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
           <input
@@ -179,15 +176,8 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
             }}
             placeholder="回复这条消息..."
             disabled={isSending}
-            style={{
-              flex: 1,
-              minHeight: 36,
-              border: 'none',
-              outline: 'none',
-              fontSize: 13,
-              fontFamily: 'inherit',
-              background: 'transparent',
-            }}
+            className="input-glass"
+            style={{ flex: 1, minHeight: 36, border: 'none', outline: 'none', fontSize: 13, fontFamily: 'inherit', background: 'transparent' }}
           />
           <button
             onClick={() => {
@@ -195,12 +185,10 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
               setReplyDraft('');
             }}
             disabled={!replyDraft.trim() || isSending}
+            className="glass-button-primary"
             style={{
               padding: '6px 12px',
-              background: !replyDraft.trim() || isSending ? '#cbd5e1' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
+              opacity: !replyDraft.trim() || isSending ? 0.5 : 1,
               cursor: !replyDraft.trim() || isSending ? 'not-allowed' : 'pointer',
               fontSize: 12,
               fontWeight: 500,
