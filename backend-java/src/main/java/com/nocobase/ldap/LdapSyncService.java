@@ -4,11 +4,14 @@ import com.nocobase.ldap.entity.LdapConfigEntity;
 import com.nocobase.ldap.entity.LdapUserMappingEntity;
 import com.nocobase.ldap.repository.LdapConfigRepository;
 import com.nocobase.ldap.repository.LdapUserMappingRepository;
-import com.nocobase.auth.UserAdminService;
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
+import org.springframework.ldap.core.ContextMapper;
+import org.springframework.ldap.core.DirContextOperations;
+import org.springframework.ldap.core.LdapTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,16 +37,19 @@ public class LdapSyncService {
     private final LdapConfigRepository ldapConfigRepository;
     private final LdapUserMappingRepository ldapUserMappingRepository;
     private final UserRepository userRepository;
+    private final LdapTemplate ldapTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public LdapSyncService(
             LdapConfigRepository ldapConfigRepository,
             LdapUserMappingRepository ldapUserMappingRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            LdapTemplate ldapTemplate
     ) {
         this.ldapConfigRepository = ldapConfigRepository;
         this.ldapUserMappingRepository = ldapUserMappingRepository;
         this.userRepository = userRepository;
+        this.ldapTemplate = ldapTemplate;
     }
 
     /**
@@ -87,7 +93,7 @@ public class LdapSyncService {
     }
 
     /**
-     * 执行同步 — 从 LDAP 导入所有用户。
+     * 执行同步 — 从 LDAP 导入所有用户（真实 LdapTemplate 查询）。
      */
     @Transactional
     public Map<String, Object> syncUsers(UUID configId, String tenantId) {
@@ -102,16 +108,23 @@ public class LdapSyncService {
         int errorCount = 0;
         
         try {
-            // TODO: 实际 LDAP 搜索需要引入 spring-ldap 依赖
-            // 当前使用模拟数据演示流程
-            List<Map<String, Object>> ldapUsers = new ArrayList<>();
-            // 模拟从 LDAP 获取的用户列表
-            Map<String, Object> mockUser = new HashMap<>();
-            mockUser.put("dn", "uid=testuser,dc=example,dc=com");
-            mockUser.put("uid", "testuser");
-            mockUser.put("displayName", "Test User");
-            mockUser.put("email", "test@example.com");
-            ldapUsers.add(mockUser);
+            // 使用 LdapTemplate 真实查询 LDAP 目录
+            String filter = config.getUserSearchFilter();
+            List<String> attributes = List.of("dn", "uid", "displayName", "mail", "email");
+            List<Map<String, Object>> ldapUsers = ldapTemplate.search(
+                    config.getBaseDn(),
+                    filter,
+                    (ContextMapper<Map<String, Object>>) ctx -> {
+                        DirContextOperations d = (DirContextOperations) ctx;
+                        Map<String, Object> user = new HashMap<>();
+                        user.put("dn", d.getNameInNamespace());
+                        user.put("uid", d.getStringAttribute("uid"));
+                        user.put("displayName", d.getStringAttribute("displayName"));
+                        user.put("mail", d.getStringAttribute("mail"));
+                        user.put("email", d.getStringAttribute("email"));
+                        return user;
+                    }
+            );
             
             for (Map<String, Object> ldapUser : ldapUsers) {
                 try {
@@ -139,6 +152,24 @@ public class LdapSyncService {
         result.put("errors", errorCount);
         result.put("status", "SUCCESS");
         return result;
+    }
+
+    /**
+     * 定时同步（按配置的 syncIntervalMinutes 执行）。
+     */
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void scheduledSync() {
+        try {
+            List<LdapConfigEntity> configs = ldapConfigRepository.findByTenantId("system");
+            for (LdapConfigEntity config : configs) {
+                if (Boolean.TRUE.equals(config.getEnabled())) {
+                    syncUsers(config.getId(), config.getTenantId());
+                }
+            }
+        } catch (Exception e) {
+            // 定时任务失败不影响其他任务
+        }
     }
 
     /**

@@ -7,12 +7,18 @@ import com.nocobase.automation.entity.AutomationRuleEntity;
 import com.nocobase.automation.repository.AutomationExecutionRepository;
 import com.nocobase.automation.repository.AutomationRuleRepository;
 import com.nocobase.meta.CollectionService;
+import com.nocobase.notification.NotificationService;
+import com.nocobase.notification.WebhookDispatcher;
 import com.nocobase.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.UUID;
@@ -52,17 +58,23 @@ public class AutomationRuleService {
     private final AutomationRuleRepository ruleRepository;
     private final AutomationExecutionRepository executionRepository;
     private final CollectionService collectionService;
+    private final NotificationService notificationService;
+    private final WebhookDispatcher webhookDispatcher;
     private final ObjectMapper objectMapper;
 
     public AutomationRuleService(
             AutomationRuleRepository ruleRepository,
             AutomationExecutionRepository executionRepository,
             CollectionService collectionService,
+            NotificationService notificationService,
+            WebhookDispatcher webhookDispatcher,
             ObjectMapper objectMapper
     ) {
         this.ruleRepository = ruleRepository;
         this.executionRepository = executionRepository;
         this.collectionService = collectionService;
+        this.notificationService = notificationService;
+        this.webhookDispatcher = webhookDispatcher;
         this.objectMapper = objectMapper;
     }
 
@@ -269,18 +281,68 @@ public class AutomationRuleService {
         }
     }
 
+    /**
+     * 执行完整自动化规则（供 AutomationTriggerListener 调用）。
+     */
+    @Transactional
+    public void executeRule(AutomationRuleEntity rule, Map<String, Object> data,
+                            String recordId, UUID userId) {
+        long startTime = System.currentTimeMillis();
+        AutomationExecutionEntity execution = new AutomationExecutionEntity();
+        execution.setId(UUID.randomUUID());
+        execution.setRuleId(rule.getId());
+        execution.setRecordId(recordId);
+        execution.setStatus("RUNNING");
+        execution.setTriggeredBy(userId);
+        execution.setCreatedAt(Instant.now());
+        executionRepository.save(execution);
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> actions = (List<Map<String, Object>>) rule.getActions();
+            if (actions != null) {
+                for (Map<String, Object> action : actions) {
+                    executeAction(action, data, rule);
+                }
+            }
+            execution.setStatus("SUCCESS");
+            execution.setExecutionTimeMs(System.currentTimeMillis() - startTime);
+        } catch (Exception e) {
+            execution.setStatus("FAILED");
+            execution.setErrorMessage(e.getMessage());
+            execution.setExecutionTimeMs(System.currentTimeMillis() - startTime);
+            log.warn("[AUTOMATION EXECUTE] ruleId={} failed: {}", rule.getId(), e.getMessage());
+        }
+        executionRepository.save(execution);
+    }
+
     private void executeNotify(Map<String, Object> action, Map<String, Object> data) {
         String message = (String) action.get("message");
-        log.info("[AUTOMATION NOTIFY] {}", message);
-        // TODO: 集成通知服务
+        String recipient = (String) action.get("recipient");
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("message", message);
+        payload.put("source", "automation");
+        payload.put("data", data);
+        try {
+            notificationService.fire(TenantContext.currentTenantId(), "automation.notify",
+                    recipient != null ? recipient : "all", payload);
+            log.info("[AUTOMATION NOTIFY] sent to={}", recipient);
+        } catch (Exception e) {
+            log.warn("[AUTOMATION NOTIFY] failed: {}", e.getMessage());
+        }
     }
 
     private void executeUpdateRecord(Map<String, Object> action, Map<String, Object> data, AutomationRuleEntity rule) {
         String recordId = (String) data.get("recordId");
         Map<String, Object> updates = (Map<String, Object>) action.get("updates");
         if (recordId != null && updates != null) {
-            // 更新集合记录
-            log.info("[AUTOMATION UPDATE_RECORD] recordId={}, updates={}", recordId, updates);
+            try {
+                collectionService.updateRecord(rule.getCollectionName(), recordId, updates,
+                        TenantContext.currentTenantId());
+                log.info("[AUTOMATION UPDATE_RECORD] recordId={}", recordId);
+            } catch (Exception e) {
+                log.warn("[AUTOMATION UPDATE_RECORD] failed: {}", e.getMessage());
+            }
         }
     }
 
@@ -288,14 +350,44 @@ public class AutomationRuleService {
         String collectionName = (String) action.get("collection");
         Map<String, Object> fields = (Map<String, Object>) action.get("fields");
         if (collectionName != null && fields != null) {
-            log.info("[AUTOMATION CREATE_RECORD] collection={}, fields={}", collectionName, fields);
+            try {
+                UUID newId = collectionService.insertRecord(collectionName, fields,
+                        TenantContext.currentTenantId());
+                log.info("[AUTOMATION CREATE_RECORD] collection={}, newId={}", collectionName, newId);
+            } catch (Exception e) {
+                log.warn("[AUTOMATION CREATE_RECORD] failed: {}", e.getMessage());
+            }
         }
     }
 
     private void executeWebhook(Map<String, Object> action, Map<String, Object> data) {
         String url = (String) action.get("url");
-        log.info("[AUTOMATION WEBHOOK] url={}", url);
-        // TODO: 调用外部 Webhook
+        if (url != null && !url.isBlank()) {
+            try {
+                sendWebhookDirect(url, data);
+                log.info("[AUTOMATION WEBHOOK] url={}", url);
+            } catch (Exception e) {
+                log.warn("[AUTOMATION WEBHOOK] failed: {}", e.getMessage());
+            }
+        }
+    }
+
+    private void sendWebhookDirect(String url, Map<String, Object> data) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        String json = mapper.writeValueAsString(data);
+        HttpClient http = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url))
+                .timeout(Duration.ofSeconds(10))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+            throw new RuntimeException("webhook failed: HTTP " + resp.statusCode());
+        }
     }
 
     private double toDouble(Object o) {
