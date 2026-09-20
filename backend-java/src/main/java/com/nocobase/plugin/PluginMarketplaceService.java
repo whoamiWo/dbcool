@@ -146,7 +146,11 @@ public class PluginMarketplaceService {
         PluginMarketplaceAppEntity app = appRepository.findByAppKeyAndTenantId(appKey, tenantId)
                 .orElseThrow(() -> new RuntimeException("应用不存在: " + appKey));
 
-        app.setConfigJson(objectMapper.writeValueAsString(config));
+        try {
+            app.setConfigJson(objectMapper.writeValueAsString(config));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new RuntimeException("序列化配置失败", e);
+        }
         app.setUpdatedAt(Instant.now());
         appRepository.save(app);
 

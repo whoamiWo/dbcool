@@ -3,7 +3,7 @@ package com.nocobase.search;
 import com.nocobase.wiki.WikiPageService;
 import com.nocobase.wiki.WikiPageEntity;
 import com.nocobase.im.MessageService;
-import com.nocobase.im.ImMessageEntity;
+import com.nocobase.im.entity.ImMessageEntity;
 import com.nocobase.meta.CollectionService;
 import com.nocobase.automation.AutomationRuleService;
 import org.springframework.stereotype.Service;
@@ -70,14 +70,18 @@ public class UnifiedSearchService {
             try {
                 List<ImMessageEntity> messages = messageService.searchCrossChannel(
                         tenantId, null, null, keyword, perTypeLimit);
-                allResults.addAll(messages.stream().map(m -> Map.of(
-                        "type", "message",
-                        "id", m.getId(),
-                        "title", m.getContent(),
-                        "snippet", m.getContent(),
-                        "channelId", m.getChannelId(),
-                        "createdAt", m.getCreatedAt()
-                )).toList());
+                List<Map<String, Object>> msgResults = new ArrayList<>();
+                for (ImMessageEntity m : messages) {
+                    Map<String, Object> msgMap = new HashMap<>();
+                    msgMap.put("type", "message");
+                    msgMap.put("id", m.getId());
+                    msgMap.put("title", m.getContent());
+                    msgMap.put("snippet", m.getContent());
+                    msgMap.put("channelId", m.getChannelId());
+                    msgMap.put("createdAt", m.getCreatedAt());
+                    msgResults.add(msgMap);
+                }
+                allResults.addAll(msgResults);
             } catch (Exception e) {
                 // 搜索失败不影响其他模块
             }
@@ -86,16 +90,21 @@ public class UnifiedSearchService {
         // 搜索 Wiki 页面
         if (types == null || types.contains("wiki")) {
             try {
-                List<WikiPageEntity> pages = 
+                List<WikiPageEntity> pages =
                         wikiPageService.listByKbAndStatus(null, "PUBLISHED", tenantId);
-                allResults.addAll(pages.stream().map(p -> Map.of(
-                        "type", "wiki",
-                        "id", p.getId(),
-                        "title", p.getTitle(),
-                        "snippet", p.getContent() != null ? p.getContent().substring(0, Math.min(200, p.getContent().length())) : "",
-                        "slug", p.getSlug(),
-                        "createdAt", p.getCreatedAt()
-                )).toList());
+                List<Map<String, Object>> wikiResults = new ArrayList<>();
+                for (WikiPageEntity p : pages) {
+                    Map<String, Object> wikiMap = new HashMap<>();
+                    wikiMap.put("type", "wiki");
+                    wikiMap.put("id", p.getId());
+                    wikiMap.put("title", p.getTitle());
+                    String snippet = p.getContent() != null ? p.getContent().substring(0, Math.min(200, p.getContent().length())) : "";
+                    wikiMap.put("snippet", snippet);
+                    wikiMap.put("slug", p.getSlug());
+                    wikiMap.put("createdAt", p.getCreatedAt());
+                    wikiResults.add(wikiMap);
+                }
+                allResults.addAll(wikiResults);
             } catch (Exception e) {
                 // 搜索失败不影响其他模块
             }
@@ -105,29 +114,33 @@ public class UnifiedSearchService {
         if (types == null || types.contains("record")) {
             try {
                 // 简化:实际应使用 CollectionService 的搜索功能
-                allResults.add(Map.of(
-                        "type", "record",
-                        "id", "search-placeholder",
-                        "title", "Collection 记录搜索(待实现)",
-                        "snippet", "使用关键词: " + keyword
-                ));
+                Map<String, Object> recordResult = new HashMap<>();
+                recordResult.put("type", "record");
+                recordResult.put("id", "search-placeholder");
+                recordResult.put("title", "Collection 记录搜索(待实现)");
+                recordResult.put("snippet", "使用关键词: " + keyword);
+                allResults.add(recordResult);
             } catch (Exception e) {
                 // 搜索失败不影响其他模块
             }
         }
-        
+
         // 搜索自动化规则
         if (types == null || types.contains("automation")) {
             try {
                 List<com.nocobase.automation.entity.AutomationRuleEntity> rules =
                         automationRuleService.listRules(tenantId);
-                allResults.addAll(rules.stream().map(r -> Map.of(
-                        "type", "automation",
-                        "id", r.getId(),
-                        "title", r.getName(),
-                        "snippet", r.getDescription() != null ? r.getDescription() : "",
-                        "triggerType", r.getTriggerType()
-                )).toList());
+                List<Map<String, Object>> autoResults = new ArrayList<>();
+                for (com.nocobase.automation.entity.AutomationRuleEntity r : rules) {
+                    Map<String, Object> autoMap = new HashMap<>();
+                    autoMap.put("type", "automation");
+                    autoMap.put("id", r.getId());
+                    autoMap.put("title", r.getName());
+                    autoMap.put("snippet", r.getDescription() != null ? r.getDescription() : "");
+                    autoMap.put("triggerType", r.getTriggerType());
+                    autoResults.add(autoMap);
+                }
+                allResults.addAll(autoResults);
             } catch (Exception e) {
                 // 搜索失败不影响其他模块
             }

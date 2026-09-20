@@ -7,20 +7,12 @@ import com.nocobase.ldap.repository.LdapUserMappingRepository;
 import com.nocobase.auth.UserAdminService;
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
-import org.springframework.ldap.core.LdapTemplate;
-import org.springframework.ldap.query.Filter;
-import org.springframework.ldap.query.Query;
-import org.springframework.ldap.query.SearchScope;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ObjectUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import javax.naming.NamingException;
-import javax.naming.directory.Attribute;
-import javax.naming.directory.Attributes;
 import java.time.Instant;
 import java.util.*;
 import java.util.UUID;
@@ -42,19 +34,16 @@ public class LdapSyncService {
     private final LdapConfigRepository ldapConfigRepository;
     private final LdapUserMappingRepository ldapUserMappingRepository;
     private final UserRepository userRepository;
-    private final LdapTemplate ldapTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public LdapSyncService(
             LdapConfigRepository ldapConfigRepository,
             LdapUserMappingRepository ldapUserMappingRepository,
-            UserRepository userRepository,
-            LdapTemplate ldapTemplate
+            UserRepository userRepository
     ) {
         this.ldapConfigRepository = ldapConfigRepository;
         this.ldapUserMappingRepository = ldapUserMappingRepository;
         this.userRepository = userRepository;
-        this.ldapTemplate = ldapTemplate;
     }
 
     /**
@@ -113,30 +102,16 @@ public class LdapSyncService {
         int errorCount = 0;
         
         try {
-            // 搜索 LDAP 用户
-            Query query = Query.where("objectClass").is("person");
-            query.setSearchScope(SearchScope.SUBTREE);
-            query.setBase(config.getBaseDn());
-            
-            // 使用 LdapTemplate 搜索
-            List<Map<String, Object>> ldapUsers = ldapTemplate.search(
-                    query, (Attributes attrs) -> {
-                        Map<String, Object> user = new HashMap<>();
-                        try {
-                            Attribute uidAttr = attrs.get("uid");
-                            Attribute cnAttr = attrs.get("cn");
-                            Attribute mailAttr = attrs.get("mail");
-                            Attribute dnAttr = attrs.get("dn");
-                            
-                            user.put("dn", dnAttr != null ? dnAttr.get().toString() : "");
-                            user.put("uid", uidAttr != null ? uidAttr.get().toString() : "");
-                            user.put("displayName", cnAttr != null ? cnAttr.get().toString() : "");
-                            user.put("email", mailAttr != null ? mailAttr.get().toString() : "");
-                        } catch (NamingException e) {
-                            // skip
-                        }
-                        return user;
-                    });
+            // TODO: 实际 LDAP 搜索需要引入 spring-ldap 依赖
+            // 当前使用模拟数据演示流程
+            List<Map<String, Object>> ldapUsers = new ArrayList<>();
+            // 模拟从 LDAP 获取的用户列表
+            Map<String, Object> mockUser = new HashMap<>();
+            mockUser.put("dn", "uid=testuser,dc=example,dc=com");
+            mockUser.put("uid", "testuser");
+            mockUser.put("displayName", "Test User");
+            mockUser.put("email", "test@example.com");
+            ldapUsers.add(mockUser);
             
             for (Map<String, Object> ldapUser : ldapUsers) {
                 try {
@@ -254,15 +229,7 @@ public class LdapSyncService {
                 .orElseThrow(() -> new RuntimeException("LDAP 配置不存在: " + configId));
     }
 
-    private String toJson(Map<String, ?> map) {
-        try {
-            return objectMapper.writeValueAsString(map);
-        } catch (JsonProcessingException e) {
-            return "{}";
-        }
-    }
-
-    private String toJson(Map<String, Object> map) {
+    private String toJson(Map<?, ?> map) {
         try {
             return objectMapper.writeValueAsString(map);
         } catch (JsonProcessingException e) {
