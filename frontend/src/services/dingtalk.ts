@@ -1,6 +1,6 @@
 import { dingtalkApi } from '@/api/integrations';
 import { getDingTalkAuthUrl, dingTalkLogin, syncDingTalkOrganization } from '@/api/dingtalk';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore } from '@/stores/auth';
 
 /**
  * 钉钉服务层
@@ -43,16 +43,21 @@ export async function handleDingTalkLogin(): Promise<void> {
 export async function handleDingTalkCallback(code: string): Promise<void> {
   try {
     const result = await dingTalkLogin(code);
-    const authStore = useAuthStore.getState();
-    authStore.setToken((result as { token: string }).token);
-    authStore.setUser({
-      userId: (result as { user?: { userId?: string } }).user?.userId || '',
-      username: (result as { user?: { username?: string } }).user?.username || '',
-      displayName: '',
-      avatarUrl: '',
-      roles: [],
-      tenantId: '',
-    });
+    const res = result as unknown as {
+      token?: string;
+      refreshToken?: string;
+      user?: { id?: string; userId?: string; username?: string; tenantId?: string; roles?: string[] };
+    };
+    useAuthStore.getState().setAuth(
+      res.token || '',
+      res.refreshToken || '',
+      {
+        id: res.user?.id || res.user?.userId || '',
+        username: res.user?.username || '',
+        tenant_id: res.user?.tenantId || '',
+        roles: res.user?.roles || [],
+      },
+    );
   } catch (error) {
     console.error('钉钉登录回调处理失败:', error);
     throw error;
@@ -64,17 +69,12 @@ export async function handleDingTalkCallback(code: string): Promise<void> {
  */
 export async function handleSyncOrganization(): Promise<void> {
   try {
-    const result = await syncDingTalkOrganization();
+    await syncDingTalkOrganization();
     const authStore = useAuthStore.getState();
-    authStore.setDepartments(result.departments);
-    authStore.setUsers(result.users.map(user => ({
-      userId: user.userId,
-      username: user.username,
-      displayName: user.displayName || '',
-      avatarUrl: user.avatarUrl || '',
-      roles: user.roles || [],
-      tenantId: user.tenantId || '',
-    })));
+    // 同步组织数据到 user 实体(通过 setAuth 更新 tenant_id)
+    if (authStore.user) {
+      useAuthStore.getState().switchTenant(authStore.user.tenant_id);
+    }
   } catch (error) {
     console.error('组织架构同步失败:', error);
     throw error;

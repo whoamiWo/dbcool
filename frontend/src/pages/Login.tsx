@@ -68,7 +68,12 @@ export function LoginPage() {
         localStorage.removeItem(REMEMBER_KEY);
       }
 
-      setAuth((res as any).data?.access_token ?? (res as any).access_token, (res as any).data?.user ?? (res as any).user);
+      const respData = (res as any).data ?? (res as any);
+      setAuth(
+        respData.access_token ?? respData.accessToken ?? '',
+        respData.refresh_token ?? respData.refreshToken ?? '',
+        respData.user ?? respData,
+      );
       setSuccessHint('登录成功,正在跳转…');
       setTimeout(() => navigate('/home'), 300);
     } catch (e) {

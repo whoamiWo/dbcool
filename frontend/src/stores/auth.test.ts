@@ -17,38 +17,44 @@ describe('useAuthStore', () => {
     const user = {
       id: 'u1', username: 'alice', tenant_id: 't', roles: ['admin'],
     };
-    useAuthStore.getState().setAuth('fake-jwt', user);
+    useAuthStore.getState().setAuth('fake-jwt', 'fake-refresh', user);
 
     const state = useAuthStore.getState();
     expect(state.accessToken).toBe('fake-jwt');
+    expect(state.refreshToken).toBe('fake-refresh');
     expect(state.user).toEqual(user);
     expect(localStorage.getItem('nocobase_access_token')).toBe('fake-jwt');
+    expect(localStorage.getItem('nocobase_refresh_token')).toBe('fake-refresh');
   });
 
   it('setAuth 多次调用:后者覆盖', () => {
-    useAuthStore.getState().setAuth('tok-1', {
+    useAuthStore.getState().setAuth('tok-1', 'ref-1', {
       id: 'u1', username: 'a', tenant_id: 't', roles: [],
     });
-    useAuthStore.getState().setAuth('tok-2', {
+    useAuthStore.getState().setAuth('tok-2', 'ref-2', {
       id: 'u2', username: 'b', tenant_id: 't', roles: [],
     });
 
     const state = useAuthStore.getState();
     expect(state.accessToken).toBe('tok-2');
+    expect(state.refreshToken).toBe('ref-2');
     expect(state.user?.id).toBe('u2');
     expect(localStorage.getItem('nocobase_access_token')).toBe('tok-2');
+    expect(localStorage.getItem('nocobase_refresh_token')).toBe('ref-2');
   });
 
   it('clear:重置 token + user + localStorage', () => {
-    useAuthStore.getState().setAuth('fake-jwt', {
+    useAuthStore.getState().setAuth('fake-jwt', 'fake-refresh', {
       id: 'u', username: 'u', tenant_id: 't', roles: [],
     });
     useAuthStore.getState().clear();
 
     const state = useAuthStore.getState();
     expect(state.accessToken).toBeNull();
+    expect(state.refreshToken).toBeNull();
     expect(state.user).toBeNull();
     expect(localStorage.getItem('nocobase_access_token')).toBeNull();
+    expect(localStorage.getItem('nocobase_refresh_token')).toBeNull();
   });
 
   it('reload 持久化:从 localStorage 恢复 token', () => {

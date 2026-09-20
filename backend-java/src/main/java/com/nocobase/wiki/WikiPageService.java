@@ -239,6 +239,17 @@ public class WikiPageService {
         return pageRepository.save(e);
     }
 
+    /** 标记页面为模板（带租户校验）。 */
+    @Transactional
+    public WikiPageEntity markTemplate(UUID id, boolean isTemplate, String tenantId) {
+        WikiPageEntity e = get(id);
+        if (!e.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权操作");
+        }
+        e.setIsTemplate(isTemplate);
+        return pageRepository.save(e);
+    }
+
     /** 列出所有模板页面。 */
     public List<WikiPageEntity> listTemplates(String tenantId) {
         return pageRepository.findByIsTemplateTrueAndTenantId(tenantId);

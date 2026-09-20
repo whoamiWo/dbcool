@@ -35,15 +35,11 @@ export function DetailViewPage() {
   const displayFields = config.fields ?? fields.map((f) => f.name);
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      <h1>{view.title}</h1>
+    <div style={{ maxWidth: 800, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
+      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{view.title}</h1>
       <div
-        style={{
-          background: 'white',
-          padding: 24,
-          borderRadius: 8,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        }}
+        className="glass-card"
+        style={{ padding: 24, borderRadius: 8 }}
       >
         {displayFields
           .filter((fn) => !(config.hiddenFields ?? []).includes(fn))
@@ -57,12 +53,12 @@ export function DetailViewPage() {
                   display: 'grid',
                   gridTemplateColumns: '140px 1fr',
                   padding: '8px 0',
-                  borderBottom: '1px solid #e2e8f0',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
                 }}
               >
-                <div style={{ color: '#64748b', fontSize: 13 }}>{f?.label ?? fn}</div>
-                <div style={{ fontSize: 14 }}>
-                  {val == null ? <span style={{ color: '#94a3b8' }}>—</span> : String(val)}
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{f?.label ?? fn}</div>
+                <div style={{ fontSize: 14, color: 'var(--color-text-primary)' }}>
+                  {val == null ? <span style={{ color: 'var(--color-text-muted)' }}>—</span> : String(val)}
                 </div>
               </div>
             );

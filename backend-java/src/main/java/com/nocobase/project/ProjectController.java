@@ -24,6 +24,32 @@ public class ProjectController {
         this.projectService = projectService;
     }
 
+    /** 项目列表。 */
+    @GetMapping
+    public Map<String, Object> listProjects(@AuthenticationPrincipal AuthenticatedUser user) {
+        List<ProjectEntity> projects = projectService.listByTenant(user.tenantId());
+        return Map.of("code", 0, "message", "success",
+                "data", projects.stream().map(this::projectToDto).toList(),
+                "total", projects.size());
+    }
+
+    /** 创建项目：body = {name, description}. */
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> createProject(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String name = (String) body.get("name");
+        if (name == null || name.isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "项目名称必填");
+        }
+        String description = (String) body.get("description");
+        ProjectEntity project = projectService.create(name, description, user.userId(), user.tenantId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                Map.of("code", 0, "message", "success", "data", projectToDto(project)));
+    }
+
     /** 创建任务:body = {projectId, title, description, parentId, assigneeId, status, priority, startDate, endDate} */
     @PostMapping("/tasks")
     public ResponseEntity<Map<String, Object>> createTask(
@@ -137,6 +163,17 @@ public class ProjectController {
         m.put("endDate", t.getEndDate() == null ? null : t.getEndDate().toString());
         m.put("progress", t.getProgress());
         m.put("sortOrder", t.getSortOrder());
+        return m;
+    }
+
+    private Map<String, Object> projectToDto(ProjectEntity p) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", p.getId().toString());
+        m.put("name", p.getName());
+        m.put("description", p.getDescription());
+        m.put("ownerId", p.getOwnerId().toString());
+        m.put("createdAt", p.getCreatedAt().toString());
+        m.put("updatedAt", p.getUpdatedAt().toString());
         return m;
     }
 

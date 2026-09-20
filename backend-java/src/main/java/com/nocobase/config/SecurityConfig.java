@@ -61,6 +61,9 @@ public class SecurityConfig {
                         // 注意只放行 /ws/im/** —— 不放行 /ws/**,避免既有 /ws/alerts
                         // (原生端点,自身无鉴权)被一并暴露。
                         .requestMatchers("/ws/im/**").permitAll()
+                        // Huddle WebRTC 信令:原生 WS,同样无法携带 Authorization 头,
+                        // 握手鉴权由 StompHandshakeInterceptor 统一完成。
+                        .requestMatchers("/ws/huddle").permitAll()
                         // Swagger / OpenAPI(Week 14.5)
                         .requestMatchers(
                                 "/v3/api-docs/**",

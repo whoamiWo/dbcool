@@ -38,9 +38,9 @@ export function GalleryViewPage() {
   const cardFields = config.cardFields ?? fields.filter((f) => f.type !== 'belongsTo' && f.type !== 'hasMany').map((f) => f.name);
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
-      <h1>{viewData.title}</h1>
-      <p style={{ color: '#64748b', marginBottom: 24 }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
+      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{viewData.title}</h1>
+      <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>
         共 {records.length} 条记录
       </p>
 
@@ -51,7 +51,7 @@ export function GalleryViewPage() {
       </div>
 
       {records.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 48, color: '#64748b' }}>
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
           无数据
         </div>
       )}
@@ -71,25 +71,18 @@ function Card({ record, fieldMap, titleField, displayFields }: CardProps) {
 
   return (
     <div
-      style={{
-        background: 'white',
-        borderRadius: 8,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        padding: 16,
-        transition: 'box-shadow 0.2s',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)')}
-      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)')}
+      className="glass-card"
+      style={{ borderRadius: 8, padding: 16 }}
     >
-      <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>{title ?? '—'}</h3>
+      <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>{title ?? '—'}</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {displayFields.map((fieldName) => {
           const field = fieldMap.get(fieldName);
           const value = record[fieldName];
           if (!field || value == null) return null;
           return (
-            <div key={fieldName} style={{ fontSize: 13, color: '#475569' }}>
-              <span style={{ color: '#64748b' }}>{field.label ?? fieldName}: </span>
+            <div key={fieldName} style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              <span style={{ color: 'var(--color-text-muted)' }}>{field.label ?? fieldName}: </span>
               <span>{renderValue(value, field)}</span>
             </div>
           );

@@ -1,9 +1,13 @@
 package com.nocobase.wiki;
 
-import com.nocobase.audit.AuditService;
+import com.nocobase.wiki.WikiTemplateService;
+import com.nocobase.wiki.WikiBacklinkRepository;
+import com.nocobase.wiki.WikiBacklinkEntity;
 import com.nocobase.auth.AclEnforcer;
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.event.RecordChangeEvent;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,8 +46,11 @@ public class WikiController {
     private final AclEnforcer aclEnforcer;
     private final WikiPermissionService permissionService;
     private final WikiAttachmentService attachmentService;
+    private final WikiBlockService blockService;
     private final AuditService auditService;
     private final ApplicationEventPublisher eventPublisher;
+    private final WikiTemplateService templateService;
+    private final WikiBacklinkRepository backlinkRepository;
 
     public WikiController(
             KnowledgeBaseService knowledgeBaseService,
@@ -53,8 +60,11 @@ public class WikiController {
             AclEnforcer aclEnforcer,
             WikiPermissionService permissionService,
             WikiAttachmentService attachmentService,
+            WikiBlockService blockService,
             AuditService auditService,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            WikiTemplateService templateService,
+            WikiBacklinkRepository backlinkRepository
     ) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.pageService = pageService;
@@ -63,8 +73,11 @@ public class WikiController {
         this.aclEnforcer = aclEnforcer;
         this.permissionService = permissionService;
         this.attachmentService = attachmentService;
+        this.blockService = blockService;
         this.auditService = auditService;
         this.eventPublisher = eventPublisher;
+        this.templateService = templateService;
+        this.backlinkRepository = backlinkRepository;
     }
 
     // ============================================================
@@ -354,6 +367,88 @@ public class WikiController {
     }
 
     // ============================================================
+    //  Block 管理（Notion 式块级内容）
+    // ============================================================
+
+    @GetMapping("/pages/{id}/blocks")
+    public Map<String, Object> listBlocks(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        List<WikiBlockEntity> blocks = blockService.getBlocksByPageId(id);
+        return Map.of("code", 0, "message", "success",
+                "data", blocks.stream().map(this::toBlockDto).toList());
+    }
+
+    @PostMapping("/pages/{id}/blocks")
+    public Map<String, Object> createBlocks(
+            @PathVariable UUID id,
+            @RequestBody List<Map<String, Object>> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        List<WikiBlockEntity> blocks = blockService.createBlocksForPage(id, body, user.tenantId(), user.userId());
+        return Map.of("code", 0, "message", "created",
+                "data", blocks.stream().map(this::toBlockDto).toList());
+    }
+
+    @PutMapping("/blocks/{blockId}")
+    public Map<String, Object> updateBlock(
+            @PathVariable UUID blockId,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_block",
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        WikiBlockEntity block = blockService.moveBlock(blockId,
+                (UUID) body.get("parent_id"),
+                body.containsKey("sort_order") ? (Integer) body.get("sort_order") : null,
+                user.tenantId());
+        return Map.of("code", 0, "message", "updated", "data", toBlockDto(block));
+    }
+
+    @DeleteMapping("/blocks/{blockId}")
+    public Map<String, Object> deleteBlock(
+            @PathVariable UUID blockId,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_block",
+                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        blockService.deleteBlocksByPageId(blockId, user.tenantId());
+        return Map.of("code", 0, "message", "deleted");
+    }
+
+    @PutMapping("/pages/{id}/blocks/reorder")
+    public Map<String, Object> reorderBlocks(
+            @PathVariable UUID id,
+            @RequestBody List<UUID> blockIds,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        List<WikiBlockEntity> blocks = blockService.reorderBlocks(id, blockIds, user.tenantId());
+        return Map.of("code", 0, "message", "reordered",
+                "data", blocks.stream().map(this::toBlockDto).toList());
+    }
+
+    private Map<String, Object> toBlockDto(WikiBlockEntity block) {
+        Map<String, Object> dto = new HashMap<>();
+        dto.put("id", block.getId().toString());
+        dto.put("page_id", block.getPageId().toString());
+        dto.put("parent_id", block.getParentId() != null ? block.getParentId().toString() : null);
+        dto.put("type", block.getType());
+        dto.put("content", block.getContentJson());
+        dto.put("sort_order", block.getSortOrder());
+        dto.put("created_by", block.getCreatedBy().toString());
+        dto.put("created_at", block.getCreatedAt().toString());
+        dto.put("updated_at", block.getUpdatedAt().toString());
+        return dto;
+    }
+
+    // ============================================================
     //  分类管理
     // ============================================================
 
@@ -449,6 +544,114 @@ public class WikiController {
                 "total", result.getTotalElements(),
                 "page", page,
                 "size", size);
+    }
+
+    // ============================================================
+    //  模板管理
+    // ============================================================
+
+    @GetMapping("/kb/{kbId}/templates")
+    public Map<String, Object> listTemplates(
+            @PathVariable UUID kbId,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        var templates = templateService.listTemplates(kbId);
+        List<Map<String, Object>> dtoList = templates.stream()
+                .map(t -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", t.getId().toString());
+                    m.put("kb_id", t.getKbId().toString());
+                    m.put("name", t.getName());
+                    m.put("title", t.getTitle());
+                    m.put("icon", t.getIcon());
+                    m.put("blocks", t.getContentJson());
+                    m.put("created_at", t.getCreatedAt() != null ? t.getCreatedAt().toString() : null);
+                    return m;
+                }).toList();
+        return Map.of(
+                "code", 0, "message", "success",
+                "data", dtoList,
+                "total", dtoList.size());
+    }
+
+    @PostMapping("/pages/{id}/mark-template")
+    public Map<String, Object> markTemplate(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        Boolean isTemplate = (Boolean) body.get("isTemplate");
+        if (isTemplate == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "isTemplate 必填");
+        }
+        pageService.markTemplate(id, isTemplate, user.tenantId());
+        return Map.of("code", 0, "message", "success");
+    }
+
+    @PostMapping("/pages/{id}/from-template")
+    public Map<String, Object> createFromTemplate(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        UUID kbId = UUID.fromString(body.get("kbId").toString());
+        UUID parentId = body.get("parentId") != null ? 
+            UUID.fromString(body.get("parentId").toString()) : null;
+        String title = (String) body.get("title");
+        String slug = (String) body.get("slug");
+        
+        var newPage = templateService.createPageFromTemplate(
+            id, kbId, parentId, title, slug, user.userId(), user.tenantId());
+        
+        eventPublisher.publishEvent(new RecordChangeEvent(
+            RecordChangeEvent.ChangeType.CREATE, "wiki_page",
+            newPage.getId().toString(), toPageDto(newPage), user.tenantId(), user.userId()));
+        
+        return Map.of(
+                "code", 0, "message", "success",
+                "data", toPageDto(newPage));
+    }
+
+    // ============================================================
+    //  反向链接
+    // ============================================================
+
+    @GetMapping("/pages/{id}/backlinks")
+    public Map<String, Object> listBacklinks(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        
+        var page = pageService.get(id);
+        var backlinks = backlinkRepository.findByTargetPageIdOrderByCreatedAtDesc(id);
+        
+        List<Map<String, Object>> dtoList = backlinks.stream()
+                .map(bl -> {
+                    Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("id", bl.getId().toString());
+                    m.put("sourcePageId", bl.getSourcePageId().toString());
+                    m.put("targetPageId", bl.getTargetPageId() != null ? 
+                        bl.getTargetPageId().toString() : null);
+                    m.put("targetSlug", bl.getTargetSlug());
+                    m.put("createdAt", bl.getCreatedAt().toString());
+                    
+                    // 获取源页面信息
+                    var sourcePage = pageService.get(bl.getSourcePageId());
+                    if (sourcePage != null) {
+                        m.put("sourceTitle", sourcePage.getTitle());
+                        m.put("sourceSlug", sourcePage.getSlug());
+                    }
+                    return m;
+                }).toList();
+        
+        return Map.of(
+                "code", 0, "message", "success",
+                "data", dtoList,
+                "total", dtoList.size());
     }
 
     // ============================================================

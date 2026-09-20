@@ -10,8 +10,9 @@ export interface User {
 
 interface AuthState {
   accessToken: string | null;
+  refreshToken: string | null;
   user: User | null;
-  setAuth: (token: string, user: User) => void;
+  setAuth: (accessToken: string, refreshToken: string, user: User) => void;
   clear: () => void;
   /** US-504: 切换应用(租户) */
   switchTenant: (tenantId: string) => void;
@@ -20,21 +21,26 @@ interface AuthState {
 /**
  * 认证状态管理.
  *
- * Week 3 脚手架:仅持久化 token 到 localStorage
- * Week 4+ 会用 HttpOnly Cookie + refresh token 机制
+ * 持久化 access_token + refresh_token 到 localStorage,
+ * apiClient 响应拦截器在 401 时自动静默续期.
  */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       accessToken: null,
+      refreshToken: null,
       user: null,
-      setAuth: (accessToken, user) => {
+      setAuth: (accessToken, refreshToken, user) => {
         localStorage.setItem('nocobase_access_token', accessToken);
-        set({ accessToken, user });
+        if (refreshToken) {
+          localStorage.setItem('nocobase_refresh_token', refreshToken);
+        }
+        set({ accessToken, refreshToken, user });
       },
       clear: () => {
         localStorage.removeItem('nocobase_access_token');
-        set({ accessToken: null, user: null });
+        localStorage.removeItem('nocobase_refresh_token');
+        set({ accessToken: null, refreshToken: null, user: null });
       },
       /** US-504: 切换应用(租户) —— 仅更新 user.tenant_id, persist 中间件自动同步 localStorage */
       switchTenant: (tenantId) => {

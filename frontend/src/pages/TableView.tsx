@@ -117,28 +117,28 @@ export function TableViewPage() {
   const sorted = filtered; // Week 17: 服务端 sort 已完成
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <Link to={`/designer/collections/${collectionName}`} style={{ color: '#64748b', fontSize: 12 }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
+      <Link to={`/designer/collections/${collectionName}`} style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>
         ← 返回 {collectionName}
       </Link>
-      <h1>{view.title}</h1>
+      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{view.title}</h1>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button onClick={exportCsv} style={{ padding: '4px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+        <button onClick={exportCsv} className="glass-button-primary" style={{ padding: '4px 12px', fontSize: 12 }}>
           📥 导出 CSV
         </button>
-        <label style={{ padding: '4px 12px', background: '#3b82f6', color: 'white', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+        <label style={{ padding: '4px 12px', background: 'rgba(59, 130, 246, 0.2)', color: 'white', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
           📤 导入 CSV
           <input type="file" accept=".csv" onChange={handleImport} style={{ display: 'none' }} />
         </label>
-        {importResult && <span style={{ alignSelf: 'center', fontSize: 12, color: importResult.failed > 0 ? '#dc2626' : '#10b981' }}>
+        {importResult && <span style={{ alignSelf: 'center', fontSize: 12, color: importResult.failed > 0 ? 'var(--color-error)' : 'var(--color-success)' }}>
           {importResult.success}/{importResult.total} 成功{importResult.failed > 0 ? `, ${importResult.failed} 失败` : ''}
         </span>}
       </div>
 
       <FilterBar fields={fields} filters={filters} onChange={setFilters} />
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 12, color: '#64748b' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 12, color: 'var(--color-text-muted)' }}>
         <span>点击列头排序:</span>
         {columns.map((c) => {
           const s = sort.find((x) => x.field === c.field);
@@ -148,9 +148,9 @@ export function TableViewPage() {
               onClick={() => toggleSort(c.field, sort, setSort)}
               style={{
                 padding: '2px 8px',
-                background: s ? '#1e293b' : 'white',
-                color: s ? 'white' : '#1e293b',
-                border: '1px solid #cbd5e1',
+                background: s ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                color: s ? 'white' : 'var(--color-text-secondary)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: 4,
                 cursor: 'pointer',
                 fontSize: 12,
@@ -163,15 +163,11 @@ export function TableViewPage() {
       </div>
 
       {isLoading ? (
-        <p>加载中…</p>
+        <p style={{ color: 'var(--color-text-muted)' }}>加载中…</p>
       ) : (
         <div
-          style={{
-            background: 'white',
-            borderRadius: 8,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            overflowX: 'auto',
-          }}
+          className="glass-card"
+          style={{ borderRadius: 8, overflowX: 'auto' }}
         >
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
             <colgroup>
@@ -180,9 +176,9 @@ export function TableViewPage() {
               ))}
             </colgroup>
             <thead>
-              <tr style={{ background: '#f1f5f9' }}>
+              <tr style={{ background: 'rgba(30, 41, 59, 0.5)' }}>
                 {columns.map((c) => (
-                  <th key={c.field} style={{ padding: 8, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <th key={c.field} style={{ padding: 8, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
                     {c.label ?? c.field}
                   </th>
                 ))}
@@ -191,20 +187,20 @@ export function TableViewPage() {
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan={columns.length} style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     无数据
                   </td>
                 </tr>
               ) : (
                 sorted.map((r) => (
-                  <tr key={r.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                  <tr key={r.id} style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
                     {columns.map((c) => {
                       const f = fieldMap.get(c.field);
                       const val = r[c.field];
                       return (
                         <td
                           key={c.field}
-                          style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                          style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
                           onDoubleClick={() => {
                             setEditing({ id: r.id, field: c.field });
                           }}
@@ -227,7 +223,8 @@ export function TableViewPage() {
                                 }
                                 if (e.key === 'Escape') setEditing(null);
                               }}
-                              style={{ width: '100%', border: '1px solid #3b82f6', borderRadius: 4, padding: 2, fontSize: 13, outline: 'none' }}
+                              className="glass-input"
+                              style={{ width: '100%', fontSize: 13 }}
                             />
                           ) : (
                             renderCell(val, f)
@@ -243,7 +240,7 @@ export function TableViewPage() {
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
+      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
         共 {sorted.length} 条(Week 9 MVP — 列控制 UI、详情链接、列宽设置见 WEEK_9_HANDOFF.md)
       </p>
     </div>

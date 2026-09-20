@@ -42,12 +42,12 @@ export function KanbanViewPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      <Link to={`/designer/collections/${collectionName}`} style={{ color: '#64748b', fontSize: 12 }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
+      <Link to={`/designer/collections/${collectionName}`} style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>
         ← 返回 {collectionName}
       </Link>
-      <h1>{view.title}</h1>
-      <p style={{ color: '#64748b', fontSize: 13 }}>
+      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{view.title}</h1>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
         按 <code>{config.groupBy}</code> 分组({groups.size} 个分组)
       </p>
 
@@ -64,22 +64,19 @@ export function KanbanViewPage() {
         {Array.from(groups.entries()).map(([key, items]) => (
           <div
             key={key}
-            style={{
-              background: '#f1f5f9',
-              borderRadius: 8,
-              padding: 12,
-              minHeight: 200,
-            }}
+            className="glass-card"
+            style={{ borderRadius: 8, padding: 12, minHeight: 200 }}
           >
             <div
               style={{
                 fontWeight: 500,
                 marginBottom: 8,
                 paddingBottom: 8,
-                borderBottom: '1px solid #cbd5e1',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                color: 'var(--color-text-primary)',
               }}
             >
-              {key} <span style={{ color: '#64748b', fontSize: 12 }}>({items.length})</span>
+              {key} <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>({items.length})</span>
             </div>
             {items.map((r) => {
               const titleField = config.cardTitleField ?? Object.keys(r).find((k) => k !== 'id');
@@ -87,19 +84,14 @@ export function KanbanViewPage() {
               return (
                 <div
                   key={r.id}
-                  style={{
-                    background: 'white',
-                    padding: 8,
-                    borderRadius: 4,
-                    marginBottom: 6,
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                  }}
+                  className="glass-card"
+                  style={{ borderRadius: 4, padding: 8, marginBottom: 6 }}
                 >
-                  <div style={{ fontWeight: 500, fontSize: 13 }}>{title}</div>
+                  <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--color-text-primary)' }}>{title}</div>
                   {(config.cardFields ?? []).slice(0, 3).map((f) => {
                     const field = fields.find((x) => x.name === f);
                     return (
-                      <div key={f} style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                      <div key={f} style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
                         <strong>{field?.label ?? f}:</strong> {String(r[f] ?? '—')}
                       </div>
                     );

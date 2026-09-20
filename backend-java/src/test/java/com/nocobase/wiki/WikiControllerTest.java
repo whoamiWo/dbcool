@@ -36,6 +36,9 @@ class WikiControllerTest {
     private WikiAttachmentService attachmentService;
     private AuditService auditService;
     private ApplicationEventPublisher eventPublisher;
+    private WikiBlockService wikiBlockService;
+    private WikiTemplateService wikiTemplateService;
+    private WikiBacklinkRepository wikiBacklinkRepository;
     private WikiController controller;
 
     private AuthenticatedUser testUser;
@@ -60,6 +63,9 @@ class WikiControllerTest {
         attachmentService = mock(WikiAttachmentService.class);
         auditService = mock(AuditService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
+        wikiBlockService = mock(WikiBlockService.class);
+        wikiTemplateService = mock(WikiTemplateService.class);
+        wikiBacklinkRepository = mock(WikiBacklinkRepository.class);
 
         doNothing().when(aclEnforcer).assertCan(any(), anyString(), anyString(), any());
         doNothing().when(eventPublisher).publishEvent(any());
@@ -70,7 +76,7 @@ class WikiControllerTest {
 
         controller = new WikiController(kbService, pageService, categoryService,
                 searchService, aclEnforcer, permissionService, attachmentService,
-                auditService, eventPublisher);
+                wikiBlockService, auditService, eventPublisher, wikiTemplateService, wikiBacklinkRepository);
     }
 
     // ---- 知识库 CRUD ----

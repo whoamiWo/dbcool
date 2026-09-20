@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 /**
  * 项目任务服务 — 看板(Trello 对标)+ 甘特图。
  *
@@ -26,9 +29,11 @@ public class ProjectService {
     private static final Logger log = LoggerFactory.getLogger(ProjectService.class);
 
     private final ProjectTaskRepository taskRepository;
+    private final ProjectRepository projectRepository;
 
-    public ProjectService(ProjectTaskRepository taskRepository) {
+    public ProjectService(ProjectTaskRepository taskRepository, ProjectRepository projectRepository) {
         this.taskRepository = taskRepository;
+        this.projectRepository = projectRepository;
     }
 
     /** 创建任务。 */
@@ -162,5 +167,27 @@ public class ProjectService {
     private static int clamp(Integer p) {
         if (p == null) return 0;
         return Math.max(0, Math.min(100, p));
+    }
+
+    /** 创建项目。 */
+    @Transactional
+    public ProjectEntity create(String name, String description, UUID ownerId, String tenantId) {
+        if (name == null || name.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "项目名称必填");
+        }
+        ProjectEntity project = new ProjectEntity();
+        project.setId(UUID.randomUUID());
+        project.setName(name);
+        project.setDescription(description);
+        project.setOwnerId(ownerId);
+        project.setTenantId(tenantId);
+        project.setCreatedAt(Instant.now());
+        project.setUpdatedAt(Instant.now());
+        return projectRepository.save(project);
+    }
+
+    /** 当前租户下的项目列表。 */
+    public List<ProjectEntity> listByTenant(String tenantId) {
+        return projectRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
     }
 }

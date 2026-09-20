@@ -18,13 +18,15 @@ import org.springframework.web.server.ResponseStatusException;
 class ProjectServiceTest {
 
     private ProjectTaskRepository repo;
+    private ProjectRepository projectRepo;
     private ProjectService service;
 
     @BeforeEach
     void setUp() {
         repo = mock(ProjectTaskRepository.class);
+        projectRepo = mock(ProjectRepository.class);
         when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        service = new ProjectService(repo);
+        service = new ProjectService(repo, projectRepo);
     }
 
     private UUID pid = UUID.randomUUID();

@@ -75,6 +75,16 @@ export const wikiApi = {
   // 搜索
   search: (q: string, params?: { kbId?: string; page?: number; size?: number }) =>
     apiClient.get('/api/wiki/search', { params: { q, ...params } }),
+
+  // Block（Notion 式块级内容）
+  listBlocks: (pageId: string) => apiClient.get(`/api/wiki/pages/${pageId}/blocks`),
+  createBlocks: (pageId: string, blocks: Array<{ type: string; content: any }>) =>
+    apiClient.post(`/api/wiki/pages/${pageId}/blocks`, blocks),
+  updateBlock: (blockId: string, body: { parent_id?: string; sort_order?: number }) =>
+    apiClient.put(`/api/wiki/blocks/${blockId}`, body),
+  deleteBlock: (blockId: string) => apiClient.delete(`/api/wiki/blocks/${blockId}`),
+  reorderBlocks: (pageId: string, blockIds: string[]) =>
+    apiClient.put(`/api/wiki/pages/${pageId}/blocks/reorder`, blockIds),
 };
 
 export function parseKnowledgeBase(r: any): KnowledgeBase {

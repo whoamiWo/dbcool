@@ -3,12 +3,15 @@ package com.nocobase.integration.wecom;
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.web.client.RestTemplate;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -33,6 +36,7 @@ public class WeComAppService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${wecom.corp-id:}")
@@ -47,10 +51,15 @@ public class WeComAppService {
     @Value("${wecom.redirect-uri:}")
     private String redirectUri;
 
-    public WeComAppService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public WeComAppService(UserRepository userRepository, PasswordEncoder passwordEncoder, RestTemplate restTemplate) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.restTemplate = restTemplate;
     }
+
+    public String getCorpId() { return corpId; }
+    public String getAgentId() { return agentId; }
+    public String getSecret() { return secret; }
 
     /** 是否已配置企业微信应用凭证。 */
     public boolean isConfigured() {
@@ -65,9 +74,19 @@ public class WeComAppService {
      * <p>生产环境应使用缓存（如 Redis），此处为演示直接请求。</p>
      */
     public String getAccessToken() {
-        // TODO: 实现 HTTP 请求获取 access_token
-        // 示例: GET https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=XXX&corpsecret=YYY
-        return "FAKE_ACCESS_TOKEN_FOR_DEMO";
+        String url = "https://qyapi.weixin.qq.com/cgi-bin/gettoken" +
+                "?corpid=" + corpId + "&corpsecret=" + secret;
+        String body = restTemplate.getForObject(url, String.class);
+        try {
+            JsonNode json = objectMapper.readTree(body == null ? "{}" : body);
+            String token = json.path("access_token").asText("");
+            if (token.isBlank()) {
+                throw new RuntimeException("获取 access_token 失败：" + body);
+            }
+            return token;
+        } catch (Exception e) {
+            throw new RuntimeException("解析 access_token 失败", e);
+        }
     }
 
     /**
@@ -87,28 +106,42 @@ public class WeComAppService {
             throw new IllegalStateException("企业微信应用未配置");
         }
 
-        // TODO: 实际调用企业微信接口
-        // 1. 通过 code 获取用户信息
-        // String accessToken = getAccessToken();
-        // String userInfoUrl = "https://qyapi.weixin.qq.com/cgi-bin/user/getuserinfo?access_token=" + accessToken + "&code=" + code;
-        // JsonNode userInfoResp = objectMapper.readValue(httpGet(userInfoUrl), JsonNode.class);
-        // String userId = userInfoResp.get("userid").asText();
-        // // 2. 获取详细信息
-        // String detailUrl = "https://qyapi.weixin.qq.com/cgi-bin/user/get?access_token=" + accessToken + "&userid=" + userId;
-        // JsonNode detailResp = objectMapper.readValue(httpGet(detailUrl), JsonNode.class);
-        // String name = detailResp.get("name").asText();
-        // String email = detailResp.get("email").asText();
-        // String avatar = detailResp.get("avatar").asText();
-        // String mobile = detailResp.get("mobile").asText();
-        // String unionId = detailResp.get("unionid").asText();
+        String accessToken = getAccessToken();
 
-        // 演示数据
-        String unionId = "wecom_unionid_demo_" + code.hashCode();
-        String name = "企业微信用户_" + code.substring(0, 4);
-        String email = name + "@wecom.example.com";
+        // 1. 通过 code 获取用户信息
+        String userUrl = "https://qyapi.weixin.qq.com/cgi-bin/user/getuserinfo" +
+                "?access_token=" + accessToken + "&code=" + code;
+        String userBody = restTemplate.getForObject(userUrl, String.class);
+        JsonNode userJson = null;
+        try {
+            userJson = objectMapper.readTree(userBody == null ? "{}" : userBody);
+        } catch (Exception e) {
+            throw new RuntimeException("解析用户信息失败", e);
+        }
+        String userId = userJson.path("userid").asText("");
+        if (userId.isBlank()) {
+            throw new RuntimeException("获取 userid 失败：" + userBody);
+        }
+
+        // 2. 获取详细信息
+        String detailUrl = "https://qyapi.weixin.qq.com/cgi-bin/user/get" +
+                "?access_token=" + accessToken + "&userid=" + userId;
+        String detailBody = restTemplate.getForObject(detailUrl, String.class);
+        JsonNode detailJson = null;
+        try {
+            detailJson = objectMapper.readTree(detailBody == null ? "{}" : detailBody);
+        } catch (Exception e) {
+            throw new RuntimeException("解析用户详情失败", e);
+        }
+        String name = detailJson.path("name").asText(userId);
+        String email = detailJson.path("email").asText("");
+        String avatar = detailJson.path("avatar").asText("");
+        String mobile = detailJson.path("mobile").asText("");
+        String unionId = detailJson.path("unionid").asText("");
+        if (unionId.isBlank()) unionId = userId;
 
         // 按 unionId 哈希后的用户名查找本地用户
-        String username = "wecom_" + Base64.getEncoder().encodeToString(unionId.getBytes()).substring(0, 8);
+        String username = "wecom_" + safeTail(unionId, 12);
         UserEntity existing = userRepository.findByUsername(username).orElse(null);
         if (existing != null) {
             log.info("[WeCom] 用户已存在: username={}", username);
@@ -127,7 +160,14 @@ public class WeComAppService {
         user.setEnabled(true);
         user.setCreatedAt(Instant.now());
         userRepository.save(user);
-        log.info("[WeCom] 新建用户: username={}", username);
+        log.info("[WeCom] 新建用户: username={}, unionId={}", username, unionId);
         return user;
+    }
+
+    /** 取标识尾部并只保留字母数字，避免生成非法用户名。 */
+    private static String safeTail(String raw, int max) {
+        String s = raw == null ? "" : raw.replaceAll("[^a-zA-Z0-9]", "");
+        if (s.isEmpty()) s = "unknown";
+        return s.length() <= max ? s : s.substring(s.length() - max);
     }
 }

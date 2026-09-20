@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 跨模块统一搜索服务 — 参考 Algolia / Elasticsearch 设计。
@@ -34,17 +35,20 @@ public class UnifiedSearchService {
     private final WikiPageService wikiPageService;
     private final CollectionService collectionService;
     private final AutomationRuleService automationRuleService;
+    private final UnifiedSearchIndexRepository searchIndexRepository;
 
     public UnifiedSearchService(
             MessageService messageService,
             WikiPageService wikiPageService,
             CollectionService collectionService,
-            AutomationRuleService automationRuleService
+            AutomationRuleService automationRuleService,
+            UnifiedSearchIndexRepository searchIndexRepository
     ) {
         this.messageService = messageService;
         this.wikiPageService = wikiPageService;
         this.collectionService = collectionService;
         this.automationRuleService = automationRuleService;
+        this.searchIndexRepository = searchIndexRepository;
     }
 
     /**
@@ -90,10 +94,17 @@ public class UnifiedSearchService {
         // 搜索 Wiki 页面
         if (types == null || types.contains("wiki")) {
             try {
+        // wiki 分支：按关键词过滤标题/内容（kbId=null 不限知识库）
                 List<WikiPageEntity> pages =
                         wikiPageService.listByKbAndStatus(null, "PUBLISHED", tenantId);
                 List<Map<String, Object>> wikiResults = new ArrayList<>();
+                String kw = keyword == null ? "" : keyword.toLowerCase();
                 for (WikiPageEntity p : pages) {
+                    if (!kw.isEmpty()) {
+                        boolean hit = (p.getTitle() != null && p.getTitle().toLowerCase().contains(kw))
+                                || (p.getContent() != null && p.getContent().toLowerCase().contains(kw));
+                        if (!hit) continue;
+                    }
                     Map<String, Object> wikiMap = new HashMap<>();
                     wikiMap.put("type", "wiki");
                     wikiMap.put("id", p.getId());
@@ -103,6 +114,7 @@ public class UnifiedSearchService {
                     wikiMap.put("slug", p.getSlug());
                     wikiMap.put("createdAt", p.getCreatedAt());
                     wikiResults.add(wikiMap);
+                    if (wikiResults.size() >= perTypeLimit) break;
                 }
                 allResults.addAll(wikiResults);
             } catch (Exception e) {
@@ -110,16 +122,12 @@ public class UnifiedSearchService {
             }
         }
         
-        // 搜索 Collection 记录
+        // 搜索 Collection 记录（真实查询）
         if (types == null || types.contains("record")) {
             try {
-                // 简化:实际应使用 CollectionService 的搜索功能
-                Map<String, Object> recordResult = new HashMap<>();
-                recordResult.put("type", "record");
-                recordResult.put("id", "search-placeholder");
-                recordResult.put("title", "Collection 记录搜索(待实现)");
-                recordResult.put("snippet", "使用关键词: " + keyword);
-                allResults.add(recordResult);
+                List<Map<String, Object>> recordResults = searchCollectionRecords(
+                        keyword, tenantId, perTypeLimit);
+                allResults.addAll(recordResults);
             } catch (Exception e) {
                 // 搜索失败不影响其他模块
             }
@@ -170,13 +178,27 @@ public class UnifiedSearchService {
     }
 
     /**
-     * 记录搜索到统一索引(用于增量更新)。
+     * 写入统一搜索索引（增量更新）。
      */
     @Transactional
     public void indexEntity(String entityType, String entityId, String tenantId,
                             String title, String content, Map<String, Object> metadata) {
-        // TODO: 写入 unified_search_index 表
-        // 实际实现使用 JPA Repository 保存
+        // 先删除已有索引（upsert）
+        searchIndexRepository.deleteByEntityTypeAndEntityIdAndTenantId(
+                entityType, entityId, tenantId);
+        // 创建新索引
+        UnifiedSearchIndexEntity index = new UnifiedSearchIndexEntity();
+        index.setId(UUID.randomUUID());
+        index.setEntityType(entityType);
+        index.setEntityId(entityId);
+        index.setTenantId(tenantId);
+        index.setTitle(title);
+        index.setContent(content);
+        // content_tsv 由 DB 触发器维护，应用层不再写入
+        index.setMetadataJson(metadata != null ? metadata.toString() : "{}");
+        index.setCreatedAt(Instant.now());
+        index.setUpdatedAt(Instant.now());
+        searchIndexRepository.save(index);
     }
 
     /**
@@ -184,7 +206,50 @@ public class UnifiedSearchService {
      */
     @Transactional
     public void removeEntity(String entityType, String entityId, String tenantId) {
-        // TODO: 从 unified_search_index 表删除
+        searchIndexRepository.deleteByEntityTypeAndEntityIdAndTenantId(
+                entityType, entityId, tenantId);
+    }
+
+    /**
+     * 真实搜索 Collection 记录（复用 CollectionService.listRecords + 权限过滤）。
+     */
+    private List<Map<String, Object>> searchCollectionRecords(
+            String keyword, String tenantId, int limit) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        try {
+            // 复用 CollectionService.listRecords 获取记录并按 keyword 过滤
+            // 注意: CollectionService.listRecords 需要 tenantId 权限过滤
+            // 这里通过搜索索引 + CollectionService 结合实现
+            List<UnifiedSearchIndexEntity> indexed = searchIndexRepository
+                    .searchByKeywordAndType(keyword, tenantId, "record");
+            for (UnifiedSearchIndexEntity idx : indexed) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("type", "record");
+                map.put("id", idx.getEntityId());
+                map.put("title", idx.getTitle());
+                map.put("snippet", idx.getContent() != null
+                        ? idx.getContent().substring(0, Math.min(200, idx.getContent().length()))
+                        : "");
+                map.put("createdAt", idx.getCreatedAt());
+                results.add(map);
+            }
+        } catch (Exception e) {
+            // 索引未命中时回退到 CollectionService 模糊搜索
+            try {
+                var records = collectionService.listRecords(keyword, tenantId, limit);
+                for (var rec : records) {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("type", "record");
+                    map.put("id", rec.get("id"));
+                    map.put("title", rec.get("title"));
+                    map.put("snippet", rec.get("content"));
+                    results.add(map);
+                }
+            } catch (Exception ex) {
+                // 忽略
+            }
+        }
+        return results;
     }
 
     private long countByType(List<Map<String, Object>> results, String type) {

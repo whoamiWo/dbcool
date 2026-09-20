@@ -12,7 +12,7 @@ import java.util.UUID;
 public class NotificationChannelEntity {
 
     public enum Type {
-        EMAIL, WEBHOOK, DINGTALK, WECHAT_WORK
+        EMAIL, WEBHOOK, DINGTALK, WECHAT_WORK, WE_COM
     }
 
     @Id

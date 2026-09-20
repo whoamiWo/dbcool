@@ -209,6 +209,7 @@ public class LdapSyncService {
                     localUser.setDisplayName(displayName);
                     localUser.setEmail(email);
                     localUser.setTenantId(tenantId);
+                    localUser.setPasswordHash("LDAP_SYNCED");
                     localUser.setCreatedAt(Instant.now());
                     userRepository.save(localUser);
                     mapping.setLocalUserId(localUser.getId());

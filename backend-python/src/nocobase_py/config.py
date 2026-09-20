@@ -63,6 +63,25 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_model: str = "gpt-4o"
 
+    # Slack 连接器配置
+    slack_signing_secret: str = ""
+    slack_bot_token: str = ""
+    slack_team_id: str = ""
+
+    # 企业微信连接器配置
+    wecom_corp_id: str = ""
+    wecom_corp_secret: str = ""
+    wecom_agent_id: str = ""
+
+    # 钉钉连接器配置
+    dingtalk_app_key: str = ""
+    dingtalk_app_secret: str = ""
+    dingtalk_agent_id: str = ""
+
+    # 飞书连接器配置
+    feishu_app_id: str = ""
+    feishu_app_secret: str = ""
+
     # R15: 插件热加载目录
     plugins_dir: str = "plugins"
 

@@ -1,12 +1,15 @@
 package com.nocobase.im;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import com.nocobase.ai.AgentService;
+import com.nocobase.auth.UserEntity;
+import com.nocobase.auth.UserRepository;
 import com.nocobase.notification.NotificationService;
 
 /**
@@ -26,17 +29,20 @@ public class SlashCommandInitializer implements CommandLineRunner {
     private final ChannelService channelService;
     private final NotificationService notificationService;
     private final AgentService agentService;
+    private final UserRepository userRepository;
 
     public SlashCommandInitializer(SlashCommandRegistry registry,
                                    MessageService messageService,
                                    ChannelService channelService,
                                    NotificationService notificationService,
-                                   AgentService agentService) {
+                                   AgentService agentService,
+                                   UserRepository userRepository) {
         this.registry = registry;
         this.messageService = messageService;
         this.channelService = channelService;
         this.notificationService = notificationService;
         this.agentService = agentService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -81,16 +87,31 @@ public class SlashCommandInitializer implements CommandLineRunner {
                     ctx.put("message", "代码块回显功能待后续迭代");
                 });
 
-        // /invite <userId>：接 ChannelService.join + MessageService.send
+        // /invite <userId 或用户名>：接 ChannelService.join + MessageService.send
         registry.register("invite",
                 "邀请成员加入频道（/invite 用户）",
                 (content, ctx) -> {
-                    String targetId = content.trim();
-                    if (targetId.isBlank()) {
-                        ctx.put("error", "缺少目标用户 ID");
+                    String targetInput = content.trim();
+                    if (targetInput.isBlank()) {
+                        ctx.put("error", "缺少目标用户 ID 或用户名");
                         return;
                     }
-                    UUID targetUuid = UUID.fromString(targetId);
+                    UUID targetUuid;
+                    String targetDisplay;
+                    try {
+                        // 尝试解析为 UUID
+                        targetUuid = UUID.fromString(targetInput);
+                        targetDisplay = targetInput;
+                    } catch (IllegalArgumentException e1) {
+                        // 尝试按用户名查找
+                        Optional<UserEntity> userOpt = userRepository.findByUsername(targetInput);
+                        if (userOpt.isEmpty()) {
+                            ctx.put("error", "未找到用户：" + targetInput);
+                            return;
+                        }
+                        targetUuid = userOpt.get().getId();
+                        targetDisplay = userOpt.get().getUsername();
+                    }
                     UUID channelId  = UUID.fromString(String.valueOf(ctx.get("channelId")));
                     UUID selfUserId = UUID.fromString(String.valueOf(ctx.get("userId")));
                     channelService.join(
@@ -99,9 +120,9 @@ public class SlashCommandInitializer implements CommandLineRunner {
                     messageService.send(
                             String.valueOf(ctx.get("tenantId")),
                             channelId, selfUserId,
-                            "*[" + ctx.get("user") + "] 邀请 " + targetId + " 加入本频道*",
+                            "*[" + ctx.get("user") + "] 邀请 " + targetDisplay + " 加入本频道*",
                             "markdown", null);
-                    ctx.put("invited", targetId);
+                    ctx.put("invited", targetDisplay);
                     ctx.put("channelId", channelId.toString());
                 });
 

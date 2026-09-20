@@ -22,6 +22,10 @@ import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.nocobase.auth.JwtAuthFilter;
+import com.nocobase.auth.RoleEntity;
+import com.nocobase.auth.RoleRepository;
+import com.nocobase.auth.UserRoleEntity;
+import com.nocobase.auth.UserRoleRepository;
 import com.nocobase.config.SecurityConfig;
 
 /**
@@ -42,9 +46,27 @@ class UserControllerTest {
     @MockBean
     private JwtAuthFilter jwtAuthFilter;
 
+    @MockBean
+    private UserRoleRepository userRoleRepository;
+
+    @MockBean
+    private RoleRepository roleRepository;
+
     @Test
     void me_withAuthenticatedUser_returnsUserInfo() throws Exception {
         UUID userId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+        
+        // Mock UserRoleRepository 返回用户角色关系
+        UserRoleEntity ur = new UserRoleEntity(userId, roleId);
+        when(userRoleRepository.findByIdUserId(userId)).thenReturn(List.of(ur));
+        
+        // Mock RoleRepository 返回角色
+        RoleEntity role = new RoleEntity();
+        role.setId(roleId);
+        role.setName("admin");
+        when(roleRepository.findById(roleId)).thenReturn(java.util.Optional.of(role));
+        
         // 把 Authentication 放入 SecurityContext 让 controller @AuthenticationPrincipal 能拿到
         AuthenticatedUser principal = new AuthenticatedUser(userId, "alice", "tenant_default");
         Authentication auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(

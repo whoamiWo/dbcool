@@ -1,10 +1,8 @@
 import axios, { type AxiosInstance } from 'axios';
+import { useAuthStore } from '@/stores/auth';
 
 /**
- * API 客户端 — 自动注入 JWT.
- *
- * Week 3 脚手架:从 zustand store 取 token
- * Week 5+ 会改为 OpenAPI 生成的类型化 client
+ * API 客户端 — 自动注入 JWT + refresh token 静默续期.
  */
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -13,6 +11,54 @@ const axiosInstance: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+let refreshRequest: Promise<string> | null = null;
+
+// TODO: 当需要静默续期时取消注释
+// function subscribeTokenRefresh(cb: (token: string) => void) {
+//   refreshSubscribers.push(cb);
+// }
+
+function notifyRefreshCallbacks(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+async function handleRefreshToken() {
+  if (isRefreshing) {
+    return refreshRequest ?? Promise.reject(new Error('Refresh in progress'));
+  }
+
+  isRefreshing = true;
+  refreshRequest = (async () => {
+    try {
+      const refreshToken = localStorage.getItem('nocobase_refresh_token');
+      if (!refreshToken) {
+        throw new Error('No refresh token');
+      }
+
+      const res = await axios.post('/api/auth/refresh', { refreshToken });
+      const data = res.data?.data ?? res.data;
+      const access_token = data.access_token ?? data.accessToken ?? '';
+      const refresh_token = data.refresh_token ?? data.refreshToken ?? '';
+
+      localStorage.setItem('nocobase_access_token', access_token);
+      if (refresh_token) {
+        localStorage.setItem('nocobase_refresh_token', refresh_token);
+      }
+
+      useAuthStore.getState().setAuth(access_token, refresh_token, useAuthStore.getState().user!);
+      notifyRefreshCallbacks(access_token);
+      return access_token;
+    } finally {
+      isRefreshing = false;
+      refreshRequest = null;
+    }
+  })();
+  return refreshRequest;
+}
 
 // 包装:get/post/etc 直接返回 T(response 拦截器已解 data)
 function makeApi(instance: AxiosInstance) {
@@ -43,16 +89,29 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// 响应拦截器:统一错误处理
+// 响应拦截器:统一错误处理 + refresh token 静默续期
 axiosInstance.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    if (error.response?.status === 401) {
-      // 已在登录页时不要强制 reload(让 Login page 自己处理错误消息)
-      const isLoginPage = window.location.pathname.startsWith('/login');
-      if (!isLoginPage) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const newToken = await handleRefreshToken();
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        // 刷新失败,清除登录态并跳转登录页
+        const isLoginPage = window.location.pathname.startsWith('/login');
         localStorage.removeItem('nocobase_access_token');
-        window.location.href = '/login';
+        localStorage.removeItem('nocobase_refresh_token');
+        useAuthStore.getState().clear();
+        if (!isLoginPage) {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
       }
     }
     return Promise.reject(error);

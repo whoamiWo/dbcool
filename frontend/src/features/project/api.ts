@@ -45,7 +45,26 @@ function unwrap<T>(r: unknown): T {
   return r as T;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  ownerId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const projectApi = {
+  listProjects: async (): Promise<Project[]> => {
+    const r = await apiClient.get<Envelope<Project[]>>('/projects');
+    return unwrap<Project[]>(r);
+  },
+
+  createProject: async (body: Record<string, unknown>): Promise<Project> => {
+    const r = await apiClient.post<Envelope<Project>>('/projects', body);
+    return unwrap<Project>(r);
+  },
+
   listTasks: async (projectId: string, status?: string): Promise<Task[]> => {
     const r = await apiClient.get<Envelope<Task[]>>(`/projects/${projectId}/tasks`, {
       params: status ? { status } : {},

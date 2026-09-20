@@ -21,6 +21,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { wikiApi } from '@/api/wiki';
 import type { WikiPage } from '@/types/wiki';
+import '@/theme/glass.css';
 
 export function WikiPageReadPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -59,7 +60,7 @@ export function WikiPageReadPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto', px: 2, py: 4 }}>
+    <Box sx={{ maxWidth: 900, mx: 'auto', px: 2, py: 4 }} className="bg-primary">
       <Breadcrumbs separator="›" sx={{ mb: 2 }}>
         <MuiLink component={Link} to="/wiki/kb" color="inherit">
           <HomeIcon fontSize="small" />
@@ -70,45 +71,45 @@ export function WikiPageReadPage() {
         <Typography color="textPrimary">{page.title}</Typography>
       </Breadcrumbs>
 
-      <Paper sx={{ p: 4 }}>
+      <Paper sx={{ p: 4, background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 12 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-          <Typography variant="h3" component="h1">{page.title}</Typography>
+          <Typography variant="h3" component="h1" sx={{ color: '#f8fafc' }}>{page.title}</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Chip
               label={page.status}
               color={page.status === 'PUBLISHED' ? 'success' : page.status === 'ARCHIVED' ? 'default' : 'warning'}
               size="small"
             />
-            <Typography variant="caption" color="textSecondary">
+            <Typography variant="caption" sx={{ color: '#94a3b8' }}>
               v{page.version}
             </Typography>
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ mb: 3, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
 
         <Box sx={{ mb: 4 }}>
           <Box
             sx={{
-              '& h1': { fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0 0.5rem' },
-              '& h2': { fontSize: '1.5rem', fontWeight: 'bold', margin: '0.75rem 0 0.5rem' },
-              '& h3': { fontSize: '1.25rem', fontWeight: 'bold', margin: '0.5rem 0' },
-              '& p': { margin: '0.5rem 0', lineHeight: 1.8 },
+              '& h1': { fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0 0.5rem', color: '#f8fafc' },
+              '& h2': { fontSize: '1.5rem', fontWeight: 'bold', margin: '0.75rem 0 0.5rem', color: '#f8fafc' },
+              '& h3': { fontSize: '1.25rem', fontWeight: 'bold', margin: '0.5rem 0', color: '#e2e8f0' },
+              '& p': { margin: '0.5rem 0', lineHeight: 1.8, color: '#e2e8f0' },
               '& ul': { paddingLeft: 2, margin: '0.5rem 0' },
               '& ol': { paddingLeft: 2, margin: '0.5rem 0' },
-              '& li': { margin: '0.25rem 0' },
+              '& li': { margin: '0.25rem 0', color: '#e2e8f0' },
               '& code': {
-                background: '#f5f5f5', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace',
+                background: 'rgba(30, 41, 59, 0.8)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace', color: '#c7d2fe',
               },
               '& pre': {
                 background: '#1e1e1e', padding: 1.5, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
               },
               '& blockquote': {
-                borderLeft: '4px solid #ccc', paddingLeft: 1, margin: 0.5, color: '#666',
+                borderLeft: '4px solid #6366f1', paddingLeft: 1, margin: 0.5, color: '#94a3b8',
               },
               '& table': { borderCollapse: 'collapse', width: '100%', margin: '0.5rem 0' },
-              '& th, &td': { border: '1px solid #ddd', padding: 8, textAlign: 'left' },
-              '& a': { color: '#1976d2' },
+              '& th, &td': { border: '1px solid rgba(255, 255, 255, 0.1)', padding: 8, textAlign: 'left', color: '#e2e8f0' },
+              '& a': { color: '#818cf8' },
             }}
           >
             <ReactMarkdown
@@ -136,10 +137,10 @@ export function WikiPageReadPage() {
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ mb: 3, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="textSecondary">
+          <Typography variant="caption" sx={{ color: '#94a3b8' }}>
             创建于 {new Date(page.created_at).toLocaleString('zh-CN')}
             {page.created_by && ` · 作者: ${page.created_by}`}
           </Typography>
@@ -149,6 +150,7 @@ export function WikiPageReadPage() {
               component={Link}
               to={`/wiki/${page.slug}/edit`}
               variant="outlined"
+              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: '#f8fafc', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
             >
               编辑
             </Button>
@@ -157,6 +159,7 @@ export function WikiPageReadPage() {
               component={Link}
               to={`/wiki/${page.slug}/versions`}
               variant="outlined"
+              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: '#f8fafc', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
             >
               版本历史
             </Button>

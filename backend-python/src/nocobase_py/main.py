@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from nocobase_py import __version__
 from nocobase_py.config import get_settings
-from nocobase_py.routers import ai, health
+from nocobase_py.routers import ai, health, integration, tasks
 
 
 @asynccontextmanager
@@ -44,6 +44,8 @@ def create_app() -> FastAPI:
     # 路由
     app.include_router(health.router)
     app.include_router(ai.router)
+    app.include_router(integration.router)
+    app.include_router(tasks.router)
 
     return app
 

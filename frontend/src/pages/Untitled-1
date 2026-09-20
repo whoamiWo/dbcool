@@ -1,0 +1,35 @@
+backend-java/src/main/java/com/nocobase/
+├── wiki/WikiBlockService.java              [修改] 补 Map import
+├── wiki/WikiBlockRepository.java           [修改] 补 deleteByPageId
+├── automation/AutomationRuleService.java   [修改] TenantContext 方法名 + webhook 调用
+├── automation/AutomationTriggerListener.java [修改] 补 TransactionPhase import
+├── notification/WeComDispatcher.java       [修改] SendResult.ok
+├── integration/wecom/WeComAppService.java  [修改] 去 findByUnionId/setUpdatedAt，接真实 API
+├── integration/wecom/WeComController.java  [修改] 真实 gettoken/getuserinfo/message/send
+├── ldap/LdapSyncService.java               [修改] ContextMapper 转型 + passwordHash
+├── search/UnifiedSearchService.java        [修改] 搜索参数 + content_tsv 不写入
+├── search/UnifiedSearchIndexEntity.java    [修改] contentTsv insertable/updatable=false
+├── project/ProjectBoardController.java     [修改] 注入 Repository + setId/save
+├── im/HuddleSignalingController.java       [删除] 下线旧 STOMP 信令
+├── config/RestTemplateConfig.java          [修改] HC5 TimeValue
+├── config/HuddleWebSocketConfig.java       [修改] 挂 JWT 鉴权拦截器
+├── config/LdapTemplateConfig.java          [新建] 占位 LdapTemplate Bean
+└── api/UserController.java                 [已 OK] 保留
+
+backend-java/src/main/resources/
+├── application.yml                          [修改] 加 spring.ldap.* 配置
+└── db/migration/V34__project_board.sql      [新建] 4 张看板表
+
+backend-python/src/nocobase_py/
+├── services/connectors/wecom.py            [修改] corp_secret 赋值
+├── services/connectors/dingtalk.py         [修改] 拼 base_url
+├── services/connectors/feishu.py           [修改] 拼 base_url
+└── routers/integration.py                  [修改] slack_verify 用 Body
+
+frontend/src/
+├── features/im/useHuddle.ts                [修改] token key + TS 收窄
+├── features/im/HuddlePanel.tsx             [新建] 音视频渲染 + 控制
+├── features/im/LivechatWidget.tsx          [新建] 客服组件
+├── components/wiki/NotionStyleEditor.tsx   [修改] 对接 Block API + 反向链接 + 模板
+├── features/project/ProjectPage.tsx        [修改] 接线真实看板 API
+└── features/project/TaskBoard.tsx          [修改] dnd-kit 拖拽

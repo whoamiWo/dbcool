@@ -199,6 +199,8 @@ interface NotionStyleEditorProps {
   onTitleChange: (title: string) => void;
   content: string;
   onContentChange: (content: string) => void;
+  kbId?: string; // 知识库 ID，用于调用 Block API
+  onNavigateToPage?: (pageId: string) => void; // 页面跳转回调
 }
 
 export function NotionStyleEditor({
@@ -207,12 +209,20 @@ export function NotionStyleEditor({
   onTitleChange,
   content,
   onContentChange,
+  kbId,
+  onNavigateToPage,
 }: NotionStyleEditorProps) {
   const [blocks, setBlocks] = useState<Block[]>(() => markdownToBlocks(content));
   const [showPreview, setShowPreview] = useState(false);
   const [slashAnchor, setSlashAnchor] = useState<{ blockId: string; top: number; left: number } | null>(null);
   const [slashFilter, setSlashFilter] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [backlinks, setBacklinks] = useState<Array<{ id: string; sourcePageId: string; sourceTitle?: string; sourceSlug?: string; targetPageId?: string; targetSlug?: string; createdAt: string }>>([]);
+  const [backlinksLoading, setBacklinksLoading] = useState(false);
+  const [templates, setTemplates] = useState<Array<{ id: string; title: string; kbId?: string }>>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
 
   // 同步 blocks → content
   useEffect(() => {
@@ -229,6 +239,115 @@ export function NotionStyleEditor({
       setBlocks(newBlocks);
     }
   }, [content]);
+
+  // ============================================================
+  //  Block API 自动保存（防抖）
+  // ============================================================
+  const saveBlocksToBackend = useCallback(async () => {
+    if (!kbId || blocks.length === 0) return;
+    setSaving(true);
+    try {
+      // 调用后端 POST /api/wiki/blocks/batch-upsert
+      const res = await fetch(`/api/wiki/blocks/batch-upsert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kbId,
+          blocks: blocks.map(b => ({
+            pageId: _page?.id,
+            type: b.type,
+            content: b.content,
+            language: b.language,
+            checked: b.checked,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error('保存失败');
+      console.log('Block 已保存到后端');
+    } catch (err) {
+      console.error('保存失败:', err);
+    } finally {
+      setSaving(false);
+    }
+  }, [kbId, blocks, _page?.id]);
+
+  // 防抖保存
+  useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveBlocksToBackend();
+    }, 2000); // 2 秒防抖
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [saveBlocksToBackend]);
+
+  // 加载反向链接
+  const loadBacklinks = useCallback(async () => {
+    if (!_page?.id) return;
+    setBacklinksLoading(true);
+    try {
+      const res = await fetch(`/api/wiki/pages/${_page.id}/backlinks`);
+      if (!res.ok) throw new Error('加载反向链接失败');
+      const data = await res.json();
+      setBacklinks(data || []);
+    } catch (err) {
+      console.error('加载反向链接失败:', err);
+    } finally {
+      setBacklinksLoading(false);
+    }
+  }, [_page?.id]);
+
+  // 加载模板列表
+  const loadTemplates = useCallback(async () => {
+    try {
+      setTemplatesLoading(true);
+      const res = await fetch('/api/wiki/templates');
+      if (!res.ok) throw new Error('加载模板失败');
+      const data = await res.json();
+      setTemplates(data || []);
+    } catch (err) {
+      console.error('加载模板失败:', err);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
+  // 应用模板（从模板创建新页面）
+  const applyTemplate = useCallback(async (templateId: string) => {
+    if (!kbId) {
+      alert('请先选择知识库');
+      return;
+    }
+    const title = prompt('请输入新页面标题：');
+    if (!title) return;
+    
+    try {
+      const res = await fetch(`/api/wiki/pages/${templateId}/from-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          kbId, 
+          title,
+          slug: title.toLowerCase().replace(/\s+/g, '-'),
+        }),
+      });
+      if (!res.ok) throw new Error('创建页面失败');
+      const data = await res.json();
+      // 跳转到新创建的页面
+      window.location.href = `/wiki/${data.data.slug}`;
+    } catch (err) {
+      console.error('创建页面失败:', err);
+    }
+  }, [kbId]);
+
+  // 初始加载反向链接和模板
+  useEffect(() => {
+    if (_page?.id) {
+      loadBacklinks();
+    }
+    loadTemplates();
+  }, [_page?.id, loadBacklinks, loadTemplates]);
 
   // ============================================================
   //  块操作
@@ -588,6 +707,9 @@ export function NotionStyleEditor({
           {showPreview ? '编辑模式' : '预览模式'}
         </Button>
         <Chip label={`${blocks.length} 个块`} size="small" variant="outlined" />
+        {saving && (
+          <Chip label="保存中..." size="small" color="info" variant="filled" />
+        )}
       </Box>
 
       {!showPreview && (
@@ -695,6 +817,101 @@ export function NotionStyleEditor({
           </List>
         </Box>
       </Popover>
+
+      {/* 反向链接面板（毛玻璃侧栏） */}
+      <Paper
+        sx={{
+          mt: 2, p: 2,
+          background: 'rgba(255,255,255,0.05)',
+          backdropFilter: 'blur(12px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 2,
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>
+          🔗 反向链接
+        </Typography>
+        {backlinksLoading ? (
+          <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
+            加载中...
+          </Typography>
+        ) : backlinks.length === 0 ? (
+          <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
+            暂无页面引用本页
+          </Typography>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            {backlinks.map(bl => (
+              <Box
+                key={bl.id}
+                sx={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  p: 1, borderRadius: 1, cursor: 'pointer',
+                  transition: 'background 200ms ease',
+                  '&:hover': { background: 'rgba(255,255,255,0.06)' },
+                }}
+                onClick={() => onNavigateToPage?.(bl.sourcePageId)}
+              >
+                <Box>
+                  <Typography variant="body2">{bl.sourceTitle || '未知页面'}</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                    {bl.sourceSlug ? `/${bl.sourceSlug}` : ''}
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                  {new Date(bl.createdAt).toLocaleDateString()}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Paper>
+
+      {/* 模板选择（毛玻璃按钮组） */}
+      <Paper
+        sx={{
+          mt: 2, p: 2,
+          background: 'rgba(255,255,255,0.05)',
+          backdropFilter: 'blur(12px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 2,
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>
+          📄 模板
+        </Typography>
+        {templatesLoading ? (
+          <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
+            加载模板中...
+          </Typography>
+        ) : templates.length === 0 ? (
+          <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
+            暂无可用模板，可在页面详情中将页面标记为模板
+          </Typography>
+        ) : (
+          <>
+            <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
+              点击模板将从中创建新页面
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {templates.map(tpl => (
+                <Chip
+                  key={tpl.id}
+                  label={tpl.title}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
+                    borderColor: 'rgba(255,255,255,0.15)',
+                  }}
+                  onClick={() => applyTemplate(tpl.id)}
+                />
+              ))}
+            </Box>
+          </>
+        )}
+      </Paper>
     </Box>
   );
 }

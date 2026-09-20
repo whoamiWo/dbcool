@@ -41,15 +41,15 @@ export function CalendarViewPage() {
   const monthName = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
-      <h1>{viewData.title}</h1>
-      <p style={{ color: '#64748b', marginBottom: 24 }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
+      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{viewData.title}</h1>
+      <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>
         共 {records.length} 条记录 · 按 <code>{dateField}</code> 排列 · {monthName}
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: '#e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 8, overflow: 'hidden' }}>
         {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
-          <div key={day} style={{ background: '#f8fafc', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: '#475569' }}>
+          <div key={day} style={{ background: 'rgba(255,255,255,0.02)', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-text-muted)' }}>
             {day}
           </div>
         ))}
@@ -58,21 +58,22 @@ export function CalendarViewPage() {
           week.map((day, di) => (
             <div
               key={wi + '-' + di}
-              style={{ background: 'white', minHeight: 120, padding: 8, border: '1px solid #e2e8f0' }}
+              className="glass-card"
+              style={{ minHeight: 120, padding: 8, border: '1px solid rgba(255,255,255,0.05)' }}
             >
-              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>{day.day}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>{day.day}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {day.records.slice(0, 3).map((r) => (
                   <div
                     key={r.id}
-                    style={{ background: '#eff6ff', borderLeft: '2px solid #3b82f6', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: '#1e40af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    style={{ background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid #3b82f6', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: '#bfdbfe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                     title={r.title}
                   >
                     {r.title}
                   </div>
                 ))}
                 {day.records.length > 3 && (
-                  <div style={{ fontSize: 10, color: '#94a3b8' }}>还有 {day.records.length - 3} 条</div>
+                  <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>还有 {day.records.length - 3} 条</div>
                 )}
               </div>
             </div>
