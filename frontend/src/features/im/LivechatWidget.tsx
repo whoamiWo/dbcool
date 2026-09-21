@@ -1,18 +1,18 @@
 /**
- * Livechat 客服组件 - Rocket.Chat Livechat 对接
- * 
+ * Livechat 客服组件 — 内嵌工单系统对接
+ *
  * 功能：
  * 1. 右下角悬浮入口气泡
  * 2. 展开为毛玻璃会话窗口
- * 3. 支持文字/图片消息
- * 4. 自动转工单（当会话结束时）
+ * 3. 支持文字消息
+ * 4. 会话结束自动转工单（调用后端 /api/tickets）
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Paperclip, Minimize2, Maximize2 } from 'lucide-react';
-import axios from 'axios';
+import { MessageCircle, X, Send, Minimize2, Maximize2 } from 'lucide-react';
 import cl from 'clsx';
+import apiClient from '@/api/client';
 
 interface Message {
   id: string;
@@ -23,30 +23,17 @@ interface Message {
 }
 
 interface LivechatWidgetProps {
-  /** Rocket.Chat Livechat URL */
-  livechatUrl?: string;
-  /** 部门 ID（可选） */
-  departmentId?: string;
-  /** 客户信息 */
-  customerInfo?: {
-    name: string;
-    email: string;
-    token: string;
-  };
   /** 是否启用 */
   enabled?: boolean;
   /** 主题颜色 */
   primaryColor?: string;
-  /** 回调函数 */
+  /** 工单创建回调 */
   onTicketCreated?: (ticketId: string) => void;
 }
 
 export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
-  livechatUrl = 'http://localhost:3000',
-  departmentId,
-  customerInfo,
   enabled = true,
-  primaryColor = '#6366F1',
+  primaryColor = 'var(--color-primary-500)',
   onTicketCreated,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -54,49 +41,36 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 初始化 Livechat
+  // 初始化会话
   useEffect(() => {
-    if (!enabled || !customerInfo) return;
+    if (!enabled) return;
+    initSession();
+  }, [enabled]);
 
-    const initLivechat = async () => {
-      try {
-        // 创建或获取房间
-        const response = await axios.post(`${livechatUrl}/api/v1/livechat/room`, {
-          ...customerInfo,
-          ...(departmentId && { department: departmentId }),
-        });
-
-        setRoomId(response.data.room._id);
-        
-        // 加载历史消息
-        const messagesResp = await axios.get(
-          `${livechatUrl}/api/v1/livechat/messages.history/${response.data.room._id}`,
+  const initSession = async () => {
+    try {
+      const resp = await apiClient.post<{ code: number; data: { sessionId: string } }>(
+        '/api/livechat/session',
+        {}
+      );
+      if (resp.code === 0 && resp.data?.sessionId) {
+        setSessionId(resp.data.sessionId);
+        setMessages([
           {
-            params: {
-              limit: 50,
-            },
-          }
-        );
-
-        const history: Message[] = messagesResp.data.messages.map((msg: any) => ({
-          id: msg._id,
-          text: msg.msg || '',
-          sender: msg.u.username === 'livechat-agent' ? 'agent' : 'customer',
-          timestamp: new Date(msg.ts),
-          type: msg.attachments?.length ? 'image' : 'text',
-        }));
-
-        setMessages(history.reverse());
-      } catch (error) {
-        console.error('[Livechat] 初始化失败:', error);
+            id: 'welcome',
+            text: '👋 您好！有什么可以帮到您？',
+            sender: 'agent',
+            timestamp: new Date(),
+          },
+        ]);
       }
-    };
-
-    initLivechat();
-  }, [enabled, customerInfo, livechatUrl, departmentId]);
+    } catch {
+      // 会话初始化失败，静默处理
+    }
+  };
 
   // 自动滚动到底部
   useEffect(() => {
@@ -104,7 +78,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !roomId || !customerInfo) return;
+    if (!inputText.trim() || !sessionId) return;
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -114,45 +88,53 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
       type: 'text',
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    setMessages((prev) => [...prev, newMessage]);
     setInputText('');
     setIsLoading(true);
 
     try {
-      await axios.post(`${livechatUrl}/api/v1/livechat/message`, {
-        ...customerInfo,
-        roomId,
-        message: {
-          msg: inputText.trim(),
-        },
+      await apiClient.post('/api/livechat/message', {
+        sessionId,
+        message: inputText.trim(),
       });
-    } catch (error) {
-      console.error('[Livechat] 发送消息失败:', error);
-      setMessages(prev => prev.filter(m => m.id !== newMessage.id));
+
+      // 模拟客服回复（实际应由后端推送）
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            text: '已收到您的消息，客服将尽快回复。',
+            sender: 'agent',
+            timestamp: new Date(),
+          },
+        ]);
+      }, 1000);
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== newMessage.id));
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleEndChat = async () => {
-    if (!roomId || !customerInfo) return;
+    if (!sessionId) return;
 
     try {
-      // 结束会话并创建工单
-      const response = await axios.post(`${livechatUrl}/api/v1/livechat/close`, {
-        ...customerInfo,
-        roomId,
-      });
+      const resp = await apiClient.post<{ code: number; data: { ticketId: string } }>(
+        '/api/livechat/close',
+        { sessionId }
+      );
 
-      if (onTicketCreated && response.data.ticketId) {
-        onTicketCreated(response.data.ticketId);
+      if (resp.code === 0 && resp.data?.ticketId) {
+        onTicketCreated?.(resp.data.ticketId);
       }
 
-      alert('会话已结束，已为您创建工单');
       setMessages([]);
-      setRoomId(null);
-    } catch (error) {
-      console.error('[Livechat] 结束会话失败:', error);
+      setSessionId(null);
+      setIsOpen(false);
+    } catch {
+      // 结束会话失败，静默处理
     }
   };
 
@@ -177,25 +159,26 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: 'spring', damping: 15 }}
             onClick={() => setIsOpen(true)}
-            className="glass-button-primary rounded-full p-4 shadow-xl hover:scale-110 active:scale-95"
+            className="rounded-full p-4 shadow-xl hover:scale-110 active:scale-95 transition-transform"
             style={{ backgroundColor: primaryColor }}
           >
-            <MessageCircle className="w-6 h-6" />
+            <MessageCircle className="w-6 h-6 text-white" />
           </motion.button>
         ) : (
           // 聊天窗口
           <motion.div
             key="window"
             initial={{ y: 100, opacity: 0, scale: 0.9 }}
-            animate={{ 
-              y: 0, 
-              opacity: 1, 
+            animate={{
+              y: 0,
+              opacity: 1,
               scale: isMinimized ? 0.95 : 1,
             }}
             exit={{ y: 100, opacity: 0, scale: 0.9 }}
             transition={{ type: 'spring', damping: 20 }}
             className={cl(
-              'glass-card rounded-2xl shadow-2xl overflow-hidden',
+              'glass-strong rounded-2xl shadow-2xl overflow-hidden',
+              'border border-white/10',
               isMinimized ? 'w-80' : 'w-96 h-[600px]'
             )}
           >
@@ -231,7 +214,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
             {/* 最小化时只显示标题 */}
             {isMinimized ? (
               <div className="p-4 text-center text-sm text-muted">
-                点击展开聊天窗口
+                <p className="text-white/60">点击展开聊天窗口</p>
               </div>
             ) : (
               <>
@@ -239,8 +222,8 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[400px] max-h-[400px]">
                   {messages.length === 0 ? (
                     <div className="text-center text-muted py-8">
-                      <p className="text-sm mb-2">👋 您好！有什么可以帮到您？</p>
-                      <p className="text-xs">工作时间：周一至周五 9:00-18:00</p>
+                      <p className="text-sm mb-2 text-white/80">👋 您好！有什么可以帮到您？</p>
+                      <p className="text-xs text-white/50">工作时间：周一至周五 9:00-18:00</p>
                     </div>
                   ) : (
                     messages.map((msg) => (
@@ -256,7 +239,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                             'max-w-[80%] rounded-2xl px-4 py-2',
                             msg.sender === 'customer'
                               ? 'bg-blue-500 text-white'
-                              : 'bg-gray-700 text-white'
+                              : 'bg-white/10 text-white'
                           )}
                         >
                           <p className="text-sm break-words">{msg.text}</p>
@@ -272,7 +255,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                   )}
                   {isLoading && (
                     <div className="flex justify-start">
-                      <div className="bg-gray-700 rounded-2xl px-4 py-2">
+                      <div className="bg-white/10 rounded-2xl px-4 py-2">
                         <div className="flex gap-1">
                           <span className="w-2 h-2 bg-white rounded-full animate-bounce" />
                           <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-100" />
@@ -285,33 +268,28 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                 </div>
 
                 {/* 输入区域 */}
-                <div className="border-t border-white/10 p-3 bg-gray-800/50">
+                <div className="border-t border-white/10 p-3 bg-black/20">
                   <div className="flex items-center gap-2">
-                    <button className="text-gray-400 hover:text-white p-1 rounded hover:bg-white/10 transition">
-                      <Paperclip className="w-5 h-5" />
-                    </button>
                     <textarea
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="输入消息..."
-                      className="flex-1 bg-transparent text-white placeholder-gray-400 text-sm resize-none outline-none min-h-[40px] max-h-[120px]"
+                      className="flex-1 bg-transparent text-white placeholder-white/50 text-sm resize-none outline-none min-h-[40px] max-h-[120px]"
                       rows={1}
-                      disabled={!roomId}
+                      disabled={!sessionId}
                     />
                     <button
                       onClick={handleSendMessage}
-                      disabled={!inputText.trim() || isLoading || !roomId}
-                      className="glass-button-primary p-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!inputText.trim() || isLoading || !sessionId}
+                      className="rounded-full p-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                       style={{ backgroundColor: primaryColor }}
                     >
-                      <Send className="w-5 h-5" />
+                      <Send className="w-5 h-5 text-white" />
                     </button>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <button className="text-xs text-gray-400 hover:text-white transition">
-                      📎 上传截图
-                    </button>
+                    <span className="text-xs text-white/40">按 Enter 发送</span>
                     <button
                       onClick={handleEndChat}
                       className="text-xs text-red-400 hover:text-red-300 transition"
