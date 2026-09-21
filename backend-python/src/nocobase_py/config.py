@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
 
+    # Mattermost 连接器配置
+    mattermost_webhook_url: str = ""
+    mattermost_bot_token: str = ""
+
     # R15: 插件热加载目录
     plugins_dir: str = "plugins"
 

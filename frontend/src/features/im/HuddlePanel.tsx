@@ -9,31 +9,39 @@ import {
   VolumeUp as VolumeIcon,
 } from '@mui/icons-material';
 
-/**
- * Huddle 真实音视频面板 — WebRTC P2P + 信令中继
- *
- * <p>媒体流走 WebRTC P2P（单房间内），信令通过 /ws/huddle 中继。
- * 当前实现单房间单 peer（自己），未来扩展多 peer。
- */
-export function HuddlePanel({
-  roomId,
-  onLeave,
-  peers,
-}: {
+interface HuddlePanelProps {
   roomId: string | null;
   onLeave: () => void;
   peers: Array<{ id: string; name: string }>;
-}) {
+}
+
+/** 通过 WebSocket 发送信令消息 */
+function sendWs(ws: WebSocket | null, msg: Record<string, unknown>): void {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify(msg));
+}
+
+export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(true);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const peerVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const [error, setError] = useState<string | null>(null);
   const [volume, setVolume] = useState(100);
 
-  /** 初始化本地媒体流 */
+  // WebRTC 状态
+  const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const peerVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const wsRef = useRef<WebSocket | null>(null);
+
+  /** 发送信令消息的便捷方法 */
+  const sendSignal = useCallback((payload: Record<string, unknown>) => {
+    sendWs(wsRef.current, payload);
+  }, []);
+
+  /** 初始化本地媒体流（复用已有流，避免重复弹权限框） */
   const initStream = useCallback(async () => {
+    if (localStream) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -43,39 +51,202 @@ export function HuddlePanel({
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
+      // 将本地音频轨道添加到所有活跃 PeerConnection
+      stream.getAudioTracks().forEach(track => {
+        peerConnections.current.forEach(pc => pc.addTrack(track, stream));
+      });
     } catch (e) {
       console.warn('[Huddle] 无法获取媒体流:', e);
+      setError('无法访问麦克风/摄像头，请检查浏览器权限');
     }
-  }, [isVideoOff]);
+  }, [isVideoOff, localStream]);
 
-  useEffect(() => {
-    if (roomId) {
-      initStream();
+  /** 创建或获取指定 peerId 的 RTCPeerConnection */
+  const getOrCreatePeerConnection = useCallback((peerId: string): RTCPeerConnection => {
+    const existing = peerConnections.current.get(peerId);
+    if (existing) return existing;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: import.meta.env.VITE_ICE_URL || 'stun:stun.l.google.com:19302' },
+      ],
+    });
+
+    // 收到远端流 → 渲染到对应 <video>
+    pc.ontrack = (event) => {
+      const videoEl = peerVideoRefs.current.get(peerId);
+      if (videoEl) {
+        videoEl.srcObject = event.streams[0];
+      }
+    };
+
+    // ICE candidate 中继
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal({ type: 'candidate', peerId, payload: event.candidate });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        peerConnections.current.delete(peerId);
+      }
+    };
+
+    // 添加本地轨道
+    if (localStream) {
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
     }
-    return () => {
-      localStream?.getTracks().forEach((t) => t.stop());
-      peerConnections.current.forEach((pc) => pc.close());
+
+    peerConnections.current.set(peerId, pc);
+    return pc;
+  }, [localStream, sendSignal]);
+
+  // ── 建立 WebSocket 连接，监听信令消息 ────────────────────────────────────
+  useEffect(() => {
+    const token = window.localStorage.getItem('nocobase_access_token');
+    const ws = new WebSocket(
+      `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/huddle?token=${token}`
+    );
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      let msg: Record<string, unknown>;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      switch (msg.type) {
+        case 'joined':
+          setError(null);
+          break;
+        case 'peer-joined': {
+          const peerId = String(msg.peerId ?? '');
+          if (!peerId) return;
+          setError(null);
+          // 已有 peer 加入 → 发起 offer
+          const pc = getOrCreatePeerConnection(peerId);
+          pc.createOffer()
+            .then(offer => pc.setLocalDescription(offer))
+            .then(() => sendSignal({ type: 'offer', peerId, payload: pc.localDescription }))
+            .catch(err => console.error('[Huddle] offer 创建失败:', err));
+          break;
+        }
+        case 'offer': {
+          const peerId = String(msg.from ?? '');
+          if (!peerId) return;
+          setError(null);
+          const pc = getOrCreatePeerConnection(peerId);
+          const desc = new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit);
+          pc.setRemoteDescription(desc)
+            .then(() => pc.createAnswer())
+            .then(answer => pc.setLocalDescription(answer))
+            .then(() => sendSignal({ type: 'answer', peerId: msg.from, payload: pc.localDescription }))
+            .catch(err => console.error('[Huddle] answer 创建失败:', err));
+          break;
+        }
+        case 'answer': {
+          const peerId = String(msg.from ?? '');
+          if (!peerId) return;
+          const pc = peerConnections.current.get(peerId);
+          if (!pc) return;
+          const desc = new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit);
+          pc.setRemoteDescription(desc).catch(err =>
+            console.error('[Huddle] setRemoteAnswer 失败:', err)
+          );
+          break;
+        }
+        case 'candidate': {
+          const peerId = String(msg.from ?? '');
+          if (!peerId) return;
+          const pc = peerConnections.current.get(peerId);
+          if (!pc) return;
+          const candidate = msg.payload as RTCIceCandidate;
+          pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(err =>
+            console.error('[Huddle] addIceCandidate 失败:', err)
+          );
+          break;
+        }
+        case 'error':
+          setError(String(msg.msg ?? '信令错误'));
+          break;
+        case 'left':
+        case 'peer-left': {
+          const leftPeerId = String(
+            (msg.type === 'peer-left' ? msg.peerId : msg.roomId) ?? ''
+          );
+          const pc = peerConnections.current.get(leftPeerId);
+          if (pc) { pc.close(); peerConnections.current.delete(leftPeerId); }
+          break;
+        }
+        default:
+          break;
+      }
+    };
+
+    ws.onclose = () => {
+      wsRef.current = null;
+      peerConnections.current.forEach(pc => pc.close());
       peerConnections.current.clear();
     };
-  }, [roomId, initStream, localStream]);
+
+    ws.onerror = () => setError('WebSocket 连接失败，请检查网络连接');
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+      peerConnections.current.forEach(pc => pc.close());
+      peerConnections.current.clear();
+    };
+  // 仅初始化一次
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── 监听 roomId 变化：加入/离开房间 ────────────────────────────────────
+  useEffect(() => {
+    if (!roomId) return;
+    // 加入房间
+    sendSignal({ type: 'join', roomId });
+    // 媒体流初始化（延迟确保 WS 已建立）
+    const timer = setTimeout(() => { initStream(); }, 500);
+    return () => clearTimeout(timer);
+  // sendSignal/initStream 是稳定的 useCallback，roomId 变化时重新执行
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId]);
 
   const toggleMute = () => {
     if (!localStream) return;
-    localStream.getAudioTracks().forEach((t) => (t.enabled = !isMuted));
+    localStream.getAudioTracks().forEach(t => (t.enabled = !isMuted));
     setIsMuted(!isMuted);
   };
 
-  const toggleVideo = () => {
-    if (!localStream) return;
-    localStream.getVideoTracks().forEach((t) => {
-      t.enabled = !isVideoOff;
-    });
-    setIsVideoOff(!isVideoOff);
+  const toggleVideo = async () => {
+    const nextOff = !isVideoOff;
+    setIsVideoOff(nextOff);
+    if (localStream) {
+      localStream.getVideoTracks().forEach(t => (t.enabled = !nextOff));
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: !nextOff });
+        setLocalStream(stream);
+        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        peerConnections.current.forEach(pc => {
+          stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        });
+      } catch (e) {
+        console.warn('[Huddle] 视频流初始化失败:', e);
+        setIsVideoOff(true);
+      }
+    }
   };
 
   if (!roomId) return null;
 
-  const activePeers = peers.length > 0 ? [...peers, { id: 'self', name: '我' }] : [{ id: 'self', name: '我' }];
+  const activePeers = peers.length > 0
+    ? [...peers, { id: 'self', name: '我' }]
+    : [{ id: 'self', name: '我' }];
 
   return (
     <Box
@@ -84,7 +255,7 @@ export function HuddlePanel({
         position: 'fixed',
         bottom: 24,
         right: 24,
-        width: 360,
+        width: 380,
         borderRadius: 3,
         zIndex: 100,
         padding: 2,
@@ -101,7 +272,7 @@ export function HuddlePanel({
               width: 10,
               height: 10,
               borderRadius: '50%',
-              bgcolor: 'var(--color-success)',
+              bgcolor: error ? 'var(--color-error)' : 'var(--color-success)',
               animation: 'pulse 2s infinite',
             }}
           />
@@ -110,10 +281,27 @@ export function HuddlePanel({
           </Typography>
           <Chip label={roomId} size="small" sx={{ fontSize: 10, height: 18 }} />
         </Box>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: 'var(--color-text-muted)' }}>
           {activePeers.length - 1} 位参与者
         </Typography>
       </Box>
+
+      {/* 错误提示 */}
+      {error && (
+        <Box
+          sx={{
+            mb: 1.5,
+            p: 1,
+            borderRadius: 1,
+            bgcolor: 'rgba(239,68,68,0.15)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: 'var(--color-error)',
+            fontSize: 12,
+          }}
+        >
+          {error}
+        </Box>
+      )}
 
       {/* 参与者网格 */}
       <Box
@@ -134,7 +322,9 @@ export function HuddlePanel({
               overflow: 'hidden',
               background: 'var(--color-bg-tertiary)',
               aspectRatio: '4/3',
-              border: peer.id === 'self' ? '2px solid var(--color-primary-500)' : '1px solid var(--color-border-light)',
+              border: peer.id === 'self'
+                ? '2px solid var(--color-primary-500)'
+                : '1px solid var(--color-border-light)',
             }}
           >
             {peer.id === 'self' ? (
@@ -147,17 +337,12 @@ export function HuddlePanel({
               />
             ) : (
               <video
-                ref={(el) => {
-                  if (el && peerVideoRefs.current.get(peer.id)) {
-                    peerVideoRefs.current.set(peer.id, el);
-                  }
-                }}
+                ref={(el) => { if (el) peerVideoRefs.current.set(peer.id, el); }}
                 autoPlay
                 playsInline
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             )}
-            {/* 姓名标签 */}
             <Box
               sx={{
                 position: 'absolute',
@@ -207,11 +392,7 @@ export function HuddlePanel({
         <Tooltip title="挂断">
           <IconButton
             onClick={onLeave}
-            sx={{
-              bgcolor: 'var(--color-error)',
-              color: '#fff',
-              '&:hover': { bgcolor: '#dc2626' },
-            }}
+            sx={{ bgcolor: 'var(--color-error)', color: '#fff', '&:hover': { bgcolor: '#dc2626' } }}
           >
             <HangupIcon />
           </IconButton>

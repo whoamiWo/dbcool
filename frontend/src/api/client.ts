@@ -57,8 +57,10 @@ async function handleRefreshToken(): Promise<string> {
       notifyRefreshCallbacks(access_token);
       return access_token;
     } catch (e) {
-      // 排队的订阅者也失败
-      refreshSubscribers.forEach(() => {});
+      // 排队的订阅者也失败：清空队列并 reject，避免 Promise 永久悬挂
+      const failed = [...refreshSubscribers];
+      refreshSubscribers = [];
+      failed.forEach(cb => cb(null as unknown as string));
       throw e;
     } finally {
       isRefreshing = false;

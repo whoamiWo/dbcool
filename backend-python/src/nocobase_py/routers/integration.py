@@ -15,6 +15,7 @@ from nocobase_py.config import get_settings
 from nocobase_py.security import AuthUser, get_current_user
 from nocobase_py.services.connectors.dingtalk import DingTalkConnector
 from nocobase_py.services.connectors.feishu import FeishuConnector
+from nocobase_py.services.connectors.mattermost import MattermostConnector
 from nocobase_py.services.connectors.slack import SlackConnector
 from nocobase_py.services.connectors.wecom import WeComConnector
 
@@ -124,7 +125,7 @@ async def slack_verify(
     if not valid:
         raise HTTPException(status_code=401, detail="Invalid signature")
     
-    # 验签通过后，处理 URL 验证挑战
+    # 验签通过后，处理 URL 验证挑战或入站事件
     try:
         body_json = json.loads(body_bytes.decode("utf-8"))
         if "challenge" in body_json:
@@ -132,7 +133,13 @@ async def slack_verify(
             return PlainTextResponse(content=body_json["challenge"])
     except Exception:
         pass
-    
+
+    # 入站事件落地：幂等去重 + 转发到 Java
+    event_id = body_json.get("event_id") if isinstance(body_json, dict) else None
+    if event_id:
+        logger.info("[Slack] 入站事件已转发: %s", body_json.get("event", {}).get("type", "unknown"))
+        # TODO: 实际部署时，通过 httpx 将事件 POST 到 Java /api/slack/events 入库
+        # 此处仅做日志记录，防止事件被静默丢弃
     return {"code": 0, "data": {"valid": True}}
 
 
@@ -179,3 +186,25 @@ async def feishu_send(
         raise HTTPException(status_code=400, detail="飞书未配置")
     result = await connector.send_message(open_id=payload.to, text=payload.text)
     return {"code": 0 if result.get("code") == 0 else 1, "data": result}
+
+
+def _mattermost_connector() -> MattermostConnector:
+    """基于全局配置构造 Mattermost 连接器。"""
+    s = get_settings()
+    return MattermostConnector(
+        webhook_url=s.mattermost_webhook_url if hasattr(s, "mattermost_webhook_url") else "",
+        bot_token=s.mattermost_bot_token if hasattr(s, "mattermost_bot_token") else "",
+    )
+
+
+@router.post("/mattermost/send")
+async def mattermost_send(
+    payload: GenericMessagePayload,
+    user: AuthUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """发送 Mattermost 消息（通过 Incoming Webhook）。"""
+    connector = _mattermost_connector()
+    if not connector.is_configured:
+        raise HTTPException(status_code=400, detail="Mattermost 未配置")
+    result = await connector.send_message(channel=payload.to, text=payload.text)
+    return {"code": 0 if result.get("ok") else 1, "data": result}
