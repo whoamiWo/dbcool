@@ -25,35 +25,7 @@ import { SearchResults } from './SearchResults';
 import { ThreadPanel } from './ThreadPanel';
 import { useHuddle } from './useHuddle';
 import { LivechatWidget } from './LivechatWidget';
-
-/** Huddle 音视频入口占位 UI */
-function HuddlePanel({ roomId }: { roomId: string | null }) {
-  if (!roomId) return null;
-  return (
-    <div
-      className="glass"
-      style={{
-        position: 'fixed',
-        bottom: 24,
-        right: 24,
-        width: 280,
-        padding: 16,
-        borderRadius: 16,
-        zIndex: 100,
-        background: 'rgba(15, 23, 42, 0.7)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>
-        Huddle 房间: {roomId}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-        音视频流由 SFU 处理，信令已连接
-      </div>
-    </div>
-  );
-}
+import { HuddlePanel } from './HuddlePanel';
 
 /** IM 聊天主布局，三栏：频道列表 | 消息流 | 线程面板 */
 export function ImChatPage() {
@@ -65,7 +37,7 @@ export function ImChatPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
-  const { roomId: huddleRoomId, joinHuddle, leaveHuddle } = useHuddle();
+  const { roomId: huddleRoomId, joinHuddle, leaveHuddle, peers } = useHuddle();
 
   const { data: channelsData, refetch: refetchChannels } = useQuery({
     queryKey: ['im-channels'],
@@ -343,7 +315,11 @@ export function ImChatPage() {
         onClose={() => setThreadMessage(null)}
       />
 
-      <HuddlePanel roomId={huddleRoomId} />
+      <HuddlePanel
+        roomId={huddleRoomId}
+        onLeave={leaveHuddle}
+        peers={Array.from(peers.entries()).map(([id, name]) => ({ id, name }))}
+      />
       <LivechatWidget />
 
       {showCreateDialog && (
