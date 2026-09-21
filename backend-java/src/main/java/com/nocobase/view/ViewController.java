@@ -45,7 +45,7 @@ public class ViewController {
             type = ViewEntity.Type.valueOf(request.type().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new org.springframework.web.server.ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "type 必须是 table / kanban / detail / gallery / calendar");
+                    HttpStatus.BAD_REQUEST, "type 必须是 table / kanban / detail / gallery / calendar / timeline");
         }
 
         ViewEntity view = service.create(

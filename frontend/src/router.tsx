@@ -128,6 +128,9 @@ const CollabPage = lazy(() =>
 const WorkbenchPage = lazy(() =>
   import('./pages/Workbench').then(m => ({ default: m.default } as { default: React.ComponentType })),
 );
+const TimelineViewPage = lazy(() =>
+  import('./features/collection/TimelineView').then(m => ({ default: m.TimelineViewPage } as { default: React.ComponentType })),
+);
 const DingTalkPage = lazy(() =>
   import('./pages/dingtalk/DingTalkPage').then(m => ({ default: m.DingTalkPage } as { default: React.ComponentType })),
 );
@@ -192,6 +195,7 @@ export const router = createBrowserRouter([
       { path: 'views/:id/gallery', element: <Lazy><GalleryViewPage /></Lazy> },
       { path: 'views/:id/calendar', element: <Lazy><CalendarViewPage /></Lazy> },
       { path: 'views/:id/detail/:recordId', element: <Lazy><DetailViewPage /></Lazy> },
+      { path: 'views/:id/timeline', element: <Lazy><TimelineViewPage /></Lazy> },
       { path: 'workbench', element: <Lazy><WorkbenchPage /></Lazy> },
       { path: 'im', element: <Lazy><ImChatPage /></Lazy> },
       { path: 'im/:channelId', element: <Lazy><ImChatPage /></Lazy> },

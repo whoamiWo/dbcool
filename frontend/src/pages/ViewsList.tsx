@@ -119,5 +119,5 @@ export function ViewsListPage() {
 }
 
 function typeColor(type: string): string {
-  return { TABLE: '#3b82f6', KANBAN: '#8b5cf6', DETAIL: '#10b981' }[type] ?? '#64748b';
+  return { TABLE: '#3b82f6', KANBAN: '#8b5cf6', DETAIL: '#10b981', TIMELINE: '#f59e0b' }[type] ?? '#64748b';
 }

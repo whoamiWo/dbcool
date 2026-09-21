@@ -1,6 +1,6 @@
 /** 视图(Week 9 Epic 3)类型定义. */
 
-export type ViewType = 'table' | 'kanban' | 'detail' | 'gallery' | 'calendar';
+export type ViewType = 'table' | 'kanban' | 'detail' | 'gallery' | 'calendar' | 'timeline';
 
 export interface TableColumn {
   field: string;
@@ -38,7 +38,14 @@ export interface DetailConfig {
   hiddenFields?: string[];
 }
 
-export type ViewConfig = TableConfig | KanbanConfig | DetailConfig;
+export interface TimelineConfig {
+  dateField: string; // 时间字段名，默认 'created_at'
+  titleField?: string; // 标题字段，默认 'title'
+  colorField?: string; // 按字段颜色映射
+  compact?: boolean; // 紧凑模式
+}
+
+export type ViewConfig = TableConfig | KanbanConfig | DetailConfig | TimelineConfig;
 
 export interface ViewMeta {
   id: string;

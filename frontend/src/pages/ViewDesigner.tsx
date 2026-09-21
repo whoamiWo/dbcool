@@ -158,6 +158,7 @@ export function ViewDesignerPage() {
             <option value="table">表格视图</option>
             <option value="kanban">看板视图</option>
             <option value="detail">详情视图</option>
+            <option value="timeline">时间线视图</option>
           </select>
         </div>
 
