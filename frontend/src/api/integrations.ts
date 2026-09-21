@@ -120,10 +120,64 @@ export const integrationApi = {
 };
 
 // ============================================================
+//  企业微信集成 API
+// ============================================================
+
+export interface WeComAuthUrlResponse {
+  code: number;
+  message: string;
+  data: {
+    authUrl: string;
+  };
+}
+
+export interface WeComLoginResponse {
+  code: number;
+  message: string;
+  data: {
+    token: string;
+    userId: string;
+    username: string;
+  };
+}
+
+export interface WeComSyncContactsResponse {
+  code: number;
+  message: string;
+  data: {
+    synced: boolean;
+    users: number;
+  };
+}
+
+export const wecomApi = {
+  /** 获取企业微信授权 URL */
+  getAuthUrl: (): Promise<WeComAuthUrlResponse> =>
+    client.post('/api/wecom/auth-url'),
+
+  /** 企业微信登录回调 */
+  login: (code: string): Promise<WeComLoginResponse> =>
+    client.post('/api/wecom/callback', { code }),
+
+  /** 同步通讯录 */
+  syncContacts: (): Promise<WeComSyncContactsResponse> =>
+    client.post('/api/wecom/sync-contacts'),
+
+  /** 发送消息 */
+  sendMessage: (body: Record<string, unknown>): Promise<{ code: number; message: string }> =>
+    client.post('/api/wecom/message/send', body),
+
+  /** 获取配置状态 */
+  getConfig: (): Promise<{ code: number; message: string; data: { configured: boolean } }> =>
+    client.get('/api/wecom/config'),
+};
+
+// ============================================================
 //  统一 API 入口
 // ============================================================
 
 export const integrationsApi = {
   dingtalk: dingtalkApi,
+  wecom: wecomApi,
   integration: integrationApi,
 };

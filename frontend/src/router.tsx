@@ -3,6 +3,9 @@ import { Suspense, lazy } from 'react';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/Login';
 import { HomePage } from './pages/Home';
+const WeComLoginPage = lazy(() =>
+  import('./pages/auth/WeComLoginPage').then(m => ({ default: m.WeComLoginPage } as { default: React.ComponentType })),
+);
 
 // R12 代码分割 — React.lazy + 命名导出桥接(不改 29 个页面文件)
 const SchemaDesignerPage = lazy(() =>
@@ -205,6 +208,7 @@ export const router = createBrowserRouter([
       { path: 'projects', element: <Lazy><ProjectPage /></Lazy> },
       { path: 'collab/:docId', element: <Lazy><CollabPage /></Lazy> },
       { path: 'dingtalk', element: <Lazy><DingTalkPage /></Lazy> },
+      { path: 'wecom', element: <Lazy><WeComLoginPage /></Lazy> },
 
       // Playbooks
       { path: 'playbooks', element: <Lazy><PlaybookListPage /></Lazy> },
