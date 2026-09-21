@@ -49,10 +49,12 @@ class FeishuConnector:
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         }
+        import json
+
         payload = {
             "receive_id": open_id,
             "msg_type": "text",
-            "content": '{"text": "' + text.replace('"', '\\"') + '"}',
+            "content": json.dumps({"text": text}),
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:

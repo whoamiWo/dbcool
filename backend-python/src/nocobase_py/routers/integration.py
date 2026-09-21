@@ -108,26 +108,31 @@ async def slack_send(
 @router.post("/slack/verify")
 async def slack_verify(
     request: Request,
-    user: AuthUser = Depends(get_current_user),
 ) -> PlainTextResponse | dict[str, Any]:
-    """验证 Slack Events API 请求签名并处理 challenge。"""
+    """验证 Slack Events API 请求签名并处理 challenge。
+    
+    修复：先验签再返 challenge（Slack 要求先返回 challenge 完成握手）。
+    不需要用户鉴权（Slack 事件推送无需 JWT）。
+    """
     connector = _slack_connector()
     body_bytes = await request.body()
     timestamp = int(request.headers.get("X-Slack-Request-Timestamp", 0))
     signature = request.headers.get("X-Slack-Signature", "")
     
-    # 处理 URL 验证挑战（Slack 会发送 challenge 字段）
+    # 先验签
+    valid = connector.verify_signature(timestamp, signature, body_bytes)
+    if not valid:
+        raise HTTPException(status_code=401, detail="Invalid signature")
+    
+    # 验签通过后，处理 URL 验证挑战
     try:
         body_json = json.loads(body_bytes.decode("utf-8"))
         if "challenge" in body_json:
-            # 直接返回 challenge 字符串完成验证
+            # 返回 challenge 字符串完成验证
             return PlainTextResponse(content=body_json["challenge"])
     except Exception:
         pass
     
-    valid = connector.verify_signature(timestamp, signature, body_bytes)
-    if not valid:
-        raise HTTPException(status_code=401, detail="Invalid signature")
     return {"code": 0, "data": {"valid": True}}
 
 
