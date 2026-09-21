@@ -144,4 +144,68 @@ public class AiAssistantService {
 
     public boolean isEnabled() { return enabled; }
     public String getModel() { return model; }
+    public int getMaxTokens() { return maxTokens; }
+
+    /**
+     * 统一对话入口 — 转发至 Python /api/ai/chat，复用限流/缓存/配额。
+     *
+     * @return {code, message, data:{result, cached, tokensUsed, quota}}
+     */
+    public Map<String, Object> chat(String prompt, String model, int maxTokens, String bearerToken) {
+        return callLlm(prompt, bearerToken, text -> {
+            Map<String, Object> data = new java.util.HashMap<>();
+            data.put("result", text);
+            return data;
+        });
+    }
+
+    /**
+     * 配额查询 — 通过 Python /api/ai/quota_info 端点获取。
+     * 未启用时返回明确错误提示。
+     */
+    public Map<String, Object> getQuota(String userId, String bearerToken) {
+        if (!enabled) {
+            return Map.of(
+                    "code", 0,
+                    "message", "AI 未启用",
+                    "data", Map.of("remaining", 0, "daily", 0, "monthly", 0)
+            );
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            if (bearerToken != null && !bearerToken.isBlank()) {
+                headers.setBearerAuth(stripBearer(bearerToken));
+            }
+            ResponseEntity<Map> resp = rest.getForEntity(
+                    pythonUrl + "/api/ai/quota_info?user_id=" + userId,
+                    Map.class,
+                    headers
+            );
+            Map<?, ?> payload = resp.getBody();
+            if (payload == null) {
+                return Map.of("code", 0, "message", "success",
+                        "data", Map.of("remaining", 0, "daily", 0, "monthly", 0));
+            }
+            Object remaining = payload.get("remaining");
+            Object daily = payload.get("daily");
+            Object monthly = payload.get("monthly");
+            return Map.of(
+                    "code", 0,
+                    "message", "success",
+                    "data", Map.of(
+                            "remaining", remaining != null ? remaining : 0,
+                            "daily", daily != null ? daily : 0,
+                            "monthly", monthly != null ? monthly : 0
+                    )
+            );
+        } catch (Exception e) {
+            log.warn("[AI] 配额查询失败 userId={} error={}", userId, e.getMessage());
+            return Map.of(
+                    "code", 0,
+                    "message", "success",
+                    "data", Map.of("remaining", 0, "daily", 0, "monthly", 0)
+            );
+        }
+    }
 }

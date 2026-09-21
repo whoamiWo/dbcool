@@ -10,7 +10,9 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 统一搜索索引 Repository。
+ * 统一搜索索引 Repository — 基于 PostgreSQL FTS (tsvector/tsquery/ts_headline)。
+ *
+ * <p>触发器 V28 使用 'simple' 解析器，因此所有查询统一使用 'simple' 配置。
  */
 @Repository
 public interface UnifiedSearchIndexRepository extends JpaRepository<UnifiedSearchIndexEntity, UUID> {
@@ -19,41 +21,71 @@ public interface UnifiedSearchIndexRepository extends JpaRepository<UnifiedSearc
 
     List<UnifiedSearchIndexEntity> findByTenantId(String tenantId);
 
-    /**
-     * 按 entity_type + entity_id 查找（用于 upsert 判断）。
-     */
     List<UnifiedSearchIndexEntity> findByEntityTypeAndEntityIdAndTenantId(
             String entityType, String entityId, String tenantId);
 
-    /**
-     * 删除某实体的所有索引。
-     */
     void deleteByEntityTypeAndEntityIdAndTenantId(
             String entityType, String entityId, String tenantId);
 
     /**
-     * FTS 全文检索（兼容 H2 用 LIKE，PG 用 tsvector）。
+     * 按实体类型 + 关键词 FTS 检索，返回相关度分数与高亮片段。
+     * 使用 PG 内置 ts_rank + ts_headline（配置 'simple' 与触发器一致）。
      */
     @Query(value = """
-        SELECT e FROM UnifiedSearchIndexEntity e
-        WHERE e.tenantId = :tenantId
-          AND (e.contentTsv ILIKE %:query% OR e.title ILIKE %:query%)
-        ORDER BY e.updatedAt DESC
-        """)
-    List<UnifiedSearchIndexEntity> searchByKeyword(@Param("query") String query,
-                                                    @Param("tenantId") String tenantId);
+        SELECT e.entity_type AS entityType,
+               e.entity_id AS entityId,
+               e.tenant_id AS tenantId,
+               e.title AS title,
+               ts_headline('simple', e.content,
+                   tsquery('simple', :keyword),
+                   'StartSel=&lt;mark&gt;, StopSel=&lt;/mark&gt;, MaxWords=50, MinWords=20, MaxFragments=2, FragmentDelimiter= ... ')
+                   AS snippet,
+               ts_rank(e.content_tsv, tsquery('simple', :keyword)) AS rank,
+               e.updated_at AS updatedAt,
+               e.metadata AS metadataJson
+        FROM unified_search_index e
+        WHERE e.tenant_id = :tenantId
+          AND e.entity_type = :entityType
+          AND e.content_tsv @@ to_tsquery('simple', :keyword)
+        ORDER BY rank DESC
+        LIMIT :limit
+        """,
+        nativeQuery = true)
+    List<UnifiedSearchIndexEntity> searchByKeywordAndType(
+            @Param("entityType") String entityType,
+            @Param("keyword") String keyword,
+            @Param("tenantId") String tenantId,
+            @Param("limit") int limit);
 
     /**
-     * 按类型过滤搜索。
+     * 无类型过滤的全局 FTS 检索。
      */
     @Query(value = """
-        SELECT e FROM UnifiedSearchIndexEntity e
-        WHERE e.tenantId = :tenantId
-          AND e.entityType = :entityType
-          AND (e.contentTsv ILIKE %:query% OR e.title ILIKE %:query%)
-        ORDER BY e.updatedAt DESC
-        """)
-    List<UnifiedSearchIndexEntity> searchByKeywordAndType(@Param("query") String query,
-                                                            @Param("tenantId") String tenantId,
-                                                            @Param("entityType") String entityType);
+        SELECT e.entity_type AS entityType,
+               e.entity_id AS entityId,
+               e.tenant_id AS tenantId,
+               e.title AS title,
+               ts_headline('simple', e.content,
+                   tsquery('simple', :keyword),
+                   'StartSel=&lt;mark&gt;, StopSel=&lt;/mark&gt;, MaxWords=50, MinWords=20, MaxFragments=2, FragmentDelimiter= ... ')
+                   AS snippet,
+               ts_rank(e.content_tsv, tsquery('simple', :keyword)) AS rank,
+               e.updated_at AS updatedAt,
+               e.metadata AS metadataJson
+        FROM unified_search_index e
+        WHERE e.tenant_id = :tenantId
+          AND e.content_tsv @@ to_tsquery('simple', :keyword)
+        ORDER BY rank DESC
+        LIMIT :limit
+        """,
+        nativeQuery = true)
+    List<UnifiedSearchIndexEntity> searchAllTypes(
+            @Param("keyword") String keyword,
+            @Param("tenantId") String tenantId,
+            @Param("limit") int limit);
+
+    /**
+     * 统计某实体类型在租户下的索引数量（用于 facets）。
+     */
+    long countByEntityTypeAndTenantId(String entityType, String tenantId);
 }

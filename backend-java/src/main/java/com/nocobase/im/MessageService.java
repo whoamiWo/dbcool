@@ -172,6 +172,14 @@ public class MessageService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
     }
 
+    /**
+     * 校验用户是否为某频道的成员（用于搜索 ACL 过滤）。
+     */
+    public boolean isMemberOfChannel(UUID channelId, UUID userId) {
+        if (channelId == null || userId == null) return false;
+        return memberRepository.existsByChannelIdAndUserId(channelId, userId);
+    }
+
     private Instant lastReadCursor(ImChannelMemberEntity m) {
         UUID lastId = m.getLastReadMessageId();
         if (lastId == null) return null; // 从未读过 → 全部视为未读

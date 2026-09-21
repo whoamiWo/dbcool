@@ -78,4 +78,40 @@ public class AiController {
                 "data", Map.of("enabled", aiService.isEnabled(), "model", aiService.getModel())
         ));
     }
+
+    /**
+     * 统一 AI 对话入口 — 转发至 Python LLM 网关(/api/ai/chat)，
+     * 复用其限流/缓存/配额三层防护。
+     *
+     * <p>请求体: {prompt, model?, max_tokens?}
+     * <p>响应体: {code, message, data:{result, cached, tokensUsed, quota:{remaining, daily, monthly}}}
+     */
+    @PostMapping("/chat")
+    public Map<String, Object> chat(
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String prompt = (String) body.get("prompt");
+        if (prompt == null || prompt.isBlank()) {
+            return Map.of("code", 400, "message", "prompt 必填", "data", Map.of());
+        }
+        String model = (String) body.getOrDefault("model", aiService.getModel());
+        int maxTokens = body.containsKey("max_tokens")
+                ? ((Number) body.get("max_tokens")).intValue()
+                : aiService.getMaxTokens();
+        return aiService.chat(prompt, model, maxTokens, auth);
+    }
+
+    /**
+     * 配额查询 — 返回当前用户的剩余调用次数与 token 额度。
+     * 未启用时返回明确提示。
+     */
+    @GetMapping("/quota")
+    public Map<String, Object> quota(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth
+    ) {
+        return aiService.getQuota(user.userId().toString(), auth);
+    }
 }

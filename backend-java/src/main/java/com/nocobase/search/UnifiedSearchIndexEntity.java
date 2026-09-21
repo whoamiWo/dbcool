@@ -47,6 +47,11 @@ public class UnifiedSearchIndexEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** 高亮片段（由 ts_headline 生成，来自原生查询别名）。 */
+    private String snippet;
+    /** 相关度分数（来自 ts_rank，来自原生查询别名）。 */
+    private Double rank;
+
     public UnifiedSearchIndexEntity() {}
 
     public UUID getId() { return id; }
@@ -78,4 +83,10 @@ public class UnifiedSearchIndexEntity {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getSnippet() { return snippet; }
+    public void setSnippet(String snippet) { this.snippet = snippet; }
+
+    public Double getRank() { return rank; }
+    public void setRank(Double rank) { this.rank = rank; }
 }
