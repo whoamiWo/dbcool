@@ -1,8 +1,10 @@
 package com.nocobase.project;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.event.RecordChangeEvent;
 import com.nocobase.project.CardChecklistItemEntity;
 import com.nocobase.project.CardChecklistItemRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -28,18 +31,21 @@ public class ProjectBoardController {
     private final CardChecklistRepository checklistRepository;
     private final CardChecklistItemRepository checklistItemRepository;
     private final CardLabelRepository labelRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ProjectBoardController(ProjectService projectService, CardMoveService cardMoveService,
                                   BoardListRepository boardListRepository,
                                   CardChecklistRepository checklistRepository,
                                   CardChecklistItemRepository checklistItemRepository,
-                                  CardLabelRepository labelRepository) {
+                                  CardLabelRepository labelRepository,
+                                  ApplicationEventPublisher eventPublisher) {
         this.projectService = projectService;
         this.cardMoveService = cardMoveService;
         this.boardListRepository = boardListRepository;
         this.checklistRepository = checklistRepository;
         this.checklistItemRepository = checklistItemRepository;
         this.labelRepository = labelRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     // ============================================================
@@ -396,5 +402,107 @@ public class ProjectBoardController {
                 user.userId(), user.tenantId()
         );
         return Map.of("code", 0, "message", "assigned", "data", Map.of());
+    }
+
+    // ============================================================
+    //  Task (任务) CRUD — 发布 RecordChangeEvent 供搜索索引同步
+    // ============================================================
+
+    /** 创建任务：{projectId, title, description, parentId, assigneeId, status, priority, startDate, endDate} */
+    @PostMapping("/tasks")
+    public ResponseEntity<Map<String, Object>> createTask(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String projectIdStr = (String) body.get("projectId");
+        if (projectIdStr == null || projectIdStr.isBlank()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "projectId 必填");
+        }
+        UUID projectId = UUID.fromString(projectIdStr);
+        UUID parentId = body.get("parentId") != null
+                ? UUID.fromString(String.valueOf(body.get("parentId"))) : null;
+        UUID assigneeId = body.get("assigneeId") != null
+                ? UUID.fromString(String.valueOf(body.get("assigneeId"))) : null;
+
+        ProjectTaskEntity task = projectService.create(
+                projectId,
+                str(body.get("title")),
+                str(body.get("description")),
+                parentId, assigneeId,
+                str(body.get("status")),
+                str(body.get("priority")),
+                parseInstant(body.get("startDate")),
+                parseInstant(body.get("endDate")),
+                user.userId(), user.tenantId()
+        );
+
+        publishTaskEvent(RecordChangeEvent.ChangeType.CREATE, task, user);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                Map.of("code", 0, "message", "success", "data", Map.of("id", task.getId().toString())));
+    }
+
+    /** 更新任务：{id, title?, description?, status?, priority?, assigneeId?, startDate?, endDate?} */
+    @PutMapping("/tasks/{id}")
+    public Map<String, Object> updateTask(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        ProjectTaskEntity task = projectService.update(
+                id,
+                str(body.get("title")),
+                str(body.get("description")),
+                str(body.get("status")),
+                str(body.get("priority")),
+                body.get("assigneeId") != null ? UUID.fromString(String.valueOf(body.get("assigneeId"))) : null,
+                body.get("progress") instanceof Number n ? n.intValue() : null,
+                parseInstant(body.get("startDate")),
+                parseInstant(body.get("endDate")),
+                user.userId(), user.tenantId()
+        );
+        publishTaskEvent(RecordChangeEvent.ChangeType.UPDATE, task, user);
+        return Map.of("code", 0, "message", "success", "data", Map.of("id", task.getId().toString()));
+    }
+
+    /** 删除任务 */
+    @DeleteMapping("/tasks/{id}")
+    public Map<String, Object> deleteTask(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        projectService.delete(id, user.tenantId());
+        publishTaskEvent(RecordChangeEvent.ChangeType.DELETE, null, user);
+        return Map.of("code", 0, "message", "success", "data", Map.of("id", id.toString()));
+    }
+
+    /** 发布任务变更事件（供搜索索引同步）。 */
+    private void publishTaskEvent(RecordChangeEvent.ChangeType type,
+                                   ProjectTaskEntity task,
+                                   AuthenticatedUser user) {
+        String recordId = task != null ? task.getId().toString() : null;
+        Map<String, Object> data = null;
+        if (task != null && (type == RecordChangeEvent.ChangeType.CREATE || type == RecordChangeEvent.ChangeType.UPDATE)) {
+            data = new LinkedHashMap<>();
+            data.put("title", task.getTitle());
+            data.put("description", task.getDescription());
+            data.put("status", task.getStatus());
+            data.put("projectId", task.getProjectId());
+        }
+        eventPublisher.publishEvent(new RecordChangeEvent(type, "project_task", recordId, data,
+                user.tenantId(), user.userId()));
+    }
+
+    private static String str(Object o) {
+        return o == null ? null : String.valueOf(o);
+    }
+
+    private static Instant parseInstant(Object o) {
+        if (o == null) return null;
+        try {
+            return Instant.parse(String.valueOf(o));
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

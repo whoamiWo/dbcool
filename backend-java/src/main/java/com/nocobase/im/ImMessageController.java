@@ -1,15 +1,18 @@
 package com.nocobase.im;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.event.RecordChangeEvent;
 import com.nocobase.im.dto.ImMessageDto;
 import com.nocobase.im.entity.ImMessageEntity;
 import com.nocobase.im.entity.ImMessageReactionEntity;
 import com.nocobase.im.entity.ImPinEntity;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,12 +35,14 @@ public class ImMessageController {
     private final MessageService messageService;
     private final ReactionService reactionService;
     private final PinService pinService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public ImMessageController(MessageService messageService, ReactionService reactionService,
-                               PinService pinService) {
+                               PinService pinService, ApplicationEventPublisher eventPublisher) {
         this.messageService = messageService;
         this.reactionService = reactionService;
         this.pinService = pinService;
+        this.eventPublisher = eventPublisher;
     }
 
     /** 置顶消息列表(按置顶时间倒序)。 */
@@ -116,6 +121,10 @@ public class ImMessageController {
                 user.tenantId(), channelId, user.userId(),
                 str(body.get("content")), str(body.get("contentType")), parentId);
 
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.CREATE, "im_message", m.getId().toString(), null,
+                user.tenantId(), user.userId()));
+
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 Map.of("code", 0, "message", "success", "data", ImMessageDto.from(m)));
     }
@@ -128,6 +137,11 @@ public class ImMessageController {
     ) {
         ImMessageEntity m = messageService.edit(
                 user.tenantId(), id, user.userId(), str(body.get("content")));
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put("content", m.getContent());
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.UPDATE, "im_message", id.toString(), dataMap,
+                user.tenantId(), user.userId()));
         return Map.of("code", 0, "message", "success", "data", ImMessageDto.from(m));
     }
 
@@ -137,6 +151,9 @@ public class ImMessageController {
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         messageService.delete(user.tenantId(), id, user.userId());
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.DELETE, "im_message", id.toString(), null,
+                user.tenantId(), user.userId()));
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("id", id.toString()));
     }

@@ -12,12 +12,14 @@ import static org.mockito.Mockito.when;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.im.entity.ImMessageEntity;
 import com.nocobase.im.entity.ImMessageReactionEntity;
+import com.nocobase.event.RecordChangeEvent;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -27,6 +29,7 @@ class ImMessageControllerTest {
     private MessageService messageService;
     private ReactionService reactionService;
     private PinService pinService;
+    private ApplicationEventPublisher eventPublisher;
     private ImMessageController controller;
 
     private final UUID userId = UUID.randomUUID();
@@ -38,7 +41,8 @@ class ImMessageControllerTest {
         messageService = mock(MessageService.class);
         reactionService = mock(ReactionService.class);
         pinService = mock(PinService.class);
-        controller = new ImMessageController(messageService, reactionService, pinService);
+        eventPublisher = mock(ApplicationEventPublisher.class);
+        controller = new ImMessageController(messageService, reactionService, pinService, eventPublisher);
     }
 
     @Test
