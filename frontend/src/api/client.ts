@@ -16,19 +16,23 @@ let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
 let refreshRequest: Promise<string> | null = null;
 
-// TODO: 当需要静默续期时取消注释
-// function subscribeTokenRefresh(cb: (token: string) => void) {
-//   refreshSubscribers.push(cb);
-// }
+/** 并发 401 排队等待：避免多个请求同时触发 refresh 导致竞态失败。 */
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
 
 function notifyRefreshCallbacks(token: string) {
   refreshSubscribers.forEach((cb) => cb(token));
   refreshSubscribers = [];
 }
 
-async function handleRefreshToken() {
+async function handleRefreshToken(): Promise<string> {
   if (isRefreshing) {
-    return refreshRequest ?? Promise.reject(new Error('Refresh in progress'));
+    // 已有刷新进行中 → 排队等待，而非直接 reject
+    return new Promise<string>((resolve) => {
+      subscribeTokenRefresh((token) => resolve(token));
+      // 刷新失败时通过全局错误处理统一跳转，此处不 reject
+    });
   }
 
   isRefreshing = true;
@@ -52,6 +56,10 @@ async function handleRefreshToken() {
       useAuthStore.getState().setAuth(access_token, refresh_token, useAuthStore.getState().user!);
       notifyRefreshCallbacks(access_token);
       return access_token;
+    } catch (e) {
+      // 排队的订阅者也失败
+      refreshSubscribers.forEach(() => {});
+      throw e;
     } finally {
       isRefreshing = false;
       refreshRequest = null;

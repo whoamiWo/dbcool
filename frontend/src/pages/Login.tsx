@@ -91,21 +91,22 @@ export function LoginPage() {
         justifyContent: 'center',
         alignItems: 'center',
         minHeight: '100vh',
-        background: '#f1f5f9',
+        background: 'var(--color-bg-primary)',
       }}
     >
       <form
         onSubmit={handleSubmit(onSubmit)}
         style={{
           padding: 32,
-          background: 'white',
+          background: 'var(--color-bg-secondary)',
           borderRadius: 8,
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          boxShadow: 'var(--shadow-md)',
           width: 360,
+          border: '1px solid var(--color-border-light)',
         }}
       >
-        <h1 style={{ marginTop: 0 }}>🛠 NocoBase</h1>
-        <p style={{ color: '#64748b', marginTop: 0 }}>登录开始使用</p>
+        <h1 style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>🛠 NocoBase</h1>
+        <p style={{ color: 'var(--color-text-muted)', marginTop: 0 }}>登录开始使用</p>
 
         {error && (
           <div
@@ -113,10 +114,10 @@ export function LoginPage() {
             style={{
               padding: '8px 12px',
               marginBottom: 12,
-              background: '#fee2e2',
-              color: '#991b1b',
+              background: 'rgba(239,68,68,0.2)',
+              color: '#fca5a5',
               borderRadius: 4,
-              borderLeft: '4px solid #dc2626',
+              borderLeft: '4px solid var(--color-error)',
               fontSize: 13,
               display: 'flex',
               justifyContent: 'space-between',
@@ -132,34 +133,34 @@ export function LoginPage() {
         )}
 
         {successHint && (
-          <div style={{ padding: 8, marginBottom: 12, background: '#dcfce7',
-                        color: '#166534', borderRadius: 4, borderLeft: '4px solid #10b981', fontSize: 13 }}>
+          <div style={{ padding: 8, marginBottom: 12, background: 'rgba(16,185,129,0.2)',
+                        color: '#34d399', borderRadius: 4, borderLeft: '4px solid var(--color-success)', fontSize: 13 }}>
             ✅ {successHint}
           </div>
         )}
 
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>用户名</label>
+          <label style={{ display: 'block', marginBottom: 4, color: 'var(--color-text-secondary)' }}>用户名</label>
           <input
             {...register('username')}
             autoComplete="username"
-            style={{ width: '100%', padding: 8, fontSize: 14 }}
+            style={{ width: '100%', padding: 8, fontSize: 14, background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-primary)' }}
           />
           {errors.username && (
-            <span style={{ color: '#dc2626', fontSize: 12 }}>{errors.username.message}</span>
+            <span style={{ color: 'var(--color-error)', fontSize: 12 }}>{errors.username.message}</span>
           )}
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>密码</label>
+          <label style={{ display: 'block', marginBottom: 4, color: 'var(--color-text-secondary)' }}>密码</label>
           <input
             {...register('password')}
             type="password"
             autoComplete="current-password"
-            style={{ width: '100%', padding: 8, fontSize: 14 }}
+            style={{ width: '100%', padding: 8, fontSize: 14, background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-primary)' }}
           />
           {errors.password && (
-            <span style={{ color: '#dc2626', fontSize: 12 }}>{errors.password.message}</span>
+            <span style={{ color: 'var(--color-error)', fontSize: 12 }}>{errors.password.message}</span>
           )}
         </div>
 
@@ -167,14 +168,14 @@ export function LoginPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between',
                       alignItems: 'center', marginBottom: 16, fontSize: 13 }}>
           <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer',
-                          color: '#475569' }}>
+                          color: 'var(--color-text-muted)' }}>
             <input type="checkbox" checked={remember}
                    onChange={(e) => setRemember(e.target.checked)}
                    style={{ marginRight: 6 }} />
             记住用户名
           </label>
           <a href="#" onClick={(e) => { e.preventDefault(); alert('请联系管理员重置密码'); }}
-             style={{ color: '#1e40af', textDecoration: 'none', fontSize: 13 }}>
+             style={{ color: 'var(--color-primary-400)', textDecoration: 'none', fontSize: 13 }}>
             忘记密码?
           </a>
         </div>
@@ -185,8 +186,8 @@ export function LoginPage() {
           style={{
             width: '100%',
             padding: 10,
-            background: loading ? '#94a3b8' : '#1e293b',
-            color: 'white',
+            background: loading ? 'var(--color-text-disabled)' : 'var(--color-primary-500)',
+            color: '#fff',
             border: 'none',
             borderRadius: 4,
             cursor: loading ? 'not-allowed' : 'pointer',
@@ -196,7 +197,7 @@ export function LoginPage() {
           {loading ? '登录中…' : '登录'}
         </button>
 
-        <p style={{ fontSize: 12, color: '#64748b', marginTop: 16, textAlign: 'center' }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 16, textAlign: 'center' }}>
           Week 3 脚手架版:任意非空账号密码可登录
         </p>
       </form>

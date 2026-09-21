@@ -29,12 +29,12 @@ export default function WorkbenchPage() {
   }, [collectionsResp]);
 
   const cards = [
-    { icon: Storage, title: '数据模型', desc: '动态 Collection + 表单/视图设计器', path: '/designer/schemas', count: collections.length, meta: '低代码底座', color: '#3b82f6' },
-    { icon: AutoGraph, title: 'BI 报表', desc: '数据透视与图表可视化', path: '/bi', count: 0, meta: '数据分析', color: '#f59e0b' },
-    { icon: TaskAlt, title: '项目协同', desc: '任务看板与甘特图', path: '/projects', count: 0, meta: '项目管理', color: '#10b981' },
-    { icon: MessageIcon, title: '即时消息', desc: '频道、线程、在线状态', path: '/im', count: 0, meta: '团队协作', color: '#a855f7' },
-    { icon: Workspaces, title: '工作流', desc: '审批/通知/数据更新/HTTP', path: '/designer/workflows', count: 0, meta: '流程引擎', color: '#ef4444' },
-    { icon: FolderOpen, title: 'Wiki 知识库', desc: '文档编辑、版本历史、全文检索', path: '/wiki/kb', count: 0, meta: '知识管理', color: '#3b82f6' },
+    { icon: Storage, title: '数据模型', desc: '动态 Collection + 表单/视图设计器', path: '/designer/schemas', count: collections.length, meta: '低代码底座', color: 'var(--color-primary-500)' },
+    { icon: AutoGraph, title: 'BI 报表', desc: '数据透视与图表可视化', path: '/bi', count: 0, meta: '数据分析', color: 'var(--color-secondary-500)' },
+    { icon: TaskAlt, title: '项目协同', desc: '任务看板与甘特图', path: '/projects', count: 0, meta: '项目管理', color: 'var(--color-success-500)' },
+    { icon: MessageIcon, title: '即时消息', desc: '频道、线程、在线状态', path: '/im', count: 0, meta: '团队协作', color: 'var(--color-info-500)' },
+    { icon: Workspaces, title: '工作流', desc: '审批/通知/数据更新/HTTP', path: '/designer/workflows', count: 0, meta: '流程引擎', color: 'var(--color-error-500)' },
+    { icon: FolderOpen, title: 'Wiki 知识库', desc: '文档编辑、版本历史、全文检索', path: '/wiki/kb', count: 0, meta: '知识管理', color: 'var(--color-primary-400)' },
   ];
 
   const filtered = cards.filter((c) =>
@@ -64,12 +64,12 @@ export default function WorkbenchPage() {
               sx={{
                 height: '100%',
                 cursor: 'pointer',
-                background: 'rgba(30, 41, 59, 0.7)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                borderRadius: '12px',
-                transition: 'all 200ms ease',
+                background: 'var(--glass-bg-medium)',
+                backdropFilter: 'var(--glass-blur)',
+                border: 'var(--glass-border)',
+                boxShadow: 'var(--glass-shadow)',
+                borderRadius: 'var(--radius-lg)',
+                transition: 'all var(--transition-normal)',
                 position: 'relative',
                 overflow: 'hidden',
                 '&::before': {
@@ -83,14 +83,14 @@ export default function WorkbenchPage() {
                 },
                 '&:hover': {
                   background: 'rgba(255, 255, 255, 0.08)',
-                  boxShadow: '0 12px 48px rgba(0, 0, 0, 0.5)',
+                  boxShadow: 'var(--glass-shadow-lg)',
                   transform: 'translateY(-4px)',
                 },
               }}
             >
               <CardContent>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
-                  <Box sx={{ p: 1, borderRadius: 1, bgcolor: `${c.color}20`, backdropFilter: 'blur(8px)' }}>
+                  <Box sx={{ p: 1, borderRadius: 1, bgcolor: `${c.color}20`, backdropFilter: 'var(--glass-blur)' }}>
                     <c.icon sx={{ color: c.color, fontSize: 28 }} />
                   </Box>
                   <Box sx={{ flex: 1 }}>
@@ -112,7 +112,7 @@ export default function WorkbenchPage() {
         ))}
       </Grid>
 
-      <Box sx={{ mt: 4, p: 3, background: 'rgba(30, 41, 59, 0.5)', backdropFilter: 'blur(10px)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      <Box sx={{ mt: 4, p: 3, background: 'var(--glass-bg-light)', backdropFilter: 'var(--glass-blur)', borderRadius: 'var(--radius-lg)', border: 'var(--glass-border)' }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: 'text.primary' }}>快速入口</Typography>
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           {[

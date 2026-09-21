@@ -2,20 +2,34 @@
    CSS Custom Properties (Design Tokens)
    Glassmorphism Dark Theme
    ============================================ */
+   /* 暗色主题：所有硬编码亮色需替换为 CSS 变量 */
+   /* 使用方式: import { dark, btnStyles, inputStyle } from '@/theme/dark' */
 
 :root {
   /* 主色调 */
   --color-primary-500: #6366f1;
   --color-primary-600: #4f46e5;
   --color-primary-400: #818cf8;
+  --color-primary-300: #a5b4fc;
+  --color-primary-200: #c7d2fe;
+  --color-primary-100: #e0e7ff;
   --color-secondary-500: #a855f7;
   --color-secondary-400: #c084fc;
+  --color-secondary-300: #d8b4fe;
 
   /* 功能色 */
   --color-success: #10b981;
+  --color-success-500: #10b981;
+  --color-success-400: #34d399;
   --color-warning: #f59e0b;
+  --color-warning-500: #f59e0b;
+  --color-warning-400: #fbbf24;
   --color-error: #ef4444;
+  --color-error-500: #ef4444;
+  --color-error-400: #f87171;
   --color-info: #3b82f6;
+  --color-info-500: #3b82f6;
+  --color-info-400: #60a5fa;
 
   /* 背景色 */
   --color-bg-primary: #0F172A;

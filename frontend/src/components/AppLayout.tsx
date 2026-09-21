@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useMediaQuery } from '@mui/material';
 import { useAuthStore } from '@/stores/auth';
 import { disconnectStomp } from '@/lib/stompClient';
+import { GlobalSearchPanel } from '@/components/GlobalSearchPanel';
 
 /** 移动端底部导航 — 固定 5 个高频入口。 */
 const MOBILE_BOTTOM_NAV = [
@@ -28,8 +29,12 @@ export function AppLayout() {
 
   const navItems = [
     { path: '/home', label: '首页' },
-    { path: '/designer/schemas', label: '数据模型' },
-    { path: '/designer/views', label: '视图' },
+    { path: '/designer/schemas', label: 'Tables' },
+    { path: '/wiki/kb', label: 'Docs' },
+    { path: '/im', label: 'Chat' },
+    { path: '/projects', label: 'Projects' },
+    { path: '/designer/workflows', label: 'Automations' },
+    { path: '/agent', label: 'AI' },
     { path: '/admin/users', label: '用户' },
     { path: '/admin/roles', label: '角色' },
     { path: '/admin/acl', label: '权限' },
@@ -38,9 +43,7 @@ export function AppLayout() {
     { path: '/admin/er', label: 'ER 图' },
     { path: '/admin/notifications', label: '通知渠道' },
     { path: '/swagger', label: 'API 文档', external: 'http://localhost:8080/swagger-ui/index.html' },
-    { path: '/designer/workflows', label: '工作流' },
     { path: '/messages', label: '站内信' },
-    { path: '/im', label: '即时消息' },
     { path: '/profile', label: '我的' },
   ];
 
@@ -99,6 +102,7 @@ export function AppLayout() {
           })}
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <GlobalSearchPanel />
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
             {user?.username ?? '游客'}({user?.roles.join(', ') ?? 'no role'})
           </span>
