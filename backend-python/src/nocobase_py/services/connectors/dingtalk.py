@@ -1,6 +1,6 @@
-"""钉钉连接器 — OAuth2 + 通讯录同步 + 应用消息。
+"""钉钉连接器 — 机器人 + 消息发送。
 
-参考钉钉官方文档实现，复用 HMAC 签名模式。
+复用 WebhookPusher 的 HMAC 签名模式。
 """
 
 import hashlib
@@ -10,58 +10,97 @@ import time
 
 import httpx
 
+from nocobase_py.services.connectors.base import (
+    BaseConnector,
+    ConnectorConfig,
+    register_connector,
+)
+
 logger = logging.getLogger(__name__)
 
 
-class DingTalkConnector:
-    """钉钉连接器，支持 OAuth2 授权与消息发送。"""
+@register_connector
+class DingTalkConnector(BaseConnector):
+    """钉钉机器人连接器，支持加签安全设置。"""
 
-    def __init__(self, app_key: str = "", app_secret: str = "", agent_id: str = ""):
-        self.app_key = app_key
-        self.app_secret = app_secret
-        self.agent_id = agent_id
-        self.base_url = "https://api.dingtalk.com"
+    NAME = "dingtalk"
+    DISPLAY_NAME = "钉钉"
+
+    def __init__(self, config: ConnectorConfig):
+        super().__init__(config)
+        self.webhook_url = getattr(config, "webhook_url", "")
+        self.secret = getattr(config, "secret", "")  # 加签密钥
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.app_key and self.app_secret and self.agent_id)
+        return bool(self.webhook_url)
 
-    async def get_access_token(self) -> str:
-        """获取钉钉 access_token（新版 POST /v1.0/oauth2/accessToken）。"""
+    async def health_check(self) -> bool:
+        """健康检查：测试 Webhook 连通性。"""
         if not self.is_configured:
-            raise RuntimeError("钉钉未配置")
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{self.base_url}/v1.0/oauth2/accessToken",
-                json={"appKey": self.app_key, "appSecret": self.app_secret},
-            )
-            data = resp.json()
-            access_token = data.get("accessToken")
-            if not access_token:
-                raise RuntimeError(f"获取 access_token 失败: {data}")
-            return access_token
+            return False
+        try:
+            # 发送一条测试消息
+            result = await self.send_message("test", "health check")
+            return result.get("ok", False)
+        except Exception as e:
+            logger.warning("[DingTalk] 健康检查失败：%s", e)
+            return False
 
-    async def send_message(self, user_id: str, text: str, msg_type: str = "text") -> dict:
-        """发送应用消息（/message/send）。"""
+    async def authenticate(self) -> bool:
+        """认证测试。"""
+        return await self.health_check()
+
+    def _sign(self, timestamp: str) -> str:
+        """生成钉钉加签签名。"""
+        if not self.secret:
+            return ""
+        string_to_sign = f"{timestamp}\n{self.secret}"
+        hmac_code = hmac.new(
+            self.secret.encode(),
+            string_to_sign.encode(),
+            hashlib.sha256,
+        ).digest()
+        return hmac_code.hex()
+
+    async def send_message(self, text: str, **kwargs) -> dict:
+        """发送消息到钉钉机器人。
+
+        Args:
+            text: 消息文本
+            **kwargs: 额外参数（如 at_mobiles, is_at_all）
+
+        Returns:
+            钉钉 API 响应 dict
+        """
         if not self.is_configured:
-            raise RuntimeError("钉钉未配置")
+            logger.warning("[DingTalk] 未配置，跳过消息发送")
+            return {"ok": False, "error": "not_configured"}
 
-        access_token = await self.get_access_token()
-        headers = {"Content-Type": "application/json"}
+        # 构建 URL（带签名）
+        url = self.webhook_url
+        if self.secret:
+            timestamp = str(round(time.time() * 1000))
+            sign = self._sign(timestamp)
+            url = f"{url}&timestamp={timestamp}&sign={sign}"
+
         payload = {
-            "touser": user_id,
-            "msgtype": msg_type,
-            msg_type: {"content": text},
-            "agentid": int(self.agent_id),
+            "msgtype": "text",
+            "text": {"content": text},
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{self.base_url}/message/send?access_token={access_token}",
-                headers=headers,
-                json=payload,
-            )
+        # 添加@人配置
+        if kwargs.get("at_mobiles"):
+            payload["at"] = {
+                "atMobiles": kwargs["at_mobiles"],
+                "isAtAll": kwargs.get("is_at_all", False),
+            }
+
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+
+        async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
+            resp = await client.post(url, headers=headers, json=payload)
             data = resp.json()
-            if data.get("errcode") != 0:
-                logger.error("[DingTalk] 发送消息失败: %s", data)
-            return data
+            if data.get("errcode", 0) != 0:
+                logger.error("[DingTalk] 发送消息失败：%s", data)
+            return {"ok": data.get("errcode", 0) == 0, "data": data}

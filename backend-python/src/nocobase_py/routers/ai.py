@@ -1,4 +1,5 @@
 """AI 增强端点 — R11 LLM 成本控制(限流 + 缓存 + 配额)."""
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse
@@ -290,10 +291,10 @@ async def chat(
     3. 配额:每日 100 次 / 50K token → 429(可配)
     """
     # 1. 限流
-    _rate_limiter.consume(f"llm:{user.user_id}")
+    await _rate_limiter.consume(f"llm:{user.user_id}")
 
     # 2. 缓存检查
-    cached = _llm_cache.get(model=req.model, prompt=req.prompt)
+    cached = await _llm_cache.get(model=req.model, prompt=req.prompt)
     if cached is not None:
         return ChatResponse(
             model=req.model,
@@ -301,7 +302,7 @@ async def chat(
             response=cached,
             cached=True,
             tokens_used=0,
-            quota=_quota.remaining(user.user_id),
+            quota=await _quota.remaining(user.user_id),
         )
 
     # 3. 调用 LLM(真实模型或 simulated 回退; 消耗 token 由 _invoke_llm 记账)
@@ -311,7 +312,7 @@ async def chat(
         max_tokens=req.max_tokens,
         user_id=user.user_id,
     )
-    _llm_cache.put(model=req.model, prompt=req.prompt, response=response_text)
+    await _llm_cache.put(model=req.model, prompt=req.prompt, response=response_text)
 
     return ChatResponse(
         model=req.model,
@@ -319,7 +320,7 @@ async def chat(
         response=response_text,
         cached=False,
         tokens_used=tokens_used,
-        quota=_quota.remaining(user.user_id),
+        quota=await _quota.remaining(user.user_id),
     )
 
 

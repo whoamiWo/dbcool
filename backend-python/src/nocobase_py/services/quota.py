@@ -1,11 +1,13 @@
-"""R11 用户 LLM 配额追踪 — 按日统计 token / 调用次数."""
+"""R11 用户 LLM 配额追踪 — 按日统计 token / 调用次数 (Redis 版)."""
 
 from __future__ import annotations
 
+import calendar
+import json
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass, asdict
+
+from nocobase_py.redis_client import get_redis
 
 
 @dataclass
@@ -18,107 +20,153 @@ class UserQuota:
 
 
 class QuotaService:
-    """内存级用户配额跟踪(可扩展到持久化).
+    """基于 Redis 的用户配额服务，支持多副本一致性。
 
     Usage:
-        quota = QuotaService(daily_call_limit=100, daily_token_limit=50000)
-        quota.consume(user_id, tokens=120)  # 超限抛 ValueError
+        quota = QuotaService(daily_call_limit=100, daily_token_limit=50000, ...)
+        await quota.consume(user_id, calls=1, tokens=1000)  # 超限抛异常
+        remaining = await quota.remaining(user_id)
     """
 
     def __init__(
         self,
         daily_call_limit: int = 100,
-        daily_token_limit: int = 50_000,
-        monthly_call_limit: int = 2000,
-        monthly_token_limit: int = 1_000_000,
+        daily_token_limit: int = 50000,
+        monthly_call_limit: int = 3000,
+        monthly_token_limit: int = 1500000,
     ) -> None:
         self.daily_call_limit = daily_call_limit
         self.daily_token_limit = daily_token_limit
         self.monthly_call_limit = monthly_call_limit
         self.monthly_token_limit = monthly_token_limit
-        self._quotas: dict[str, UserQuota] = defaultdict(UserQuota)
-        # key = user_id, value per-period tracker
-        self._day_start: dict[str, float] = {}
-        self._month_start: dict[str, float] = {}
+        self._prefix = "llm_quota:"
 
-    @staticmethod
-    def _today() -> float:
-        """返回当天 00:00 的时间戳(秒)."""
-        import datetime as _dt
+    def _daily_key(self, user_id: str, date: str | None = None) -> str:
+        if date is None:
+            date = time.strftime("%Y-%m-%d")
+        return f"{self._prefix}{user_id}:daily:{date}"
 
-        now = _dt.datetime.now(_dt.timezone.utc)
-        day = _dt.datetime(now.year, now.month, now.day, tzinfo=_dt.timezone.utc)
-        return day.timestamp()
+    def _monthly_key(self, user_id: str, month: str | None = None) -> str:
+        if month is None:
+            month = time.strftime("%Y-%m")
+        return f"{self._prefix}{user_id}:monthly:{month}"
 
-    @staticmethod
-    def _this_month() -> float:
-        import datetime as _dt
-
-        now = _dt.datetime.now(_dt.timezone.utc)
-        first = _dt.datetime(now.year, now.month, 1, tzinfo=_dt.timezone.utc)
-        return first.timestamp()
-
-    def _ensure_period(self, user_id: str) -> None:
+    async def consume(self, user_id: str, calls: int = 1, tokens: int = 0) -> None:
+        """消费配额。超限抛 ValueError."""
         now = time.time()
-        day = self._today()
-        month = self._this_month()
-        if self._day_start.get(user_id, 0) < day:
-            self._day_start[user_id] = day
-            q = self._quotas[user_id]
-            q.daily_calls = 0
-            q.daily_tokens = 0
-        if self._month_start.get(user_id, 0) < month:
-            self._month_start[user_id] = month
-            q = self._quotas[user_id]
-            q.monthly_calls = 0
-            q.monthly_tokens = 0
+        redis = await get_redis()
 
-    def consume(self, user_id: str, tokens: int = 0) -> None:
-        """消耗配额;超限抛 ValueError 并发出告警."""
-        self._ensure_period(user_id)
-        q = self._quotas[user_id]
-        q.daily_calls += 1
-        q.daily_tokens += tokens
-        q.monthly_calls += 1
-        q.monthly_tokens += tokens
-        q.last_call_ts = time.time()
+        daily_key = self._daily_key(user_id)
+        monthly_key = self._monthly_key(user_id)
 
-        # R11: 超限前先做告警,再抛出
-        if q.daily_calls > self.daily_call_limit:
-            self._alert_quota(user_id, "daily_calls", q.daily_calls, self.daily_call_limit)
-            raise ValueError(f"每日调用已达上限 ({self.daily_call_limit})")
-        if q.daily_tokens > self.daily_token_limit:
-            self._alert_quota(user_id, "daily_tokens", q.daily_tokens, self.daily_token_limit)
-            raise ValueError(f"每日 token 已达上限 ({self.daily_token_limit})")
-        if q.monthly_calls > self.monthly_call_limit:
-            self._alert_quota(user_id, "monthly_calls", q.monthly_calls, self.monthly_call_limit)
-            raise ValueError(f"每月调用已达上限 ({self.monthly_call_limit})")
-        if q.monthly_tokens > self.monthly_token_limit:
-            self._alert_quota(user_id, "monthly_tokens", q.monthly_tokens, self.monthly_token_limit)
-            raise ValueError(f"每月 token 已达上限 ({self.monthly_token_limit})")
+        # 获取当前配额
+        d = await self._get_daily(redis, user_id)
+        m = await self._get_monthly(redis, user_id)
 
-    @staticmethod
-    def _alert_quota(user_id: str, scope: str, current: int, limit: int) -> None:
-        """配额超限告警(可选,避免硬依赖)."""
-        try:
-            from nocobase_py.services.alerts import get_collector
+        # 检查限制
+        new_daily_calls = d.daily_calls + calls
+        new_daily_tokens = d.daily_tokens + tokens
+        new_monthly_calls = m.monthly_calls + calls
+        new_monthly_tokens = m.monthly_tokens + tokens
 
-            get_collector().emit(
-                kind="quota_exceeded",
-                user_id=user_id,
-                detail={"scope": scope, "current": current, "limit": limit},
-            )
-        except Exception:  # noqa: BLE001
-            # 告警链路故障不应阻塞业务
-            pass
+        if new_daily_calls > self.daily_call_limit:
+            raise ValueError(f"超出每日调用次数限制 ({self.daily_call_limit})")
+        if new_daily_tokens > self.daily_token_limit:
+            raise ValueError(f"超出每日 token 限制 ({self.daily_token_limit})")
+        if new_monthly_calls > self.monthly_call_limit:
+            raise ValueError(f"超出每月调用次数限制 ({self.monthly_call_limit})")
+        if new_monthly_tokens > self.monthly_token_limit:
+            raise ValueError(f"超出每月 token 限制 ({self.monthly_token_limit})")
 
-    def remaining(self, user_id: str) -> dict[str, Any]:
-        """返回当前用户剩余额度."""
-        self._ensure_period(user_id)
-        q = self._quotas[user_id]
-        return {
-            "daily_calls_remaining": max(0, self.daily_call_limit - q.daily_calls),
-            "daily_tokens_remaining": max(0, self.daily_token_limit - q.daily_tokens),
-            "monthly_calls_remaining": max(0, self.monthly_call_limit - q.monthly_calls),
-            "monthly_tokens_remaining": max(0, self.monthly_token_limit - q.monthly_tokens),
+        # 更新配额
+        await self._update_daily(redis, user_id, calls, tokens, now)
+        await self._update_monthly(redis, user_id, calls, tokens)
+
+    async def _get_daily(self, redis, user_id: str) -> UserQuota:
+        """获取或初始化日配额."""
+        daily_key = self._daily_key(user_id)
+        data = await redis.get(daily_key)
+        if data is None:
+            return UserQuota()
+        d = json.loads(data)
+        # 检查日期是否过期
+        today = time.strftime("%Y-%m-%d")
+        if d.get("date") != today:
+            return UserQuota()
+        return UserQuota(
+            daily_calls=d["calls"],
+            daily_tokens=d["tokens"],
+            last_call_ts=d["last_ts"],
+        )
+
+    async def _get_monthly(self, redis, user_id: str) -> UserQuota:
+        """获取或初始化月配额."""
+        monthly_key = self._monthly_key(user_id)
+        data = await redis.get(monthly_key)
+        if data is None:
+            return UserQuota()
+        m = json.loads(data)
+        # 检查月份是否过期
+        this_month = time.strftime("%Y-%m")
+        if m.get("month") != this_month:
+            return UserQuota()
+        return UserQuota(
+            monthly_calls=m["calls"],
+            monthly_tokens=m["tokens"],
+            last_call_ts=m["last_ts"],
+        )
+
+    async def _update_daily(self, redis, user_id: str, calls: int, tokens: int, now: float) -> None:
+        """更新日配额."""
+        daily_key = self._daily_key(user_id)
+        today = time.strftime("%Y-%m-%d")
+        data = {
+            "date": today,
+            "calls": calls,
+            "tokens": tokens,
+            "last_ts": now,
         }
+        await redis.setex(daily_key, 86400 * 2, json.dumps(data))  # 2 天过期
+
+    async def _update_monthly(self, redis, user_id: str, calls: int, tokens: int) -> None:
+        """更新月配额."""
+        monthly_key = self._monthly_key(user_id)
+        this_month = time.strftime("%Y-%m")
+        data = {
+            "month": this_month,
+            "calls": calls,
+            "tokens": tokens,
+            "last_ts": time.time(),
+        }
+        # 计算到下个月 1 号的秒数
+        year, month = map(int, this_month.split("-"))
+        _, last_day = calendar.monthrange(year, month)
+        day = int(time.strftime("%d"))
+        expire_at = 86400 * (last_day - day + 2)
+        await redis.setex(monthly_key, expire_at, json.dumps(data))
+
+    async def remaining(self, user_id: str) -> dict:
+        """返回剩余配额."""
+        redis = await get_redis()
+        d = await self._get_daily(redis, user_id)
+        m = await self._get_monthly(redis, user_id)
+
+        return {
+            "daily_calls_remaining": max(0, self.daily_call_limit - d.daily_calls),
+            "daily_tokens_remaining": max(0, self.daily_token_limit - d.daily_tokens),
+            "monthly_calls_remaining": max(0, self.monthly_call_limit - m.monthly_calls),
+            "monthly_tokens_remaining": max(0, self.monthly_token_limit - m.monthly_tokens),
+            "last_call_ts": max(d.last_call_ts, m.last_call_ts),
+        }
+
+    async def reset_daily(self, user_id: str) -> None:
+        """手动重置日配额."""
+        redis = await get_redis()
+        daily_key = self._daily_key(user_id)
+        await redis.delete(daily_key)
+
+    async def reset_monthly(self, user_id: str) -> None:
+        """手动重置月配额."""
+        redis = await get_redis()
+        monthly_key = self._monthly_key(user_id)
+        await redis.delete(monthly_key)

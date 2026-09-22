@@ -570,4 +570,83 @@ public class CollectionService {
         }
         return true;
     }
+
+    /**
+     * 批量插入记录 (W3)。
+     *
+     * @return 成功插入的数量
+     */
+    @Transactional
+    public int batchInsert(String collectionName, List<Map<String, Object>> dataList, String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        List<FieldDef> fields = parseFields(meta);
+        int count = 0;
+        for (Map<String, Object> data : dataList) {
+            UUID id = UUID.randomUUID();
+            String json = serializeRecord(data, fields);
+            tableManager.insertRecord(collectionName, id.toString(), json);
+            count++;
+        }
+        return count;
+    }
+
+    /**
+     * 批量更新记录 (W3)。
+     *
+     * @return 成功更新的 ID 列表
+     */
+    @Transactional
+    public List<String> batchUpdate(String collectionName, List<BatchUpdateItem> items, String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        List<FieldDef> fields = parseFields(meta);
+        List<String> updatedIds = new ArrayList<>();
+        for (BatchUpdateItem item : items) {
+            if (updateRecordInternal(collectionName, item.id(), item.data(), fields)) {
+                updatedIds.add(item.id());
+            }
+        }
+        return updatedIds;
+    }
+
+    /**
+     * 批量删除记录 (W3)。
+     *
+     * @return 成功删除的数量
+     */
+    @Transactional
+    public int batchDelete(String collectionName, List<String> ids, String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        int count = 0;
+        for (String id : ids) {
+            if (tableManager.deleteRecord(collectionName, id) > 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private boolean updateRecordInternal(String collectionName, String id, Map<String, Object> data, List<FieldDef> fields) {
+        String json = serializeRecord(data, fields);
+        return tableManager.updateRecord(collectionName, id, json) > 0;
+    }
+
+    private String serializeRecord(Map<String, Object> data, List<FieldDef> fields) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.writeValueAsString(data);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "序列化失败：" + e.getMessage());
+        }
+    }
+
+    public record BatchUpdateItem(String id, Map<String, Object> data) {}
 }

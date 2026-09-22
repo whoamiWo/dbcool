@@ -36,6 +36,12 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      // Huddle 音视频信令通道（独立 WebSocket）
+      '/ws/huddle': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   build: {

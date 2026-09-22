@@ -12,21 +12,51 @@ import time
 
 import httpx
 
+from nocobase_py.services.connectors.base import (
+    BaseConnector,
+    ConnectorConfig,
+    register_connector,
+)
+
 logger = logging.getLogger(__name__)
 
 
-class SlackConnector:
+@register_connector
+class SlackConnector(BaseConnector):
     """Slack 连接器，支持 Events API 签名验证与消息发送。"""
 
-    def __init__(self, signing_secret: str = "", bot_token: str = "", team_id: str = ""):
-        self.signing_secret = signing_secret
-        self.bot_token = bot_token
-        self.team_id = team_id
-        self.base_url = f"https://slack.com/api"
+    NAME = "slack"
+    DISPLAY_NAME = "Slack"
+
+    def __init__(self, config: ConnectorConfig):
+        super().__init__(config)
+        self.signing_secret = getattr(config, "signing_secret", "")
+        self.bot_token = getattr(config, "bot_token", "")
+        self.team_id = getattr(config, "team_id", "")
+        self.base_url = "https://slack.com/api"
 
     @property
     def is_configured(self) -> bool:
         return bool(self.signing_secret and self.bot_token)
+
+    async def health_check(self) -> bool:
+        """健康检查：测试 API 连通性。"""
+        if not self.is_configured:
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
+                resp = await client.get(
+                    f"{self.base_url}/auth.test",
+                    headers={"Authorization": f"Bearer {self.bot_token}"},
+                )
+                return resp.status_code == 200
+        except Exception as e:
+            logger.warning("[Slack] 健康检查失败：%s", e)
+            return False
+
+    async def authenticate(self) -> bool:
+        """认证测试。"""
+        return await self.health_check()
 
     def verify_signature(self, timestamp: int, signature: str, body: bytes) -> bool:
         """校验 Slack Events API 请求签名。
@@ -36,7 +66,7 @@ class SlackConnector:
         if not self.signing_secret:
             return False
         if abs(time.time() - timestamp) > 300:
-            logger.warning("[Slack] 时间戳过期或未来时间: %s", timestamp)
+            logger.warning("[Slack] 时间戳过期或未来时间：%s", timestamp)
             return False
 
         msg = f"v0:{timestamp}:".encode() + body
@@ -72,7 +102,7 @@ class SlackConnector:
             "Content-Type": "application/json; charset=utf-8",
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
             resp = await client.post(
                 f"{self.base_url}/chat.postMessage",
                 headers=headers,
@@ -80,7 +110,7 @@ class SlackConnector:
             )
             data = resp.json()
             if not data.get("ok"):
-                logger.error("[Slack] chat.postMessage 失败: %s", data)
+                logger.error("[Slack] chat.postMessage 失败：%s", data)
             return data
 
     async def reply(self, channel: str, thread_ts: str, text: str) -> dict:

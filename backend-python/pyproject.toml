@@ -25,7 +25,8 @@ dependencies = [
     "asyncpg>=0.30.0",
     # CORS
     "starlette>=0.41.0",
-]
+    # Redis (R11 多副本一致性必需)
+    "redis[hiredis]>=5.2.0",
 
 [project.optional-dependencies]
 dev = [
