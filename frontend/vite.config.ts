@@ -58,6 +58,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
+    // H1：跨文件污染治理 —— 每个测试文件独立子进程/模块注册表
+    pool: 'forks',
+    isolate: true,
+    sequence: { concurrent: false },
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', '.vscode-server'],
     coverage: {
