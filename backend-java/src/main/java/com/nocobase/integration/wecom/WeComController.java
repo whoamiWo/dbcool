@@ -106,12 +106,17 @@ public class WeComController {
     public ResponseEntity<Map<String, Object>> syncContacts(
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        // TODO: 调用企业微信通讯录 API 同步部门/成员
-        // 1. 获取 access_token
-        // 2. 调用 /cgi-bin/department/list 获取部门列表
-        // 3. 调用 /cgi-bin/user/list 获取成员列表
-        // 4. 同步到本地用户/部门表
-        return ResponseEntity.ok(Map.of("code", 0, "message", "sync initiated"));
+        if (!weComAppService.isConfigured()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "code", 1, "message", "企业微信应用未配置"));
+        }
+        try {
+            Map<String, Object> result = weComAppService.syncContacts();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "code", 1, "message", "通讯录同步失败: " + e.getMessage()));
+        }
     }
 
     /** 发送应用消息（真实调用企业微信 /cgi-bin/message/send） */

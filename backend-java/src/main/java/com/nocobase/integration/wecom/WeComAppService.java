@@ -164,6 +164,85 @@ public class WeComAppService {
         return user;
     }
 
+    /**
+     * 同步企业微信通讯录：部门 → 成员。
+     *
+     * <p>1. 调用 /cgi-bin/department/list 获取部门树
+     * 2. 调用 /cgi-bin/user/simplelist 获取成员（按部门迭代）
+     * 3. 写入本地用户表（已存在则跳过）
+     *
+     * @return 同步结果摘要
+     */
+    @Transactional
+    public Map<String, Object> syncContacts() {
+        if (!isConfigured()) {
+            throw new IllegalStateException("企业微信应用未配置");
+        }
+        String accessToken = getAccessToken();
+
+        // 1. 拉取部门列表
+        String deptUrl = "https://qyapi.weixin.qq.com/cgi-bin/department/list" +
+                "?access_token=" + accessToken;
+        String deptBody = restTemplate.getForObject(deptUrl, String.class);
+        JsonNode deptJson = null;
+        try {
+            deptJson = objectMapper.readTree(deptBody == null ? "{}" : deptBody);
+        } catch (Exception e) {
+            throw new RuntimeException("解析部门列表失败", e);
+        }
+        int deptCount = 0;
+        if (deptJson.has("department") && deptJson.get("department").isArray()) {
+            deptCount = deptJson.get("department").size();
+            for (JsonNode dept : deptJson.get("department")) {
+                log.info("[WeCom] 部门: id={} name={}",
+                        dept.path("id").asText(""),
+                        dept.path("name").asText(""));
+            }
+        }
+
+        // 2. 拉取成员列表（简单场景：按根部门 / 迭代拉取）
+        int userCount = 0;
+        if (deptJson.has("department") && deptJson.get("department").size() > 0) {
+            String rootDeptId = deptJson.get("department").get(0).path("id").asText("1");
+            String userListUrl = "https://qyapi.weixin.qq.com/cgi-bin/user/simplelist" +
+                    "?access_token=" + accessToken + "&department_id=" + rootDeptId + "&fetch_child=1";
+            String userListBody = restTemplate.getForObject(userListUrl, String.class);
+            JsonNode userListJson = null;
+            try {
+                userListJson = objectMapper.readTree(userListBody == null ? "{}" : userListBody);
+            } catch (Exception e) {
+                throw new RuntimeException("解析成员列表失败", e);
+            }
+            if (userListJson.has("userlist") && userListJson.get("userlist").isArray()) {
+                for (JsonNode u : userListJson.get("userlist")) {
+                    String uid = u.path("userid").asText("");
+                    String uname = u.path("name").asText(uid);
+                    String uemail = u.path("email").asText("");
+                    if (uid.isBlank()) continue;
+                    String uusername = "wecom_" + safeTail(uid, 12);
+                    if (userRepository.findByUsername(uusername).isEmpty() &&
+                            userRepository.findByEmail(uemail).isEmpty()) {
+                        UserEntity user = new UserEntity();
+                        user.setId(UUID.randomUUID());
+                        user.setUsername(uusername);
+                        user.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+                        user.setTenantId("system");
+                        user.setDisplayName(uname);
+                        user.setEmail(uemail);
+                        user.setEnabled(true);
+                        user.setCreatedAt(Instant.now());
+                        userRepository.save(user);
+                        userCount++;
+                    }
+                }
+            }
+        }
+
+        log.info("[WeCom] 通讯录同步完成: departments={} users={}", deptCount, userCount);
+        return Map.of("code", 0, "message", "sync completed",
+                "departments", deptCount, "users", userCount);
+    }
+
     /** 取标识尾部并只保留字母数字，避免生成非法用户名。 */
     private static String safeTail(String raw, int max) {
         String s = raw == null ? "" : raw.replaceAll("[^a-zA-Z0-9]", "");

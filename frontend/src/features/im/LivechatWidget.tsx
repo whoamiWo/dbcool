@@ -123,7 +123,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
     try {
       const resp = await apiClient.post<{ code: number; data: { ticketId: string } }>(
         '/api/livechat/close',
-        { sessionId }
+        { sessionId, message: '会话结束，自动转工单' }
       );
 
       if (resp.code === 0 && resp.data?.ticketId) {
