@@ -191,7 +191,7 @@ export function WikiVersionHistoryPage() {
                   sx={{
                     maxHeight: 200,
                     overflow: 'auto',
-                    background: '#f5f5f5',
+                    background: 'var(--color-bg-tertiary)',
                     padding: 2,
                     borderRadius: 1,
                     fontFamily: 'monospace',

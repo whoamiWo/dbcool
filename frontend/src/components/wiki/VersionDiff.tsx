@@ -82,16 +82,16 @@ export function VersionDiff({ oldContent, newContent, oldLabel, newLabel }: Vers
           fontSize: 13,
           maxHeight: 500,
           overflow: 'auto',
-          border: '1px solid #ddd',
+          border: '1px solid var(--color-border-medium)',
           borderRadius: 1,
         }}
       >
         {diffs.map((line, idx) => {
-          const bg = line.type === 'added' ? '#e8f5e9'
-            : line.type === 'removed' ? '#ffebee'
+          const bg = line.type === 'added' ? 'rgba(16,185,129,0.2)'
+            : line.type === 'removed' ? 'rgba(239,68,68,0.1)'
             : 'transparent';
-          const color = line.type === 'added' ? '#2e7d32'
-            : line.type === 'removed' ? '#c62828'
+          const color = line.type === 'added' ? 'var(--color-success)'
+            : line.type === 'removed' ? 'var(--color-error)'
             : 'inherit';
           const prefix = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' ';
           return (
@@ -101,7 +101,7 @@ export function VersionDiff({ oldContent, newContent, oldLabel, newLabel }: Vers
                 display: 'flex',
                 background: bg,
                 borderLeft: line.type !== 'unchanged' ? '3px solid' : 'none',
-                borderColor: line.type === 'added' ? '#4caf50' : line.type === 'removed' ? '#f44336' : 'transparent',
+                borderColor: line.type === 'added' ? 'var(--color-success)' : line.type === 'removed' ? 'var(--color-error)' : 'transparent',
                 minHeight: 20,
                 lineHeight: '20px',
               }}
@@ -111,8 +111,8 @@ export function VersionDiff({ oldContent, newContent, oldLabel, newLabel }: Vers
                   width: 50,
                   minWidth: 50,
                   textAlign: 'right',
-                  color: '#999',
-                  borderRight: '1px solid #eee',
+                  color: 'var(--color-text-muted)',
+                  borderRight: '1px solid var(--color-border-light)',
                   pr: 1,
                   userSelect: 'none',
                 }}
@@ -124,8 +124,8 @@ export function VersionDiff({ oldContent, newContent, oldLabel, newLabel }: Vers
                   width: 50,
                   minWidth: 50,
                   textAlign: 'right',
-                  color: '#999',
-                  borderRight: '1px solid #eee',
+                  color: 'var(--color-text-muted)',
+                  borderRight: '1px solid var(--color-border-light)',
                   pr: 1,
                   userSelect: 'none',
                 }}

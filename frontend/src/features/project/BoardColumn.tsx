@@ -49,7 +49,7 @@ function SortableCard({ card }: { card: CardItem; columnId?: string }) {
       {...listeners}
       sx={{
         p: 1.5, mb: 1, borderRadius: 1, bgcolor: 'background.paper',
-        border: '1px solid #e0e0e0', cursor: 'grab',
+        border: '1px solid var(--color-border-light)', cursor: 'grab',
         '&:hover': { boxShadow: 1 },
       }}
     >
@@ -82,7 +82,7 @@ export function BoardColumn({ columnId, title, cards, onMoveCard, onAddCard }: B
 
 
   return (
-    <Paper sx={{ p: 1.5, minWidth: 280, maxWidth: 320, height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#f5f5f5' }}>
+    <Paper sx={{ p: 1.5, minWidth: 280, maxWidth: 320, height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'var(--color-bg-tertiary)' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="subtitle2" component="div">
           {title}

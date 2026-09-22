@@ -145,7 +145,7 @@ export function WikiSearchPage() {
         </Paper>
       ) : searched && results.length > 0 ? (
         <Paper>
-          <Box sx={{ px: 2, py: 1, borderBottom: '1px solid #e0e0e0' }}>
+          <Box sx={{ px: 2, py: 1, borderBottom: '1px solid var(--color-border-light)' }}>
             <Typography variant="body2" color="textSecondary">
               找到 {results.length} 条结果
             </Typography>

@@ -61,7 +61,7 @@ export function WeComLoginPage({ onError }: WeComLoginPageProps) {
       >
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Login sx={{ fontSize: 48, color: '#07C160', mb: 1 }} />
+            <Login sx={{ fontSize: 48, color: 'var(--color-success)', mb: 1 }} />
             <Typography variant="h5" gutterBottom sx={{ color: 'var(--color-text-primary)' }}>
               企业微信登录
             </Typography>
@@ -85,8 +85,8 @@ export function WeComLoginPage({ onError }: WeComLoginPageProps) {
             startIcon={loading ? <CircularProgress size={20} /> : <Login />}
             sx={{
               py: 1.5,
-              bgcolor: '#07C160',
-              '&:hover': { bgcolor: '#06ad56' },
+              bgcolor: 'var(--color-success)',
+              '&:hover': { bgcolor: 'var(--color-success)' },
             }}
           >
             {loading ? '正在跳转企微...' : '企业微信扫码登录'}

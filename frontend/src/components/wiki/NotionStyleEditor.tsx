@@ -469,7 +469,7 @@ export function NotionStyleEditor({
             suppressContentEditableWarning
             onBlur={(e) => updateBlock(block.id, { content: e.currentTarget.textContent || '' })}
             sx={{
-              bgcolor: '#1e1e1e', color: '#d4d4d4', p: 2, borderRadius: 1,
+              bgcolor: 'var(--color-bg-primary)', color: 'var(--color-text-muted)', p: 2, borderRadius: 1,
               fontFamily: 'monospace', fontSize: '0.85rem', minHeight: 80,
               outline: 'none', whiteSpace: 'pre-wrap',
             }}
@@ -583,8 +583,8 @@ export function NotionStyleEditor({
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`(.+?)`/g, '<code style="background:#f5f5f5;padding:0.2em 0.4em;border-radius:3px;font-family:monospace;">$1</code>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#1976d2;">$1</a>')
+      .replace(/`(.+?)`/g, '<code style="background:var(--color-bg-tertiary);padding:0.2em 0.4em;border-radius:3px;font-family:monospace;">$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--color-info);">$1</a>')
       .replace(/\n/g, '<br />');
     return html;
   }
@@ -605,17 +605,17 @@ export function NotionStyleEditor({
           '& ol': { paddingLeft: 2, margin: '0.5rem 0' },
           '& li': { margin: '0.25rem 0' },
           '& code': {
-            background: '#f5f5f5', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace',
+            background: 'var(--color-bg-tertiary)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace',
           },
           '& pre': {
-            background: '#1e1e1e', padding: 1, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
+            background: 'var(--color-bg-primary)', padding: 1, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
           },
           '& blockquote': {
-            borderLeft: '4px solid #ccc', paddingLeft: 1, margin: 0.5, color: '#666',
+            borderLeft: '4px solid var(--color-border-light)', paddingLeft: 1, margin: 0.5, color: 'var(--color-text-muted)',
           },
           '& table': { borderCollapse: 'collapse', width: '100%', margin: '0.5rem 0' },
-          '& th, &td': { border: '1px solid #ddd', padding: 8, textAlign: 'left' },
-          '& a': { color: '#1976d2' },
+          '& th, &td': { border: '1px solid var(--color-border-medium)', padding: 8, textAlign: 'left' },
+          '& a': { color: 'var(--color-info)' },
         }}
       >
         <ReactMarkdown
@@ -718,7 +718,7 @@ export function NotionStyleEditor({
           <Box
             sx={{
               display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1, pb: 1,
-              borderBottom: '1px solid #e0e0e0',
+              borderBottom: '1px solid var(--color-border-light)',
             }}
           >
             <Typography variant="subtitle2" sx={{ mr: 1, alignSelf: 'center' }}>
