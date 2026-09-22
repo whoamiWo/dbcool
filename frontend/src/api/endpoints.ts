@@ -17,6 +17,9 @@ export const Endpoints = {
   AI_CHAT: '/ai/chat',
   AI_QUOTA: '/ai/quota',
   AI_STATUS: '/ai/status',
+  AI_WIKI: '/ai/wiki',
+  AI_ASK: '/ai/ask',
+  AI_CODE: '/ai/code',
 
   /** Livechat 客服转工单（Java 侧 /api/livechat/*，TicketController） */
   LIVECHAT_SESSION: '/api/livechat/session',

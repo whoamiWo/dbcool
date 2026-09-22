@@ -24,6 +24,12 @@ describe('endpoints.ts 与后端 @RequestMapping 契约', () => {
     expect(Endpoints.AI_STATUS).toBe('/ai/status');
   });
 
+  it('AI 专用端点 /ai/wiki /ai/ask /ai/code（AgentChatPage 实际调用）', () => {
+    expect(Endpoints.AI_WIKI).toBe('/ai/wiki');
+    expect(Endpoints.AI_ASK).toBe('/ai/ask');
+    expect(Endpoints.AI_CODE).toBe('/ai/code');
+  });
+
   it('Livechat 四端点（Java TicketController /api/livechat/*）', () => {
     expect(Endpoints.LIVECHAT_SESSION).toBe('/api/livechat/session');
     expect(Endpoints.LIVECHAT_MESSAGE).toBe('/api/livechat/message');
