@@ -148,9 +148,9 @@ export function TableViewPage() {
               onClick={() => toggleSort(c.field, sort, setSort)}
               style={{
                 padding: '2px 8px',
-                background: s ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                background: s ? 'rgba(99, 102, 241, 0.3)' : 'var(--color-border-light)',
                 color: s ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                border: '1px solid var(--color-border-light)',
                 borderRadius: 4,
                 cursor: 'pointer',
                 fontSize: 12,
@@ -178,7 +178,7 @@ export function TableViewPage() {
             <thead>
               <tr style={{ background: 'rgba(30, 41, 59, 0.5)' }}>
                 {columns.map((c) => (
-                  <th key={c.field} style={{ padding: 8, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                  <th key={c.field} style={{ padding: 8, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)' }}>
                     {c.label ?? c.field}
                   </th>
                 ))}
@@ -193,7 +193,7 @@ export function TableViewPage() {
                 </tr>
               ) : (
                 sorted.map((r) => (
-                  <tr key={r.id} style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                     {columns.map((c) => {
                       const f = fieldMap.get(c.field);
                       const val = r[c.field];

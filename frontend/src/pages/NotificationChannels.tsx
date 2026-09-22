@@ -151,7 +151,7 @@ export function NotificationChannelsPage() {
           <span style={{
             color: testResult.ok ? 'var(--color-success)' : 'var(--color-error)',
             fontSize: 13,
-            background: testResult.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+            background: testResult.ok ? 'rgba(var(--color-success-rgb, 16,185,129),0.2)' : 'var(--color-error)',
             padding: '4px 10px', borderRadius: 4,
           }}>
             {testResult.ok ? '✓' : '✗'} {testResult.detail}
@@ -159,7 +159,7 @@ export function NotificationChannelsPage() {
         )}
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <thead style={{ background: 'var(--color-bg-tertiary)' }}>
           <tr>
             <th style={th}>类型</th>
@@ -317,10 +317,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const th: React.CSSProperties = { padding: '8px 12px', textAlign: 'left', fontSize: 13, fontWeight: 600 };
 const td: React.CSSProperties = { padding: '8px 12px', fontSize: 13, verticalAlign: 'top' };
 const input: React.CSSProperties = { width: '100%', padding: '6px 10px', border: '1px solid var(--color-border-medium)', borderRadius: 4 };
-const btnTest: React.CSSProperties = { background: 'rgba(59,130,246,0.1)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
-const btnEdit: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
-const btnDelete: React.CSSProperties = { background: 'rgba(239,68,68,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
+const btnTest: React.CSSProperties = { background: 'var(--color-info)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
+const btnEdit: React.CSSProperties = { background: 'var(--color-primary-500)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
+const btnDelete: React.CSSProperties = { background: 'var(--color-error)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
 const btnCancel: React.CSSProperties = { background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-medium)', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
 const btnSave: React.CSSProperties = { background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
-const modalOverlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 };
+const modalOverlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'var(--color-bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 };
 const modalCard: React.CSSProperties = { background: 'var(--color-text-primary)', padding: 24, borderRadius: 8, width: 600, maxHeight: '90vh', overflow: 'auto' };

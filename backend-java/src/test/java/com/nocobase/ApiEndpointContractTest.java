@@ -5,9 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 /**
- * 端点契约测试 — 确保关键控制器类存在且可实例化（防"编译绿、运行空"）。
+ * 前端端点契约测试 — 防前后端路径漂移。
  *
- * <p>通过 Class.forName 验证类存在；通过反射验证目标方法签名兼容。
+ * <p>验证关键控制器类存在且可实例化；验证方法签名与前端常量表匹配。
+ * 前端 `endpoints.ts` 变化时，必须同步更新此测试（或反过来）。
  */
 class ApiEndpointContractTest {
 

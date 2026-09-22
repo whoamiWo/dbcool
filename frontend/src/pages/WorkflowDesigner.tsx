@@ -47,7 +47,7 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
       background: 'var(--color-text-primary)',
       border: `2px solid ${selected ? 'var(--color-bg-primary)' : meta.color}`,
       borderRadius: 8,
-      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+      boxShadow: '0 2px 6px var(--color-bg-primary)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>{meta.icon} {meta.label}</strong>
@@ -292,13 +292,13 @@ export function WorkflowDesignerPage() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 100px)', gap: 12 }}>
       {/* 左:节点面板 + 元数据 */}
-      <aside style={{ width: 200, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
+      <aside style={{ width: 200, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', overflowY: 'auto' }}>
         <button onClick={() => navigate('/designer/workflows')}
                 style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 8 }}>
           ← 返回列表
         </button>
         <h3 style={{ marginTop: 0 }}>{isEdit ? '编辑' : '新建'}工作流</h3>
-        {error && <div style={{ padding: 4, marginBottom: 8, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4, fontSize: 11 }}>{error}</div>}
+        {error && <div style={{ padding: 4, marginBottom: 8, background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 11 }}>{error}</div>}
         <label style={lbl}>技术名 *</label>
         <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
         <label style={lbl}>标题</label>
@@ -359,7 +359,7 @@ export function WorkflowDesignerPage() {
       </div>
 
       {/* 右:配置面板 */}
-      <aside style={{ width: 280, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
+      <aside style={{ width: 280, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', overflowY: 'auto' }}>
         <h3 style={{ marginTop: 0 }}>节点配置</h3>
         {!selectedNode ? (
           <p style={{ color: 'var(--color-text-disabled)' }}>点选节点以编辑</p>
@@ -374,10 +374,10 @@ export function WorkflowDesignerPage() {
       {/* US-406 测试运行弹窗 */}
       {showSimulate && (
         <div role="dialog"
-             style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
+             style={{ position: 'fixed', inset: 0, background: 'var(--glass-bg-strong)',
                       display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--color-text-primary)', borderRadius: 8, padding: 24, width: 480,
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+                        boxShadow: '0 10px 25px var(--color-bg-primary)' }}>
             <h3 style={{ marginTop: 0 }}>▶ 测试运行工作流</h3>
             <p style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>
               输入模拟的 triggerData,系统将创建一个工作流实例并跳转到详情页。
@@ -391,7 +391,7 @@ export function WorkflowDesignerPage() {
                                padding: 8, border: '1px solid var(--color-border-medium)', borderRadius: 4 }}
                       placeholder='{"record_id":"test-001","name":"测试"}' />
             {simulateResult?.instanceId && (
-              <div style={{ marginTop: 12, padding: 8, background: 'rgba(16,185,129,0.2)', color: 'var(--color-success)',
+              <div style={{ marginTop: 12, padding: 8, background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)',
                             borderRadius: 4, fontSize: 13 }}>
                 ✅ 实例已创建: <code>{simulateResult.instanceId.slice(0, 8)}…</code>
                 <div style={{ marginTop: 6 }}>
@@ -404,7 +404,7 @@ export function WorkflowDesignerPage() {
               </div>
             )}
             {simulateResult?.error && (
-              <div style={{ marginTop: 12, padding: 8, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)',
+              <div style={{ marginTop: 12, padding: 8, background: 'var(--color-error)', color: 'var(--color-error)',
                             borderRadius: 4, fontSize: 13 }}>
                 ❌ {simulateResult.error}
               </div>

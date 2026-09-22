@@ -71,7 +71,7 @@ const SlashPanel = ({
               fontSize: 13,
               transition: 'all var(--transition-fast)',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--color-border-light)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
           >
             <span style={{ fontWeight: 500, color: 'var(--color-primary-400)' }}>{cmd.name}</span>
@@ -79,7 +79,7 @@ const SlashPanel = ({
           </div>
         ))
       )}
-      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: '4px 8px', borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 4 }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: '4px 8px', borderTop: '1px solid var(--color-border-light)', marginTop: 4 }}>
         ↑↓ 选择 · Enter 确认 · Esc 关闭
       </div>
     </div>
@@ -191,7 +191,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
         onDrop={handleDrop}
         style={{
           padding: 12,
-          borderTop: '1px solid rgba(255,255,255,0.1)',
+          borderTop: '1px solid var(--color-border-light)',
           background: 'rgba(15, 23, 42, 0.5)',
           backdropFilter: 'blur(10px)',
           minHeight: 80,
@@ -206,7 +206,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             background: 'rgba(30, 41, 59, 0.6)',
             backdropFilter: 'blur(10px)',
             borderRadius: 'var(--radius-lg)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            border: '1px solid var(--color-border-light)',
           }}
         >
           <button

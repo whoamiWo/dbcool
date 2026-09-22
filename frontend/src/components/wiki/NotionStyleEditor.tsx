@@ -822,9 +822,9 @@ export function NotionStyleEditor({
       <Paper
         sx={{
           mt: 2, p: 2,
-          background: 'rgba(255,255,255,0.05)',
+          background: 'var(--color-border-light)',
           backdropFilter: 'blur(12px) saturate(180%)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: '1px solid var(--color-border-light)',
           borderRadius: 2,
         }}
       >
@@ -848,7 +848,7 @@ export function NotionStyleEditor({
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   p: 1, borderRadius: 1, cursor: 'pointer',
                   transition: 'background 200ms ease',
-                  '&:hover': { background: 'rgba(255,255,255,0.06)' },
+                  '&:hover': { background: 'var(--color-border-light)' },
                 }}
                 onClick={() => onNavigateToPage?.(bl.sourcePageId)}
               >
@@ -871,9 +871,9 @@ export function NotionStyleEditor({
       <Paper
         sx={{
           mt: 2, p: 2,
-          background: 'rgba(255,255,255,0.05)',
+          background: 'var(--color-border-light)',
           backdropFilter: 'blur(12px) saturate(180%)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: '1px solid var(--color-border-light)',
           borderRadius: 2,
         }}
       >
@@ -902,8 +902,8 @@ export function NotionStyleEditor({
                   variant="outlined"
                   sx={{
                     cursor: 'pointer',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
-                    borderColor: 'rgba(255,255,255,0.15)',
+                    '&:hover': { bgcolor: 'var(--color-border-light)' },
+                    borderColor: 'var(--color-border-medium)',
                   }}
                   onClick={() => applyTemplate(tpl.id)}
                 />

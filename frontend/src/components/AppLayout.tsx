@@ -17,6 +17,7 @@ const MOBILE_BOTTOM_NAV = [
   { path: '/im', label: '消息', icon: '💬' },
   { path: '/wiki/kb', label: '知识库', icon: '📚' },
   { path: '/projects', label: '项目', icon: '📋' },
+  { path: '/admin/automations', label: '自动化', icon: '⚙️' },
   { path: '/profile', label: '我的', icon: '👤' },
 ];
 
@@ -78,7 +79,7 @@ export function AppLayout() {
                     transition: 'all var(--transition-fast)',
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+                    (e.currentTarget as HTMLElement).style.background = 'var(--color-border-light)';
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = 'transparent';
@@ -207,7 +208,7 @@ export function AppLayout() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15,23,42,0.7)',
+            background: 'var(--glass-bg-strong)',
             backdropFilter: 'blur(8px)',
             display: 'flex',
             justifyContent: 'center',
@@ -271,7 +272,7 @@ function TenantSwitcher({
   return (
     <div style={{ marginTop: 12 }}>
       {error && (
-        <div style={{ padding: 8, background: 'rgba(239,68,68,0.2)', color: 'rgba(239,68,68,0.2)', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
+        <div style={{ padding: 8, background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
           {error}
         </div>
       )}
@@ -287,7 +288,7 @@ function TenantSwitcher({
               onClick={() => onSelect(t.id)}
               style={{
                 padding: '8px 12px',
-                background: t.id === currentTenantId ? 'rgba(99,102,241,0.2)' : 'var(--glass-bg-light)',
+                background: t.id === currentTenantId ? 'var(--color-primary-500)' : 'var(--glass-bg-light)',
                 color: t.id === currentTenantId ? 'var(--color-primary-300)' : 'var(--color-text-primary)',
                 border: `1px solid ${t.id === currentTenantId ? 'var(--color-primary-500)' : 'var(--color-border-light)'}`,
                 borderRadius: 'var(--radius-md)',

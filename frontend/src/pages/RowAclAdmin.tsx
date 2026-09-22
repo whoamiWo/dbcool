@@ -168,7 +168,7 @@ export function RowAclAdminPage() {
         {error && <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>}
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <thead style={{ background: 'var(--color-bg-tertiary)' }}>
           <tr>
             <th style={th}>Collection</th>
@@ -319,12 +319,12 @@ const tdMono: React.CSSProperties = { ...td, fontFamily: 'monospace' };
 const input: React.CSSProperties = {
   width: '100%', padding: '6px 10px', border: '1px solid var(--color-border-medium)', borderRadius: 4,
 };
-const btnEdit: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
-const btnDelete: React.CSSProperties = { background: 'rgba(239,68,68,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
+const btnEdit: React.CSSProperties = { background: 'var(--color-primary-500)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
+const btnDelete: React.CSSProperties = { background: 'var(--color-error)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
 const btnCancel: React.CSSProperties = { background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-medium)', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
 const btnSave: React.CSSProperties = { background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
 const modalOverlay: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+  position: 'fixed', inset: 0, background: 'var(--color-bg-primary)',
   display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
 };
 const modalCard: React.CSSProperties = {

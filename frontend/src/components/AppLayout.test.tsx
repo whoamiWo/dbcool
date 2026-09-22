@@ -35,7 +35,7 @@ describe('AppLayout', () => {
     );
 
     // AppLayout 总会渲染导航链接(只显示是否 active),即便没用户
-    expect(screen.getByText(/🛠 NocoBase/)).toBeInTheDocument();
+    expect(screen.getByText(/NocoBase/)).toBeInTheDocument();
   });
 
   it('已登录 admin:显示用户名 + 所有导航', () => {

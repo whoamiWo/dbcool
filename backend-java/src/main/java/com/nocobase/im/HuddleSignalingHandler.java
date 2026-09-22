@@ -77,7 +77,7 @@ public class HuddleSignalingHandler extends TextWebSocketHandler {
             }
         }
         send(session, Map.of("type", "joined", "roomId", roomId,
-                "peerCount", room.size()));
+                "peerCount", room.size(), "sessionId", sessionId(session)));
     }
 
     private void handleLeave(WebSocketSession session, String roomId) throws IOException {

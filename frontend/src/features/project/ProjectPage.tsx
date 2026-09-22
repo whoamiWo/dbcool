@@ -84,7 +84,7 @@ export default function ProjectPage() {
           </Typography>
           
           {projects && projects.length === 0 ? (
-            <Alert severity="info" sx={{ bgcolor: 'rgba(25,118,210,0.1)', border: '1px solid rgba(25,118,210,0.3)' }}>
+            <Alert severity="info" sx={{ bgcolor: 'var(--color-info)', border: '1px solid var(--color-info)' }}>
               暂无项目，点击上方按钮创建第一个项目
             </Alert>
           ) : (
@@ -97,14 +97,14 @@ export default function ProjectPage() {
                   sx={{
                     cursor: 'pointer',
                     p: 2,
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    border: '1px solid var(--color-border-light)',
                     borderRadius: 2,
-                    background: 'rgba(255,255,255,0.03)',
+                    background: 'var(--color-border-light)',
                     backdropFilter: 'blur(8px)',
                     transition: 'all 0.2s ease',
                     '&:hover': {
                       boxShadow: 'var(--shadow-lg)',
-                      borderColor: 'rgba(255,255,255,0.15)',
+                      borderColor: 'var(--color-border-medium)',
                       transform: 'translateY(-2px)',
                     },
                   }}
@@ -116,7 +116,7 @@ export default function ProjectPage() {
                         height: 12,
                         borderRadius: '50%',
                         bgcolor: 'primary.main',
-                        boxShadow: '0 0 12px rgba(99,102,241,0.4)',
+                        boxShadow: '0 0 12px var(--color-primary-500)',
                       }}
                     />
                     <Box sx={{ flex: 1 }}>

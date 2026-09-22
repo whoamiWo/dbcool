@@ -63,8 +63,8 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
     <div className="im-thread-panel">
       <div style={{
         padding: 12,
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(15, 23, 42, 0.5)',
+        borderBottom: '1px solid var(--color-border-light)',
+        background: 'var(--color-bg-primary)',
         backdropFilter: 'blur(10px)',
         display: 'flex',
         justifyContent: 'space-between',
@@ -92,8 +92,8 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
 
       <div style={{
         padding: 12,
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(30, 41, 59, 0.5)',
+        borderBottom: '1px solid var(--color-border-light)',
+        background: 'var(--color-bg-secondary)',
         backdropFilter: 'blur(10px)',
         borderRadius: 'var(--radius-md)',
         margin: '0 12px',
@@ -127,7 +127,7 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
               style={{
                 padding: 8,
                 borderRadius: 'var(--radius-md)',
-                background: 'rgba(30, 41, 59, 0.5)',
+                background: 'var(--color-bg-secondary)',
                 backdropFilter: 'blur(10px)',
               }}
             >
@@ -148,8 +148,8 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
       {/* 线程回复输入框 */}
       <div style={{
         padding: 12,
-        borderTop: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(15, 23, 42, 0.5)',
+        borderTop: '1px solid var(--color-border-light)',
+        background: 'var(--color-bg-primary)',
         backdropFilter: 'blur(10px)',
       }}>
         <div
@@ -158,10 +158,10 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
             gap: 8,
             alignItems: 'flex-end',
             padding: 8,
-            background: 'rgba(30, 41, 59, 0.6)',
+            background: 'var(--color-bg-secondary)',
             backdropFilter: 'blur(10px)',
             borderRadius: 'var(--radius-lg)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            border: '1px solid var(--color-border-light)',
           }}
         >
           <input

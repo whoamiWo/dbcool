@@ -90,7 +90,7 @@ export function HomePage() {
       </div>
 
       {/* 系统状态 */}
-      <div style={{ marginTop: 16, padding: 12, background: 'rgba(30, 41, 59, 0.5)', borderRadius: 'var(--radius-md)', color: 'var(--color-text-muted)', fontSize: 12, backdropFilter: 'blur(10px)' }}>
+      <div style={{ marginTop: 16, padding: 12, background: 'var(--glass-bg-medium)', borderRadius: 'var(--radius-md)', color: 'var(--color-text-muted)', fontSize: 12, backdropFilter: 'blur(10px)' }}>
         系统状态: {meQuery.isError ? '❌ 鉴权失败' : '✅ 已认证'} |{' '}
         tenant: <strong style={{ color: 'var(--color-text-primary)' }}>{user?.tenant_id ?? '-'}</strong> |{' '}
         <a href="/api/health" target="_blank" rel="noreferrer">API 健康</a>
@@ -105,21 +105,21 @@ function SummaryCard({ color, icon, label, value, link }: {
   return (
     <Link to={link} style={{
       padding: 14,
-      background: 'rgba(30, 41, 59, 0.7)',
+      background: 'var(--glass-bg-medium)',
       backdropFilter: 'blur(10px)',
       borderRadius: 'var(--radius-lg)',
-      border: '1px solid rgba(255,255,255,0.1)',
+      border: '1px solid var(--color-border-light)',
       boxShadow: 'var(--shadow-md)',
       textDecoration: 'none',
       color: 'var(--color-text-primary)',
       transition: 'all var(--transition-normal)',
     }}
     onMouseEnter={(e) => {
-      (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+      (e.currentTarget as HTMLElement).style.background = 'var(--color-border-light)';
       (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
     }}
     onMouseLeave={(e) => {
-      (e.currentTarget as HTMLElement).style.background = 'rgba(30, 41, 59, 0.7)';
+      (e.currentTarget as HTMLElement).style.background = 'var(--glass-bg-medium)';
       (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
     }}
     >
@@ -151,7 +151,7 @@ function Empty({ text }: { text: string }) {
 
 const itemLink: React.CSSProperties = {
   display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center',
-  padding: 6, borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--color-text-primary)', textDecoration: 'none', fontSize: 13,
+  padding: 6, borderBottom: '1px solid var(--color-border-light)', color: 'var(--color-text-primary)', textDecoration: 'none', fontSize: 13,
   borderRadius: 'var(--radius-sm)',
   transition: 'all var(--transition-fast)',
 };

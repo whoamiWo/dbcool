@@ -13,15 +13,15 @@ const axiosInstance: AxiosInstance = axios.create({
 });
 
 let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
+let refreshSubscribers: ((token: string | null) => void)[] = [];
 let refreshRequest: Promise<string> | null = null;
 
 /** 并发 401 排队等待：避免多个请求同时触发 refresh 导致竞态失败。 */
-function subscribeTokenRefresh(cb: (token: string) => void) {
+function subscribeTokenRefresh(cb: (token: string | null) => void) {
   refreshSubscribers.push(cb);
 }
 
-function notifyRefreshCallbacks(token: string) {
+function notifyRefreshCallbacks(token: string | null) {
   refreshSubscribers.forEach((cb) => cb(token));
   refreshSubscribers = [];
 }
@@ -29,9 +29,14 @@ function notifyRefreshCallbacks(token: string) {
 async function handleRefreshToken(): Promise<string> {
   if (isRefreshing) {
     // 已有刷新进行中 → 排队等待，而非直接 reject
-    return new Promise<string>((resolve) => {
-      subscribeTokenRefresh((token) => resolve(token));
-      // 刷新失败时通过全局错误处理统一跳转，此处不 reject
+    return new Promise<string>((resolve, reject) => {
+      subscribeTokenRefresh((token) => {
+        if (token) {
+          resolve(token);
+        } else {
+          reject(new Error('Refresh failed'));
+        }
+      });
     });
   }
 
@@ -60,7 +65,7 @@ async function handleRefreshToken(): Promise<string> {
       // 排队的订阅者也失败：清空队列并 reject，避免 Promise 永久悬挂
       const failed = [...refreshSubscribers];
       refreshSubscribers = [];
-      failed.forEach(cb => cb(null as unknown as string));
+      failed.forEach(cb => cb(null));
       throw e;
     } finally {
       isRefreshing = false;

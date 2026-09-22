@@ -53,7 +53,7 @@ function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }
       onClick={onClick}
       sx={{
         ...style,
-        background: 'rgba(255,255,255,0.05)',
+        background: 'var(--color-border-light)',
         borderRadius: 1.5,
         p: 1.5,
         mb: 1,
@@ -61,7 +61,7 @@ function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }
         border: '1px solid rgba(255,255,255,0.08)',
         '&:hover': {
           background: 'rgba(255,255,255,0.08)',
-          borderColor: 'rgba(255,255,255,0.15)',
+          borderColor: 'var(--color-border-medium)',
         },
       }}
     >
@@ -119,7 +119,7 @@ function Column({
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color, boxShadow: `0 0 8px ${color}60` }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{label}</Typography>
-              <Chip label={tasks.length} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.1)', height: 20, fontSize: '10px' }} />
+              <Chip label={tasks.length} size="small" sx={{ bgcolor: 'var(--color-border-light)', height: 20, fontSize: '10px' }} />
             </Stack>
             <Button size="small" onClick={onAddClick} sx={{ color: 'primary.main', minWidth: 28, p: 0.5 }}>+</Button>
           </Stack>
@@ -266,7 +266,7 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
         </Box>
         <DragOverlay>
           {activeTask ? (
-            <Box sx={{ background: 'rgba(255,255,255,0.1)', borderRadius: 2, p: 2, border: '1px solid rgba(255,255,255,0.2)' }}>
+            <Box sx={{ background: 'var(--color-border-light)', borderRadius: 2, p: 2, border: '1px solid rgba(255,255,255,0.2)' }}>
               <Typography variant="body1" sx={{ fontWeight: 600 }}>{activeTask.title}</Typography>
             </Box>
           ) : null}

@@ -71,7 +71,7 @@ export function WikiPageReadPage() {
         <Typography color="textPrimary">{page.title}</Typography>
       </Breadcrumbs>
 
-      <Paper sx={{ p: 4, background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 12 }}>
+      <Paper sx={{ p: 4, background: 'var(--glass-bg-medium)', border: '1px solid var(--color-border-light)', borderRadius: 12 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
           <Typography variant="h3" component="h1" sx={{ color: 'var(--color-text-primary)' }}>{page.title}</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -86,7 +86,7 @@ export function WikiPageReadPage() {
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 3, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+        <Divider sx={{ mb: 3, borderColor: 'var(--color-border-light)' }} />
 
         <Box sx={{ mb: 4 }}>
           <Box
@@ -99,7 +99,7 @@ export function WikiPageReadPage() {
               '& ol': { paddingLeft: 2, margin: '0.5rem 0' },
               '& li': { margin: '0.25rem 0', color: 'var(--color-text-secondary)' },
               '& code': {
-                background: 'rgba(30, 41, 59, 0.8)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace', color: 'var(--color-primary-200)',
+                background: 'var(--glass-bg-medium)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace', color: 'var(--color-primary-200)',
               },
               '& pre': {
                 background: 'var(--color-bg-primary)', padding: 1.5, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
@@ -108,7 +108,7 @@ export function WikiPageReadPage() {
                 borderLeft: '4px solid var(--color-primary-500)', paddingLeft: 1, margin: 0.5, color: 'var(--color-text-muted)',
               },
               '& table': { borderCollapse: 'collapse', width: '100%', margin: '0.5rem 0' },
-              '& th, &td': { border: '1px solid rgba(255, 255, 255, 0.1)', padding: 8, textAlign: 'left', color: 'var(--color-text-secondary)' },
+              '& th, &td': { border: '1px solid var(--color-border-light)', padding: 8, textAlign: 'left', color: 'var(--color-text-secondary)' },
               '& a': { color: 'var(--color-primary-400)' },
             }}
           >
@@ -137,7 +137,7 @@ export function WikiPageReadPage() {
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 3, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+        <Divider sx={{ mb: 3, borderColor: 'var(--color-border-light)' }} />
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="caption" sx={{ color: 'var(--color-text-muted)' }}>
@@ -150,7 +150,7 @@ export function WikiPageReadPage() {
               component={Link}
               to={`/wiki/${page.slug}/edit`}
               variant="outlined"
-              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: 'var(--color-text-primary)', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
+              sx={{ borderColor: 'var(--color-border-medium)', color: 'var(--color-text-primary)', '&:hover': { background: 'var(--color-border-light)' } }}
             >
               编辑
             </Button>
@@ -159,7 +159,7 @@ export function WikiPageReadPage() {
               component={Link}
               to={`/wiki/${page.slug}/versions`}
               variant="outlined"
-              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: 'var(--color-text-primary)', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
+              sx={{ borderColor: 'var(--color-border-medium)', color: 'var(--color-text-primary)', '&:hover': { background: 'var(--color-border-light)' } }}
             >
               版本历史
             </Button>

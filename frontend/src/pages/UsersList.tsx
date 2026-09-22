@@ -62,13 +62,13 @@ export function UsersListPage() {
       </div>
 
       {error && (
-        <div style={{ padding: 8, marginBottom: 12, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4 }}>
+        <div style={{ padding: 8, marginBottom: 12, background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4 }}>
           {error}
         </div>
       )}
 
       {showCreate && (
-        <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
           <div style={{ marginBottom: 8 }}>
             <label>用户名 *</label>
             <input value={username} onChange={(e) => setUsername(e.target.value)} style={{ padding: 6, width: '100%' }} />
@@ -91,7 +91,7 @@ export function UsersListPage() {
         </div>
       )}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <thead>
           <tr style={{ background: 'var(--color-bg-secondary)' }}>
             <th style={{ padding: 12, textAlign: 'left' }}>用户名</th>
@@ -108,9 +108,9 @@ export function UsersListPage() {
               <td style={{ padding: 12 }}>{u.display_name}</td>
               <td style={{ padding: 12 }}>
                 {u.enabled ? (
-                  <span style={{ padding: '2px 8px', background: 'rgba(16,185,129,0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>启用</span>
+                  <span style={{ padding: '2px 8px', background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>启用</span>
                 ) : (
-                  <span style={{ padding: '2px 8px', background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>禁用</span>
+                  <span style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>禁用</span>
                 )}
               </td>
               <td style={{ padding: 12, color: 'var(--color-text-disabled)' }}>{new Date(u.created_at).toLocaleString('zh-CN')}</td>

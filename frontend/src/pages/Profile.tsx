@@ -51,7 +51,7 @@ export function ProfilePage() {
       <h1>👤 个人中心</h1>
 
       {/* 我的信息卡(US-502) */}
-      <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: 16 }}>
+      <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', marginBottom: 16 }}>
         <h3 style={{ marginTop: 0 }}>我的信息</h3>
         {meQuery.isLoading && <p style={{ color: 'var(--color-text-disabled)' }}>加载中…</p>}
         {meQuery.data && (
@@ -74,10 +74,10 @@ export function ProfilePage() {
       </div>
 
       {/* 修改密码(US-502) */}
-      <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <h3 style={{ marginTop: 0 }}>修改密码</h3>
-        {error && <div style={{ padding: 8, marginBottom: 12, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4 }}>{error}</div>}
-        {success && <div style={{ padding: 8, marginBottom: 12, background: 'rgba(16,185,129,0.2)', color: 'var(--color-success)', borderRadius: 4 }}>{success}</div>}
+        {error && <div style={{ padding: 8, marginBottom: 12, background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4 }}>{error}</div>}
+        {success && <div style={{ padding: 8, marginBottom: 12, background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)', borderRadius: 4 }}>{success}</div>}
         <div style={{ marginBottom: 8 }}>
           <label>旧密码</label>
           <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} style={inputStyle} />

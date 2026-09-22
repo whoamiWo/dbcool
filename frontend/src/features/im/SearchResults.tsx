@@ -67,7 +67,7 @@ export function SearchResults({ keyword, limit = 20, onMessageClick }: SearchRes
           </div>
           {results.messages.map((msg) => {
             const highlight = keyword
-              ? msg.content.replace(new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), (m) => `<mark style="background:rgba(245,158,11,0.3);color:var(--color-warning)">${m}</mark>`)
+              ? msg.content.replace(new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), (m) => `<mark style="background:var(--color-warning);color:var(--color-warning)">${m}</mark>`)
               : msg.content;
             return (
               <div
@@ -80,8 +80,8 @@ export function SearchResults({ keyword, limit = 20, onMessageClick }: SearchRes
                   transition: 'all var(--transition-fast)',
                 }}
                 onClick={() => onMessageClick?.(msg.id, msg.channelId)}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--color-border-light)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--color-border-light)'; }}
               >
                 <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>
                   频道：{msg.channelId.slice(-6)} · {new Date(msg.createdAt).toLocaleString('zh-CN')}

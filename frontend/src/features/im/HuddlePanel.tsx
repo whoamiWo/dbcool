@@ -259,9 +259,9 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
         borderRadius: 3,
         zIndex: 100,
         padding: 2,
-        border: '1px solid rgba(255,255,255,0.12)',
+        border: '1px solid var(--color-border-light)',
         backdropFilter: 'blur(16px)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        boxShadow: '0 8px 32px var(--color-bg-primary)',
       }}
     >
       {/* 头部 */}
@@ -293,8 +293,8 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
             mb: 1.5,
             p: 1,
             borderRadius: 1,
-            bgcolor: 'rgba(239,68,68,0.15)',
-            border: '1px solid rgba(239,68,68,0.3)',
+            bgcolor: 'var(--color-error)',
+            border: '1px solid var(--color-error)',
             color: 'var(--color-error)',
             fontSize: 12,
           }}
@@ -350,7 +350,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
                 left: 0,
                 right: 0,
                 padding: '4px 8px',
-                background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                background: 'linear-gradient(transparent, var(--color-bg-primary))',
                 color: 'var(--color-text-primary)',
                 fontSize: 12,
               }}

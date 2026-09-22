@@ -114,9 +114,9 @@ export function WikiDiffViewer({
               sx={{
                 backgroundColor:
                   line.type === 'added'
-                    ? 'rgba(16,185,129,0.2)'
+                    ? 'var(--color-success)'
                     : line.type === 'removed'
-                    ? 'rgba(239,68,68,0.1)'
+                    ? 'var(--color-error)'
                     : 'transparent',
               }}
             >
@@ -135,9 +135,9 @@ export function WikiDiffViewer({
                   wordBreak: 'break-all',
                   backgroundColor:
                     line.type === 'added'
-                      ? 'rgba(16,185,129,0.2)'
+                      ? 'var(--color-success)'
                       : line.type === 'removed'
-                      ? 'rgba(239,68,68,0.2)'
+                      ? 'var(--color-error)'
                       : 'transparent',
                 }}
               >

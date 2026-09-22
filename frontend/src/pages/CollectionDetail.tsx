@@ -85,11 +85,11 @@ export function CollectionDetailPage() {
       </div>
 
       {forms.length > 0 && (
-        <div style={{ marginTop: 12, padding: 12, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
           <h3 style={{ marginTop: 0 }}>📋 关联表单({forms.length})</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {forms.map((f) => (
-              <Link key={f.id} to={`/forms/${f.id}/fill`} style={{ padding: '8px 12px', background: 'rgba(8,145,178,0.1)', border: '1px solid var(--color-info)', borderRadius: 4, color: 'var(--color-info)', textDecoration: 'none' }}>
+              <Link key={f.id} to={`/forms/${f.id}/fill`} style={{ padding: '8px 12px', background: 'var(--color-info)', border: '1px solid var(--color-info)', borderRadius: 4, color: 'var(--color-info)', textDecoration: 'none' }}>
                 {f.title}
               </Link>
             ))}
@@ -98,11 +98,11 @@ export function CollectionDetailPage() {
       )}
 
       {views.length > 0 && (
-        <div style={{ marginTop: 12, padding: 12, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
           <h3 style={{ marginTop: 0 }}>👁 视图({views.length})</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {views.map((v) => (
-              <Link key={v.id} to={`/views/${v.id}/run`} style={{ padding: '8px 12px', background: 'rgba(59,130,246,0.1)', border: '1px solid var(--color-info)', borderRadius: 4, color: 'var(--color-info)', textDecoration: 'none', fontSize: 13 }}>
+              <Link key={v.id} to={`/views/${v.id}/run`} style={{ padding: '8px 12px', background: 'var(--color-info)', border: '1px solid var(--color-info)', borderRadius: 4, color: 'var(--color-info)', textDecoration: 'none', fontSize: 13 }}>
                 📊 {v.title} ({v.type})
               </Link>
             ))}
@@ -111,7 +111,7 @@ export function CollectionDetailPage() {
       )}
 
       {showForm && (
-        <div style={{ marginTop: 16, padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ marginTop: 16, padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
           <h3 style={{ marginTop: 0 }}>新记录</h3>
           {fields.map((f) => (
             <div key={f.name} style={{ marginBottom: 12 }}>
@@ -143,7 +143,7 @@ export function CollectionDetailPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 16, padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div style={{ marginTop: 16, padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <h3 style={{ marginTop: 0 }}>记录({records.length})</h3>
         {records.length === 0 ? (
           <p style={{ color: 'var(--color-text-disabled)' }}>暂无记录</p>

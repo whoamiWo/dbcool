@@ -47,7 +47,7 @@ export function CalendarViewPage() {
         共 {records.length} 条记录 · 按 <code>{dateField}</code> 排列 · {monthName}
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'rgba(255,255,255,0.05)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--color-border-light)', borderRadius: 8, overflow: 'hidden' }}>
         {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
           <div key={day} style={{ background: 'rgba(255,255,255,0.02)', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-text-muted)' }}>
             {day}
@@ -59,7 +59,7 @@ export function CalendarViewPage() {
             <div
               key={wi + '-' + di}
               className="glass-card"
-              style={{ minHeight: 120, padding: 8, border: '1px solid rgba(255,255,255,0.05)' }}
+              style={{ minHeight: 120, padding: 8, border: '1px solid var(--color-border-light)' }}
             >
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>{day.day}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

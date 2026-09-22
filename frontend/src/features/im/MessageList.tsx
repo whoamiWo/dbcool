@@ -195,10 +195,10 @@ export function MessageList({
                   color: 'var(--color-warning)',
                   padding: '2px 8px',
                   marginBottom: 4,
-                  background: 'rgba(245, 158, 11, 0.15)',
+                  background: 'var(--color-warning)',
                   borderRadius: 'var(--radius-sm)',
                   width: 'fit-content',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  border: '1px solid var(--color-warning)',
                 }}
               >
                 📌 已置顶
