@@ -223,19 +223,33 @@ export function NotionStyleEditor({
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  // G2-R：标记 blocks 变更来源。仅当用户在编辑器内操作（updateBlock/addBlock/deleteBlock/输入）
+  // 置 true 时，effect① 才允许把 blocks 反向回写 content；
+  // 由 effect②（外部 content 载入）触发的 setBlocks 不得反向回写，避免"外部载入被清空"竞态。
+  const userEditedRef = useRef(false);
+  // 记录最后一次外部载入的 content，用于跳过紧随其后的反向回写
+  const lastExternalContentRef = useRef(content);
 
-  // 同步 blocks → content
+  // 归一化比较：统一首尾空白/换行，避免 '' 与 '\n' 之类误判
+  const normalizeMd = (s: string) => (s ?? '').replace(/\s+$/g, '').trimEnd();
+
+  // 同步 blocks → content（仅在用户编辑后回写）
   useEffect(() => {
+    if (!userEditedRef.current) return;
+    userEditedRef.current = false;
     const md = blockToMarkdown(blocks);
-    if (md !== content) {
+    if (normalizeMd(md) !== normalizeMd(content)) {
       onContentChange(md);
     }
   }, [blocks, content, onContentChange]);
 
-  // 外部 content 变化时同步
+  // 外部 content 变化时同步（数据载入：把 markdown 解析为 blocks 并渲染）
   useEffect(() => {
+    lastExternalContentRef.current = content;
     const newBlocks = markdownToBlocks(content);
-    if (JSON.stringify(newBlocks) !== JSON.stringify(blocks)) {
+    // 归一化比较（忽略每次解析生成的随机 block id），避免无谓重渲染
+    const stripIds = (bs: Block[]) => JSON.stringify(bs.map(({ id: _id, ...rest }) => rest));
+    if (stripIds(newBlocks) !== stripIds(blocks)) {
       setBlocks(newBlocks);
     }
   }, [content]);
@@ -353,10 +367,12 @@ export function NotionStyleEditor({
   //  块操作
   // ============================================================
   const updateBlock = useCallback((id: string, patch: Partial<Block>) => {
+    userEditedRef.current = true;
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b));
   }, []);
 
   const deleteBlock = useCallback((id: string) => {
+    userEditedRef.current = true;
     setBlocks(prev => {
       const idx = prev.findIndex(b => b.id === id);
       if (prev.length <= 1) return prev; // 保留最后一个块
@@ -374,6 +390,7 @@ export function NotionStyleEditor({
   }, []);
 
   const addBlock = useCallback((afterId: string, type: BlockType) => {
+    userEditedRef.current = true;
     setBlocks(prev => {
       const idx = prev.findIndex(b => b.id === afterId);
       const newBlock: Block = { id: generateId(), type, content: '' };
