@@ -163,14 +163,14 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
         <Box sx={{ flex: 1 }} />
         {/* 在线协作者 */}
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-          <Avatar sx={{ width: 28, height: 28, bgcolor: '#1976D2', fontSize: 12 }}>
+          <Avatar sx={{ width: 28, height: 28, bgcolor: 'var(--color-info)', fontSize: 12 }}>
             {myName.slice(0, 1)}
           </Avatar>
           {collaborators.map((c) => (
             <Avatar
               key={c.userId}
               title={c.username}
-              sx={{ width: 28, height: 28, bgcolor: '#FF9800', fontSize: 12 }}
+              sx={{ width: 28, height: 28, bgcolor: 'var(--color-warning)', fontSize: 12 }}
             >
               {c.username.slice(0, 1)}
             </Avatar>

@@ -174,17 +174,17 @@ export function FormRuntime({
       <div key={f.name} style={{ gridColumn: `span ${span}`, marginBottom: 12 }}>
         <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
           {f.label ?? f.name}
-          {f.required && <span style={{ color: '#dc2626' }}> *</span>}
-          <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 8 }}>({f.type})</span>
+          {f.required && <span style={{ color: 'var(--color-error)' }}> *</span>}
+          <span style={{ color: 'var(--color-text-muted)', fontSize: 12, marginLeft: 8 }}>({f.type})</span>
         </label>
         {renderInput(f)}
         {helpText && (
-          <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: 'var(--color-text-disabled)', fontSize: 12, marginTop: 2 }}>
             {helpText}
           </div>
         )}
         {errors[f.name] && (
-          <div style={{ color: '#dc2626', fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: 'var(--color-error)', fontSize: 12, marginTop: 2 }}>
             {errors[f.name]}
           </div>
         )}
@@ -259,8 +259,8 @@ export function FormRuntime({
               disabled
               style={{
                 padding: '4px 8px',
-                background: '#e2e8f0',
-                color: '#64748b',
+                background: 'var(--color-border-light)',
+                color: 'var(--color-text-disabled)',
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'not-allowed',
@@ -313,7 +313,7 @@ export function FormRuntime({
     <form onSubmit={handleSubmit}>
       <h2 style={{ marginTop: 0 }}>{form.title}</h2>
       {form.description && (
-        <p style={{ color: '#64748b', marginTop: 0 }}>{form.description}</p>
+        <p style={{ color: 'var(--color-text-disabled)', marginTop: 0 }}>{form.description}</p>
       )}
       {/* US-105: fieldset[disabled] 一次性禁用内部所有表单控件(含各类型 input 与按钮) */}
       <fieldset
@@ -338,8 +338,8 @@ export function FormRuntime({
           style={{
             marginTop: 16,
             padding: '10px 24px',
-            background: submitting ? '#94a3b8' : '#1e293b',
-            color: 'white',
+            background: submitting ? 'var(--color-text-muted)' : 'var(--color-bg-secondary)',
+            color: 'var(--color-text-primary)',
             border: 'none',
             borderRadius: 4,
             cursor: submitting ? 'not-allowed' : 'pointer',
@@ -355,8 +355,8 @@ export function FormRuntime({
           style={{
             marginTop: 12,
             padding: '8px 12px',
-            background: '#ecfdf5',
-            color: '#065f46',
+            background: 'rgba(16,185,129,0.1)',
+            color: 'var(--color-success)',
             borderRadius: 4,
             fontSize: 13,
           }}
@@ -371,6 +371,6 @@ export function FormRuntime({
 const inputStyle: React.CSSProperties = {
   padding: 8,
   fontSize: 14,
-  border: '1px solid #cbd5e1',
+  border: '1px solid var(--color-border-medium)',
   borderRadius: 4,
 };

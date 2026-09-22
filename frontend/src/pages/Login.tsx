@@ -115,7 +115,7 @@ export function LoginPage() {
               padding: '8px 12px',
               marginBottom: 12,
               background: 'rgba(239,68,68,0.2)',
-              color: '#fca5a5',
+              color: 'rgba(239,68,68,0.2)',
               borderRadius: 4,
               borderLeft: '4px solid var(--color-error)',
               fontSize: 13,
@@ -126,7 +126,7 @@ export function LoginPage() {
           >
             <span>❌ {error}</span>
             <button type="button" onClick={() => setError(null)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991b1b', fontSize: 14 }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-error)', fontSize: 14 }}>
               ✕
             </button>
           </div>
@@ -134,7 +134,7 @@ export function LoginPage() {
 
         {successHint && (
           <div style={{ padding: 8, marginBottom: 12, background: 'rgba(16,185,129,0.2)',
-                        color: '#34d399', borderRadius: 4, borderLeft: '4px solid var(--color-success)', fontSize: 13 }}>
+                        color: 'var(--color-success)', borderRadius: 4, borderLeft: '4px solid var(--color-success)', fontSize: 13 }}>
             ✅ {successHint}
           </div>
         )}
@@ -187,7 +187,7 @@ export function LoginPage() {
             width: '100%',
             padding: 10,
             background: loading ? 'var(--color-text-disabled)' : 'var(--color-primary-500)',
-            color: '#fff',
+            color: 'var(--color-text-primary)',
             border: 'none',
             borderRadius: 4,
             cursor: loading ? 'not-allowed' : 'pointer',

@@ -28,14 +28,14 @@ import { projectApi, type Task, type TaskStatus } from './api';
 import { Add, DragIndicator } from '@mui/icons-material';
 
 const COLUMNS: Array<{ key: TaskStatus; label: string; color: string }> = [
-  { key: 'TODO', label: '待办', color: '#9E9E9E' },
-  { key: 'IN_PROGRESS', label: '进行中', color: '#1976D2' },
-  { key: 'BLOCKED', label: '阻塞', color: '#F44336' },
-  { key: 'DONE', label: '已完成', color: '#4CAF50' },
+  { key: 'TODO', label: '待办', color: 'var(--color-text-muted)' },
+  { key: 'IN_PROGRESS', label: '进行中', color: 'var(--color-info)' },
+  { key: 'BLOCKED', label: '阻塞', color: 'var(--color-error)' },
+  { key: 'DONE', label: '已完成', color: 'var(--color-success)' },
 ];
 
 const PRIORITY_COLOR: Record<string, string> = {
-  LOW: '#9E9E9E', MEDIUM: '#1976D2', HIGH: '#FF9800', CRITICAL: '#F44336',
+  LOW: 'var(--color-text-muted)', MEDIUM: 'var(--color-info)', HIGH: 'var(--color-warning)', CRITICAL: 'var(--color-error)',
 };
 
 function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
@@ -79,8 +79,8 @@ function SortableTaskCard({ task, onClick }: { task: Task; onClick: () => void }
               size="small"
               label={task.priority}
               sx={{
-                bgcolor: `${PRIORITY_COLOR[task.priority] || '#9E9E9E'}20`,
-                color: PRIORITY_COLOR[task.priority] || '#9E9E9E',
+                bgcolor: `${PRIORITY_COLOR[task.priority] || 'var(--color-text-muted)'}20`,
+                color: PRIORITY_COLOR[task.priority] || 'var(--color-text-muted)',
                 height: 20,
                 fontSize: '10px',
               }}

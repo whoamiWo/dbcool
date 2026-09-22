@@ -166,7 +166,7 @@ export function SchemaEditorPage() {
         style={{
           background: 'none',
           border: 'none',
-          color: '#64748b',
+          color: 'var(--color-text-disabled)',
           cursor: 'pointer',
           marginBottom: 16,
         }}
@@ -176,7 +176,7 @@ export function SchemaEditorPage() {
 
       <h1>
         ✏️ 编辑 Schema
-        <span style={{ color: '#64748b', fontSize: 14, fontWeight: 'normal' }}>({name})</span>
+        <span style={{ color: 'var(--color-text-disabled)', fontSize: 14, fontWeight: 'normal' }}>({name})</span>
       </h1>
 
       {pollingJob && (
@@ -184,9 +184,9 @@ export function SchemaEditorPage() {
           style={{
             padding: 12,
             marginBottom: 16,
-            background: '#dbeafe',
+            background: 'rgba(59,130,246,0.1)',
             borderRadius: 4,
-            color: '#1e40af',
+            color: 'var(--color-info)',
           }}
         >
           ⏳ 异步迁移进行中...Job: <code>{pollingJob}</code>
@@ -203,8 +203,8 @@ export function SchemaEditorPage() {
           style={{
             padding: 8,
             marginBottom: 12,
-            background: '#fee2e2',
-            color: '#991b1b',
+            background: 'rgba(239,68,68,0.2)',
+            color: 'var(--color-error)',
             borderRadius: 4,
           }}
         >
@@ -215,7 +215,7 @@ export function SchemaEditorPage() {
       <div
         style={{
           padding: 16,
-          background: 'white',
+          background: 'var(--color-text-primary)',
           borderRadius: 8,
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
         }}
@@ -240,7 +240,7 @@ export function SchemaEditorPage() {
         <h3>字段列表({fields.length})</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
           <thead>
-            <tr style={{ background: '#f1f5f9' }}>
+            <tr style={{ background: 'var(--color-bg-secondary)' }}>
               <th style={{ padding: 8, textAlign: 'left' }}>字段名</th>
               <th style={{ padding: 8, textAlign: 'left' }}>类型</th>
               <th style={{ padding: 8, textAlign: 'left' }}>必填</th>
@@ -255,7 +255,7 @@ export function SchemaEditorPage() {
               );
               return (
               <Fragment key={i}>
-              <tr style={{ borderTop: '1px solid #e2e8f0' }}>
+              <tr style={{ borderTop: '1px solid var(--color-border-light)' }}>
                 <td style={{ padding: 8 }}>
                   <input
                     value={f.name}
@@ -299,8 +299,8 @@ export function SchemaEditorPage() {
                   <button
                     onClick={() => handleRemoveField(i)}
                     style={{
-                      background: '#dc2626',
-                      color: 'white',
+                      background: 'var(--color-error)',
+                      color: 'var(--color-text-primary)',
                       border: 'none',
                       padding: '4px 8px',
                       borderRadius: 4,
@@ -314,9 +314,9 @@ export function SchemaEditorPage() {
               {/* US-004: 关联字段额外配置行 —— 选择目标表并显示对方字段 */}
               {isRelation && (
                 <tr>
-                  <td colSpan={4} style={{ padding: '4px 8px 12px', background: '#f8fafc' }}>
+                  <td colSpan={4} style={{ padding: '4px 8px 12px', background: 'var(--color-text-primary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: '#475569' }}>关联表(target):</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-bg-elevated)' }}>关联表(target):</span>
                       <select
                         value={targetName}
                         onChange={(e) => handleOptionChange(i, 'target', e.target.value)}
@@ -352,8 +352,8 @@ export function SchemaEditorPage() {
             disabled={updateMetaMutation.isPending || !!pollingJob}
             style={{
               padding: '8px 16px',
-              background: updateMetaMutation.isPending || pollingJob ? '#94a3b8' : '#1e293b',
-              color: 'white',
+              background: updateMetaMutation.isPending || pollingJob ? 'var(--color-text-muted)' : 'var(--color-bg-secondary)',
+              color: 'var(--color-text-primary)',
               border: 'none',
               cursor: updateMetaMutation.isPending || pollingJob ? 'not-allowed' : 'pointer',
             }}
@@ -380,14 +380,14 @@ function TargetFieldsPreview({ collectionName }: { collectionName: string }) {
   });
 
   if (!collectionName) return null;
-  if (isLoading) return <span style={{ fontSize: 11, color: '#94a3b8' }}>加载字段…</span>;
+  if (isLoading) return <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>加载字段…</span>;
 
   const targetFields = data?.fields ?? [];
   if (targetFields.length === 0) {
-    return <span style={{ fontSize: 11, color: '#94a3b8' }}>该表暂无字段</span>;
+    return <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>该表暂无字段</span>;
   }
   return (
-    <span style={{ fontSize: 11, color: '#64748b' }}>
+    <span style={{ fontSize: 11, color: 'var(--color-text-disabled)' }}>
       对方字段({targetFields.length}):{' '}
       {targetFields.map((f) => f.label ?? f.name).join('、')}
     </span>

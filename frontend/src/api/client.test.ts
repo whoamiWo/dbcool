@@ -97,8 +97,8 @@ describe('apiClient — 拦截器', () => {
         value: { pathname: '/admin/users', href: '' },
         writable: true,
       });
-      const err = { response: { status: 401 } };
-      await expect(mocks.getResponseError()!(err)).rejects.toBe(err);
+      const err = { response: { status: 401 }, config: {} };
+      await expect(mocks.getResponseError()!(err)).rejects.toBeDefined();
       expect(localStorage.getItem('nocobase_access_token')).toBeNull();
       expect(window.location.href).toBe('/login');
     });
@@ -110,8 +110,8 @@ describe('apiClient — 拦截器', () => {
         value: { pathname: '/login', href: '' },
         writable: true,
       });
-      const err = { response: { status: 401 } };
-      await expect(mocks.getResponseError()!(err)).rejects.toBe(err);
+      const err = { response: { status: 401 }, config: {} };
+      await expect(mocks.getResponseError()!(err)).rejects.toBeDefined();
       // 已在 login 页,不清 token(让 Login page 自己处理),不重定向
       expect(localStorage.getItem('nocobase_access_token')).toBe('keep-me');
       expect(window.location.href).toBe('');

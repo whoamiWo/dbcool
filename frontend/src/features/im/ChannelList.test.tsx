@@ -50,7 +50,7 @@ describe('ChannelList', () => {
 
   it('显示当前登录用户名', () => {
     render(<ChannelList {...baseProps()} />);
-    expect(screen.getByText(/当前:alice/)).toBeInTheDocument();
+    expect(screen.getByText(/当前用户：alice/)).toBeInTheDocument();
   });
 
   it('渲染频道名称与类型(群聊/私聊)', () => {

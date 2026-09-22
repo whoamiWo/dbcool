@@ -351,7 +351,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
                 right: 0,
                 padding: '4px 8px',
                 background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-                color: '#fff',
+                color: 'var(--color-text-primary)',
                 fontSize: 12,
               }}
             >
@@ -370,8 +370,8 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
             onClick={toggleMute}
             sx={{
               bgcolor: isMuted ? 'var(--color-error)' : 'var(--color-bg-tertiary)',
-              color: '#fff',
-              '&:hover': { bgcolor: isMuted ? '#dc2626' : 'rgba(255,255,255,0.1)' },
+              color: 'var(--color-text-primary)',
+              '&:hover': { bgcolor: isMuted ? 'var(--color-error)' : 'rgba(255,255,255,0.1)' },
             }}
           >
             {isMuted ? <MicOffIcon /> : <MicIcon />}
@@ -382,7 +382,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
             onClick={toggleVideo}
             sx={{
               bgcolor: isVideoOff ? 'var(--color-bg-tertiary)' : 'var(--color-primary-500)',
-              color: '#fff',
+              color: 'var(--color-text-primary)',
               '&:hover': { bgcolor: isVideoOff ? 'rgba(255,255,255,0.1)' : 'var(--color-primary-600)' },
             }}
           >
@@ -392,7 +392,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
         <Tooltip title="挂断">
           <IconButton
             onClick={onLeave}
-            sx={{ bgcolor: 'var(--color-error)', color: '#fff', '&:hover': { bgcolor: '#dc2626' } }}
+            sx={{ bgcolor: 'var(--color-error)', color: 'var(--color-text-primary)', '&:hover': { bgcolor: 'var(--color-error)' } }}
           >
             <HangupIcon />
           </IconButton>

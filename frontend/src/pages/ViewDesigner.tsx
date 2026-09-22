@@ -115,14 +115,14 @@ export function ViewDesignerPage() {
     <div>
       <button
         onClick={() => navigate(`/designer/collections/${collection}`)}
-        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: 16 }}
+        style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}
       >
         ← 返回 {collection}
       </button>
       <h1>{id ? '编辑' : '新建'}视图</h1>
 
       {error && (
-        <div style={{ padding: 8, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>
+        <div style={{ padding: 8, marginBottom: 12, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4 }}>
           {error}
         </div>
       )}
@@ -130,7 +130,7 @@ export function ViewDesignerPage() {
       <div
         style={{
           padding: 16,
-          background: 'white',
+          background: 'var(--color-text-primary)',
           borderRadius: 8,
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
           maxWidth: 600,
@@ -195,7 +195,7 @@ export function ViewDesignerPage() {
           <DetailFieldEditor fields={fields} selected={detailFields} onChange={setDetailFields} />
         )}
 
-        <div style={{ padding: 8, background: '#f8fafc', borderRadius: 4, fontSize: 12, color: '#64748b' }}>
+        <div style={{ padding: 8, background: 'var(--color-text-primary)', borderRadius: 4, fontSize: 12, color: 'var(--color-text-disabled)' }}>
           💡 视图运行后可继续调整筛选/排序(US-202/203);列控制在保存前调整
         </div>
 
@@ -205,8 +205,8 @@ export function ViewDesignerPage() {
           style={{
             marginTop: 16,
             padding: '8px 16px',
-            background: saveMutation.isPending ? '#94a3b8' : '#1e293b',
-            color: 'white',
+            background: saveMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-bg-secondary)',
+            color: 'var(--color-text-primary)',
             border: 'none',
             borderRadius: 4,
             cursor: saveMutation.isPending ? 'not-allowed' : 'pointer',
@@ -233,13 +233,13 @@ function ColumnEditor({
       <label style={{ display: 'block', fontWeight: 500, marginBottom: 6 }}>
         列设置 ({visibleCount}/{columns.length} 可见)
       </label>
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, padding: 4, maxHeight: 240, overflowY: 'auto' }}>
+      <div style={{ border: '1px solid var(--color-border-light)', borderRadius: 4, padding: 4, maxHeight: 240, overflowY: 'auto' }}>
         {columns.map((c, i) => {
           const meta = fields.find((f) => f.name === c.field);
           return (
             <div key={c.field}
                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px',
-                          borderBottom: i < columns.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                          borderBottom: i < columns.length - 1 ? '1px solid var(--color-bg-secondary)' : 'none' }}>
               <input type="checkbox" checked={c.visible !== false}
                      onChange={(e) => {
                        const next = [...columns];
@@ -248,7 +248,7 @@ function ColumnEditor({
                      }} />
               <span style={{ flex: 1, fontSize: 13 }}>
                 {meta?.label ?? c.label ?? c.field}
-                <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 6 }}>({c.field})</span>
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 11, marginLeft: 6 }}>({c.field})</span>
               </span>
               <input type="number" value={c.width ?? 160}
                      onChange={(e) => {
@@ -258,7 +258,7 @@ function ColumnEditor({
                      }}
                      style={{ width: 60, padding: 2, fontSize: 12 }}
                      min={60} max={600} title="列宽(px)" />
-              <span style={{ fontSize: 11, color: '#64748b' }}>px</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-disabled)' }}>px</span>
               <button type="button"
                       onClick={() => { if (i === 0) return; const next = [...columns]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; onChange(next); }}
                       disabled={i === 0}
@@ -271,7 +271,7 @@ function ColumnEditor({
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-disabled)', marginTop: 4 }}>
         取消勾选可隐藏列;上下箭头调整列顺序
       </div>
     </div>
@@ -291,14 +291,14 @@ function DetailFieldEditor({
       <label style={{ display: 'block', fontWeight: 500, marginBottom: 6 }}>
         显示字段 ({selected.length}/{fields.length})
       </label>
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, padding: 4, maxHeight: 240, overflowY: 'auto' }}>
+      <div style={{ border: '1px solid var(--color-border-light)', borderRadius: 4, padding: 4, maxHeight: 240, overflowY: 'auto' }}>
         {fields.map((f) => {
           const idx = selected.indexOf(f.name);
           const checked = idx >= 0;
           return (
             <div key={f.name}
                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px',
-                          borderBottom: '1px solid #f1f5f9' }}>
+                          borderBottom: '1px solid var(--color-bg-secondary)' }}>
               <input type="checkbox" checked={checked}
                      onChange={(e) => {
                        if (e.target.checked) onChange([...selected, f.name]);
@@ -306,7 +306,7 @@ function DetailFieldEditor({
                      }} />
               <span style={{ flex: 1, fontSize: 13 }}>
                 {f.label ?? f.name}
-                <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 6 }}>({f.name})</span>
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 11, marginLeft: 6 }}>({f.name})</span>
               </span>
               {checked && (
                 <>

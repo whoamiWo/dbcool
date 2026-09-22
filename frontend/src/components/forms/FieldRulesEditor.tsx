@@ -51,7 +51,7 @@ const VALUELESS_OPS: VisibilityOperator[] = ['empty', 'notEmpty'];
 const inputStyle: React.CSSProperties = {
   padding: 4,
   fontSize: 12,
-  border: '1px solid #cbd5e1',
+  border: '1px solid var(--color-border-medium)',
   borderRadius: 4,
   width: '100%',
 };
@@ -102,14 +102,14 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
   return (
     <div style={{ marginTop: 12 }}>
       {/* ===== US-104: 校验规则 ===== */}
-      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
+      <div style={{ borderTop: '1px solid var(--color-border-light)', paddingTop: 8 }}>
         <strong style={{ fontSize: 12 }}>校验规则</strong>
         {VALIDATION_TYPES.map(({ type, label, input }) => (
           <div
             key={type}
             style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}
           >
-            <span style={{ fontSize: 11, width: 68, color: '#64748b', flexShrink: 0 }}>{label}</span>
+            <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>{label}</span>
             {input === 'none' ? (
               <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                 <input
@@ -140,10 +140,10 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
       </div>
 
       {/* ===== US-103: 显隐规则 ===== */}
-      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, marginTop: 8 }}>
+      <div style={{ borderTop: '1px solid var(--color-border-light)', paddingTop: 8, marginTop: 8 }}>
         <strong style={{ fontSize: 12 }}>显隐规则</strong>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <span style={{ fontSize: 11, width: 68, color: '#64748b', flexShrink: 0 }}>当字段</span>
+          <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>当字段</span>
           <select
             value={vis?.when ?? ''}
             onChange={(e) => {
@@ -166,7 +166,7 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
         {vis && (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <span style={{ fontSize: 11, width: 68, color: '#64748b', flexShrink: 0 }}>条件</span>
+              <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>条件</span>
               <select
                 value={vis.op}
                 onChange={(e) =>
@@ -185,7 +185,7 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
 
             {needsValue && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <span style={{ fontSize: 11, width: 68, color: '#64748b', flexShrink: 0 }}>比较值</span>
+                <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>比较值</span>
                 <input
                   type="text"
                   value={vis.value === undefined ? '' : String(vis.value)}
@@ -203,8 +203,8 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
                 marginTop: 6,
                 padding: '3px 8px',
                 fontSize: 11,
-                background: '#fee2e2',
-                color: '#991b1b',
+                background: 'rgba(239,68,68,0.2)',
+                color: 'var(--color-error)',
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'pointer',

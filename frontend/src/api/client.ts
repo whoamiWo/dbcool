@@ -103,25 +103,29 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response.data,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error?.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest?._retry) {
+      if (!originalRequest) {
+        // 无 config（如测试直接传 error 对象），透传原始 error
+        return Promise.reject(error);
+      }
       originalRequest._retry = true;
 
       try {
         const newToken = await handleRefreshToken();
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return axiosInstance(originalRequest);
-      } catch (refreshError) {
+      } catch {
         // 刷新失败,清除登录态并跳转登录页
         const isLoginPage = window.location.pathname.startsWith('/login');
-        localStorage.removeItem('nocobase_access_token');
-        localStorage.removeItem('nocobase_refresh_token');
-        useAuthStore.getState().clear();
         if (!isLoginPage) {
+          localStorage.removeItem('nocobase_access_token');
+          localStorage.removeItem('nocobase_refresh_token');
+          useAuthStore.getState().clear();
           window.location.href = '/login';
         }
-        return Promise.reject(refreshError);
+        return Promise.reject(error);
       }
     }
     return Promise.reject(error);

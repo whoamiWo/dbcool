@@ -66,7 +66,7 @@ export function CalendarViewPage() {
                 {day.records.slice(0, 3).map((r) => (
                   <div
                     key={r.id}
-                    style={{ background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid #3b82f6', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: '#bfdbfe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    style={{ background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid var(--color-info)', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: 'var(--color-primary-200)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                     title={r.title}
                   >
                     {r.title}

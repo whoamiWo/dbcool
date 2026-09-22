@@ -28,13 +28,53 @@ export default function WorkbenchPage() {
     return ((r as { data?: Array<{ name: string; title?: string }> })?.data ?? []);
   }, [collectionsResp]);
 
+  const { data: viewsResp } = useQuery({
+    queryKey: ['views'],
+    queryFn: () => apiClient.get<{ code: number; data: Array<{ id: string; title: string; view_type: string }> }>('/views'),
+  });
+  const views = useMemo(() => {
+    const r = viewsResp as unknown;
+    if (Array.isArray(r)) return r;
+    return ((r as { data?: Array<{ id: string; title: string; view_type: string }> })?.data ?? []);
+  }, [viewsResp]);
+
+  const { data: wikiResp } = useQuery({
+    queryKey: ['wiki-list'],
+    queryFn: () => apiClient.get<{ code: number; data: Array<{ id: string; title: string }> }>('/wiki'),
+  });
+  const wikis = useMemo(() => {
+    const r = wikiResp as unknown;
+    if (Array.isArray(r)) return r;
+    return ((r as { data?: Array<{ id: string; title: string }> })?.data ?? []);
+  }, [wikiResp]);
+
+  const { data: projectResp } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => apiClient.get<{ code: number; data: Array<{ id: string; title: string }> }>('/projects'),
+  });
+  const projects = useMemo(() => {
+    const r = projectResp as unknown;
+    if (Array.isArray(r)) return r;
+    return ((r as { data?: Array<{ id: string; title: string }> })?.data ?? []);
+  }, [projectResp]);
+
+  const { data: channelsResp } = useQuery({
+    queryKey: ['channels'],
+    queryFn: () => apiClient.get<{ code: number; data: Array<{ id: string; name: string }> }>('/im/channels'),
+  });
+  const channels = useMemo(() => {
+    const r = channelsResp as unknown;
+    if (Array.isArray(r)) return r;
+    return ((r as { data?: Array<{ id: string; name: string }> })?.data ?? []);
+  }, [channelsResp]);
+
   const cards = [
     { icon: Storage, title: '数据模型', desc: '动态 Collection + 表单/视图设计器', path: '/designer/schemas', count: collections.length, meta: '低代码底座', color: 'var(--color-primary-500)' },
-    { icon: AutoGraph, title: 'BI 报表', desc: '数据透视与图表可视化', path: '/bi', count: 0, meta: '数据分析', color: 'var(--color-secondary-500)' },
-    { icon: TaskAlt, title: '项目协同', desc: '任务看板与甘特图', path: '/projects', count: 0, meta: '项目管理', color: 'var(--color-success-500)' },
-    { icon: MessageIcon, title: '即时消息', desc: '频道、线程、在线状态', path: '/im', count: 0, meta: '团队协作', color: 'var(--color-info-500)' },
-    { icon: Workspaces, title: '工作流', desc: '审批/通知/数据更新/HTTP', path: '/designer/workflows', count: 0, meta: '流程引擎', color: 'var(--color-error-500)' },
-    { icon: FolderOpen, title: 'Wiki 知识库', desc: '文档编辑、版本历史、全文检索', path: '/wiki/kb', count: 0, meta: '知识管理', color: 'var(--color-primary-400)' },
+    { icon: AutoGraph, title: 'BI 报表', desc: '数据透视与图表可视化', path: '/bi', count: views.length, meta: '数据分析', color: 'var(--color-secondary-500)' },
+    { icon: TaskAlt, title: '项目协同', desc: '任务看板与甘特图', path: '/projects', count: projects.length, meta: '项目管理', color: 'var(--color-success)' },
+    { icon: MessageIcon, title: '即时消息', desc: '频道、线程、在线状态', path: '/im', count: channels.length, meta: '团队协作', color: 'var(--color-info)' },
+    { icon: Workspaces, title: '工作流', desc: '审批/通知/数据更新/HTTP', path: '/designer/workflows', count: 0, meta: '流程引擎', color: 'var(--color-error)' },
+    { icon: FolderOpen, title: 'Wiki 知识库', desc: '文档编辑、版本历史、全文检索', path: '/wiki/kb', count: wikis.length, meta: '知识管理', color: 'var(--color-primary-400)' },
   ];
 
   const filtered = cards.filter((c) =>
@@ -97,7 +137,7 @@ export default function WorkbenchPage() {
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>{c.title}</Typography>
                       {c.count > 0 && (
-                        <Chip size="small" label={c.count} sx={{ bgcolor: c.color, color: '#fff', height: 20 }} />
+                        <Chip size="small" label={c.count} sx={{ bgcolor: c.color, color: 'var(--color-text-primary)', height: 20 }} />
                       )}
                     </Stack>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

@@ -142,24 +142,24 @@ export function ErDiagramPage() {
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>📊 数据模型 ER 图</h2>
-        <div style={{ display: 'flex', gap: 16, color: '#475569', fontSize: 14 }}>
+        <div style={{ display: 'flex', gap: 16, color: 'var(--color-bg-elevated)', fontSize: 14 }}>
           <span><b>{data.stats.collections}</b> 张表</span>
           <span><b>{data.stats.relationships}</b> 条关系</span>
-          <span style={{ color: '#94a3b8' }}>可拖动节点</span>
+          <span style={{ color: 'var(--color-text-muted)' }}>可拖动节点</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 13, color: '#475569' }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 13, color: 'var(--color-bg-elevated)' }}>
         <span>─── belongsTo 属于</span>
         <span>┄┄┄ hasMany 拥有多个</span>
-        <span style={{ color: '#94a3b8' }}>🟢 系统表 · 🔵 业务表 · 🟠 ER demo</span>
+        <span style={{ color: 'var(--color-text-muted)' }}>🟢 系统表 · 🔵 业务表 · 🟠 ER demo</span>
       </div>
 
       <div
         style={{
-          border: '1px solid #e2e8f0',
+          border: '1px solid var(--color-border-light)',
           borderRadius: 8,
-          background: '#f8fafc',
+          background: 'var(--color-bg-tertiary)',
           overflow: 'hidden',
         }}
         onMouseMove={onMouseMove}
@@ -173,10 +173,10 @@ export function ErDiagramPage() {
         >
           <defs>
             <marker id="arrowBelongsTo" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-              <path d="M0,0 L0,6 L9,3 z" fill="#2563eb" />
+              <path d="M0,0 L0,6 L9,3 z" fill="var(--color-info)" />
             </marker>
             <marker id="arrowHasMany" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
-              <path d="M0,0 L0,6 L9,3 z" fill="#9333ea" />
+              <path d="M0,0 L0,6 L9,3 z" fill="var(--color-secondary-500)" />
             </marker>
           </defs>
 
@@ -185,7 +185,7 @@ export function ErDiagramPage() {
             const t = data.nodes.find((n) => n.name === e.target);
             if (!s || !t) return null;
             const isActive = hoverEdge === i || hoverNode === e.source || hoverNode === e.target;
-            const stroke = e.type === 'belongsTo' ? '#2563eb' : '#9333ea';
+            const stroke = e.type === 'belongsTo' ? 'var(--color-info)' : 'var(--color-secondary-500)';
             return (
               <g key={i}>
                 <line
@@ -219,8 +219,8 @@ export function ErDiagramPage() {
           {data.nodes.map((n, i) => {
             const isEr = n.name.startsWith('er_');
             const isSystem = ['user', 'role', 'user_role', 'collection_meta', 'audit_log', 'form', 'view', 'workflow'].some((s) => n.name === s);
-            const fill = isEr ? '#fff7ed' : isSystem ? '#f0fdf4' : '#eff6ff';
-            const stroke = isEr ? '#ea580c' : isSystem ? '#16a34a' : '#2563eb';
+            const fill = isEr ? 'rgba(255,158,11,0.1)' : isSystem ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)';
+            const stroke = isEr ? 'var(--color-warning)' : isSystem ? 'var(--color-success)' : 'var(--color-info)';
             return (
               <g
                 key={n.name}
@@ -238,13 +238,13 @@ export function ErDiagramPage() {
                   stroke={stroke}
                   strokeWidth={hoverNode === n.name ? 3 : 1.5}
                 />
-                <text x={12} y={22} fontSize="14" fontWeight="700" fill="#0f172a">
+                <text x={12} y={22} fontSize="14" fontWeight="700" fill="var(--color-bg-primary)">
                   {n.title || n.name}
                 </text>
-                <text x={12} y={40} fontSize="11" fill="#64748b">
+                <text x={12} y={40} fontSize="11" fill="var(--color-text-disabled)">
                   {n.name} · {n.field_count} 字段
                 </text>
-                <text x={12} y={60} fontSize="11" fill="#475569">
+                <text x={12} y={60} fontSize="11" fill="var(--color-bg-elevated)">
                   {n.fields_preview.slice(0, 3).join(', ')}{n.fields_preview.length > 3 ? '…' : ''}
                 </text>
               </g>

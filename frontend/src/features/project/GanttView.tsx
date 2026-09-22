@@ -88,7 +88,7 @@ export default function GanttView({ projectId }: Props) {
                 key={t.id}
                 sx={{
                   display: 'flex', alignItems: 'center', py: 0.75,
-                  borderBottom: '1px solid #f0f0f0',
+                  borderBottom: '1px solid var(--color-border-light)',
                 }}
               >
                 {/* 左侧:任务标题(按层级缩进) */}
@@ -104,7 +104,7 @@ export default function GanttView({ projectId }: Props) {
                 </Box>
 
                 {/* 右侧:时间条 */}
-                <Box sx={{ position: 'relative', flex: 1, height: 24, bgcolor: '#fafafa', borderRadius: 1 }}>
+                <Box sx={{ position: 'relative', flex: 1, height: 24, bgcolor: 'var(--color-bg-tertiary)', borderRadius: 1 }}>
                   {hasDates ? (
                     <Box
                       sx={{
@@ -113,7 +113,7 @@ export default function GanttView({ projectId }: Props) {
                         width: `${width}%`,
                         top: 4,
                         height: 16,
-                        bgcolor: '#1976D2',
+                        bgcolor: 'var(--color-info)',
                         borderRadius: 1,
                         overflow: 'hidden',
                       }}
@@ -123,7 +123,7 @@ export default function GanttView({ projectId }: Props) {
                         sx={{
                           width: `${t.progress}%`,
                           height: '100%',
-                          bgcolor: '#4CAF50',
+                          bgcolor: 'var(--color-success)',
                         }}
                       />
                     </Box>
@@ -194,8 +194,8 @@ function StackHeader({ min, span, showAxis }: { min: number; span: number; showA
 export function GanttLegend() {
   return (
     <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-      <Chip size="small" label="计划" sx={{ bgcolor: '#1976D2', color: '#fff' }} />
-      <Chip size="small" label="已完成进度" sx={{ bgcolor: '#4CAF50', color: '#fff' }} />
+      <Chip size="small" label="计划" sx={{ bgcolor: 'var(--color-info)', color: 'var(--color-text-primary)' }} />
+      <Chip size="small" label="已完成进度" sx={{ bgcolor: 'var(--color-success)', color: 'var(--color-text-primary)' }} />
     </Box>
   );
 }

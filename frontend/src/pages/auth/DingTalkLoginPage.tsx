@@ -52,13 +52,13 @@ export function DingTalkLoginPage({ onError }: DingTalkLoginPageProps) {
         justifyContent: 'center',
         alignItems: 'center',
         minHeight: '100vh',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: 'var(--color-bg-tertiary)',
       }}
     >
       <Card sx={{ maxWidth: 400, width: '100%', mx: 2 }}>
         <CardContent sx={{ p: 4 }}>
           <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Login sx={{ fontSize: 48, color: '#1976D2', mb: 1 }} />
+            <Login sx={{ fontSize: 48, color: 'var(--color-info)', mb: 1 }} />
             <Typography variant="h5" gutterBottom>
               钉钉登录
             </Typography>

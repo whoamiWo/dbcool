@@ -5,10 +5,13 @@
 
 import json
 import logging
+import time
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
+from jose import jwt
 from pydantic import BaseModel, Field
 
 from nocobase_py.config import get_settings
@@ -22,6 +25,57 @@ from nocobase_py.services.connectors.wecom import WeComConnector
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
+
+# 幂等去重：单机 TTL 集合（生产环境应换 Redis）
+_seen_event_ids: dict[str, float] = {}
+_IDEMPOTENCY_TTL = 300.0  # 5 min
+
+
+def _dedup(event_id: str) -> bool:
+    """已处理返回 True（去重命中）。"""
+    now = time.time()
+    # 清理过期条目
+    expired = [k for k, v in _seen_event_ids.items() if now - v > _IDEMPOTENCY_TTL]
+    for k in expired:
+        _seen_event_ids.pop(k, None)
+    if event_id in _seen_event_ids:
+        return True
+    _seen_event_ids[event_id] = now
+    return False
+
+
+def _service_token() -> str:
+    """签发服务间 JWT（与 Java 共享密钥）。"""
+    s = get_settings()
+    payload = {"sub": "nocobase-py", "service": True, "iat": int(time.time())}
+    return jwt.encode(payload, s.jwt_secret, algorithm=s.jwt_algorithm)
+
+
+async def _forward_to_java(event: dict) -> None:
+    """将入站事件转发到 Java /api/im/messages 落地。"""
+    s = get_settings()
+    channel_id = s.slack_event_channel_id
+    if not channel_id:
+        logger.warning("[Slack] slack_event_channel_id 未配置，跳过转发")
+        raise HTTPException(status_code=500, detail="slack_event_channel_id 未配置")
+    url = f"{s.java_backend_url}/api/im/messages"
+    token = _service_token()
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "channelId": channel_id,
+                "content": event.get("text") or "",
+                "contentType": "slack_event",
+                "meta": json.dumps({"slack_event_id": event.get("event_id"), "source": "slack"}),
+            },
+        )
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Java 转发失败: {resp.status_code}")
 
 
 def _slack_connector() -> SlackConnector:
@@ -135,11 +189,18 @@ async def slack_verify(
         pass
 
     # 入站事件落地：幂等去重 + 转发到 Java
+    event = body_json.get("event") if isinstance(body_json, dict) else None
     event_id = body_json.get("event_id") if isinstance(body_json, dict) else None
-    if event_id:
-        logger.info("[Slack] 入站事件已转发: %s", body_json.get("event", {}).get("type", "unknown"))
-        # TODO: 实际部署时，通过 httpx 将事件 POST 到 Java /api/slack/events 入库
-        # 此处仅做日志记录，防止事件被静默丢弃
+    if event and event_id:
+        if _dedup(event_id):
+            return {"code": 0, "data": {"valid": True}}
+        try:
+            await _forward_to_java({"event_id": event_id, "text": event.get("text", ""), "type": event.get("type")})
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("[Slack] 入站转发失败: %s", e)
+            raise HTTPException(status_code=500, detail=f"转发失败: {e}")
     return {"code": 0, "data": {"valid": True}}
 
 

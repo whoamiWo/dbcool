@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     mattermost_webhook_url: str = ""
     mattermost_bot_token: str = ""
 
+    # Slack 入站事件转发目标频道（Java IM channel UUID）
+    slack_event_channel_id: str = ""
+
     # R15: 插件热加载目录
     plugins_dir: str = "plugins"
 

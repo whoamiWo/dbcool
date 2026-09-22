@@ -56,9 +56,9 @@ interface WebhookStats {
 }
 
 const KIND_COLORS: Record<string, string> = {
-  rate_limit_exceeded: '#f59e0b',
-  quota_exceeded: '#ef4444',
-  cache_hit_rate_low: '#8b5cf6',
+  rate_limit_exceeded: 'var(--color-warning)',
+  quota_exceeded: 'var(--color-error)',
+  cache_hit_rate_low: 'var(--color-secondary-500)',
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -73,7 +73,7 @@ function formatTime(ts: number): string {
 }
 
 function KindBadge({ kind }: { kind: string }) {
-  const color = KIND_COLORS[kind] ?? '#6b7280';
+  const color = KIND_COLORS[kind] ?? 'var(--color-text-muted)';
   const label = KIND_LABELS[kind] ?? kind;
   return (
     <span
@@ -81,7 +81,7 @@ function KindBadge({ kind }: { kind: string }) {
         display: 'inline-block',
         padding: '2px 8px',
         background: color,
-        color: '#fff',
+        color: 'var(--color-text-primary)',
         borderRadius: 4,
         fontSize: 12,
         fontWeight: 600,
@@ -106,19 +106,19 @@ function AlertRow({
   const isResolved = ev.resolved;
   const isAcked = ev.acked;
   return (
-    <tr style={{ borderBottom: '1px solid #f3f4f6', opacity: isResolved ? 0.5 : 1 }}>
+    <tr style={{ borderBottom: '1px solid var(--color-bg-tertiary)', opacity: isResolved ? 0.5 : 1 }}>
       <td style={td}>
         {isResolved ? (
-          <span style={statusBadgeStyle('#10b981')}>✓ 已解决</span>
+          <span style={statusBadgeStyle('var(--color-success)')}>✓ 已解决</span>
         ) : isAcked ? (
           <span
-            style={statusBadgeStyle('#f59e0b')}
+            style={statusBadgeStyle('var(--color-warning)')}
             title={ev.acked_by ? `by ${ev.acked_by}` : ''}
           >
             👁 已确认
           </span>
         ) : (
-          <span style={statusBadgeStyle('#ef4444')}>🔥 新</span>
+          <span style={statusBadgeStyle('var(--color-error)')}>🔥 新</span>
         )}
       </td>
       <td style={td}>{formatTime(ev.timestamp)}</td>
@@ -126,9 +126,9 @@ function AlertRow({
         <KindBadge kind={ev.kind} />
       </td>
       <td style={td}>
-        {ev.user_id ?? <span style={{ color: '#9ca3af' }}>(系统)</span>}
+        {ev.user_id ?? <span style={{ color: 'var(--color-text-muted)' }}>(系统)</span>}
       </td>
-      <td style={{ ...td, fontFamily: 'monospace', fontSize: 12, color: '#374151' }}>
+      <td style={{ ...td, fontFamily: 'monospace', fontSize: 12, color: 'var(--color-bg-secondary)' }}>
         {JSON.stringify(ev.detail)}
       </td>
       <td style={td}>
@@ -136,7 +136,7 @@ function AlertRow({
           <button
             onClick={() => onAck(ev.id)}
             disabled={pending}
-            style={actionBtnStyle('#f59e0b')}
+            style={actionBtnStyle('var(--color-warning)')}
           >
             确认
           </button>
@@ -145,7 +145,7 @@ function AlertRow({
           <button
             onClick={() => onResolve(ev.id)}
             disabled={pending}
-            style={{ ...actionBtnStyle('#10b981'), marginLeft: 4 }}
+            style={{ ...actionBtnStyle('var(--color-success)'), marginLeft: 4 }}
           >
             解决
           </button>
@@ -159,7 +159,7 @@ function statusBadgeStyle(color: string): React.CSSProperties {
   return {
     padding: '2px 6px',
     background: color,
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     borderRadius: 4,
     fontSize: 11,
     fontWeight: 600,
@@ -171,7 +171,7 @@ function actionBtnStyle(color: string): React.CSSProperties {
   return {
     padding: '3px 10px',
     background: color,
-    color: '#fff',
+    color: 'var(--color-text-primary)',
     border: 'none',
     borderRadius: 4,
     cursor: 'pointer',
@@ -337,8 +337,8 @@ export function AlertCenterPage() {
               borderRadius: 4,
               fontSize: 12,
               fontWeight: 600,
-              background: wsConnected ? '#dcfce7' : '#fee2e2',
-              color: wsConnected ? '#166534' : '#991b1b',
+              background: wsConnected ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+              color: wsConnected ? 'var(--color-success)' : 'var(--color-error)',
             }}
           >
             <span
@@ -346,13 +346,13 @@ export function AlertCenterPage() {
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: wsConnected ? '#22c55e' : '#ef4444',
+                background: wsConnected ? 'var(--color-success)' : 'var(--color-error)',
               }}
             />
             {wsConnected ? 'WS 在线' : 'WS 离线'}
           </span>
 
-          <label style={{ fontSize: 13, color: '#6b7280' }}>
+          <label style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
             刷新:
             <select
               value={refreshSec}
@@ -370,8 +370,8 @@ export function AlertCenterPage() {
             disabled={simulateMutation.isPending}
             style={{
               padding: '6px 12px',
-              background: '#3b82f6',
-              color: '#fff',
+              background: 'var(--color-info)',
+              color: 'var(--color-text-primary)',
               border: 'none',
               borderRadius: 4,
               cursor: simulateMutation.isPending ? 'wait' : 'pointer',
@@ -398,7 +398,7 @@ export function AlertCenterPage() {
                 <span>命中率</span>
                 <strong
                   style={{
-                    color: cache.hit_rate_warning ? '#ef4444' : '#10b981',
+                    color: cache.hit_rate_warning ? 'var(--color-error)' : 'var(--color-success)',
                     fontSize: 18,
                   }}
                 >
@@ -424,7 +424,7 @@ export function AlertCenterPage() {
               </div>
             </>
           ) : (
-            <div style={{ color: '#9ca3af' }}>加载中…</div>
+            <div style={{ color: 'var(--color-text-muted)' }}>加载中…</div>
           )}
         </div>
 
@@ -450,7 +450,7 @@ export function AlertCenterPage() {
               </div>
             </>
           ) : (
-            <div style={{ color: '#9ca3af' }}>加载中…</div>
+            <div style={{ color: 'var(--color-text-muted)' }}>加载中…</div>
           )}
         </div>
 
@@ -468,19 +468,19 @@ export function AlertCenterPage() {
               </div>
               <div style={statLineStyle}>
                 <span>推送成功</span>
-                <strong style={{ color: '#10b981' }}>{webhook.success}</strong>
+                <strong style={{ color: 'var(--color-success)' }}>{webhook.success}</strong>
               </div>
               <div style={statLineStyle}>
                 <span>推送失败</span>
                 <strong
-                  style={{ color: webhook.failure > 0 ? '#ef4444' : '#6b7280' }}
+                  style={{ color: webhook.failure > 0 ? 'var(--color-error)' : 'var(--color-text-muted)' }}
                 >
                   {webhook.failure}
                 </strong>
               </div>
             </>
           ) : (
-            <div style={{ color: '#9ca3af' }}>加载中…</div>
+            <div style={{ color: 'var(--color-text-muted)' }}>加载中…</div>
           )}
         </div>
 
@@ -488,15 +488,15 @@ export function AlertCenterPage() {
           <h3 style={cardTitleStyle}>🔔 告警计数</h3>
           <div style={statLineStyle}>
             <span>限流告警</span>
-            <strong style={{ color: '#f59e0b' }}>{counts.rate_limit_exceeded ?? 0}</strong>
+            <strong style={{ color: 'var(--color-warning)' }}>{counts.rate_limit_exceeded ?? 0}</strong>
           </div>
           <div style={statLineStyle}>
             <span>配额告警</span>
-            <strong style={{ color: '#ef4444' }}>{counts.quota_exceeded ?? 0}</strong>
+            <strong style={{ color: 'var(--color-error)' }}>{counts.quota_exceeded ?? 0}</strong>
           </div>
           <div style={statLineStyle}>
             <span>低命中率</span>
-            <strong style={{ color: '#8b5cf6' }}>{counts.cache_hit_rate_low ?? 0}</strong>
+            <strong style={{ color: 'var(--color-secondary-500)' }}>{counts.cache_hit_rate_low ?? 0}</strong>
           </div>
           <div style={statLineStyle}>
             <span>合计</span>
@@ -507,8 +507,8 @@ export function AlertCenterPage() {
 
       <div
         style={{
-          background: '#fff',
-          border: '1px solid #e5e7eb',
+          background: 'var(--color-text-primary)',
+          border: '1px solid var(--color-border-medium)',
           borderRadius: 8,
           padding: 16,
         }}
@@ -524,13 +524,13 @@ export function AlertCenterPage() {
           <h2 style={{ margin: 0 }}>
             📜 最近告警事件({events.length}
             {alertsQuery.data?.unresolved_count !== undefined && (
-              <span style={{ color: '#6b7280', fontSize: 14, fontWeight: 'normal' }}>
+              <span style={{ color: 'var(--color-text-muted)', fontSize: 14, fontWeight: 'normal' }}>
                 {' '}/ 未解决 {alertsQuery.data.unresolved_count}
               </span>
             )})
           </h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
-            <label style={{ color: '#6b7280' }}>
+            <label style={{ color: 'var(--color-text-muted)' }}>
               确认人:
               <input
                 value={ackBy}
@@ -538,7 +538,7 @@ export function AlertCenterPage() {
                 style={{ marginLeft: 4, padding: '2px 6px', width: 100 }}
               />
             </label>
-            <label style={{ color: '#6b7280', cursor: 'pointer' }}>
+            <label style={{ color: 'var(--color-text-muted)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={showResolved}
@@ -550,13 +550,13 @@ export function AlertCenterPage() {
           </div>
         </div>
         {events.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted)' }}>
             ✅ 当前无告警。可点击右上角"触发一次 LLM 调用"产生新事件。
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+              <tr style={{ background: 'var(--color-bg-tertiary)', borderBottom: '1px solid var(--color-border-medium)' }}>
                 <th style={th}>状态</th>
                 <th style={th}>时间</th>
                 <th style={th}>类型</th>
@@ -587,11 +587,11 @@ export function AlertCenterPage() {
         style={{
           marginTop: 16,
           padding: 12,
-          background: '#f0f9ff',
-          border: '1px solid #bae6fd',
+          background: 'var(--color-bg-tertiary)',
+          border: '1px solid var(--color-border-light)',
           borderRadius: 6,
           fontSize: 13,
-          color: '#075985',
+          color: 'var(--color-info)',
         }}
       >
         💡 <strong>Week 43 R11 / R15:</strong>三层防护(限流 + 缓存 + 配额) →
@@ -605,21 +605,21 @@ export function AlertCenterPage() {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: '#fff',
-  border: '1px solid #e5e7eb',
+  background: 'var(--color-text-primary)',
+  border: '1px solid var(--color-border-medium)',
   borderRadius: 8,
   padding: 16,
 };
-const cardTitleStyle: React.CSSProperties = { margin: '0 0 12px', fontSize: 14, color: '#374151' };
+const cardTitleStyle: React.CSSProperties = { margin: '0 0 12px', fontSize: 14, color: 'var(--color-bg-secondary)' };
 const statLineStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: '4px 0',
   fontSize: 13,
-  color: '#4b5563',
+  color: 'var(--color-text-muted)',
 };
-const th: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: '#374151' };
+const th: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', fontWeight: 600, color: 'var(--color-bg-secondary)' };
 const td: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' };
 
 
@@ -665,14 +665,14 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
     <div
       style={{
         marginTop: 16,
-        background: '#fff',
-        border: '1px solid #e5e7eb',
+        background: 'var(--color-text-primary)',
+        border: '1px solid var(--color-border-medium)',
         borderRadius: 8,
         padding: 16,
       }}
     >
       <h3 style={{ marginTop: 0 }}>📮 我的告警订阅(用户: {currentUser})</h3>
-      <p style={{ color: '#6b7280', fontSize: 13, margin: '0 0 12px' }}>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '0 0 12px' }}>
         订阅后,系统会优先把关心的告警通过 Webhook 推送给你。未订阅的事件仍会写入告警中心,只是不主动推送。
       </p>
 
@@ -694,8 +694,8 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
           disabled={subscribeMutation.isPending || available.length === 0}
           style={{
             padding: '4px 12px',
-            background: '#3b82f6',
-            color: '#fff',
+            background: 'var(--color-info)',
+            color: 'var(--color-text-primary)',
             border: 'none',
             borderRadius: 4,
             cursor: subscribeMutation.isPending ? 'wait' : 'pointer',
@@ -706,7 +706,7 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
       </div>
 
       {subscribed.length === 0 ? (
-        <div style={{ padding: 12, color: '#9ca3af', fontSize: 13 }}>
+        <div style={{ padding: 12, color: 'var(--color-text-muted)', fontSize: 13 }}>
           暂未订阅任何告警类型。
         </div>
       ) : (
@@ -719,8 +719,8 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
                 alignItems: 'center',
                 gap: 6,
                 padding: '4px 10px',
-                background: '#dbeafe',
-                color: '#1e40af',
+                background: 'rgba(59,130,246,0.1)',
+                color: 'var(--color-info)',
                 borderRadius: 12,
                 fontSize: 13,
               }}
@@ -732,7 +732,7 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#1e40af',
+                  color: 'var(--color-info)',
                   cursor: 'pointer',
                   padding: 0,
                   fontSize: 14,

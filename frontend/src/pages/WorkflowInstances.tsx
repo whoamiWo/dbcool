@@ -30,11 +30,11 @@ interface NodeDef { id: string; type: string; config?: Record<string, string>; p
 interface EdgeDef { id?: string; source: string; target: string; sourceHandle?: string | null; }
 
 const statusColor: Record<string, string> = {
-  RUNNING:   '#3b82f6',
-  PENDING:   '#f59e0b',
-  COMPLETED: '#10b981',
-  FAILED:    '#ef4444',
-  REJECTED:  '#a855f7',
+  RUNNING:   'var(--color-info)',
+  PENDING:   'var(--color-warning)',
+  COMPLETED: 'var(--color-success)',
+  FAILED:    'var(--color-error)',
+  REJECTED:  'var(--color-secondary-500)',
 };
 
 /* US-407: 把毫秒时长渲染成人性化字符串 */
@@ -94,9 +94,9 @@ function InstancesInner() {
               {workflows?.map((w) => <option key={w.id} value={w.id}>{w.title || w.name}</option>)}
             </select>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)' }}>
             <thead>
-              <tr style={{ background: '#f1f5f9' }}>
+              <tr style={{ background: 'var(--color-bg-secondary)' }}>
                 <th style={th}>工作流</th><th style={th}>状态</th>
                 <th style={th}>关联记录</th><th style={th}>触发时间</th>
                 <th style={th}>结束时间</th><th style={th}></th>
@@ -104,11 +104,11 @@ function InstancesInner() {
             </thead>
             <tbody>
               {(list ?? []).map((i) => (
-                <tr key={i.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                <tr key={i.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                   <td style={td}>{i.workflow_title || i.workflow_name}</td>
                   <td style={td}>
-                    <span style={{ padding: '2px 8px', background: statusColor[i.status] || '#94a3b8',
-                                   color: 'white', borderRadius: 4, fontSize: 12 }}>
+                    <span style={{ padding: '2px 8px', background: statusColor[i.status] || 'var(--color-text-muted)',
+                                   color: 'var(--color-text-primary)', borderRadius: 4, fontSize: 12 }}>
                       {i.status}
                     </span>
                   </td>
@@ -121,7 +121,7 @@ function InstancesInner() {
                 </tr>
               ))}
               {(!list || list.length === 0) && (
-                <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: '#94a3b8' }}>暂无实例</td></tr>
+                <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)' }}>暂无实例</td></tr>
               )}
             </tbody>
           </table>
@@ -155,12 +155,12 @@ function InstanceDetail({ id }: { id: string }) {
   const currentIdx = data.current_node_index ?? -1;
 
   const rfNodes: Node[] = nodes.map((n, i) => {
-    let nodeColor = '#cbd5e1'; // 灰 — 未到
-    let borderColor = '#cbd5e1';
+    let nodeColor = 'var(--color-border-medium)'; // 灰 — 未到
+    let borderColor = 'var(--color-border-medium)';
     if (i < currentIdx || (isFinished && i <= currentIdx)) {
-      nodeColor = '#10b981'; borderColor = '#10b981'; // 绿 — 已完成
+      nodeColor = 'var(--color-success)'; borderColor = 'var(--color-success)'; // 绿 — 已完成
     } else if (i === currentIdx && !isFinished) {
-      nodeColor = '#f59e0b'; borderColor = '#f59e0b'; // 黄 — 当前
+      nodeColor = 'var(--color-warning)'; borderColor = 'var(--color-warning)'; // 黄 — 当前
     }
     return {
       id: n.id,
@@ -171,7 +171,7 @@ function InstanceDetail({ id }: { id: string }) {
   });
   const rfEdges: Edge[] = edges.map((e, i) => ({
     id: e.id || `e${i}`, source: e.source, target: e.target, sourceHandle: e.sourceHandle ?? undefined,
-    style: { stroke: currentIdx >= 0 ? '#10b981' : '#cbd5e1' },
+    style: { stroke: currentIdx >= 0 ? 'var(--color-success)' : 'var(--color-border-medium)' },
   }));
 
   return (
@@ -179,9 +179,9 @@ function InstanceDetail({ id }: { id: string }) {
       <div style={{ marginBottom: 12 }}>
         <Link to="/designer/instances">← 返回列表</Link>
       </div>
-      <div style={{ background: 'white', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+      <div style={{ background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
         <h3 style={{ marginTop: 0 }}>实例 {data.id.slice(0, 8)}...</h3>
-        <div>状态: <span style={{ padding: '2px 8px', background: statusColor[data.status], color: 'white', borderRadius: 4 }}>
+        <div>状态: <span style={{ padding: '2px 8px', background: statusColor[data.status], color: 'var(--color-text-primary)', borderRadius: 4 }}>
           {data.status}
         </span></div>
         <div>工作流: {data.workflow_title} ({data.workflow_name})</div>
@@ -190,7 +190,7 @@ function InstanceDetail({ id }: { id: string }) {
         <div>当前节点: #{currentIdx} ({nodes[currentIdx]?.id} - {nodes[currentIdx]?.type})</div>
         <details style={{ marginTop: 6 }}>
           <summary style={{ cursor: 'pointer', fontSize: 13 }}>触发数据 triggerData</summary>
-          <pre style={{ background: '#1e293b', color: '#e2e8f0', padding: 8, borderRadius: 4,
+          <pre style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-border-light)', padding: 8, borderRadius: 4,
                         fontSize: 12, overflow: 'auto', maxHeight: 160, margin: '6px 0 0' }}>
             {formatJson(data.trigger_data_json)}
           </pre>
@@ -198,11 +198,11 @@ function InstanceDetail({ id }: { id: string }) {
       </div>
 
       {data.tasks && data.tasks.length > 0 && (
-        <div style={{ background: 'white', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+        <div style={{ background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
           <h4>审批任务({data.tasks.length})</h4>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ background: '#f8fafc', color: '#475569' }}>
+              <tr style={{ background: 'var(--color-text-primary)', color: 'var(--color-bg-elevated)' }}>
                 <th style={{ ...th, fontSize: 12 }}>节点</th>
                 <th style={{ ...th, fontSize: 12 }}>类型</th>
                 <th style={{ ...th, fontSize: 12 }}>状态</th>
@@ -218,12 +218,12 @@ function InstanceDetail({ id }: { id: string }) {
                   ? humanDuration(new Date(t.finished_at).getTime() - new Date(t.created_at).getTime())
                   : (t.status === 'PENDING' ? '— 进行中' : '—');
                 return (
-                  <tr key={t.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                  <tr key={t.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                     <td style={td}><code>{t.node_id}</code></td>
                     <td style={td}>{t.node_type}</td>
                     <td style={td}>
-                      <span style={{ padding: '1px 6px', background: statusColor[t.status] || '#94a3b8',
-                                     color: 'white', borderRadius: 3, fontSize: 11 }}>
+                      <span style={{ padding: '1px 6px', background: statusColor[t.status] || 'var(--color-text-muted)',
+                                     color: 'var(--color-text-primary)', borderRadius: 3, fontSize: 11 }}>
                         {t.status}
                       </span>
                     </td>
@@ -239,17 +239,17 @@ function InstanceDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <div style={{ background: '#f8fafc', borderRadius: 8, height: 400 }}>
+      <div style={{ background: 'var(--color-text-primary)', borderRadius: 8, height: 400 }}>
         <ReactFlow nodes={rfNodes} edges={rfEdges} nodeTypes={nodeTypes} fitView>
           <Background />
           <Controls />
         </ReactFlow>
       </div>
 
-      <div style={{ marginTop: 12, fontSize: 13, color: '#475569' }}>
-        图例: <span style={{ color: '#10b981' }}>■ 已完成</span>{' '}
-        <span style={{ color: '#f59e0b' }}>■ 当前</span>{' '}
-        <span style={{ color: '#94a3b8' }}>■ 未到</span>
+      <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-bg-elevated)' }}>
+        图例: <span style={{ color: 'var(--color-success)' }}>■ 已完成</span>{' '}
+        <span style={{ color: 'var(--color-warning)' }}>■ 当前</span>{' '}
+        <span style={{ color: 'var(--color-text-muted)' }}>■ 未到</span>
       </div>
     </div>
   );
@@ -261,9 +261,9 @@ function FlowNode({ data }: { data: { kind: string; config: Record<string, strin
   };
   return (
     <div style={{
-      padding: 10, minWidth: 140, background: 'white', position: 'relative',
+      padding: 10, minWidth: 140, background: 'var(--color-text-primary)', position: 'relative',
       border: `2px solid ${data.borderColor}`,
-      borderRadius: 8, boxShadow: data.isCurrent ? '0 0 12px #f59e0b' : '0 2px 6px rgba(0,0,0,0.1)',
+      borderRadius: 8, boxShadow: data.isCurrent ? '0 0 12px var(--color-warning)' : '0 2px 6px rgba(0,0,0,0.1)',
     }}>
       <strong style={{ color: data.nodeColor }}>{label[data.kind] || data.kind}</strong>
       <Handle type="target" position={Position.Left} style={{ background: data.nodeColor, width: 10, height: 10 }} />
@@ -273,5 +273,5 @@ function FlowNode({ data }: { data: { kind: string; config: Record<string, strin
 }
 const nodeTypes = { flowNode: FlowNode };
 
-const th = { padding: 8, textAlign: 'left', fontSize: 13, color: '#475569' } as const;
+const th = { padding: 8, textAlign: 'left', fontSize: 13, color: 'var(--color-bg-elevated)' } as const;
 const td = { padding: 8, fontSize: 13 } as const;

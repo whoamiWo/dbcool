@@ -141,13 +141,13 @@ export function RowAclAdminPage() {
             description: '',
           })}
           style={{
-            background: '#3b82f6', color: 'white', border: 'none',
+            background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none',
             padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
           }}
         >+ 新建策略</button>
       </div>
 
-      <div style={{ marginBottom: 12, color: '#666', fontSize: 13 }}>
+      <div style={{ marginBottom: 12, color: 'var(--color-text-muted)', fontSize: 13 }}>
         基于表达式的单条记录级访问控制。OR 语义:任一适用策略命中 → 通过;
         无适用策略 → 放行。<code>value</code> 支持 <code>$currentUser</code> / <code>$currentRoles</code> 占位符。
       </div>
@@ -157,19 +157,19 @@ export function RowAclAdminPage() {
         <select
           value={filterCollection}
           onChange={(e) => setFilterCollection(e.target.value)}
-          style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #d1d5db' }}
+          style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
         >
           <option value="">(全部)</option>
           {collections.map((c) => (
             <option key={c.name} value={c.name}>{c.name}{c.title ? ` — ${c.title}` : ''}</option>
           ))}
         </select>
-        <span style={{ color: '#666', fontSize: 13 }}>{loading ? '加载中…' : `${policies.length} 条`}</span>
-        {error && <span style={{ color: '#ef4444', fontSize: 13 }}>{error}</span>}
+        <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{loading ? '加载中…' : `${policies.length} 条`}</span>
+        {error && <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>}
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <thead style={{ background: '#f3f4f6' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <thead style={{ background: 'var(--color-bg-tertiary)' }}>
           <tr>
             <th style={th}>Collection</th>
             <th style={th}>Principal</th>
@@ -183,10 +183,10 @@ export function RowAclAdminPage() {
         </thead>
         <tbody>
           {policies.map((p) => (
-            <tr key={p.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+            <tr key={p.id} style={{ borderTop: '1px solid var(--color-border-medium)' }}>
               <td style={tdMono}>{p.collection}</td>
               <td style={td}>
-                <span style={badge(p.principal_type === 'role' ? '#8b5cf6' : '#0ea5e9')}>
+                <span style={badge(p.principal_type === 'role' ? 'var(--color-secondary-500)' : 'var(--color-info)')}>
                   {p.principal_type}
                 </span>
                 <code style={{ marginLeft: 6 }}>{p.principal_id}</code>
@@ -196,7 +196,7 @@ export function RowAclAdminPage() {
               </td>
               <td style={tdMono}>
                 <code>{p.expression.field}</code>{' '}
-                <span style={{ color: '#9ca3af' }}>{p.expression.op}</span>{' '}
+                <span style={{ color: 'var(--color-text-muted)' }}>{p.expression.op}</span>{' '}
                 <code>{String(p.expression.value)}</code>
               </td>
               <td style={td}>{p.priority}</td>
@@ -204,13 +204,13 @@ export function RowAclAdminPage() {
                 <button
                   onClick={() => toggleEnabled(p)}
                   style={{
-                    background: p.enabled ? '#10b981' : '#9ca3af',
-                    color: 'white', border: 'none', borderRadius: 12,
+                    background: p.enabled ? 'var(--color-success)' : 'var(--color-text-muted)',
+                    color: 'var(--color-text-primary)', border: 'none', borderRadius: 12,
                     padding: '2px 10px', cursor: 'pointer', fontSize: 12,
                   }}
                 >{p.enabled ? '✓ 启用' : '✗ 禁用'}</button>
               </td>
-              <td style={{ ...td, maxWidth: 200, color: '#6b7280', fontSize: 13 }}>
+              <td style={{ ...td, maxWidth: 200, color: 'var(--color-text-muted)', fontSize: 13 }}>
                 {p.description}
               </td>
               <td style={td}>
@@ -220,7 +220,7 @@ export function RowAclAdminPage() {
             </tr>
           ))}
           {!loading && policies.length === 0 && (
-            <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: '#9ca3af' }}>
+            <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)' }}>
               暂无策略 — 点击「+ 新建策略」开始
             </td></tr>
           )}
@@ -307,7 +307,7 @@ export function RowAclAdminPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'block', marginBottom: 12, flex: 1 }}>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>{label}</div>
       {children}
     </label>
   );
@@ -317,24 +317,24 @@ const th: React.CSSProperties = { padding: '8px 12px', textAlign: 'left', fontSi
 const td: React.CSSProperties = { padding: '8px 12px', fontSize: 13 };
 const tdMono: React.CSSProperties = { ...td, fontFamily: 'monospace' };
 const input: React.CSSProperties = {
-  width: '100%', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4,
+  width: '100%', padding: '6px 10px', border: '1px solid var(--color-border-medium)', borderRadius: 4,
 };
-const btnEdit: React.CSSProperties = { background: '#e0e7ff', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
-const btnDelete: React.CSSProperties = { background: '#fee2e2', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
-const btnCancel: React.CSSProperties = { background: '#f3f4f6', border: '1px solid #d1d5db', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
-const btnSave: React.CSSProperties = { background: '#3b82f6', color: 'white', border: 'none', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
+const btnEdit: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
+const btnDelete: React.CSSProperties = { background: 'rgba(239,68,68,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
+const btnCancel: React.CSSProperties = { background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-medium)', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
+const btnSave: React.CSSProperties = { background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
 const modalOverlay: React.CSSProperties = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
   display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
 };
 const modalCard: React.CSSProperties = {
-  background: 'white', padding: 24, borderRadius: 8,
+  background: 'var(--color-text-primary)', padding: 24, borderRadius: 8,
   width: 560, maxHeight: '90vh', overflow: 'auto',
 };
 
 function badge(color: string): React.CSSProperties {
-  return { background: color, color: 'white', padding: '2px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600 };
+  return { background: color, color: 'var(--color-text-primary)', padding: '2px 8px', borderRadius: 10, fontSize: 12, fontWeight: 600 };
 }
 function actionColor(a: string) {
-  return { read: '#0ea5e9', create: '#10b981', update: '#f59e0b', delete: '#ef4444' }[a] || '#6b7280';
+  return { read: 'var(--color-info)', create: 'var(--color-success)', update: 'var(--color-warning)', delete: 'var(--color-error)' }[a] || 'var(--color-text-muted)';
 }

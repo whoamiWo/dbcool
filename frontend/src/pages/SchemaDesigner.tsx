@@ -67,14 +67,14 @@ export function SchemaDesignerPage() {
   return (
     <div>
       <h1>📐 Schema Designer</h1>
-      <p style={{ color: '#64748b' }}>
+      <p style={{ color: 'var(--color-text-disabled)' }}>
         定义一个新的数据表,字段将存为 JSONB(支持零锁表扩展).
       </p>
 
       <div
         style={{
           padding: 16,
-          background: 'white',
+          background: 'var(--color-text-primary)',
           borderRadius: 8,
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
           maxWidth: 800,
@@ -85,8 +85,8 @@ export function SchemaDesignerPage() {
             style={{
               padding: 8,
               marginBottom: 12,
-              background: '#fee2e2',
-              color: '#991b1b',
+              background: 'rgba(239,68,68,0.2)',
+              color: 'var(--color-error)',
               borderRadius: 4,
             }}
           >
@@ -96,7 +96,7 @@ export function SchemaDesignerPage() {
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
-            Collection 名称 <span style={{ color: '#dc2626' }}>*</span>
+            Collection 名称 <span style={{ color: 'var(--color-error)' }}>*</span>
           </label>
           <input
             value={name}
@@ -104,7 +104,7 @@ export function SchemaDesignerPage() {
             placeholder="customer"
             style={{ padding: 8, fontSize: 14, width: 300, fontFamily: 'monospace' }}
           />
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--color-text-disabled)', marginTop: 4 }}>
             英文小写字母开头,只允许字母数字下划线
           </div>
         </div>
@@ -124,7 +124,7 @@ export function SchemaDesignerPage() {
         <h3 style={{ marginBottom: 8 }}>字段列表</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
           <thead>
-            <tr style={{ background: '#f1f5f9' }}>
+            <tr style={{ background: 'var(--color-bg-secondary)' }}>
               <th style={{ padding: 8, textAlign: 'left' }}>字段名</th>
               <th style={{ padding: 8, textAlign: 'left' }}>类型</th>
               <th style={{ padding: 8, textAlign: 'left' }}>必填</th>
@@ -133,7 +133,7 @@ export function SchemaDesignerPage() {
           </thead>
           <tbody>
             {fields.map((f, i) => (
-              <tr key={i} style={{ borderTop: '1px solid #e2e8f0' }}>
+              <tr key={i} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                 <td style={{ padding: 8 }}>
                   <input
                     value={f.name}
@@ -163,8 +163,8 @@ export function SchemaDesignerPage() {
                   <button
                     onClick={() => removeField(i)}
                     style={{
-                      background: '#dc2626',
-                      color: 'white',
+                      background: 'var(--color-error)',
+                      color: 'var(--color-text-primary)',
                       border: 'none',
                       padding: '4px 8px',
                       borderRadius: 4,
@@ -188,8 +188,8 @@ export function SchemaDesignerPage() {
             disabled={createMutation.isPending}
             style={{
               padding: '8px 16px',
-              background: createMutation.isPending ? '#94a3b8' : '#1e293b',
-              color: 'white',
+              background: createMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-bg-secondary)',
+              color: 'var(--color-text-primary)',
               border: 'none',
               cursor: createMutation.isPending ? 'not-allowed' : 'pointer',
             }}

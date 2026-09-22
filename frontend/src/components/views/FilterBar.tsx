@@ -32,7 +32,7 @@ export function FilterBar({
     <div
       style={{
         padding: 12,
-        background: '#f1f5f9',
+        background: 'var(--color-bg-secondary)',
         borderRadius: 4,
         marginBottom: 12,
         display: 'flex',
@@ -49,8 +49,8 @@ export function FilterBar({
             key={i}
             style={{
               padding: '4px 8px',
-              background: 'white',
-              border: '1px solid #cbd5e1',
+              background: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border-medium)',
               borderRadius: 4,
               fontSize: 12,
               display: 'inline-flex',
@@ -59,9 +59,9 @@ export function FilterBar({
             }}
           >
             <strong>{field?.label ?? f.field}</strong>
-            <span style={{ color: '#64748b' }}>{opLabel(f.op)}</span>
+            <span style={{ color: 'var(--color-text-disabled)' }}>{opLabel(f.op)}</span>
             {f.op !== 'empty' && f.op !== 'notEmpty' && (
-              <span style={{ color: '#1e293b' }}>{String(f.value ?? '')}</span>
+              <span style={{ color: 'var(--color-bg-secondary)' }}>{String(f.value ?? '')}</span>
             )}
             <button
               onClick={() => remove(i)}
@@ -69,7 +69,7 @@ export function FilterBar({
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
-                color: '#dc2626',
+                color: 'var(--color-error)',
                 marginLeft: 4,
               }}
             >
@@ -117,7 +117,7 @@ export function FilterBar({
           )}
           <button
             onClick={add}
-            style={{ padding: '4px 8px', fontSize: 12, background: '#1e293b', color: 'white', border: 'none', borderRadius: 4 }}
+            style={{ padding: '4px 8px', fontSize: 12, background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4 }}
           >
             确定
           </button>
@@ -134,8 +134,8 @@ export function FilterBar({
           style={{
             padding: '4px 8px',
             fontSize: 12,
-            background: 'white',
-            border: '1px dashed #94a3b8',
+            background: 'var(--color-text-primary)',
+            border: '1px dashed var(--color-text-muted)',
             borderRadius: 4,
             cursor: 'pointer',
           }}

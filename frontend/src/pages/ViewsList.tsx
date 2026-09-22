@@ -33,8 +33,8 @@ export function ViewsListPage() {
             to={`/designer/views/${collection}/new`}
             style={{
               padding: '8px 16px',
-              background: '#1e293b',
-              color: 'white',
+              background: 'var(--color-bg-secondary)',
+              color: 'var(--color-text-primary)',
               textDecoration: 'none',
               borderRadius: 4,
             }}
@@ -49,10 +49,10 @@ export function ViewsListPage() {
           style={{
             marginTop: 24,
             padding: 32,
-            background: 'white',
+            background: 'var(--color-text-primary)',
             borderRadius: 8,
             textAlign: 'center',
-            color: '#64748b',
+            color: 'var(--color-text-disabled)',
           }}
         >
           还没有视图
@@ -61,7 +61,7 @@ export function ViewsListPage() {
         <div
           style={{
             marginTop: 16,
-            background: 'white',
+            background: 'var(--color-text-primary)',
             borderRadius: 8,
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             overflow: 'hidden',
@@ -69,7 +69,7 @@ export function ViewsListPage() {
         >
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#f1f5f9' }}>
+              <tr style={{ background: 'var(--color-bg-secondary)' }}>
                 <th style={{ padding: 12, textAlign: 'left' }}>名称</th>
                 <th style={{ padding: 12, textAlign: 'left' }}>类型</th>
                 <th style={{ padding: 12, textAlign: 'left' }}>Collection</th>
@@ -78,14 +78,14 @@ export function ViewsListPage() {
             </thead>
             <tbody>
               {views.map((v) => (
-                <tr key={v.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                <tr key={v.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                   <td style={{ padding: 12 }}>{v.title}</td>
                   <td style={{ padding: 12 }}>
                     <span
                       style={{
                         padding: '2px 8px',
                         background: typeColor(v.type),
-                        color: 'white',
+                        color: 'var(--color-text-primary)',
                         borderRadius: 4,
                         fontSize: 11,
                       }}
@@ -97,13 +97,13 @@ export function ViewsListPage() {
                   <td style={{ padding: 12, textAlign: 'right' }}>
                     <Link
                       to={`/views/${v.id}/run`}
-                      style={{ marginRight: 12, color: '#16a34a', textDecoration: 'none' }}
+                      style={{ marginRight: 12, color: 'var(--color-success)', textDecoration: 'none' }}
                     >
                       打开
                     </Link>
                     <Link
                       to={`/designer/views/${v.collection_name}/${v.id}/edit`}
-                      style={{ color: '#2563eb', textDecoration: 'none' }}
+                      style={{ color: 'var(--color-info)', textDecoration: 'none' }}
                     >
                       编辑
                     </Link>
@@ -119,5 +119,5 @@ export function ViewsListPage() {
 }
 
 function typeColor(type: string): string {
-  return { TABLE: '#3b82f6', KANBAN: '#8b5cf6', DETAIL: '#10b981', TIMELINE: '#f59e0b' }[type] ?? '#64748b';
+  return { TABLE: 'var(--color-info)', KANBAN: 'var(--color-secondary-500)', DETAIL: 'var(--color-success)', TIMELINE: 'var(--color-warning)' }[type] ?? 'var(--color-text-disabled)';
 }

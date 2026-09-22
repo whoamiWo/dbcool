@@ -157,8 +157,8 @@ export function WikiAttachmentUpload({
       <Paper
         sx={{
           p: 3,
-          border: dragActive ? '2px dashed #1976D2' : '2px dashed #ccc',
-          backgroundColor: dragActive ? '#f0f7ff' : 'background.paper',
+          border: dragActive ? '2px dashed var(--color-info)' : '2px dashed var(--color-border-light)',
+          backgroundColor: dragActive ? 'var(--color-bg-tertiary)' : 'background.paper',
           cursor: 'pointer',
           transition: 'all 0.2s',
         }}
@@ -198,7 +198,7 @@ export function WikiAttachmentUpload({
                 alignItems: 'center',
                 gap: 1,
                 backgroundColor:
-                  file.status === 'error' ? '#ffebee' : 'background.paper',
+                  file.status === 'error' ? 'rgba(239,68,68,0.1)' : 'background.paper',
               }}
             >
               {getIcon(file.file.type)}

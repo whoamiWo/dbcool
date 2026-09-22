@@ -55,20 +55,20 @@ export function UsersListPage() {
         <h1>👥 用户管理({users.length})</h1>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          style={{ padding: '8px 16px', background: '#1e293b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+          style={{ padding: '8px 16px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
         >
           {showCreate ? '取消' : '+ 新建用户'}
         </button>
       </div>
 
       {error && (
-        <div style={{ padding: 8, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>
+        <div style={{ padding: 8, marginBottom: 12, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4 }}>
           {error}
         </div>
       )}
 
       {showCreate && (
-        <div style={{ padding: 16, background: 'white', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ marginBottom: 8 }}>
             <label>用户名 *</label>
             <input value={username} onChange={(e) => setUsername(e.target.value)} style={{ padding: 6, width: '100%' }} />
@@ -84,16 +84,16 @@ export function UsersListPage() {
           <button
             onClick={() => createMutation.mutate()}
             disabled={!username || !password || createMutation.isPending}
-            style={{ padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+            style={{ padding: '8px 16px', background: 'var(--color-success)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
           >
             {createMutation.isPending ? '创建中…' : '创建'}
           </button>
         </div>
       )}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <thead>
-          <tr style={{ background: '#f1f5f9' }}>
+          <tr style={{ background: 'var(--color-bg-secondary)' }}>
             <th style={{ padding: 12, textAlign: 'left' }}>用户名</th>
             <th style={{ padding: 12, textAlign: 'left' }}>显示名</th>
             <th style={{ padding: 12, textAlign: 'left' }}>状态</th>
@@ -103,21 +103,21 @@ export function UsersListPage() {
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+            <tr key={u.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
               <td style={{ padding: 12 }}>{u.username}</td>
               <td style={{ padding: 12 }}>{u.display_name}</td>
               <td style={{ padding: 12 }}>
                 {u.enabled ? (
-                  <span style={{ padding: '2px 8px', background: '#dcfce7', color: '#166534', borderRadius: 4, fontSize: 12 }}>启用</span>
+                  <span style={{ padding: '2px 8px', background: 'rgba(16,185,129,0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>启用</span>
                 ) : (
-                  <span style={{ padding: '2px 8px', background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontSize: 12 }}>禁用</span>
+                  <span style={{ padding: '2px 8px', background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>禁用</span>
                 )}
               </td>
-              <td style={{ padding: 12, color: '#64748b' }}>{new Date(u.created_at).toLocaleString('zh-CN')}</td>
+              <td style={{ padding: 12, color: 'var(--color-text-disabled)' }}>{new Date(u.created_at).toLocaleString('zh-CN')}</td>
               <td style={{ padding: 12, textAlign: 'right' }}>
                 <button
                   onClick={() => toggleEnabledMutation.mutate({ id: u.id, enabled: !u.enabled })}
-                  style={{ padding: '4px 8px', background: u.enabled ? '#dc2626' : '#16a34a', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                  style={{ padding: '4px 8px', background: u.enabled ? 'var(--color-error)' : 'var(--color-success)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
                 >
                   {u.enabled ? '禁用' : '启用'}
                 </button>

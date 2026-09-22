@@ -76,12 +76,12 @@ export function AclEditorPage() {
     <div>
       <h1>🔐 权限配置 — 角色 {role?.name ?? roleId}</h1>
       {error && (
-        <div style={{ padding: 8, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>
+        <div style={{ padding: 8, marginBottom: 12, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4 }}>
           {error}
         </div>
       )}
 
-      <div style={{ padding: 16, background: 'white', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <h3 style={{ marginTop: 0 }}>+ 添加策略</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 8 }}>
           <select value={subject} onChange={(e) => setSubject(e.target.value)} style={{ padding: 6 }}>
@@ -113,7 +113,7 @@ export function AclEditorPage() {
         <button
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending}
-          style={{ padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+          style={{ padding: '8px 16px', background: 'var(--color-success)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
         >
           添加
         </button>
@@ -121,11 +121,11 @@ export function AclEditorPage() {
 
       <h3>现有策略({ps.length})</h3>
       {ps.length === 0 ? (
-        <p style={{ color: '#94a3b8' }}>暂无策略</p>
+        <p style={{ color: 'var(--color-text-muted)' }}>暂无策略</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 8, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden' }}>
           <thead>
-            <tr style={{ background: '#f1f5f9' }}>
+            <tr style={{ background: 'var(--color-bg-secondary)' }}>
               <th style={{ padding: 8, textAlign: 'left' }}>类型</th>
               <th style={{ padding: 8, textAlign: 'left' }}>对象</th>
               <th style={{ padding: 8, textAlign: 'left' }}>Action</th>
@@ -135,19 +135,19 @@ export function AclEditorPage() {
           </thead>
           <tbody>
             {ps.map((p) => (
-              <tr key={p.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+              <tr key={p.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                 <td style={{ padding: 8 }}>
-                  <span style={{ padding: '2px 8px', background: typeColor(p.type), color: 'white', borderRadius: 4, fontSize: 11 }}>
+                  <span style={{ padding: '2px 8px', background: typeColor(p.type), color: 'var(--color-text-primary)', borderRadius: 4, fontSize: 11 }}>
                     {p.type}
                   </span>
                 </td>
                 <td style={{ padding: 8, fontFamily: 'monospace' }}>{p.subject}</td>
                 <td style={{ padding: 8 }}>{p.action ?? '—'}</td>
-                <td style={{ padding: 8, fontSize: 12, fontFamily: 'monospace', color: '#64748b' }}>{p.config_json}</td>
+                <td style={{ padding: 8, fontSize: 12, fontFamily: 'monospace', color: 'var(--color-text-disabled)' }}>{p.config_json}</td>
                 <td style={{ padding: 8, textAlign: 'right' }}>
                   <button
                     onClick={() => deleteMutation.mutate(p.id)}
-                    style={{ padding: '2px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}
+                    style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}
                   >
                     删
                   </button>
@@ -158,7 +158,7 @@ export function AclEditorPage() {
         </table>
       )}
 
-      <p style={{ fontSize: 12, color: '#64748b', marginTop: 16 }}>
+      <p style={{ fontSize: 12, color: 'var(--color-text-disabled)', marginTop: 16 }}>
         💡 ACL 已强制执行:读操作经 <code>AclEnforcer.filterReadableFields/filterRecord</code> 移除 hidden 字段,
         写操作经 <code>filterWritableFields/assertCanWriteFields</code> 拒绝写入 hidden 字段
         (原「仅配置不强制执行」为 Week 10 旧注记,现已过时并更正)。
@@ -169,5 +169,5 @@ export function AclEditorPage() {
 }
 
 function typeColor(t: AclType): string {
-  return { FIELD: '#7c3aed', ROW: '#0891b2', ACTION: '#dc2626' }[t] ?? '#64748b';
+  return { FIELD: 'var(--color-secondary-500)', ROW: 'var(--color-info)', ACTION: 'var(--color-error)' }[t] ?? 'var(--color-text-disabled)';
 }

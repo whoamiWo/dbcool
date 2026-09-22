@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from './AppLayout';
 import { useAuthStore } from '@/stores/auth';
+
+const testQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+});
 
 // Mock useAuthStore
 vi.mock('@/stores/auth', () => ({
@@ -22,9 +27,11 @@ describe('AppLayout', () => {
     } as any);
 
     render(
-      <MemoryRouter>
-        <AppLayout />
-      </MemoryRouter>,
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter>
+          <AppLayout />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     // AppLayout 总会渲染导航链接(只显示是否 active),即便没用户
@@ -39,19 +46,21 @@ describe('AppLayout', () => {
     } as any);
 
     render(
-      <MemoryRouter initialEntries={['/home']}>
-        <AppLayout />
-      </MemoryRouter>,
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter initialEntries={['/home']}>
+          <AppLayout />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     expect(screen.getByText('🛠 NocoBase')).toBeInTheDocument();
     expect(screen.getByText(/alice\(/)).toBeInTheDocument();
-    // 主要导航项
+    // 主要导航项（实际 label 已国际化）
     expect(screen.getByText('首页')).toBeInTheDocument();
-    expect(screen.getByText('数据模型')).toBeInTheDocument();
-    expect(screen.getByText('视图')).toBeInTheDocument();
-    expect(screen.getByText('用户')).toBeInTheDocument();
-    expect(screen.getByText('工作流')).toBeInTheDocument();
+    expect(screen.getByText('Tables')).toBeInTheDocument();
+    expect(screen.getByText('Docs')).toBeInTheDocument();
+    expect(screen.getByText('Chat')).toBeInTheDocument();
+    expect(screen.getByText('Projects')).toBeInTheDocument();
   });
 
   it('退出登录:点击退出 → 调用 clear()', () => {
@@ -62,9 +71,11 @@ describe('AppLayout', () => {
     } as any);
 
     render(
-      <MemoryRouter initialEntries={['/home']}>
-        <AppLayout />
-      </MemoryRouter>,
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter initialEntries={['/home']}>
+          <AppLayout />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /退出|登出|logout/i }));
@@ -78,13 +89,15 @@ describe('AppLayout', () => {
     } as any);
 
     render(
-      <MemoryRouter initialEntries={['/designer/views']}>
-        <AppLayout />
-      </MemoryRouter>,
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter initialEntries={['/designer/views']}>
+          <AppLayout />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
-    // "视图" link 应该有 active 样式(蓝色或加粗)
-    const viewsLink = screen.getByText('视图').closest('a');
-    expect(viewsLink).toBeInTheDocument();
+    // "Docs" link 在 /designer/views 路径下应是 active
+    const docsLink = screen.getByText('Docs').closest('a');
+    expect(docsLink).toBeInTheDocument();
   });
 });

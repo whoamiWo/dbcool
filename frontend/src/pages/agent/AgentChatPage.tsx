@@ -98,7 +98,7 @@ export function AgentChatPage() {
             sx={{
               cursor: 'pointer',
               bgcolor: selectedTool === q.tool ? 'var(--color-primary-500)' : undefined,
-              color: selectedTool === q.tool ? '#fff' : 'var(--color-text-secondary)',
+              color: selectedTool === q.tool ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
               borderColor: selectedTool === q.tool ? 'var(--color-primary-500)' : 'var(--color-border-light)',
               '&:hover': {
                 bgcolor: selectedTool === q.tool ? 'var(--color-primary-600)' : 'rgba(255,255,255,0.05)',
@@ -120,7 +120,7 @@ export function AgentChatPage() {
                 p: 1.5,
                 borderRadius: 2,
                 background: m.role === 'user' ? 'var(--color-primary-500)' : 'var(--glass-bg-light)',
-                color: m.role === 'user' ? '#fff' : 'var(--color-text-primary)',
+                color: m.role === 'user' ? 'var(--color-text-primary)' : 'var(--color-text-primary)',
                 border: 'none',
               }}
             >
@@ -130,10 +130,10 @@ export function AgentChatPage() {
                   {m.role === 'user' ? '你' : 'Copilot'}
                 </Typography>
                 {m.tool && (
-                  <Chip size="small" label={m.tool} sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 10, height: 16 }} />
+                  <Chip size="small" label={m.tool} sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'var(--color-text-primary)', fontSize: 10, height: 16 }} />
                 )}
               </Box>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{m.content}</Typography>
+              <Typography variant="body2" sx={{ color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>{m.content}</Typography>
             </Box>
           ))}
           {mutation.isPending && (
@@ -168,7 +168,7 @@ export function AgentChatPage() {
             disabled={mutation.isPending || !prompt.trim()}
             sx={{
               bgcolor: 'var(--color-primary-500)',
-              color: '#fff',
+              color: 'var(--color-text-primary)',
               '&:hover': { bgcolor: 'var(--color-primary-600)' },
               opacity: mutation.isPending || !prompt.trim() ? 0.5 : 1,
             }}

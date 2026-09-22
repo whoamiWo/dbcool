@@ -164,7 +164,7 @@ export function ChannelList({
 
       {currentUser && (
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 8, padding: '4px 8px', background: 'var(--glass-bg-light)', borderRadius: 'var(--radius-sm)' }}>
-          🧑 当前: {currentUser.username}
+          🧑 当前用户：{currentUser?.username}
         </div>
       )}
 

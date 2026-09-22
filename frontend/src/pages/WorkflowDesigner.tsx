@@ -31,11 +31,11 @@ interface WorkflowNodeData {
 }
 
 const nodeKindMeta: Record<NodeKind, { label: string; icon: string; color: string }> = {
-  APPROVAL:     { label: '审批',     icon: '📝', color: '#3b82f6' },
-  NOTIFICATION: { label: '通知',     icon: '🔔', color: '#8b5cf6' },
-  CONDITION:    { label: '条件',     icon: '🔀', color: '#f59e0b' },
-  HTTP:         { label: 'HTTP',    icon: '🌐', color: '#10b981' },
-  DATA_UPDATE:  { label: '数据更新', icon: '✏️', color: '#0ea5e9' },
+  APPROVAL:     { label: '审批',     icon: '📝', color: 'var(--color-info)' },
+  NOTIFICATION: { label: '通知',     icon: '🔔', color: 'var(--color-secondary-500)' },
+  CONDITION:    { label: '条件',     icon: '🔀', color: 'var(--color-warning)' },
+  HTTP:         { label: 'HTTP',    icon: '🌐', color: 'var(--color-success)' },
+  DATA_UPDATE:  { label: '数据更新', icon: '✏️', color: 'var(--color-info)' },
 };
 
 function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolean }) {
@@ -44,8 +44,8 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
   return (
     <div style={{
       padding: 10, minWidth: 160, position: 'relative',
-      background: 'white',
-      border: `2px solid ${selected ? '#0f172a' : meta.color}`,
+      background: 'var(--color-text-primary)',
+      border: `2px solid ${selected ? 'var(--color-bg-primary)' : meta.color}`,
       borderRadius: 8,
       boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
     }}>
@@ -53,10 +53,10 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
         <strong>{meta.icon} {meta.label}</strong>
         <button
           onClick={(e) => { e.stopPropagation(); data.onDelete(); }}
-          style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}
+          style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontSize: 16 }}
         >×</button>
       </div>
-      <div style={{ marginTop: 4, fontSize: 11, color: '#64748b' }}>
+      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-disabled)' }}>
         {data.kind === 'NOTIFICATION' && (data.config.message?.slice(0, 40) || '(未设置)')}
         {data.kind === 'HTTP' && `${data.config.method || 'GET'} ${(data.config.url || '').slice(0, 30)}`}
         {data.kind === 'CONDITION' && `if ${data.config.field || '?'} ${data.config.op || '?'} ${data.config.value || '?'}`}
@@ -69,13 +69,13 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
       {isCondition ? (
         <>
           <Handle id="true" type="source" position={Position.Bottom}
-                  style={{ left: '30%', background: '#10b981', width: 12, height: 12, border: '2px solid white' }} />
-          <span style={{ position: 'absolute', bottom: -18, left: '20%', fontSize: 10, color: '#10b981', fontWeight: 'bold' }}>
+                  style={{ left: '30%', background: 'var(--color-success)', width: 12, height: 12, border: '2px solid var(--color-text-primary)' }} />
+          <span style={{ position: 'absolute', bottom: -18, left: '20%', fontSize: 10, color: 'var(--color-success)', fontWeight: 'bold' }}>
             ✓ then
           </span>
           <Handle id="false" type="source" position={Position.Bottom}
-                  style={{ left: '70%', background: '#ef4444', width: 12, height: 12, border: '2px solid white' }} />
-          <span style={{ position: 'absolute', bottom: -18, right: '10%', fontSize: 10, color: '#ef4444', fontWeight: 'bold' }}>
+                  style={{ left: '70%', background: 'var(--color-error)', width: 12, height: 12, border: '2px solid var(--color-text-primary)' }} />
+          <span style={{ position: 'absolute', bottom: -18, right: '10%', fontSize: 10, color: 'var(--color-error)', fontWeight: 'bold' }}>
             ✗ else
           </span>
         </>
@@ -292,13 +292,13 @@ export function WorkflowDesignerPage() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 100px)', gap: 12 }}>
       {/* 左:节点面板 + 元数据 */}
-      <aside style={{ width: 200, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
+      <aside style={{ width: 200, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
         <button onClick={() => navigate('/designer/workflows')}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: 8 }}>
+                style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 8 }}>
           ← 返回列表
         </button>
         <h3 style={{ marginTop: 0 }}>{isEdit ? '编辑' : '新建'}工作流</h3>
-        {error && <div style={{ padding: 4, marginBottom: 8, background: '#fee2e2', color: '#991b1b', borderRadius: 4, fontSize: 11 }}>{error}</div>}
+        {error && <div style={{ padding: 4, marginBottom: 8, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4, fontSize: 11 }}>{error}</div>}
         <label style={lbl}>技术名 *</label>
         <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
         <label style={lbl}>标题</label>
@@ -322,28 +322,28 @@ export function WorkflowDesignerPage() {
             <div key={k}
                  draggable
                  onDragStart={(e) => onDragStart(e, k)}
-                 style={{ padding: 8, marginBottom: 6, background: m.color, color: 'white',
+                 style={{ padding: 8, marginBottom: 6, background: m.color, color: 'var(--color-text-primary)',
                           borderRadius: 4, cursor: 'grab', fontSize: 13 }}>
               {m.icon} {m.label}
             </div>
           );
         })}
         <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
-                style={{ marginTop: 12, width: '100%', padding: 8, background: saveMutation.isPending ? '#94a3b8' : '#16a34a',
-                         color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                style={{ marginTop: 12, width: '100%', padding: 8, background: saveMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-success)',
+                         color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
           {saveMutation.isPending ? '保存中…' : '💾 保存'}
         </button>
         {/* US-406: 测试运行 */}
         <button onClick={() => { setSimulateResult(null); setShowSimulate(true); }}
                 style={{ marginTop: 8, width: '100%', padding: 8,
-                         background: '#3b82f6', color: 'white', border: 'none',
+                         background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none',
                          borderRadius: 4, cursor: 'pointer' }}>
           ▶ 测试运行(模拟数据)
         </button>
       </aside>
 
       {/* 中:画布 */}
-      <div ref={reactFlowWrapper} style={{ flex: 1, background: '#f8fafc', borderRadius: 8 }} onDrop={onDrop} onDragOver={onDragOver}>
+      <div ref={reactFlowWrapper} style={{ flex: 1, background: 'var(--color-text-primary)', borderRadius: 8 }} onDrop={onDrop} onDragOver={onDragOver}>
         <ReactFlow
           nodes={nodes} edges={edges}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
@@ -359,10 +359,10 @@ export function WorkflowDesignerPage() {
       </div>
 
       {/* 右:配置面板 */}
-      <aside style={{ width: 280, background: 'white', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
+      <aside style={{ width: 280, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflowY: 'auto' }}>
         <h3 style={{ marginTop: 0 }}>节点配置</h3>
         {!selectedNode ? (
-          <p style={{ color: '#64748b' }}>点选节点以编辑</p>
+          <p style={{ color: 'var(--color-text-disabled)' }}>点选节点以编辑</p>
         ) : (
           <NodeConfigEditor
             node={selectedNode}
@@ -376,48 +376,48 @@ export function WorkflowDesignerPage() {
         <div role="dialog"
              style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
                       display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
-          <div style={{ background: 'white', borderRadius: 8, padding: 24, width: 480,
+          <div style={{ background: 'var(--color-text-primary)', borderRadius: 8, padding: 24, width: 480,
                         boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
             <h3 style={{ marginTop: 0 }}>▶ 测试运行工作流</h3>
-            <p style={{ color: '#64748b', fontSize: 13 }}>
+            <p style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>
               输入模拟的 triggerData,系统将创建一个工作流实例并跳转到详情页。
-              {!id && <strong style={{ color: '#dc2626' }}>(会先自动保存当前编辑)</strong>}
+              {!id && <strong style={{ color: 'var(--color-error)' }}>(会先自动保存当前编辑)</strong>}
             </p>
             <label style={{ display: 'block', fontWeight: 500, fontSize: 13, marginBottom: 4 }}>
               triggerData (JSON)
             </label>
             <textarea value={simulateData} onChange={(e) => setSimulateData(e.target.value)}
                       style={{ width: '100%', height: 160, fontFamily: 'monospace', fontSize: 12,
-                               padding: 8, border: '1px solid #cbd5e1', borderRadius: 4 }}
+                               padding: 8, border: '1px solid var(--color-border-medium)', borderRadius: 4 }}
                       placeholder='{"record_id":"test-001","name":"测试"}' />
             {simulateResult?.instanceId && (
-              <div style={{ marginTop: 12, padding: 8, background: '#dcfce7', color: '#166534',
+              <div style={{ marginTop: 12, padding: 8, background: 'rgba(16,185,129,0.2)', color: 'var(--color-success)',
                             borderRadius: 4, fontSize: 13 }}>
                 ✅ 实例已创建: <code>{simulateResult.instanceId.slice(0, 8)}…</code>
                 <div style={{ marginTop: 6 }}>
                   <a href={`/designer/instances/${simulateResult.instanceId}`}
                      onClick={(e) => { e.preventDefault(); navigate(`/designer/instances/${simulateResult.instanceId}`); setShowSimulate(false); }}
-                     style={{ color: '#1e40af', textDecoration: 'underline' }}>
+                     style={{ color: 'var(--color-info)', textDecoration: 'underline' }}>
                     查看实例详情 →
                   </a>
                 </div>
               </div>
             )}
             {simulateResult?.error && (
-              <div style={{ marginTop: 12, padding: 8, background: '#fee2e2', color: '#991b1b',
+              <div style={{ marginTop: 12, padding: 8, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)',
                             borderRadius: 4, fontSize: 13 }}>
                 ❌ {simulateResult.error}
               </div>
             )}
             <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowSimulate(false)}
-                      style={{ padding: '6px 14px', background: '#e2e8f0', color: '#1e293b',
+                      style={{ padding: '6px 14px', background: 'var(--color-border-light)', color: 'var(--color-bg-secondary)',
                                border: 'none', borderRadius: 4, cursor: 'pointer' }}>
                 关闭
               </button>
               <button onClick={() => simulateMutation.mutate()}
                       disabled={simulateMutation.isPending || saveMutation.isPending}
-                      style={{ padding: '6px 14px', background: '#3b82f6', color: 'white',
+                      style={{ padding: '6px 14px', background: 'var(--color-info)', color: 'var(--color-text-primary)',
                                border: 'none', borderRadius: 4,
                                cursor: simulateMutation.isPending ? 'not-allowed' : 'pointer' }}>
                 {simulateMutation.isPending ? '运行中…' : '▶ 运行'}
@@ -436,7 +436,7 @@ function NodeConfigEditor({ node, onChange }: { node: Node<WorkflowNodeData>; on
   const setCfg = (k: string, v: string) => onChange({ config: { ...cfg, [k]: v } });
   return (
     <div>
-      <div style={{ padding: 6, marginBottom: 8, background: meta.color, color: 'white', borderRadius: 4 }}>
+      <div style={{ padding: 6, marginBottom: 8, background: meta.color, color: 'var(--color-text-primary)', borderRadius: 4 }}>
         {meta.icon} {meta.label}(id: {node.id})
       </div>
       {node.data.kind === 'NOTIFICATION' && (
@@ -489,7 +489,7 @@ function NodeConfigEditor({ node, onChange }: { node: Node<WorkflowNodeData>; on
         </>
       )}
       {node.data.kind === 'APPROVAL' && (
-        <p style={{ color: '#64748b', fontSize: 13 }}>(审批节点使用当前用户作为审批人,无配置项)</p>
+        <p style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>(审批节点使用当前用户作为审批人,无配置项)</p>
       )}
     </div>
   );
@@ -503,8 +503,8 @@ function defaultConfig(kind: NodeKind): Record<string, string> {
   return {};
 }
 
-const lbl = { display: 'block', fontSize: 12, color: '#475569', marginTop: 6 };
-const inp = { padding: 4, width: '100%', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 };
+const lbl = { display: 'block', fontSize: 12, color: 'var(--color-bg-elevated)', marginTop: 6 };
+const inp = { padding: 4, width: '100%', border: '1px solid var(--color-border-medium)', borderRadius: 4, fontSize: 13 };
 
 interface WorkflowMeta {
   id: string;

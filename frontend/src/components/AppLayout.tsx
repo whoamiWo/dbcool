@@ -1,9 +1,15 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMediaQuery } from '@mui/material';
 import { useAuthStore } from '@/stores/auth';
 import { disconnectStomp } from '@/lib/stompClient';
 import { GlobalSearchPanel } from '@/components/GlobalSearchPanel';
+
+/** AppLayout 内部的 QueryClient（测试覆盖用） */
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+});
 
 /** 移动端底部导航 — 固定 5 个高频入口。 */
 const MOBILE_BOTTOM_NAV = [
@@ -155,9 +161,11 @@ export function AppLayout() {
           </button>
         </div>
       </header>
-      <main className="app-main">
-        <Outlet />
-      </main>
+      <QueryClientProvider client={queryClient}>
+        <main className="app-main">
+          <Outlet />
+        </main>
+      </QueryClientProvider>
 
       {/* 移动端底部导航 (768px 以下) */}
       {isMobile && (
@@ -263,7 +271,7 @@ function TenantSwitcher({
   return (
     <div style={{ marginTop: 12 }}>
       {error && (
-        <div style={{ padding: 8, background: 'rgba(239,68,68,0.2)', color: '#fca5a5', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
+        <div style={{ padding: 8, background: 'rgba(239,68,68,0.2)', color: 'rgba(239,68,68,0.2)', borderRadius: 'var(--radius-sm)', fontSize: 12 }}>
           {error}
         </div>
       )}

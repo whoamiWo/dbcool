@@ -71,25 +71,25 @@ export function CollectionDetailPage() {
 
   return (
     <div>
-      <button onClick={() => navigate(`/designer/collections/${name}`)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: 16 }}>← 返回</button>
+      <button onClick={() => navigate(`/designer/collections/${name}`)} style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}>← 返回</button>
       <h1>
-        📋 {meta.title} <span style={{ color: '#64748b', fontSize: 14, fontWeight: 'normal' }}>({meta.name})</span>
+        📋 {meta.title} <span style={{ color: 'var(--color-text-disabled)', fontSize: 14, fontWeight: 'normal' }}>({meta.name})</span>
       </h1>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <Link to={`/designer/schemas/${meta.name}/edit`} style={{ padding: '8px 16px', background: '#475569', color: 'white', textDecoration: 'none', borderRadius: 4 }}>✏️ 编辑 Schema</Link>
-        <Link to={`/designer/forms/${meta.name}/new`} style={{ padding: '8px 16px', background: '#0891b2', color: 'white', textDecoration: 'none', borderRadius: 4 }}>📝 建表单</Link>
-        <Link to={`/designer/views/${meta.name}/new`} style={{ padding: '8px 16px', background: '#7c3aed', color: 'white', textDecoration: 'none', borderRadius: 4 }}>📊 建视图</Link>
-        <button onClick={() => setShowForm(!showForm)} style={{ padding: '8px 16px', background: '#1e293b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+        <Link to={`/designer/schemas/${meta.name}/edit`} style={{ padding: '8px 16px', background: 'var(--color-bg-elevated)', color: 'var(--color-text-primary)', textDecoration: 'none', borderRadius: 4 }}>✏️ 编辑 Schema</Link>
+        <Link to={`/designer/forms/${meta.name}/new`} style={{ padding: '8px 16px', background: 'var(--color-info)', color: 'var(--color-text-primary)', textDecoration: 'none', borderRadius: 4 }}>📝 建表单</Link>
+        <Link to={`/designer/views/${meta.name}/new`} style={{ padding: '8px 16px', background: 'var(--color-secondary-500)', color: 'var(--color-text-primary)', textDecoration: 'none', borderRadius: 4 }}>📊 建视图</Link>
+        <button onClick={() => setShowForm(!showForm)} style={{ padding: '8px 16px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
           {showForm ? '取消' : '+ 添加记录'}
         </button>
       </div>
 
       {forms.length > 0 && (
-        <div style={{ marginTop: 12, padding: 12, background: 'white', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <h3 style={{ marginTop: 0 }}>📋 关联表单({forms.length})</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {forms.map((f) => (
-              <Link key={f.id} to={`/forms/${f.id}/fill`} style={{ padding: '8px 12px', background: '#ecfeff', border: '1px solid #0891b2', borderRadius: 4, color: '#0e7490', textDecoration: 'none' }}>
+              <Link key={f.id} to={`/forms/${f.id}/fill`} style={{ padding: '8px 12px', background: 'rgba(8,145,178,0.1)', border: '1px solid var(--color-info)', borderRadius: 4, color: 'var(--color-info)', textDecoration: 'none' }}>
                 {f.title}
               </Link>
             ))}
@@ -98,11 +98,11 @@ export function CollectionDetailPage() {
       )}
 
       {views.length > 0 && (
-        <div style={{ marginTop: 12, padding: 12, background: 'white', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <h3 style={{ marginTop: 0 }}>👁 视图({views.length})</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {views.map((v) => (
-              <Link key={v.id} to={`/views/${v.id}/run`} style={{ padding: '8px 12px', background: '#eff6ff', border: '1px solid #3b82f6', borderRadius: 4, color: '#1e40af', textDecoration: 'none', fontSize: 13 }}>
+              <Link key={v.id} to={`/views/${v.id}/run`} style={{ padding: '8px 12px', background: 'rgba(59,130,246,0.1)', border: '1px solid var(--color-info)', borderRadius: 4, color: 'var(--color-info)', textDecoration: 'none', fontSize: 13 }}>
                 📊 {v.title} ({v.type})
               </Link>
             ))}
@@ -111,13 +111,13 @@ export function CollectionDetailPage() {
       )}
 
       {showForm && (
-        <div style={{ marginTop: 16, padding: 16, background: 'white', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ marginTop: 16, padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <h3 style={{ marginTop: 0 }}>新记录</h3>
           {fields.map((f) => (
             <div key={f.name} style={{ marginBottom: 12 }}>
               <label style={{ display: 'block', marginBottom: 4 }}>
-                {f.label ?? f.name} {f.required && <span style={{ color: '#dc2626' }}>*</span>}
-                <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 8 }}>({f.type})</span>
+                {f.label ?? f.name} {f.required && <span style={{ color: 'var(--color-error)' }}>*</span>}
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 12, marginLeft: 8 }}>({f.type})</span>
               </label>
               <input
                 value={formData[f.name] ?? ''}
@@ -131,8 +131,8 @@ export function CollectionDetailPage() {
             disabled={createRecordMutation.isPending}
             style={{
               padding: '8px 16px',
-              background: createRecordMutation.isPending ? '#94a3b8' : '#1e293b',
-              color: 'white',
+              background: createRecordMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-bg-secondary)',
+              color: 'var(--color-text-primary)',
               border: 'none',
               borderRadius: 4,
               cursor: createRecordMutation.isPending ? 'not-allowed' : 'pointer',
@@ -143,15 +143,15 @@ export function CollectionDetailPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 16, padding: 16, background: 'white', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div style={{ marginTop: 16, padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <h3 style={{ marginTop: 0 }}>记录({records.length})</h3>
         {records.length === 0 ? (
-          <p style={{ color: '#64748b' }}>暂无记录</p>
+          <p style={{ color: 'var(--color-text-disabled)' }}>暂无记录</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#f1f5f9' }}>
+                <tr style={{ background: 'var(--color-bg-secondary)' }}>
                   <th style={{ padding: 8, textAlign: 'left' }}>ID</th>
                   {fields.map((f) => (
                     <th key={f.name} style={{ padding: 8, textAlign: 'left' }}>
@@ -162,7 +162,7 @@ export function CollectionDetailPage() {
               </thead>
               <tbody>
                 {records.map((r) => (
-                  <tr key={r.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                  <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                     <td style={{ padding: 8, fontFamily: 'monospace', fontSize: 12 }}>{String(r.id).slice(0, 8)}…</td>
                     {fields.map((f) => (
                       <td key={f.name} style={{ padding: 8 }}>{String((r as Record<string, unknown>)[f.name] ?? '')}</td>

@@ -22,10 +22,10 @@ interface TypeSchema {
 }
 
 const TYPE_COLORS: Record<ChannelType, string> = {
-  EMAIL: '#3b82f6',
-  WEBHOOK: '#10b981',
-  DINGTALK: '#0ea5e9',
-  WECHAT_WORK: '#22c55e',
+  EMAIL: 'var(--color-info)',
+  WEBHOOK: 'var(--color-success)',
+  DINGTALK: 'var(--color-info)',
+  WECHAT_WORK: 'var(--color-success)',
 };
 
 export function NotificationChannelsPage() {
@@ -114,10 +114,10 @@ export function NotificationChannelsPage() {
 
   function configString(c: Channel) {
     const entries = Object.entries(c.config || {});
-    if (entries.length === 0) return <span style={{ color: '#9ca3af' }}>(无配置)</span>;
+    if (entries.length === 0) return <span style={{ color: 'var(--color-text-muted)' }}>(无配置)</span>;
     return entries.slice(0, 3).map(([k, v]) => (
-      <div key={k} style={{ fontSize: 12, color: '#374151' }}>
-        <code style={{ color: '#6b7280' }}>{k}</code> = <code>{String(v).slice(0, 40)}{String(v).length > 40 ? '…' : ''}</code>
+      <div key={k} style={{ fontSize: 12, color: 'var(--color-bg-secondary)' }}>
+        <code style={{ color: 'var(--color-text-muted)' }}>{k}</code> = <code>{String(v).slice(0, 40)}{String(v).length > 40 ? '…' : ''}</code>
       </div>
     ));
   }
@@ -135,23 +135,23 @@ export function NotificationChannelsPage() {
             enabled: true,
             description: '',
           })}
-          style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}
+          style={{ background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}
         >+ 新建 channel</button>
       </div>
 
-      <div style={{ marginBottom: 12, color: '#666', fontSize: 13 }}>
+      <div style={{ marginBottom: 12, color: 'var(--color-text-muted)', fontSize: 13 }}>
         多渠道通知配置。Workflow 触发通知节点时,会 fan-out 到所有启用且 events 匹配的 channel。
         空 <code>events</code> = 全部事件。
       </div>
 
       <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <span style={{ color: '#666', fontSize: 13 }}>{loading ? '加载中…' : `${channels.length} 条`}</span>
-        {error && <span style={{ color: '#ef4444', fontSize: 13 }}>{error}</span>}
+        <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{loading ? '加载中…' : `${channels.length} 条`}</span>
+        {error && <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>}
         {testResult && (
           <span style={{
-            color: testResult.ok ? '#10b981' : '#ef4444',
+            color: testResult.ok ? 'var(--color-success)' : 'var(--color-error)',
             fontSize: 13,
-            background: testResult.ok ? '#d1fae5' : '#fee2e2',
+            background: testResult.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
             padding: '4px 10px', borderRadius: 4,
           }}>
             {testResult.ok ? '✓' : '✗'} {testResult.detail}
@@ -159,8 +159,8 @@ export function NotificationChannelsPage() {
         )}
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <thead style={{ background: '#f3f4f6' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <thead style={{ background: 'var(--color-bg-tertiary)' }}>
           <tr>
             <th style={th}>类型</th>
             <th style={th}>名称</th>
@@ -173,28 +173,28 @@ export function NotificationChannelsPage() {
         </thead>
         <tbody>
           {channels.map((c) => (
-            <tr key={c.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+            <tr key={c.id} style={{ borderTop: '1px solid var(--color-border-medium)' }}>
               <td style={td}>
                 <span style={{
-                  background: TYPE_COLORS[c.type] || '#6b7280',
-                  color: 'white', padding: '2px 8px',
+                  background: TYPE_COLORS[c.type] || 'var(--color-text-muted)',
+                  color: 'var(--color-text-primary)', padding: '2px 8px',
                   borderRadius: 10, fontSize: 12, fontWeight: 600,
                 }}>{c.type}</span>
               </td>
               <td style={td}><strong>{c.name}</strong></td>
               <td style={td}>{configString(c)}</td>
-              <td style={td}><code style={{ fontSize: 12, color: '#6b7280' }}>{c.events || '(全部)'}</code></td>
+              <td style={td}><code style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{c.events || '(全部)'}</code></td>
               <td style={td}>
                 <button
                   onClick={() => toggle(c)}
                   style={{
-                    background: c.enabled ? '#10b981' : '#9ca3af',
-                    color: 'white', border: 'none', borderRadius: 12,
+                    background: c.enabled ? 'var(--color-success)' : 'var(--color-text-muted)',
+                    color: 'var(--color-text-primary)', border: 'none', borderRadius: 12,
                     padding: '2px 10px', cursor: 'pointer', fontSize: 12,
                   }}
                 >{c.enabled ? '✓ 启用' : '✗ 禁用'}</button>
               </td>
-              <td style={{ ...td, maxWidth: 200, color: '#6b7280', fontSize: 13 }}>{c.description}</td>
+              <td style={{ ...td, maxWidth: 200, color: 'var(--color-text-muted)', fontSize: 13 }}>{c.description}</td>
               <td style={td}>
                 <button onClick={() => testChannel(c)} style={btnTest}>📨 测试</button>
                 <button onClick={() => setEditing(c)} style={btnEdit}>编辑</button>
@@ -203,7 +203,7 @@ export function NotificationChannelsPage() {
             </tr>
           ))}
           {!loading && channels.length === 0 && (
-            <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: '#9ca3af' }}>
+            <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)' }}>
               暂无通知 channel — 点击「+ 新建 channel」开始
             </td></tr>
           )}
@@ -234,7 +234,7 @@ export function NotificationChannelsPage() {
             </Field>
 
             {editing.type === 'EMAIL' && (
-              <div style={{ padding: 8, background: '#f8fafc', borderRadius: 4, marginTop: 8 }}>
+              <div style={{ padding: 8, background: 'var(--color-bg-tertiary)', borderRadius: 4, marginTop: 8 }}>
                 <strong style={{ fontSize: 12 }}>SMTP 配置</strong>
                 {[
                   { k: 'host', label: 'SMTP 主机' },
@@ -245,7 +245,7 @@ export function NotificationChannelsPage() {
                   { k: 'from', label: '发件人' },
                 ].map(({ k, label, type, options }) => (
                   <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <span style={{ fontSize: 11, width: 64, color: '#64748b' }}>{label}</span>
+                    <span style={{ fontSize: 11, width: 64, color: 'var(--color-text-disabled)' }}>{label}</span>
                     {type === 'select' ? (
                       <select
                         value={(editing.config?.[k] as string) ?? ''}
@@ -308,7 +308,7 @@ export function NotificationChannelsPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'block', marginBottom: 12 }}>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>{label}</div>
       {children}
     </label>
   );
@@ -316,11 +316,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const th: React.CSSProperties = { padding: '8px 12px', textAlign: 'left', fontSize: 13, fontWeight: 600 };
 const td: React.CSSProperties = { padding: '8px 12px', fontSize: 13, verticalAlign: 'top' };
-const input: React.CSSProperties = { width: '100%', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4 };
-const btnTest: React.CSSProperties = { background: '#dbeafe', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
-const btnEdit: React.CSSProperties = { background: '#e0e7ff', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
-const btnDelete: React.CSSProperties = { background: '#fee2e2', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
-const btnCancel: React.CSSProperties = { background: '#f3f4f6', border: '1px solid #d1d5db', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
-const btnSave: React.CSSProperties = { background: '#3b82f6', color: 'white', border: 'none', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
+const input: React.CSSProperties = { width: '100%', padding: '6px 10px', border: '1px solid var(--color-border-medium)', borderRadius: 4 };
+const btnTest: React.CSSProperties = { background: 'rgba(59,130,246,0.1)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
+const btnEdit: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', marginRight: 4 };
+const btnDelete: React.CSSProperties = { background: 'rgba(239,68,68,0.2)', border: 'none', padding: '4px 10px', borderRadius: 4, cursor: 'pointer' };
+const btnCancel: React.CSSProperties = { background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-medium)', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
+const btnSave: React.CSSProperties = { background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none', padding: '6px 14px', borderRadius: 4, cursor: 'pointer' };
 const modalOverlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 };
-const modalCard: React.CSSProperties = { background: 'white', padding: 24, borderRadius: 8, width: 600, maxHeight: '90vh', overflow: 'auto' };
+const modalCard: React.CSSProperties = { background: 'var(--color-text-primary)', padding: 24, borderRadius: 8, width: 600, maxHeight: '90vh', overflow: 'auto' };

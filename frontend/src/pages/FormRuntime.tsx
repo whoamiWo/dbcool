@@ -97,14 +97,14 @@ export function FormRuntimePage() {
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <button
         onClick={() => navigate(`/designer/collections/${formData.collection_name}`)}
-        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: 16 }}
+        style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}
       >
         ← 返回
       </button>
       <div
         style={{
           padding: 24,
-          background: 'white',
+          background: 'var(--color-text-primary)',
           borderRadius: 8,
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
         }}

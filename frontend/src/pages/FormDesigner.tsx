@@ -206,34 +206,34 @@ export function FormDesignerPage() {
     <div>
       <button
         onClick={() => navigate(`/designer/collections/${collection}`)}
-        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: 16 }}
+        style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}
       >
         ← 返回 Collection
       </button>
 
       <h1>
         📋 {id ? '编辑' : '新建'}表单
-        <span style={{ color: '#64748b', fontSize: 14, fontWeight: 'normal' }}>({collection})</span>
+        <span style={{ color: 'var(--color-text-disabled)', fontSize: 14, fontWeight: 'normal' }}>({collection})</span>
         {layout.length > 0 && (
-          <span style={{ marginLeft: 12, fontSize: 13, color: '#10b981' }}>
+          <span style={{ marginLeft: 12, fontSize: 13, color: 'var(--color-success)' }}>
             🎯 {layout.length} 字段 — 拖拽调整顺序
           </span>
         )}
       </h1>
 
       {error && (
-        <div style={{ padding: 8, marginBottom: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 4 }}>
+        <div style={{ padding: 8, marginBottom: 12, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4 }}>
           {error}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 280px', gap: 16 }}>
         {/* 字段面板(可拖源) */}
-        <div style={{ padding: 12, background: 'white', borderRadius: 8 }}>
+        <div style={{ padding: 12, background: 'var(--color-text-primary)', borderRadius: 8 }}>
           <h3 style={{ marginTop: 0 }}>可用字段</h3>
-          <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 8px' }}>拖拽到画布 ↘</p>
+          <p style={{ fontSize: 11, color: 'var(--color-text-disabled)', margin: '0 0 8px' }}>拖拽到画布 ↘</p>
           {fields.length === 0 ? (
-            <p style={{ color: '#94a3b8', fontSize: 12 }}>该 collection 还没有字段</p>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>该 collection 还没有字段</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {fields.map((f) => {
@@ -248,9 +248,9 @@ export function FormDesignerPage() {
                     style={{
                       padding: 6,
                       fontSize: 12,
-                      background: added ? '#e2e8f0' : '#f1f5f9',
-                      color: added ? '#94a3b8' : '#0f172a',
-                      border: '1px solid #cbd5e1',
+                      background: added ? 'var(--color-border-light)' : 'var(--color-bg-secondary)',
+                      color: added ? 'var(--color-text-muted)' : 'var(--color-bg-primary)',
+                      border: '1px solid var(--color-border-medium)',
                       borderRadius: 4,
                       cursor: added ? 'not-allowed' : 'grab',
                       userSelect: 'none',
@@ -259,7 +259,7 @@ export function FormDesignerPage() {
                     title={added ? '已在画布' : '拖动到画布,或双击追加到末尾'}
                   >
                     {added ? '✓ ' : ''}{FIELD_ICON[f.type] ?? '🧩'} {f.label ?? f.name}{' '}
-                    <span style={{ color: '#94a3b8' }}>({f.type})</span>
+                    <span style={{ color: 'var(--color-text-muted)' }}>({f.type})</span>
                   </div>
                 );
               })}
@@ -269,7 +269,7 @@ export function FormDesignerPage() {
 
         {/* 画布 */}
         <div
-          style={{ padding: 16, background: 'white', borderRadius: 8 }}
+          style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8 }}
           onDragOver={(e) => handleDragOver(e, layout.length)}
           onDrop={(e) => handleDrop(e, 'end')}
         >
@@ -289,11 +289,11 @@ export function FormDesignerPage() {
               onDrop={(e) => handleDrop(e, 0)}
               style={{
                 padding: 48,
-                border: '2px dashed #cbd5e1',
+                border: '2px dashed var(--color-border-medium)',
                 borderRadius: 8,
                 textAlign: 'center',
-                color: '#94a3b8',
-                background: dragOverIdx === 0 ? '#dbeafe' : '#f8fafc',
+                color: 'var(--color-text-muted)',
+                background: dragOverIdx === 0 ? 'rgba(59,130,246,0.1)' : 'var(--color-text-primary)',
               }}
             >
               从左侧拖动字段到这里
@@ -311,7 +311,7 @@ export function FormDesignerPage() {
                       onDrop={(e) => { e.stopPropagation(); handleDrop(e, idx); }}
                       style={{
                         height: 4,
-                        background: isDragOver ? '#3b82f6' : 'transparent',
+                        background: isDragOver ? 'var(--color-info)' : 'transparent',
                         borderRadius: 2,
                         margin: '2px 0',
                         transition: 'all 0.1s',
@@ -325,17 +325,17 @@ export function FormDesignerPage() {
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: 8,
-                        background: activeField === item.field ? '#dbeafe' : '#f8fafc',
-                        border: `1px solid ${activeField === item.field ? '#3b82f6' : '#cbd5e1'}`,
+                        background: activeField === item.field ? 'rgba(59,130,246,0.1)' : 'var(--color-text-primary)',
+                        border: `1px solid ${activeField === item.field ? 'var(--color-info)' : 'var(--color-border-medium)'}`,
                         borderRadius: 4,
                         cursor: 'grab',
                       }}
                     >
-                      <span style={{ color: '#94a3b8', cursor: 'grab' }}>⋮⋮</span>
+                      <span style={{ color: 'var(--color-text-muted)', cursor: 'grab' }}>⋮⋮</span>
                       <span style={{ flex: 1 }}>
                         {idx + 1}. {FIELD_ICON[f?.type ?? 'text']} <strong>{f?.label ?? item.field}</strong>{' '}
-                        <span style={{ color: '#94a3b8', fontSize: 12 }}>({f?.type ?? '?'})</span>
-                        {isFieldRequired(item.field) && <span style={{ color: '#dc2626' }}> *</span>}
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>({f?.type ?? '?'})</span>
+                        {isFieldRequired(item.field) && <span style={{ color: 'var(--color-error)' }}> *</span>}
                       </span>
                       <button
                         onClick={(e) => { e.stopPropagation(); moveField(item.field, 'up'); }}
@@ -351,12 +351,12 @@ export function FormDesignerPage() {
                       >↓</button>
                       <button
                         onClick={(e) => e.stopPropagation()}
-                        style={{ padding: '2px 8px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 4, opacity: 0.4 }}
+                        style={{ padding: '2px 8px', background: 'var(--color-secondary-500)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, opacity: 0.4 }}
                         title="复制(预留)"
                       >⧉</button>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeFromLayout(item.field); }}
-                        style={{ padding: '2px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                        style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
                         title="删除"
                       >×</button>
                     </div>
@@ -369,7 +369,7 @@ export function FormDesignerPage() {
                 onDrop={(e) => { e.stopPropagation(); handleDrop(e, layout.length); }}
                 style={{
                   height: 8,
-                  background: dragOverIdx === layout.length ? '#3b82f6' : 'transparent',
+                  background: dragOverIdx === layout.length ? 'var(--color-info)' : 'transparent',
                   borderRadius: 2,
                   margin: '4px 0',
                 }}
@@ -378,7 +378,7 @@ export function FormDesignerPage() {
           )}
 
           {/* US-106: 提交后动作(表单级规则) */}
-          <div style={{ marginTop: 16, borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+          <div style={{ marginTop: 16, borderTop: '1px solid var(--color-border-light)', paddingTop: 12 }}>
             <strong style={{ fontSize: 13 }}>提交后动作</strong>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
               <select
@@ -389,7 +389,7 @@ export function FormDesignerPage() {
                     submit: { action: e.target.value as SubmitAction },
                   })
                 }
-                style={{ padding: 6, fontSize: 12, borderRadius: 4, border: '1px solid #cbd5e1' }}
+                style={{ padding: 6, fontSize: 12, borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
                 aria-label="提交后动作"
               >
                 <option value="stay">停留并显示提示</option>
@@ -405,7 +405,7 @@ export function FormDesignerPage() {
                 onChange={(e) => setRules({ ...rules, submit: { ...rules.submit!, url: e.target.value } })}
                 placeholder="跳转地址,如 /thanks"
                 aria-label="跳转地址"
-                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid #cbd5e1' }}
+                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
               />
             )}
 
@@ -418,7 +418,7 @@ export function FormDesignerPage() {
                 }
                 placeholder="工作流 ID"
                 aria-label="工作流 ID"
-                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid #cbd5e1' }}
+                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
               />
             )}
 
@@ -431,7 +431,7 @@ export function FormDesignerPage() {
                 }
                 placeholder={rules.submit.action === 'workflow' ? '触发后提示(可选)' : '提交后提示文案'}
                 aria-label="提交后提示"
-                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid #cbd5e1' }}
+                style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
               />
             )}
           </div>
@@ -442,30 +442,30 @@ export function FormDesignerPage() {
               disabled={saveMutation.isPending}
               style={{
                 padding: '8px 16px',
-                background: saveMutation.isPending ? '#94a3b8' : '#1e293b',
-                color: 'white', border: 'none', borderRadius: 4,
+                background: saveMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-bg-secondary)',
+                color: 'var(--color-text-primary)', border: 'none', borderRadius: 4,
                 cursor: saveMutation.isPending ? 'not-allowed' : 'pointer',
               }}
             >
               {saveMutation.isPending ? '保存中…' : '保存表单'}
             </button>
             {saveMutation.isSuccess && (
-              <span style={{ alignSelf: 'center', color: '#10b981', fontSize: 12 }}>✅ 已保存</span>
+              <span style={{ alignSelf: 'center', color: 'var(--color-success)', fontSize: 12 }}>✅ 已保存</span>
             )}
           </div>
         </div>
 
         {/* 属性面板 */}
-        <div style={{ padding: 12, background: 'white', borderRadius: 8 }}>
+        <div style={{ padding: 12, background: 'var(--color-text-primary)', borderRadius: 8 }}>
           <h3 style={{ marginTop: 0 }}>字段属性</h3>
           {!activeField ? (
-            <p style={{ color: '#94a3b8', fontSize: 12 }}>点击画布中的字段查看属性</p>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>点击画布中的字段查看属性</p>
           ) : (
             <div>
               <p>
                 <strong>{fields.find((f) => f.name === activeField)?.label ?? activeField}</strong>
                 <br />
-                <span style={{ color: '#94a3b8', fontSize: 12 }}>
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>
                   {fields.find((f) => f.name === activeField)?.type}
                 </span>
               </p>
@@ -495,7 +495,7 @@ export function FormDesignerPage() {
                 唯一
               </label>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: '#64748b' }}>默认值</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>默认值</label>
                 <input
                   type="text"
                   value={fields.find((f) => f.name === activeField)?.defaultValue ?? ''}
@@ -505,7 +505,7 @@ export function FormDesignerPage() {
               </div>
               {/* US-102: 标签 / 占位符 / 帮助文本 */}
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: '#64748b' }}>标签(label)</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>标签(label)</label>
                 <input
                   type="text"
                   value={fields.find((f) => f.name === activeField)?.label ?? ''}
@@ -514,7 +514,7 @@ export function FormDesignerPage() {
                 />
               </div>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: '#64748b' }}>占位符(placeholder)</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>占位符(placeholder)</label>
                 <input
                   type="text"
                   value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.placeholder ?? '')}
@@ -523,7 +523,7 @@ export function FormDesignerPage() {
                 />
               </div>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: '#64748b' }}>帮助文本(helpText)</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>帮助文本(helpText)</label>
                 <input
                   type="text"
                   value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.helpText ?? '')}
@@ -538,7 +538,7 @@ export function FormDesignerPage() {
                 rules={rules}
                 onChange={setRules}
               />
-              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 12 }}>
+              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 12 }}>
                 💡 可拖拽画布字段重排序。规则在下方实时预览中立即生效。
               </p>
             </div>
@@ -550,7 +550,7 @@ export function FormDesignerPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
           <h2 style={{ margin: 0 }}>👀 实时预览</h2>
           <label
-            style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, color: '#475569' }}
+            style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--color-bg-elevated)' }}
           >
             <input
               type="checkbox"
@@ -560,7 +560,7 @@ export function FormDesignerPage() {
             只读模式(US-105:禁用输入并显示完整布局)
           </label>
         </div>
-        <div style={{ padding: 24, background: '#f8fafc', borderRadius: 8 }}>
+        <div style={{ padding: 24, background: 'var(--color-text-primary)', borderRadius: 8 }}>
           {layout.length > 0 ? (
             <FormRuntime
               form={previewForm}
@@ -570,7 +570,7 @@ export function FormDesignerPage() {
               readOnly={previewReadOnly}
             />
           ) : (
-            <p style={{ color: '#94a3b8', textAlign: 'center' }}>添加字段后看预览</p>
+            <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>添加字段后看预览</p>
           )}
         </div>
       </div>

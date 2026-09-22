@@ -61,8 +61,8 @@ export function MessagesInboxPage() {
     <div style={{ maxWidth: 700 }}>
       <h1>📬 站内信</h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <span style={{ fontSize: 14, color: '#475569' }}>
-          未读 <b style={{ color: '#dc2626' }}>{data?.unread_count ?? 0}</b>
+        <span style={{ fontSize: 14, color: 'var(--color-bg-elevated)' }}>
+          未读 <b style={{ color: 'var(--color-error)' }}>{data?.unread_count ?? 0}</b>
         </span>
         <label style={{ fontSize: 14 }}>
           <input
@@ -77,7 +77,7 @@ export function MessagesInboxPage() {
       </div>
       {isLoading && stack.messages.length === 0 ? <p>加载中…</p> : null}
       {merged.length === 0 && !isLoading ? (
-        <p style={{ color: '#64748b' }}>暂无消息</p>
+        <p style={{ color: 'var(--color-text-disabled)' }}>暂无消息</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {merged.map((m) => (
@@ -86,7 +86,7 @@ export function MessagesInboxPage() {
               onClick={() => !m.read && markRead.mutate(m.id)}
               style={{
                 padding: 12,
-                background: m.read ? 'white' : '#fef9c3',
+                background: m.read ? 'var(--color-text-primary)' : 'rgba(245,158,11,0.1)',
                 borderRadius: 8,
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                 cursor: m.read ? 'default' : 'pointer',
@@ -94,12 +94,12 @@ export function MessagesInboxPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <strong>{m.title}</strong>
-                <small style={{ color: '#64748b' }}>
+                <small style={{ color: 'var(--color-text-disabled)' }}>
                   {new Date(m.created_at).toLocaleString()}
                 </small>
               </div>
-              <div style={{ marginTop: 4, color: '#475569' }}>{m.body}</div>
-              {!m.read && <small style={{ color: '#dc2626' }}>● 未读</small>}
+              <div style={{ marginTop: 4, color: 'var(--color-bg-elevated)' }}>{m.body}</div>
+              {!m.read && <small style={{ color: 'var(--color-error)' }}>● 未读</small>}
             </div>
           ))}
         </div>
@@ -115,8 +115,8 @@ export function MessagesInboxPage() {
 
 const btnStyle = {
   padding: '8px 16px',
-  background: '#1e293b',
-  color: 'white',
+  background: 'var(--color-bg-secondary)',
+  color: 'var(--color-text-primary)',
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',

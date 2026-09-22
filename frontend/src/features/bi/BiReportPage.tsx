@@ -271,9 +271,9 @@ export default function BiReportPage() {
               <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 14 }}>
                 <thead>
                   <tr>
-                    <th style={{ border: '1px solid #e0e0e0', padding: 8 }}>维度</th>
+                    <th style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>维度</th>
                     {pivotQ.data.columns.map((c) => (
-                      <th key={c} style={{ border: '1px solid #e0e0e0', padding: 8 }}>
+                      <th key={c} style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>
                         {c || '（空）'}
                       </th>
                     ))}
@@ -282,11 +282,11 @@ export default function BiReportPage() {
                 <tbody>
                   {pivotQ.data.data.map((row, i) => (
                     <tr key={i}>
-                      <td style={{ border: '1px solid #e0e0e0', padding: 8, fontWeight: 500 }}>
+                      <td style={{ border: '1px solid var(--color-border-light)', padding: 8, fontWeight: 500 }}>
                         {String(row.row ?? '') || '（空）'}
                       </td>
                       {pivotQ.data!.columns.map((c) => (
-                        <td key={c} style={{ border: '1px solid #e0e0e0', padding: 8 }}>
+                        <td key={c} style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>
                           {String(row[`${c}|${measureField}`] ?? 0)}
                         </td>
                       ))}
@@ -324,7 +324,7 @@ export default function BiReportPage() {
                   <Legend />
                   {chartQ.data.series.map((s, i) => (
                     <Bar key={s.name} dataKey={s.name}
-                      fill={['#1976D2', '#FFC107', '#4CAF50', '#FF9800'][i % 4]} />
+                      fill={['var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-warning)'][i % 4]} />
                   ))}
                 </BarChart>
               ) : (
@@ -336,7 +336,7 @@ export default function BiReportPage() {
                   <Legend />
                   {chartQ.data.series.map((s, i) => (
                     <Line key={s.name} type="monotone" dataKey={s.name}
-                      stroke={['#1976D2', '#FFC107', '#4CAF50', '#FF9800'][i % 4]} />
+                      stroke={['var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-warning)'][i % 4]} />
                   ))}
                 </LineChart>
               )}

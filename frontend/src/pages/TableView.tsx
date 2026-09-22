@@ -127,7 +127,7 @@ export function TableViewPage() {
         <button onClick={exportCsv} className="glass-button-primary" style={{ padding: '4px 12px', fontSize: 12 }}>
           📥 导出 CSV
         </button>
-        <label style={{ padding: '4px 12px', background: 'rgba(59, 130, 246, 0.2)', color: 'white', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+        <label style={{ padding: '4px 12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-text-primary)', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
           📤 导入 CSV
           <input type="file" accept=".csv" onChange={handleImport} style={{ display: 'none' }} />
         </label>
@@ -149,7 +149,7 @@ export function TableViewPage() {
               style={{
                 padding: '2px 8px',
                 background: s ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                color: s ? 'white' : 'var(--color-text-secondary)',
+                color: s ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: 4,
                 cursor: 'pointer',
@@ -256,7 +256,7 @@ function toggleSort(field: string, sort: SortRule[], setSort: (s: SortRule[]) =>
 }
 
 function renderCell(value: unknown, field?: { type?: string }): React.ReactNode {
-  if (value == null) return <span style={{ color: '#94a3b8' }}>—</span>;
+  if (value == null) return <span style={{ color: 'var(--color-text-muted)' }}>—</span>;
   if (field?.type === 'boolean') return value === 'true' || value === true ? '✓' : '✗';
   if (field?.type === 'date') return String(value).slice(0, 10);
   // Week 41 D2:关联字段展开 {id, title} 渲染

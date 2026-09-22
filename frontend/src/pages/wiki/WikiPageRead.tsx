@@ -73,14 +73,14 @@ export function WikiPageReadPage() {
 
       <Paper sx={{ p: 4, background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 12 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-          <Typography variant="h3" component="h1" sx={{ color: '#f8fafc' }}>{page.title}</Typography>
+          <Typography variant="h3" component="h1" sx={{ color: 'var(--color-text-primary)' }}>{page.title}</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Chip
               label={page.status}
               color={page.status === 'PUBLISHED' ? 'success' : page.status === 'ARCHIVED' ? 'default' : 'warning'}
               size="small"
             />
-            <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+            <Typography variant="caption" sx={{ color: 'var(--color-text-muted)' }}>
               v{page.version}
             </Typography>
           </Box>
@@ -91,25 +91,25 @@ export function WikiPageReadPage() {
         <Box sx={{ mb: 4 }}>
           <Box
             sx={{
-              '& h1': { fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0 0.5rem', color: '#f8fafc' },
-              '& h2': { fontSize: '1.5rem', fontWeight: 'bold', margin: '0.75rem 0 0.5rem', color: '#f8fafc' },
-              '& h3': { fontSize: '1.25rem', fontWeight: 'bold', margin: '0.5rem 0', color: '#e2e8f0' },
-              '& p': { margin: '0.5rem 0', lineHeight: 1.8, color: '#e2e8f0' },
+              '& h1': { fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0 0.5rem', color: 'var(--color-text-primary)' },
+              '& h2': { fontSize: '1.5rem', fontWeight: 'bold', margin: '0.75rem 0 0.5rem', color: 'var(--color-text-primary)' },
+              '& h3': { fontSize: '1.25rem', fontWeight: 'bold', margin: '0.5rem 0', color: 'var(--color-text-secondary)' },
+              '& p': { margin: '0.5rem 0', lineHeight: 1.8, color: 'var(--color-text-secondary)' },
               '& ul': { paddingLeft: 2, margin: '0.5rem 0' },
               '& ol': { paddingLeft: 2, margin: '0.5rem 0' },
-              '& li': { margin: '0.25rem 0', color: '#e2e8f0' },
+              '& li': { margin: '0.25rem 0', color: 'var(--color-text-secondary)' },
               '& code': {
-                background: 'rgba(30, 41, 59, 0.8)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace', color: '#c7d2fe',
+                background: 'rgba(30, 41, 59, 0.8)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace', color: 'var(--color-primary-200)',
               },
               '& pre': {
-                background: '#1e1e1e', padding: 1.5, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
+                background: 'var(--color-bg-primary)', padding: 1.5, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
               },
               '& blockquote': {
-                borderLeft: '4px solid #6366f1', paddingLeft: 1, margin: 0.5, color: '#94a3b8',
+                borderLeft: '4px solid var(--color-primary-500)', paddingLeft: 1, margin: 0.5, color: 'var(--color-text-muted)',
               },
               '& table': { borderCollapse: 'collapse', width: '100%', margin: '0.5rem 0' },
-              '& th, &td': { border: '1px solid rgba(255, 255, 255, 0.1)', padding: 8, textAlign: 'left', color: '#e2e8f0' },
-              '& a': { color: '#818cf8' },
+              '& th, &td': { border: '1px solid rgba(255, 255, 255, 0.1)', padding: 8, textAlign: 'left', color: 'var(--color-text-secondary)' },
+              '& a': { color: 'var(--color-primary-400)' },
             }}
           >
             <ReactMarkdown
@@ -140,7 +140,7 @@ export function WikiPageReadPage() {
         <Divider sx={{ mb: 3, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+          <Typography variant="caption" sx={{ color: 'var(--color-text-muted)' }}>
             创建于 {new Date(page.created_at).toLocaleString('zh-CN')}
             {page.created_by && ` · 作者: ${page.created_by}`}
           </Typography>
@@ -150,7 +150,7 @@ export function WikiPageReadPage() {
               component={Link}
               to={`/wiki/${page.slug}/edit`}
               variant="outlined"
-              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: '#f8fafc', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
+              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: 'var(--color-text-primary)', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
             >
               编辑
             </Button>
@@ -159,7 +159,7 @@ export function WikiPageReadPage() {
               component={Link}
               to={`/wiki/${page.slug}/versions`}
               variant="outlined"
-              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: '#f8fafc', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
+              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: 'var(--color-text-primary)', '&:hover': { background: 'rgba(255, 255, 255, 0.05)' } }}
             >
               版本历史
             </Button>

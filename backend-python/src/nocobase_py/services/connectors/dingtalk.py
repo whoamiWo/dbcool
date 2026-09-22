@@ -20,25 +20,26 @@ class DingTalkConnector:
         self.app_key = app_key
         self.app_secret = app_secret
         self.agent_id = agent_id
-        self.base_url = "https://oapi.dingtalk.com"
+        self.base_url = "https://api.dingtalk.com"
 
     @property
     def is_configured(self) -> bool:
         return bool(self.app_key and self.app_secret and self.agent_id)
 
     async def get_access_token(self) -> str:
-        """获取钉钉 access_token。"""
+        """获取钉钉 access_token（新版 POST /v1.0/oauth2/accessToken）。"""
         if not self.is_configured:
             raise RuntimeError("钉钉未配置")
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{self.base_url}/gettoken",
-                params={"appkey": self.app_key, "appsecret": self.app_secret},
+            resp = await client.post(
+                f"{self.base_url}/v1.0/oauth2/accessToken",
+                json={"appKey": self.app_key, "appSecret": self.app_secret},
             )
             data = resp.json()
-            if not data.get("access_token"):
+            access_token = data.get("accessToken")
+            if not access_token:
                 raise RuntimeError(f"获取 access_token 失败: {data}")
-            return data["access_token"]
+            return access_token
 
     async def send_message(self, user_id: str, text: str, msg_type: str = "text") -> dict:
         """发送应用消息（/message/send）。"""

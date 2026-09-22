@@ -20,7 +20,7 @@ export function FormsListPage() {
   });
 
   if (isLoading) return <p>加载中…</p>;
-  if (error) return <p style={{ color: '#dc2626' }}>加载失败</p>;
+  if (error) return <p style={{ color: 'var(--color-error)' }}>加载失败</p>;
 
   const forms = data ?? [];
 
@@ -33,8 +33,8 @@ export function FormsListPage() {
             to={`/designer/forms/${collection}/new`}
             style={{
               padding: '8px 16px',
-              background: '#1e293b',
-              color: 'white',
+              background: 'var(--color-bg-secondary)',
+              color: 'var(--color-text-primary)',
               textDecoration: 'none',
               borderRadius: 4,
             }}
@@ -49,10 +49,10 @@ export function FormsListPage() {
           style={{
             marginTop: 24,
             padding: 32,
-            background: 'white',
+            background: 'var(--color-text-primary)',
             borderRadius: 8,
             textAlign: 'center',
-            color: '#64748b',
+            color: 'var(--color-text-disabled)',
           }}
         >
           {collection ? '该 collection 还没有表单,点上方"新建表单"开始' : '你还没有创建任何表单'}
@@ -61,7 +61,7 @@ export function FormsListPage() {
         <div
           style={{
             marginTop: 16,
-            background: 'white',
+            background: 'var(--color-text-primary)',
             borderRadius: 8,
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             overflow: 'hidden',
@@ -69,7 +69,7 @@ export function FormsListPage() {
         >
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#f1f5f9' }}>
+              <tr style={{ background: 'var(--color-bg-secondary)' }}>
                 <th style={{ padding: 12, textAlign: 'left' }}>标题</th>
                 <th style={{ padding: 12, textAlign: 'left' }}>Collection</th>
                 <th style={{ padding: 12, textAlign: 'left' }}>创建时间</th>
@@ -78,22 +78,22 @@ export function FormsListPage() {
             </thead>
             <tbody>
               {forms.map((f) => (
-                <tr key={f.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                <tr key={f.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                   <td style={{ padding: 12 }}>{f.title}</td>
                   <td style={{ padding: 12, fontFamily: 'monospace' }}>{f.collection_name}</td>
-                  <td style={{ padding: 12, color: '#64748b' }}>
+                  <td style={{ padding: 12, color: 'var(--color-text-disabled)' }}>
                     {new Date(f.created_at).toLocaleString('zh-CN')}
                   </td>
                   <td style={{ padding: 12, textAlign: 'right' }}>
                     <Link
                       to={`/designer/forms/${f.collection_name}/${f.id}/edit`}
-                      style={{ marginRight: 12, color: '#2563eb', textDecoration: 'none' }}
+                      style={{ marginRight: 12, color: 'var(--color-info)', textDecoration: 'none' }}
                     >
                       编辑
                     </Link>
                     <Link
                       to={`/forms/${f.id}/fill`}
-                      style={{ color: '#16a34a', textDecoration: 'none' }}
+                      style={{ color: 'var(--color-success)', textDecoration: 'none' }}
                     >
                       填表
                     </Link>

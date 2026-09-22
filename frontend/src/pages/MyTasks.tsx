@@ -21,9 +21,9 @@ interface Task {
 }
 
 const statusColor: Record<string, string> = {
-  PENDING: '#f59e0b',
-  APPROVED: '#10b981',
-  REJECTED: '#ef4444',
+  PENDING: 'var(--color-warning)',
+  APPROVED: 'var(--color-success)',
+  REJECTED: 'var(--color-error)',
 };
 
 export function MyTasksPage() {
@@ -48,7 +48,7 @@ export function MyTasksPage() {
   return (
     <div style={{ padding: 16 }}>
       <h2>📋 我的待办任务</h2>
-      <p style={{ color: '#475569' }}>
+      <p style={{ color: 'var(--color-bg-elevated)' }}>
         待审批 {pending.length} 项 
       </p>
 
@@ -57,7 +57,7 @@ export function MyTasksPage() {
       <TaskTable tasks={pending} showActions act={act} />
 
       {pending.length === 0 && (
-        <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', background: 'white', borderRadius: 8 }}>
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted)', background: 'var(--color-text-primary)', borderRadius: 8 }}>
           🎉 当前没有待办任务
         </div>
       )}
@@ -70,9 +70,9 @@ function TaskTable({ tasks, showActions, act }: {
   act: ReturnType<typeof useMutation<unknown, unknown, { id: string; op: 'approve' | 'reject'; comment?: string }>>;
 }) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: 8 }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8 }}>
       <thead>
-        <tr style={{ background: '#f1f5f9' }}>
+        <tr style={{ background: 'var(--color-bg-secondary)' }}>
           <th style={th}>工作流</th>
           <th style={th}>节点</th>
           <th style={th}>触发数据</th>
@@ -87,21 +87,21 @@ function TaskTable({ tasks, showActions, act }: {
           let trig: Record<string, unknown> = {};
           try { trig = JSON.parse(t.trigger_data_json || '{}'); } catch {}
           return (
-            <tr key={t.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+            <tr key={t.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
               <td style={td}>
                 <Link to={`/designer/instances/${t.instance_id}`}>{t.workflow_title || t.workflow_name}</Link>
               </td>
               <td style={td}>{t.node_id}</td>
               <td style={td}>
-                <code style={{ fontSize: 11, background: '#f1f5f9', padding: 2 }}>
+                <code style={{ fontSize: 11, background: 'var(--color-bg-secondary)', padding: 2 }}>
                   {JSON.stringify(trig).slice(0, 40)}
                 </code>
               </td>
               <td style={td}>{t.record_id || '—'}</td>
               <td style={td}>{(t.created_at || '').replace('T', ' ').slice(0, 19)}</td>
               <td style={td}>
-                <span style={{ padding: '2px 8px', background: statusColor[t.status] || '#94a3b8',
-                               color: 'white', borderRadius: 4, fontSize: 12 }}>
+                <span style={{ padding: '2px 8px', background: statusColor[t.status] || 'var(--color-text-muted)',
+                               color: 'var(--color-text-primary)', borderRadius: 4, fontSize: 12 }}>
                   {t.status}
                 </span>
               </td>
@@ -110,14 +110,14 @@ function TaskTable({ tasks, showActions, act }: {
                   <button
                     onClick={() => act.mutate({ id: t.id, op: 'approve' })}
                     disabled={act.isPending}
-                    style={{ marginRight: 4, padding: '4px 10px', background: '#10b981',
-                             color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                    style={{ marginRight: 4, padding: '4px 10px', background: 'var(--color-success)',
+                             color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
                   >✅ 通过</button>
                   <button
                     onClick={() => act.mutate({ id: t.id, op: 'reject' })}
                     disabled={act.isPending}
-                    style={{ padding: '4px 10px', background: '#ef4444',
-                             color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                    style={{ padding: '4px 10px', background: 'var(--color-error)',
+                             color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
                   >❌ 拒绝</button>
                 </td>
               )}
@@ -129,5 +129,5 @@ function TaskTable({ tasks, showActions, act }: {
   );
 }
 
-const th = { padding: 8, textAlign: 'left', fontSize: 13, color: '#475569' } as const;
+const th = { padding: 8, textAlign: 'left', fontSize: 13, color: 'var(--color-bg-elevated)' } as const;
 const td = { padding: 8, fontSize: 13 } as const;

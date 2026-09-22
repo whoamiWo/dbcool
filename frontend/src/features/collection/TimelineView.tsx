@@ -15,7 +15,7 @@ interface TimelineRecord {
   [key: string]: unknown;
 }
 
-const PALETTE = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#14b8a6'];
+const PALETTE = ['var(--color-primary-500)', 'var(--color-secondary-500)', 'var(--color-secondary-400)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-info)', 'var(--color-success)'];
 
 /** 从视图配置 + collection 字段推断时间字段 */
 function inferDateField(view: ViewFull, defaultDateField: string): string {
