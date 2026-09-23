@@ -58,7 +58,27 @@ async function handleRefreshToken(): Promise<string> {
         localStorage.setItem('nocobase_refresh_token', refresh_token);
       }
 
-      useAuthStore.getState().setAuth(access_token, refresh_token, useAuthStore.getState().user!);
+      // 刷新 token 成功后，从 localStorage 读取持久化的用户信息
+      const stored = localStorage.getItem('nocobase-auth');
+      let storedUser = null;
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          storedUser = parsed?.state?.user ?? null;
+        } catch {
+          // 解析失败，使用默认用户
+        }
+      }
+      if (storedUser) {
+        useAuthStore.getState().setAuth(access_token, refresh_token, storedUser);
+      } else {
+        useAuthStore.getState().setAuth(access_token, refresh_token, {
+          id: 'unknown',
+          username: 'unknown',
+          tenant_id: 'default',
+          roles: []
+        });
+      }
       notifyRefreshCallbacks(access_token);
       return access_token;
     } catch (e) {

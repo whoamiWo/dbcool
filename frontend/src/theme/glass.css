@@ -1,109 +1,12 @@
-/** Glassmorphism Dark Theme Utilities */
-
-.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
+/** Glassmorphism Dark Theme Utilities — 单一来源（与 styles.css 合并） */
+/* 所有硬编码亮色已替换为 CSS 变量 */
 
 .glass-card-hover {
-  transition: all 200ms ease;
+  transition: all var(--transition-normal);
 }
 
 .glass-card-hover:hover {
   background: rgba(255, 255, 255, 0.08);
   transform: translateY(-2px);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
-}
-
-.glass-input {
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
-  border-radius: 8px;
-  padding: 8px 12px;
-  transition: all 150ms ease;
-}
-
-.glass-input:focus {
-  outline: none;
-  border-color: rgba(99, 102, 241, 0.5);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-}
-
-.glass-button {
-  background: rgba(99, 102, 241, 0.2);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  color: #f8fafc;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
-
-.glass-button:hover {
-  background: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 0 24px rgba(99, 102, 241, 0.4);
-}
-
-.glass-button-primary {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  border: none;
-  color: white;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
-
-.glass-button-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5);
-}
-
-.glass-button-secondary {
-  background: rgba(168, 85, 247, 0.2);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  color: #f8fafc;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
-
-.glass-button-secondary:hover {
-  background: rgba(168, 85, 247, 0.3);
-}
-
-.text-primary {
-  color: #f8fafc;
-}
-
-.text-secondary {
-  color: #e2e8f0;
-}
-
-.text-muted {
-  color: #94a3b8;
-}
-
-.bg-primary {
-  background-color: #0f172a;
-}
-
-.bg-secondary {
-  background-color: #1e293b;
-}
-
-.bg-tertiary {
-  background-color: #334155;
-}
-
-.border-light {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.border-medium {
-  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: var(--glass-shadow-lg);
 }

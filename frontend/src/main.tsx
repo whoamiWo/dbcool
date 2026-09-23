@@ -6,6 +6,7 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import { router } from './router';
 import { darkTheme } from './theme';
 import './styles.css';
+import './theme/glass.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
