@@ -7,6 +7,9 @@ import com.nocobase.auth.UserEntity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,6 +18,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 企业微信嵌入 REST API。
@@ -36,13 +40,16 @@ public class WeComController {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final StringRedisTemplate redis;
 
     public WeComController(WeComAppService weComAppService, RestTemplate restTemplate,
-                           JwtService jwtService, RefreshTokenService refreshTokenService) {
+                           JwtService jwtService, RefreshTokenService refreshTokenService,
+                           StringRedisTemplate redis) {
         this.weComAppService = weComAppService;
         this.restTemplate = restTemplate;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.redis = redis;
     }
 
     /** 获取企业微信授权地址（前端跳转） */
@@ -54,6 +61,9 @@ public class WeComController {
         // 企业微信 OAuth2 授权地址
         // https://open.work.weixin.qq.com/wwopen/sso/qrcode?appid=XXX&redirect_uri=XXX&state=YYY
         String state = UUID.randomUUID().toString();
+        // state 绑定用户会话，防止 CSRF
+        redis.opsForValue().set("wecom:state:" + state,
+                user != null ? user.getUsername() : "anonymous", 10, TimeUnit.MINUTES);
         String authUrl = String.format(
                 "https://open.work.weixin.qq.com/wwopen/sso/qrcode?appid=%s&redirect_uri=%s&state=%s&agentid=%s",
                 weComAppService.getCorpId(),
@@ -136,15 +146,18 @@ public class WeComController {
         }
         try {
             String accessToken = weComAppService.getAccessToken();
-            String msgUrl = "https://qyapi.weixin.qq.com/cgi-bin/message/send" +
-                    "?access_token=" + accessToken;
+            String msgUrl = "https://qyapi.weixin.qq.com/cgi-bin/message/send";
             Map<String, Object> payload = Map.of(
                     "touser", toUser,
                     "msgtype", "text",
                     "text", Map.of("content", content),
                     "agentid", weComAppService.getAgentId()
             );
-            String resp = restTemplate.postForObject(msgUrl, payload, String.class);
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            org.springframework.http.HttpEntity<Map<String, Object>> entity =
+                    new org.springframework.http.HttpEntity<>(payload, headers);
+            String resp = restTemplate.postForObject(msgUrl, entity, String.class);
             JsonNode json = objectMapper.readTree(resp == null ? "{}" : resp);
             int errcode = json.path("errcode").asInt(-1);
             String errmsg = json.path("errmsg").asText("");

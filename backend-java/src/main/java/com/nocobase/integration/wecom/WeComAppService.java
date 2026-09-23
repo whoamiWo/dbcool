@@ -51,6 +51,10 @@ public class WeComAppService {
     @Value("${wecom.redirect-uri:}")
     private String redirectUri;
 
+    /** access_token 缓存（企微 token 有效期 7200s，缓存 10min 留 30s buffer） */
+    private volatile String cachedToken;
+    private volatile long cachedTokenExpireAt = 0;
+
     public WeComAppService(UserRepository userRepository, PasswordEncoder passwordEncoder, RestTemplate restTemplate) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -70,10 +74,14 @@ public class WeComAppService {
     }
 
     /**
-     * 获取企业微信 access_token（调用 /cgi-bin/gettoken）。
-     * <p>生产环境应使用缓存（如 Redis），此处为演示直接请求。</p>
+     * 获取企业微信 access_token（调用 /cgi-bin/gettoken），带本地缓存。
+     * <p>企微 token 有效期 7200s，缓存 10min 留 30s buffer，避免高频调用触发频率限制。</p>
      */
     public String getAccessToken() {
+        long now = System.currentTimeMillis();
+        if (cachedToken != null && now < cachedTokenExpireAt) {
+            return cachedToken;
+        }
         String url = "https://qyapi.weixin.qq.com/cgi-bin/gettoken" +
                 "?corpid=" + corpId + "&corpsecret=" + secret;
         String body = restTemplate.getForObject(url, String.class);
@@ -83,6 +91,8 @@ public class WeComAppService {
             if (token.isBlank()) {
                 throw new RuntimeException("获取 access_token 失败：" + body);
             }
+            cachedToken = token;
+            cachedTokenExpireAt = now + 600_000; // 10min - 30s buffer
             return token;
         } catch (Exception e) {
             throw new RuntimeException("解析 access_token 失败", e);
