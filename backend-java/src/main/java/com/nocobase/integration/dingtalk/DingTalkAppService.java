@@ -62,6 +62,11 @@ public class DingTalkAppService {
         return appKey != null && !appKey.isBlank()
                 && appSecret != null && !appSecret.isBlank();
     }
+    
+    /** 获取 appSecret（用于签名校验）。 */
+    public String getAppSecret() {
+        return appSecret;
+    }
 
     /** 生成钉钉扫码授权 URL。 */
     public String getAuthUrl(String state, String tenantId) {

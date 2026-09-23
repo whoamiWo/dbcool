@@ -8,9 +8,17 @@ import com.nocobase.integration.dingtalk.UserMappingService;
 import com.nocobase.workflow.WorkflowInstanceRepository;
 import com.nocobase.workflow.WorkflowTaskRepository;
 import com.nocobase.workflow.WorkflowTaskEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,6 +40,8 @@ public class DingTalkController {
     private final UserMappingService userMappingService;
     private final WorkflowInstanceRepository instanceRepository;
     private final WorkflowTaskRepository taskRepository;
+    private static final Logger log = LoggerFactory.getLogger(DingTalkController.class);
+
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
@@ -169,12 +179,29 @@ public class DingTalkController {
 
     /**
      * 钉钉审批回调 — 更新工作流节点状态。
+     * 
+     * <b>安全修复</b>：
+     * 1. 增加 HMAC-SHA256 签名校验（基于 dingtalk.app-secret + timestamp）
+     * 2. 删除 @RequestParam tenantId（租户必须由配置推导，绝不允许请求方指定）
      */
     @PostMapping("/approval-callback")
     public Map<String, Object> approvalCallback(
             @RequestBody Map<String, Object> payload,
-            @RequestParam(required = false, defaultValue = "tenant_default") String tenantId
+            @RequestHeader(value = "X-DingTalk-Timestamp", required = false) String timestamp,
+            @RequestHeader(value = "X-DingTalk-Signature", required = false) String signature
     ) {
+        // 1. 签名校验（防止伪造回调）
+        if (timestamp == null || signature == null) {
+            log.warn("[DingTalk] 审批回调缺少签名头");
+            return Map.of("code", 401, "message", "missing signature headers");
+        }
+        
+        if (!verifySignature(timestamp, signature, payload)) {
+            log.warn("[DingTalk] 审批回调签名验证失败");
+            return Map.of("code", 401, "message", "invalid signature");
+        }
+        
+        // 2. 处理业务逻辑
         Object instanceId = payload.get("instance_id");
         Object result = payload.get("result");
         if (instanceId != null && result != null) {
@@ -182,6 +209,50 @@ public class DingTalkController {
             updateWorkflowTaskStatus(String.valueOf(instanceId), String.valueOf(result));
         }
         return Map.of("code", 0, "message", "received");
+    }
+    
+    /**
+     * 验证钉钉回调签名。
+     * sign = Base64(HmacSHA256(appSecret, timestamp))
+     */
+    private boolean verifySignature(String timestamp, String signature, Map<String, Object> payload) {
+        try {
+            String appSecret = appService.getAppSecret();
+            if (appSecret == null || appSecret.isBlank()) {
+                log.warn("[DingTalk] 审批回调：appSecret 未配置");
+                return false;
+            }
+            
+            // 检查时间戳有效性（5 分钟窗口）
+            long ts;
+            try {
+                ts = Long.parseLong(timestamp);
+            } catch (NumberFormatException e) {
+                log.warn("[DingTalk] 审批回调：timestamp 格式错误");
+                return false;
+            }
+            
+            long now = System.currentTimeMillis();
+            if (Math.abs(now - ts) > 300_000) {
+                log.warn("[DingTalk] 审批回调：timestamp 过期 {} vs {}", ts, now);
+                return false;
+            }
+            
+            // 计算签名：HmacSHA256(appSecret, timestamp)
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(timestamp.getBytes(StandardCharsets.UTF_8));
+            String expectedSig = Base64.getEncoder().encodeToString(digest);
+            
+            // 常量时间比较防时序攻击
+            return MessageDigest.isEqual(
+                signature.getBytes(StandardCharsets.UTF_8),
+                expectedSig.getBytes(StandardCharsets.UTF_8)
+            );
+        } catch (Exception e) {
+            log.error("[DingTalk] 审批回调签名验证异常", e);
+            return false;
+        }
     }
 
     /**
