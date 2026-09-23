@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     # Mattermost 连接器配置
     mattermost_webhook_url: str = ""
     mattermost_bot_token: str = ""
+    mattermost_server_url: str = ""  # Bot API 基础路径，如 https://mattermost.example.com/api/v4
 
     # Slack 入站事件转发目标频道（Java IM channel UUID）
     slack_event_channel_id: str = ""

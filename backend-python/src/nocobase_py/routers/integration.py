@@ -255,6 +255,7 @@ def _mattermost_connector() -> MattermostConnector:
     return MattermostConnector(
         webhook_url=s.mattermost_webhook_url if hasattr(s, "mattermost_webhook_url") else "",
         bot_token=s.mattermost_bot_token if hasattr(s, "mattermost_bot_token") else "",
+        server_url=s.mattermost_server_url if hasattr(s, "mattermost_server_url") else "",
     )
 
 

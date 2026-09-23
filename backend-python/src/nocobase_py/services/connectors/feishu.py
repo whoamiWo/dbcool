@@ -62,9 +62,14 @@ class FeishuConnector(BaseConnector):
                 json={"app_id": self.app_id, "app_secret": self.app_secret},
             )
             data = resp.json()
-            if not data.get("tenant_access_token"):
-                raise RuntimeError(f"获取 tenant_access_token 失败: {data}")
-            return data["tenant_access_token"]
+            # Feishu API 返回 {code, msg, tenant_access_token, expire}
+            code = data.get("code", -1)
+            if code != 0:
+                raise RuntimeError(f"获取 tenant_access_token 失败: code={code}, msg={data.get('msg', 'unknown')}")
+            token = data.get("tenant_access_token", "")
+            if not token:
+                raise RuntimeError(f"获取 tenant_access_token 失败: 响应中无 token")
+            return token
 
     async def send_message(self, open_id: str, text: str) -> dict:
         """发送消息（/im/v1/messages）。"""
