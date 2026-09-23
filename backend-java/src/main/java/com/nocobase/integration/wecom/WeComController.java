@@ -63,7 +63,7 @@ public class WeComController {
         String state = UUID.randomUUID().toString();
         // state 绑定用户会话，防止 CSRF
         redis.opsForValue().set("wecom:state:" + state,
-                user != null ? user.getUsername() : "anonymous", 10, TimeUnit.MINUTES);
+                user != null ? user.username() : "anonymous", 10, TimeUnit.MINUTES);
         String authUrl = String.format(
                 "https://open.work.weixin.qq.com/wwopen/sso/qrcode?appid=%s&redirect_uri=%s&state=%s&agentid=%s",
                 weComAppService.getCorpId(),
@@ -84,6 +84,18 @@ public class WeComController {
         if (code == null || code.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("code", 1, "message", "code 必填"));
         }
+        // 校验 state：必须与 auth-url 阶段下发的 state 匹配且在有效期内，防 CSRF
+        String state = body.get("state");
+        if (state == null || state.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("code", 1, "message", "state 必填"));
+        }
+        String boundUser = redis.opsForValue().get("wecom:state:" + state);
+        if (boundUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", 1, "message", "state 无效或已过期"));
+        }
+        // 一次性使用：校验通过后删除，防止重放
+        redis.delete("wecom:state:" + state);
         try {
             UserEntity userEntity = weComAppService.loginFromWeCom(code);
             String accessToken = jwtService.issueAccessToken(
