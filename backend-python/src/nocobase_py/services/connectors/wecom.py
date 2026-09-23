@@ -34,6 +34,8 @@ class WeComConnector(BaseConnector):
         self.corp_secret = getattr(config, "corp_secret", "")
         self.access_token = None
         self.token_expire_time = 0
+        self.cached_token = None
+        self.cached_token_expire_at = 0
 
     @property
     def is_configured(self) -> bool:
@@ -60,7 +62,11 @@ class WeComConnector(BaseConnector):
         return await self.health_check()
 
     async def get_access_token(self) -> str:
-        """获取企业微信 access_token。"""
+        """获取企业微信 access_token（带缓存）。"""
+        now = time.time()
+        if self.cached_token and now < self.cached_token_expire_at:
+            return self.cached_token
+        
         if not self.corp_id or not self.corp_secret:
             raise RuntimeError("企业微信未配置")
 
@@ -72,16 +78,16 @@ class WeComConnector(BaseConnector):
             data = resp.json()
             if data.get("errcode") != 0:
                 raise RuntimeError(f"获取 access_token 失败：{data}")
-            self.access_token = data["access_token"]
-            self.token_expire_time = time.time() + data.get("expires_in", 7200) - 300
-            return self.access_token
+            self.cached_token = data["access_token"]
+            self.cached_token_expire_at = now + data.get("expires_in", 7200) - 300
+            return self.cached_token
 
     async def send_webhook_message(self, text: str) -> dict:
         """通过 Webhook 发送消息。"""
         if not self.webhook_url:
             return {"ok": False, "error": "no_webhook"}
 
-        payload = {"msgtype": "text", "text": {"content": text}}
+        payload = {"text": {"content": text}}
 
         async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
             resp = await client.post(self.webhook_url, json=payload)
