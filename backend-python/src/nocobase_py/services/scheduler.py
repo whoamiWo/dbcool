@@ -224,17 +224,25 @@ def install_default_alert_checks(
         cache = cache_getter()
         if cache is None:
             return
-        if cache.should_warn_low_hit_rate():
+        import asyncio
+        try:
+            hit_low = asyncio.run(cache.should_warn_low_hit_rate())
+        except Exception:
+            hit_low = False
+        if hit_low:
             from nocobase_py.services.alerts import get_collector
 
-            stats = cache.stats()
+            try:
+                stats = asyncio.run(cache.stats())
+            except Exception:
+                stats = {"hit_rate": 0, "hits": 0, "misses": 0}
             get_collector().emit(
                 kind="cache_hit_rate_low",
                 user_id=None,
                 detail={
-                    "hit_rate": stats["hit_rate"],
-                    "hits": stats["hits"],
-                    "misses": stats["misses"],
+                    "hit_rate": stats.get("hit_rate", 0),
+                    "hits": stats.get("hits", 0),
+                    "misses": stats.get("misses", 0),
                     "threshold": 0.4,
                 },
             )

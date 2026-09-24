@@ -34,6 +34,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         sched.cron(backup_cron, backup_service.run_scheduled_backup, name="backup.scheduled")
         # 3. 租户配额每日重置（每天 00:00 UTC）
         sched.cron("0 0 * * *", _reset_quotas, name="quota.daily_reset")
+        # 启动调度器守护线程（此前未 start 导致任务永不执行）
+        sched.start()
         print(f"   W6 生产化闭环已安装: 告警巡检/备份({backup_cron})/配额重置")
     except Exception as e:
         print(f"   ⚠ W6 闭环安装失败: {e}")
@@ -51,11 +53,10 @@ def _reset_quotas() -> None:
 
         async def _do():
             redis = await get_redis()
-            svc = QuotaService()  # QuotaService 内部自己调用 get_redis()
+            svc = QuotaService()
             # 遍历所有 daily key，重置（key 格式: llm_quota:<user_id>:daily:<date>）
             keys = await redis.keys("llm_quota:*:daily:*")
             for k in keys:
-                # key 格式: llm_quota:<user_id>:daily:<date>
                 user_id = k.split(":")[1]
                 await svc.reset_daily(user_id)
             logger.info("[quota] 重置 %d 个用户日配额", len(keys))
