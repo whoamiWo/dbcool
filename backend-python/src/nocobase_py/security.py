@@ -85,3 +85,23 @@ async def get_optional_user(
         username=payload.get("username", ""),
         tenant_id=payload.get("tid", ""),
     )
+
+
+async def get_current_admin_user(
+    authorization: Annotated[str | None, Header()] = None,
+) -> AuthUser:
+    """FastAPI 依赖:要求当前用户为管理员（JWT 中 role=admin）.
+
+    Usage:
+        @app.post("/api/admin/backup")
+        async def create(user: AuthUser = Depends(get_current_admin_user)):
+            ...
+    """
+    user = await get_current_user(authorization)
+    payload = _decode_token(authorization[7:]) if authorization else None
+    if payload is None or payload.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理员权限",
+        )
+    return user
