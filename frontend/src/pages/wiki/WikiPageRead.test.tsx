@@ -32,9 +32,7 @@ describe('WikiPageReadPage', () => {
 
   it('加载页面:显示标题和内容', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: [
-        { id: 'p1', title: '我的页面', slug: 'my-page', content: '# Hello World', status: 'PUBLISHED', version: 2 },
-      ],
+      data: { id: 'p1', title: '我的页面', slug: 'my-page', content: '# Hello World', status: 'PUBLISHED', version: 2 },
     } as any);
     renderPage();
     const titles = await screen.findAllByText('我的页面');
@@ -44,7 +42,7 @@ describe('WikiPageReadPage', () => {
 
   it('显示版本号', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: [{ id: 'p1', title: 'P', slug: 'p', content: 'c', status: 'PUBLISHED', version: 5 }],
+      data: { id: 'p1', title: 'P', slug: 'p', content: 'c', status: 'PUBLISHED', version: 5 },
     } as any);
     renderPage('p');
     expect(await screen.findByText(/v5/)).toBeInTheDocument();
@@ -52,14 +50,15 @@ describe('WikiPageReadPage', () => {
 
   it('显示状态徽章', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
-      data: [{ id: 'p1', title: 'P', slug: 'p', content: 'c', status: 'PUBLISHED', version: 1 }],
+      data: { id: 'p1', title: 'P', slug: 'p', content: 'c', status: 'PUBLISHED', version: 1 },
     } as any);
     renderPage('p');
     expect(await screen.findByText('PUBLISHED')).toBeInTheDocument();
   });
 
   it('页面不存在:显示"页面不存在"', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] } as any);
+    // getPageBySlug 在 404 时会 reject，触发 queryFn 抛错 → 渲染错误分支
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Not Found'));
     renderPage('nonexistent');
     expect(await screen.findByText(/页面不存在/)).toBeInTheDocument();
   });

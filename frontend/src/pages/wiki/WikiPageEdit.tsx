@@ -14,7 +14,6 @@ import {
 } from '@mui/icons-material';
 import { wikiApi } from '@/api/wiki';
 import { EnhancedMarkdownEditor } from '@/components/wiki/EnhancedMarkdownEditor';
-import type { WikiPage } from '@/types/wiki';
 
 export function WikiPageEditPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -28,11 +27,9 @@ export function WikiPageEditPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['wiki-page', slug],
     queryFn: async () => {
-      const listRes = await wikiApi.listPages({ kbId: undefined });
-      const pages = Array.isArray(listRes) ? listRes : (listRes as any)?.data || [];
-      const page = pages.find((p: WikiPage) => p.slug === slug);
-      if (!page) throw new Error('Page not found');
-      return page;
+      const res = await wikiApi.getPageBySlug(slug!);
+      // envelope 兼容
+      return (res as any)?.data ?? res;
     },
     enabled: !!slug,
   });

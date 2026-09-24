@@ -7,7 +7,7 @@ import { wikiApi } from '@/api/wiki';
 
 vi.mock('@/api/wiki', () => ({
   wikiApi: {
-    listPages: vi.fn(),
+    getPageBySlug: vi.fn(),
     updatePage: vi.fn(),
   },
 }));
@@ -34,10 +34,8 @@ describe('WikiPageEditPage', () => {
     );
 
   it('加载页面数据:回显标题和内容', async () => {
-    vi.mocked(wikiApi.listPages).mockResolvedValue({
-      data: [
-        { id: 'p1', title: '我的页面', slug: 'my-page', content: '# Hello', status: 'DRAFT' },
-      ],
+    vi.mocked(wikiApi.getPageBySlug).mockResolvedValue({
+      data: { id: 'p1', title: '我的页面', slug: 'my-page', content: '# Hello', status: 'DRAFT' },
     } as any);
     renderPage();
     expect(await screen.findByDisplayValue('我的页面')).toBeInTheDocument();
@@ -46,10 +44,8 @@ describe('WikiPageEditPage', () => {
   });
 
   it('修改标题和内容后保存', async () => {
-    vi.mocked(wikiApi.listPages).mockResolvedValue({
-      data: [
-        { id: 'p1', title: '旧标题', slug: 'my-page', content: '# old content', status: 'DRAFT' },
-      ],
+    vi.mocked(wikiApi.getPageBySlug).mockResolvedValue({
+      data: { id: 'p1', title: '旧标题', slug: 'my-page', content: '# old content', status: 'DRAFT' },
     } as any);
     vi.mocked(wikiApi.updatePage).mockResolvedValue({} as any);
     renderPage();
@@ -65,8 +61,8 @@ describe('WikiPageEditPage', () => {
   });
 
   it('保存时缺少标题:显示错误提示', async () => {
-    vi.mocked(wikiApi.listPages).mockResolvedValue({
-      data: [{ id: 'p1', title: '', slug: 'my-page', content: '# Hello', status: 'DRAFT' }],
+    vi.mocked(wikiApi.getPageBySlug).mockResolvedValue({
+      data: { id: 'p1', title: '', slug: 'my-page', content: '# Hello', status: 'DRAFT' },
     } as any);
     renderPage();
     // 等待加载完成，找到标题输入

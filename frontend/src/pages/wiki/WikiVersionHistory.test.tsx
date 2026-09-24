@@ -7,7 +7,7 @@ import { wikiApi } from '@/api/wiki';
 
 vi.mock('@/api/wiki', () => ({
   wikiApi: {
-    listPages: vi.fn(),
+    getPageBySlug: vi.fn(),
     listVersions: vi.fn(),
     restoreVersion: vi.fn(),
   },
@@ -35,14 +35,14 @@ describe('WikiVersionHistoryPage', () => {
     );
 
   it('空版本显示"暂无版本记录"', async () => {
-    vi.mocked(wikiApi.listPages).mockResolvedValue({ data: [{ id: 'p1', title: 'P', slug: 'my-page' }] } as any);
+    vi.mocked(wikiApi.getPageBySlug).mockResolvedValue({ data: { id: 'p1', title: 'P', slug: 'my-page' } } as any);
     vi.mocked(wikiApi.listVersions).mockResolvedValue([] as any);
     renderPage();
     expect(await screen.findByText(/暂无版本记录/)).toBeInTheDocument();
   });
 
   it('渲染版本列表', async () => {
-    vi.mocked(wikiApi.listPages).mockResolvedValue({ data: [{ id: 'p1', title: 'My Page', slug: 'my-page' }] } as any);
+    vi.mocked(wikiApi.getPageBySlug).mockResolvedValue({ data: { id: 'p1', title: 'My Page', slug: 'my-page' } } as any);
     vi.mocked(wikiApi.listVersions).mockResolvedValue([
       { id: 'v1', version: 3, title: 'v3 标题', created_at: '2026-01-15T10:00:00Z', created_by: 'alice' },
       { id: 'v2', version: 2, title: 'v2 标题', created_at: '2026-01-14T10:00:00Z', created_by: 'bob' },
@@ -53,7 +53,7 @@ describe('WikiVersionHistoryPage', () => {
   });
 
   it('恢复版本', async () => {
-    vi.mocked(wikiApi.listPages).mockResolvedValue({ data: [{ id: 'p1', title: 'P', slug: 'my-page' }] } as any);
+    vi.mocked(wikiApi.getPageBySlug).mockResolvedValue({ data: { id: 'p1', title: 'P', slug: 'my-page' } } as any);
     vi.mocked(wikiApi.listVersions).mockResolvedValue([
       { id: 'v1', version: 2, title: 'v2 标题', created_at: '2026-01-14T10:00:00Z', created_by: 'alice' },
     ] as any);
@@ -70,7 +70,7 @@ describe('WikiVersionHistoryPage', () => {
   });
 
   it('对比两个版本', async () => {
-    vi.mocked(wikiApi.listPages).mockResolvedValue({ data: [{ id: 'p1', title: 'P', slug: 'my-page' }] } as any);
+    vi.mocked(wikiApi.getPageBySlug).mockResolvedValue({ data: { id: 'p1', title: 'P', slug: 'my-page' } } as any);
     vi.mocked(wikiApi.listVersions).mockResolvedValue([
       { id: 'v1', version: 3, title: 'v3', created_at: '2026-01-15T10:00:00Z', created_by: 'alice', content: 'v3 content' },
       { id: 'v2', version: 2, title: 'v2', created_at: '2026-01-14T10:00:00Z', created_by: 'bob', content: 'v2 content' },

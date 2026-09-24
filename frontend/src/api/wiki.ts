@@ -46,6 +46,8 @@ export const wikiApi = {
   listPages: (params?: { kbId?: string; status?: string; page?: number; size?: number }) =>
     apiClient.get('/api/wiki/pages', { params }),
   getPage: (id: string) => apiClient.get(`/api/wiki/pages/${id}`),
+  // P0 修复：按 slug 取页面（端点必须在 /pages/{id} 之前以避免 Spring 路由冲突）
+  getPageBySlug: (slug: string) => apiClient.get(`/api/wiki/pages/by-slug/${slug}`),
   createPage: (body: { knowledge_base_id: string; slug: string; title: string; content?: string; parent_id?: string }) =>
     apiClient.post('/api/wiki/pages', body),
   updatePage: (id: string, body: { title?: string; content?: string; slug?: string }) =>

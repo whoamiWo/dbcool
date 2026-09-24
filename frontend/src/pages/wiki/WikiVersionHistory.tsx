@@ -39,11 +39,8 @@ export function WikiVersionHistoryPage() {
   const { data: pageData, isLoading: pageLoading } = useQuery({
     queryKey: ['wiki-page', slug],
     queryFn: async () => {
-      const listRes = await wikiApi.listPages({ kbId: undefined });
-      const pages = Array.isArray(listRes) ? listRes : (listRes as any)?.data || [];
-      const page = pages.find((p: WikiPage) => p.slug === slug);
-      if (!page) throw new Error('Page not found');
-      return page as WikiPage;
+      const res = await wikiApi.getPageBySlug(slug!);
+      return ((res as any)?.data ?? res) as WikiPage;
     },
     enabled: !!slug,
   });
