@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # Redis
     redis_host: str = "localhost"
     redis_port: int = 6379
+    redis_enabled: bool = True  # 关闭时限流/缓存/配额降级为单进程内存模式
 
     # R11: LLM 三层防护可配参数(演示前可放宽灰度)
     llm_rate_limit_max_requests: int = 30

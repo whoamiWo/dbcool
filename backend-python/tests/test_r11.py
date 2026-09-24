@@ -123,3 +123,57 @@ class TestQuotaService:
         await quota.reset_daily("u1")
         remaining = await quota.remaining("u1")
         assert remaining["daily_calls_remaining"] == 2
+
+
+# ---- W1 (P0) 新增：Redis 不可用须明确报错 + 内存 fallback ----
+class TestRedisUnavailable:
+    @pytest.mark.asyncio
+    async def test_redis_unavailable_raises(self, monkeypatch):
+        """Redis 连接失败须抛 RedisUnavailableError，禁止静默降级。"""
+        from nocobase_py import redis_client as rc
+        from nocobase_py.config import get_settings
+
+        # 强制启用 Redis，但指向不可达端口
+        monkeypatch.setattr(get_settings(), "redis_enabled", True)
+        monkeypatch.setattr(get_settings(), "redis_host", "127.0.0.1")
+        monkeypatch.setattr(get_settings(), "redis_port", 1)
+        # 重置单例
+        rc._redis = None
+        with pytest.raises(rc.RedisUnavailableError) as exc:
+            await rc.get_redis()
+        assert "Redis 连接失败" in str(exc.value)
+        rc._redis = None
+
+    @pytest.mark.asyncio
+    async def test_memory_fallback_when_disabled(self, monkeypatch):
+        """REDIS_ENABLED=false 时返回 _MemoryRedis，不抛错。"""
+        from nocobase_py import redis_client as rc
+        from nocobase_py.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "redis_enabled", False)
+        rc._redis = None
+        rc._memory = None
+        r = await rc.get_redis()
+        assert isinstance(r, rc._MemoryRedis)
+        await r.setex("k", 10, "v")
+        assert await r.get("k") == "v"
+        rc._memory = None
+
+    @pytest.mark.asyncio
+    async def test_memory_fallback_concurrent_incr(self, monkeypatch):
+        """内存 fallback 并发 INCR 一致性（单进程内正确）。"""
+        from nocobase_py import redis_client as rc
+        from nocobase_py.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "redis_enabled", False)
+        rc._redis = None
+        rc._memory = None
+        r = await rc.get_redis()
+
+        async def inc(n):
+            for _ in range(n):
+                await r.incr("counter")
+
+        await asyncio.gather(inc(10), inc(10), inc(10))
+        assert await r.get("counter") == "30"
+        rc._memory = None
