@@ -1,3 +1,4 @@
+git push origin main
 # PHASE52 GLM-5.3 审计返工提示词（第六轮）
 
 ## 任务背景
