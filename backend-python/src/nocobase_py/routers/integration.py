@@ -249,6 +249,67 @@ async def feishu_send(
     return {"code": 0 if result.get("code") == 0 else 1, "data": result}
 
 
+@router.post("/feishu/verify")
+async def feishu_verify(request: Request) -> PlainTextResponse | dict[str, Any]:
+    """验证飞书事件回调签名（P0-2a 接真）。
+
+    飞书事件订阅请求带以下 header:
+      X-Lark-Request-Timestamp, X-Lark-Request-Nonce, X-Lark-Signature (hex)
+    校验规则：HMAC-SHA256(key=app_secret, message=timestamp + nonce + body)。
+
+    challenge 响应：飞书 URL 校验模式会 POST {challenge: "..."}，原样返回。
+    """
+    connector = _feishu_connector()
+    if not connector.is_configured:
+        raise HTTPException(status_code=503, detail="飞书未配置")
+
+    body_bytes = await request.body()
+    timestamp = request.headers.get("X-Lark-Request-Timestamp", "")
+    nonce = request.headers.get("X-Lark-Request-Nonce", "")
+    signature = request.headers.get("X-Lark-Signature", "")
+
+    if not connector.verify_signature_hex(signature, timestamp, nonce, body_bytes):
+        logger.warning("[Feishu] 入站签名校验失败 ts=%s nonce=%s", timestamp, nonce)
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    try:
+        body_json = json.loads(body_bytes.decode("utf-8"))
+    except Exception:
+        body_json = {}
+
+    # URL 验证 challenge（飞书事件订阅握手）
+    if isinstance(body_json, dict) and "challenge" in body_json:
+        return PlainTextResponse(content=str(body_json["challenge"]))
+
+    # 业务事件落地：转 Java IM
+    event_id = body_json.get("uuid") if isinstance(body_json, dict) else None
+    if event_id and _dedup(str(event_id)):
+        return {"code": 0, "data": {"valid": True}}
+    # 飞书事件结构：body.header.event_type + body.event
+    header = body_json.get("header", {}) if isinstance(body_json, dict) else {}
+    event = body_json.get("event", {}) if isinstance(body_json, dict) else {}
+    text = ""
+    if isinstance(event, dict):
+        # 飞书消息事件 payload 结构多样,先取 text/content
+        if "text" in event:
+            text = str(event.get("text", ""))
+        elif "message" in event and isinstance(event["message"], dict):
+            text = str(event["message"].get("content", ""))
+    event_type = header.get("event_type", "unknown") if isinstance(header, dict) else "unknown"
+    try:
+        await _forward_to_java({
+            "event_id": event_id,
+            "text": text,
+            "type": event_type,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[Feishu] 入站转发失败: %s", e)
+        raise HTTPException(status_code=500, detail=f"转发失败: {e}")
+    return {"code": 0, "data": {"valid": True}}
+
+
 def _mattermost_connector() -> MattermostConnector:
     """基于全局配置构造 Mattermost 连接器。"""
     s = get_settings()
@@ -270,3 +331,59 @@ async def mattermost_send(
         raise HTTPException(status_code=400, detail="Mattermost 未配置")
     result = await connector.send_message(channel=payload.to, text=payload.text)
     return {"code": 0 if result.get("ok") else 1, "data": result}
+
+
+@router.post("/mattermost/verify")
+async def mattermost_verify(request: Request) -> dict[str, Any]:
+    """验证 Mattermost outgoing webhook 请求（P0-2a 接真）。
+
+    Mattermost outgoing webhook 字段：
+      token: 预共享密钥（与 settings.mattermost_webhook_token 比对）
+      text / user_name / channel_id / channel_name ...
+    """
+    connector = _mattermost_connector()
+    if not connector.is_configured:
+        raise HTTPException(status_code=503, detail="Mattermost 未配置")
+
+    # Mattermost outgoing webhook 走 form-urlencoded 或 json,两种都兼容
+    content_type = request.headers.get("Content-Type", "")
+    if "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        token = form.get("token", "")
+        text = form.get("text", "")
+        channel_id = form.get("channel_id", "")
+        user_name = form.get("user_name", "")
+        trigger_word = form.get("trigger_word", "")
+    else:
+        try:
+            body_json = json.loads((await request.body()).decode("utf-8"))
+        except Exception:
+            body_json = {}
+        token = body_json.get("token", "")
+        text = body_json.get("text", "")
+        channel_id = body_json.get("channel_id", "")
+        user_name = body_json.get("user_name", "")
+        trigger_word = body_json.get("trigger_word", "")
+
+    if not connector.verify_webhook_token(str(token)):
+        logger.warning("[Mattermost] 入站 webhook token 校验失败 channel=%s", channel_id)
+        raise HTTPException(status_code=401, detail="Invalid webhook token")
+
+    # 入站事件落地
+    event_id = f"mm-{channel_id}-{text[:64]}"
+    if _dedup(event_id):
+        return {"code": 0, "data": {"valid": True}}
+    try:
+        await _forward_to_java({
+            "event_id": event_id,
+            "text": f"@{user_name}: {text}" if user_name else text,
+            "type": "mattermost_outgoing",
+            "channel_id": channel_id,
+            "trigger_word": trigger_word,
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[Mattermost] 入站转发失败: %s", e)
+        raise HTTPException(status_code=500, detail=f"转发失败: {e}")
+    return {"code": 0, "data": {"valid": True}}
