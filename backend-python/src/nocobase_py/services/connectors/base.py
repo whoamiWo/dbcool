@@ -1,12 +1,19 @@
 """连接器抽象基类与注册表 (W4)。"""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Type
-from pydantic import BaseModel
+from typing import Any, Dict, Type
+from pydantic import BaseModel, ConfigDict
 
 
 class ConnectorConfig(BaseModel):
-    """连接器配置基类。"""
+    """连接器配置基类 — 允许额外字段以兼容各平台子类的专属配置。
+
+    端到端冒烟期间发现 router 调用 SlackConnector(signing_secret=..., bot_token=...)
+    这种 keyword 风格,但子类 __init__ 签名是 (self, config: ConnectorConfig)。
+    修复:ConfigDict(extra='allow') 让 Pydantic v2 接受所有平台专属字段,
+    getattr(config, 'app_id', '') / getattr(config, 'bot_token', '') 全部命中。
+    """
+    model_config = ConfigDict(extra='allow')
     enabled: bool = True
     timeout_seconds: int = 30
 

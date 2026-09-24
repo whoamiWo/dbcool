@@ -21,6 +21,7 @@ from nocobase_py.services.connectors.feishu import FeishuConnector
 from nocobase_py.services.connectors.mattermost import MattermostConnector
 from nocobase_py.services.connectors.slack import SlackConnector
 from nocobase_py.services.connectors.wecom import WeComConnector
+from nocobase_py.services.connectors.base import ConnectorConfig
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +53,12 @@ def _service_token() -> str:
 
 
 async def _forward_to_java(event: dict) -> None:
-    """将入站事件转发到 Java /api/im/messages 落地。"""
+    """将入站事件转发到 Java /api/im/messages 落地。
+
+    channel_id 优先从 event 取（各平台事件自带 channel_id），回退到 settings.slack_event_channel_id。
+    """
     s = get_settings()
-    channel_id = s.slack_event_channel_id
+    channel_id = event.get("channel_id") or s.slack_event_channel_id
     if not channel_id:
         logger.warning("[Slack] slack_event_channel_id 未配置，跳过转发")
         raise HTTPException(status_code=500, detail="slack_event_channel_id 未配置")
@@ -70,8 +74,13 @@ async def _forward_to_java(event: dict) -> None:
             json={
                 "channelId": channel_id,
                 "content": event.get("text") or "",
-                "contentType": "slack_event",
-                "meta": json.dumps({"slack_event_id": event.get("event_id"), "source": "slack"}),
+                "contentType": event.get("type", "slack_event"),
+                "meta": json.dumps({
+                    "event_id": event.get("event_id"),
+                    "source": event.get("type", "slack"),
+                    "user_name": event.get("user_name", ""),
+                    "trigger_word": event.get("trigger_word", ""),
+                }),
             },
         )
     if resp.status_code >= 400:
@@ -81,40 +90,40 @@ async def _forward_to_java(event: dict) -> None:
 def _slack_connector() -> SlackConnector:
     """基于全局配置构造 Slack 连接器。"""
     s = get_settings()
-    return SlackConnector(
+    return SlackConnector(config=ConnectorConfig(
         signing_secret=s.slack_signing_secret,
         bot_token=s.slack_bot_token,
         team_id=s.slack_team_id,
-    )
+    ))
 
 
 def _wecom_connector() -> WeComConnector:
     """基于全局配置构造企业微信连接器。"""
     s = get_settings()
-    return WeComConnector(
+    return WeComConnector(config=ConnectorConfig(
         corp_id=s.wecom_corp_id if hasattr(s, "wecom_corp_id") else "",
         corp_secret=s.wecom_corp_secret if hasattr(s, "wecom_corp_secret") else "",
         agent_id=s.wecom_agent_id if hasattr(s, "wecom_agent_id") else "",
-    )
+    ))
 
 
 def _dingtalk_connector() -> DingTalkConnector:
     """基于全局配置构造钉钉连接器。"""
     s = get_settings()
-    return DingTalkConnector(
+    return DingTalkConnector(config=ConnectorConfig(
         app_key=s.dingtalk_app_key if hasattr(s, "dingtalk_app_key") else "",
         app_secret=s.dingtalk_app_secret if hasattr(s, "dingtalk_app_secret") else "",
         agent_id=s.dingtalk_agent_id if hasattr(s, "dingtalk_agent_id") else "",
-    )
+    ))
 
 
 def _feishu_connector() -> FeishuConnector:
     """基于全局配置构造飞书连接器。"""
     s = get_settings()
-    return FeishuConnector(
+    return FeishuConnector(config=ConnectorConfig(
         app_id=s.feishu_app_id if hasattr(s, "feishu_app_id") else "",
         app_secret=s.feishu_app_secret if hasattr(s, "feishu_app_secret") else "",
-    )
+    ))
 
 
 class SlackMessagePayload(BaseModel):
@@ -160,7 +169,7 @@ async def slack_send(
     return {"code": 0 if result.get("ok") else 1, "data": result}
 
 
-@router.post("/slack/verify")
+@router.post("/slack/verify", response_model=None)
 async def slack_verify(
     request: Request,
 ) -> PlainTextResponse | dict[str, Any]:
@@ -249,7 +258,7 @@ async def feishu_send(
     return {"code": 0 if result.get("code") == 0 else 1, "data": result}
 
 
-@router.post("/feishu/verify")
+@router.post("/feishu/verify", response_model=None)
 async def feishu_verify(request: Request) -> PlainTextResponse | dict[str, Any]:
     """验证飞书事件回调签名（P0-2a 接真）。
 
@@ -313,11 +322,11 @@ async def feishu_verify(request: Request) -> PlainTextResponse | dict[str, Any]:
 def _mattermost_connector() -> MattermostConnector:
     """基于全局配置构造 Mattermost 连接器。"""
     s = get_settings()
-    return MattermostConnector(
+    return MattermostConnector(config=ConnectorConfig(
         webhook_url=s.mattermost_webhook_url if hasattr(s, "mattermost_webhook_url") else "",
         bot_token=s.mattermost_bot_token if hasattr(s, "mattermost_bot_token") else "",
         server_url=s.mattermost_server_url if hasattr(s, "mattermost_server_url") else "",
-    )
+    ))
 
 
 @router.post("/mattermost/send")
@@ -341,9 +350,9 @@ async def mattermost_verify(request: Request) -> dict[str, Any]:
       token: 预共享密钥（与 settings.mattermost_webhook_token 比对）
       text / user_name / channel_id / channel_name ...
     """
+    # P0-2a:verify 端点不依赖 is_configured（只需 MATTERMOST_WEBHOOK_TOKEN）,
+    # 发送消息端点 /mattermost/send 仍依赖 webhook_url 或 bot_token。
     connector = _mattermost_connector()
-    if not connector.is_configured:
-        raise HTTPException(status_code=503, detail="Mattermost 未配置")
 
     # Mattermost outgoing webhook 走 form-urlencoded 或 json,两种都兼容
     content_type = request.headers.get("Content-Type", "")
