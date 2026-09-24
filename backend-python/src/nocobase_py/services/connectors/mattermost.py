@@ -35,17 +35,15 @@ class MattermostConnector(BaseConnector):
 
         Mattermost outgoing webhook 在每个请求里都带 token 字段，必须严格比对
         （hmac.compare_digest 防时序攻击）。
-        配置来源（按优先级）：config.webhook_token > settings.mattermost_webhook_token。
+        配置来源：settings.mattermost_webhook_token（统一从环境变量 MATTERMOST_WEBHOOK_TOKEN 注入）。
         """
-        expected = getattr(self.config, "webhook_token", "") or ""
-        if not expected:
-            # 从 settings 兜底取
-            try:
-                from nocobase_py.config import get_settings
-                s = get_settings()
-                expected = getattr(s, "mattermost_webhook_token", "") or ""
-            except Exception:
-                expected = ""
+        expected = ""
+        try:
+            from nocobase_py.config import get_settings
+            s = get_settings()
+            expected = getattr(s, "mattermost_webhook_token", "") or ""
+        except Exception:
+            expected = ""
         if not expected or not token:
             return False
         import hmac

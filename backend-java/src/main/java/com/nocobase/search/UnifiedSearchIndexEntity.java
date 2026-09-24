@@ -34,7 +34,9 @@ public class UnifiedSearchIndexEntity {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
-    @Column(name = "content_tsv", columnDefinition = "TEXT", insertable = false, updatable = false)
+    @Column(name = "content_tsv", columnDefinition = "TSVECTOR", insertable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.OTHER)
+    @Transient
     private String contentTsv;
 
     @Column(name = "metadata", columnDefinition = "jsonb")

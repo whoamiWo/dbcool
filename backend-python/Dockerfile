@@ -10,7 +10,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # 安装依赖(利用 Docker 缓存)
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 RUN uv sync --no-install-project --no-dev
 
 # 复制源码
