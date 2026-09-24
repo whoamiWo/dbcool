@@ -241,6 +241,21 @@ public class WikiController {
         return Map.of("code", 0, "message", "success", "data", toPageDto(entity));
     }
 
+    /**
+     * 按 slug 获取页面（P0 修复：前端 /wiki/:slug 三页面统一入口）。
+     * 注意：路径必须在 /pages/{id} 之前，避免 Spring 把 "by-slug" 当成 UUID id。
+     */
+    @GetMapping("/pages/by-slug/{slug}")
+    public Map<String, Object> getPageBySlug(
+            @PathVariable String slug,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        WikiPageEntity entity = pageService.getBySlug(slug, user.tenantId());
+        return Map.of("code", 0, "message", "success", "data", toPageDto(entity));
+    }
+
     @PutMapping("/pages/{id}")
     public Map<String, Object> updatePage(
             @PathVariable UUID id,

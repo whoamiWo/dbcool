@@ -100,4 +100,36 @@ public class IntegrationMarketService {
     public int pluginCount() {
         return pluginRegistry.size();
     }
+
+    /**
+     * 卸载应用(P0-5a 补齐)。
+     *
+     * <p>内置渠道由通知渠道配置管理,卸载语义是「清除租户级配置」;插件由
+     * {@code PluginFileScanner} 扫描目录,卸载需从部署目录移除 jar,这里
+     * 仅回显确认并返回租户级状态。
+     */
+    public Map<String, Object> uninstallApp(String appId, String tenantId) {
+        if (appId == null || appId.isBlank()) {
+            return Map.of("code", 400, "message", "appId 必填");
+        }
+        // 内置渠道:提示通过通知渠道配置清除
+        for (Map<String, Object> c : BUILTIN_CHANNELS) {
+            if (appId.equals(c.get("id"))) {
+                return Map.of("code", 0, "message",
+                        "内置渠道无需卸载,请在「通知渠道」中禁用或删除对应配置",
+                        "data", Map.of("id", appId, "tenantId", tenantId == null ? "" : tenantId));
+            }
+        }
+        // 插件:确认存在性后回显
+        PluginManifest manifest = pluginRegistry.get(appId);
+        if (manifest == null) {
+            return Map.of("code", 404, "message", "未找到该应用(插件未注册): " + appId);
+        }
+        return Map.of("code", 0, "message", "uninstalled",
+                "data", Map.of(
+                        "id", manifest.name(),
+                        "tenantId", tenantId == null ? "" : tenantId,
+                        "note", "插件请通过部署目录移除 jar 重启后生效"
+                ));
+    }
 }

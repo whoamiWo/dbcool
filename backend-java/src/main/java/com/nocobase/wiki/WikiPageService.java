@@ -30,18 +30,21 @@ public class WikiPageService {
     private final WikiVersionRepository versionRepository;
     private final KnowledgeBaseService knowledgeBaseService;
     private final WikiPermissionService permissionService;
+    private final WikiBacklinkRepository backlinkRepository;
 
     @Autowired
     public WikiPageService(
             WikiPageRepository pageRepository,
             WikiVersionRepository versionRepository,
             KnowledgeBaseService knowledgeBaseService,
-            WikiPermissionService permissionService
+            WikiPermissionService permissionService,
+            WikiBacklinkRepository backlinkRepository
     ) {
         this.pageRepository = pageRepository;
         this.versionRepository = versionRepository;
         this.knowledgeBaseService = knowledgeBaseService;
         this.permissionService = permissionService;
+        this.backlinkRepository = backlinkRepository;
     }
 
     @Transactional
@@ -68,7 +71,10 @@ public class WikiPageService {
         entity.setUpdatedBy(createdBy);
         entity.setCreatedAt(Instant.now());
         entity.setUpdatedAt(Instant.now());
-        return pageRepository.save(entity);
+        WikiPageEntity saved = pageRepository.save(entity);
+        // 同步双向链接：解析 [[slug]] → 写入 wiki_backlink
+        if (content != null) syncBacklinks(saved.getId(), tenantId, content);
+        return saved;
     }
 
     public WikiPageEntity get(UUID id) {
@@ -79,6 +85,34 @@ public class WikiPageService {
     public WikiPageEntity getBySlug(String slug, String tenantId) {
         return pageRepository.findBySlugAndTenantId(slug, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "页面不存在: " + slug));
+    }
+
+    /**
+     * 双向链接同步：解析内容中的 [[slug]] → 查目标页 → 写入 wiki_backlink。
+     *
+     * <p>P0-4a 接真：parseBacklinks 解析方法已存在但从未被调用，导致 wiki_backlink 表
+     * 永远为空，反向链接查询恒返空。先清旧再插新（幂等）。
+     */
+    @Transactional
+    public void syncBacklinks(UUID sourcePageId, String tenantId, String content) {
+        if (sourcePageId == null || content == null) return;
+        backlinkRepository.deleteBySourcePageId(sourcePageId);
+        List<String> slugs = parseBacklinks(content);
+        if (slugs.isEmpty()) return;
+        java.util.Set<String> uniq = new java.util.LinkedHashSet<>(slugs);
+        Instant now = Instant.now();
+        for (String slug : uniq) {
+            UUID targetId = pageRepository.findBySlugAndTenantId(slug, tenantId)
+                    .map(WikiPageEntity::getId).orElse(null);
+            WikiBacklinkEntity link = new WikiBacklinkEntity();
+            link.setId(UUID.randomUUID());
+            link.setSourcePageId(sourcePageId);
+            link.setTargetPageId(targetId); // null 表示目标尚未创建
+            link.setTargetSlug(slug);
+            link.setTenantId(tenantId);
+            link.setCreatedAt(now);
+            backlinkRepository.save(link);
+        }
     }
 
     public List<WikiPageEntity> listByKb(UUID kbId, String tenantId) {
@@ -123,6 +157,8 @@ public class WikiPageService {
         entity.setUpdatedAt(Instant.now());
         pageRepository.saveAndFlush(entity);
         pageRepository.bumpVersion(entity.getId());
+        // 双向链接同步：仅当内容变化时重建关系表
+        if (content != null) syncBacklinks(entity.getId(), tenantId, content);
         return entity;
     }
 
