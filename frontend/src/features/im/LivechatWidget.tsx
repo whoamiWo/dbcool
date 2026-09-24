@@ -53,7 +53,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
   const initSession = async () => {
     try {
       const resp = await apiClient.post<{ code: number; data: { sessionId: string } }>(
-        '/api/livechat/session',
+        '/livechat/session',
         {}
       );
       if (resp.code === 0 && resp.data?.sessionId) {
@@ -93,7 +93,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
     setIsLoading(true);
 
     try {
-      await apiClient.post('/api/livechat/message', {
+      await apiClient.post('/livechat/message', {
         sessionId,
         message: inputText.trim(),
       });
@@ -122,7 +122,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
 
     try {
       const resp = await apiClient.post<{ code: number; data: { ticketId: string } }>(
-        '/api/livechat/close',
+        '/livechat/close',
         { sessionId, message: '会话结束，自动转工单' }
       );
 

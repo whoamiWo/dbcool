@@ -92,16 +92,15 @@ export function TimelineViewPage() {
     enabled: !!viewId,
   });
 
-  const collectionName = viewData?.collection_name;
   const { data: recordsResp, isLoading: loadingRecords } = useQuery({
-    queryKey: ['timeline-records', collectionName, viewId],
+    queryKey: ['timeline-records', viewId],
     queryFn: async () => {
       const resp = await apiClient.get<{ code: number; data: Record<string, unknown>[] }>(
-        `/collections/${collectionName}/records?limit=200&sort=${inferDateField(viewData!, 'created_at')}:asc`
+        `/views/${viewId}/timeline-records?limit=200`
       );
       return resp.data ?? [];
     },
-    enabled: !!collectionName,
+    enabled: !!viewId,
     refetchOnWindowFocus: false,
   });
 
@@ -123,11 +122,13 @@ export function TimelineViewPage() {
 
   // 按时间字段排序
   const sorted = useMemo(() => {
-    const dateField = inferDateField(viewData!, 'created_at');
+    const cfg = (viewData?.config ?? {}) as unknown as TimelineConfig;
+    const dateField = cfg.dateField || inferDateField(viewData!, 'created_at');
+    const direction = cfg.sortDirection === 'desc' ? -1 : 1;
     return [...recordsResp].sort((a, b) => {
       const da = String(a[dateField] ?? a.created_at ?? '');
       const db = String(b[dateField] ?? b.created_at ?? '');
-      return da.localeCompare(db);
+      return direction * da.localeCompare(db);
     });
   }, [recordsResp, viewData]);
 

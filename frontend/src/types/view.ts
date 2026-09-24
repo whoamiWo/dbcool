@@ -43,6 +43,7 @@ export interface TimelineConfig {
   titleField?: string; // 标题字段，默认 'title'
   colorField?: string; // 按字段颜色映射
   compact?: boolean; // 紧凑模式
+  sortDirection?: 'asc' | 'desc'; // 时间线排序方向，默认升序
 }
 
 export type ViewConfig = TableConfig | KanbanConfig | DetailConfig | TimelineConfig;
