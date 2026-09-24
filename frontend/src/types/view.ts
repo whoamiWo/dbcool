@@ -44,6 +44,10 @@ export interface TimelineConfig {
   colorField?: string; // 按字段颜色映射
   compact?: boolean; // 紧凑模式
   sortDirection?: 'asc' | 'desc'; // 时间线排序方向，默认升序
+  startDateField?: string; // 区间过滤起始字段（默认 dateField）
+  endDateField?: string;   // 区间过滤结束字段（默认 dateField）
+  filterStart?: string;    // 区间过滤起始（ISO 日期字符串，可选）
+  filterEnd?: string;      // 区间过滤结束（ISO 日期字符串，可选）
 }
 
 export type ViewConfig = TableConfig | KanbanConfig | DetailConfig | TimelineConfig;

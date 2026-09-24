@@ -92,11 +92,19 @@ export function TimelineViewPage() {
     enabled: !!viewId,
   });
 
+  // 区间过滤（后端 listTimelineRecords 支持 filterStart/filterEnd）
+  const cfg = (viewData?.config ?? {}) as unknown as TimelineConfig;
+  const filterStart = cfg.filterStart as string | undefined;
+  const filterEnd = cfg.filterEnd as string | undefined;
+
   const { data: recordsResp, isLoading: loadingRecords } = useQuery({
-    queryKey: ['timeline-records', viewId],
+    queryKey: ['timeline-records', viewId, filterStart, filterEnd],
     queryFn: async () => {
+      const params = new URLSearchParams({ limit: '200' });
+      if (filterStart) params.set('filterStart', filterStart);
+      if (filterEnd) params.set('filterEnd', filterEnd);
       const resp = await apiClient.get<{ code: number; data: Record<string, unknown>[] }>(
-        `/views/${viewId}/timeline-records?limit=200`
+        `/views/${viewId}/timeline-records?${params.toString()}`
       );
       return resp.data ?? [];
     },
