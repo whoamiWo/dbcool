@@ -12,12 +12,15 @@ import static org.mockito.Mockito.when;
 import com.nocobase.automation.AutomationRuleService;
 import com.nocobase.automation.entity.AutomationRuleEntity;
 import com.nocobase.im.MessageService;
+import com.nocobase.im.ImChannelMemberRepository;
+import com.nocobase.im.entity.ImChannelMemberEntity;
 import com.nocobase.im.entity.ImMessageEntity;
 import com.nocobase.meta.CollectionService;
 import com.nocobase.project.ProjectService;
 import com.nocobase.project.ProjectTaskEntity;
 import com.nocobase.wiki.WikiPageService;
 import com.nocobase.wiki.WikiPageEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +43,8 @@ class UnifiedSearchServiceTest {
     private CollectionService collectionService;
     private AutomationRuleService automationRuleService;
     private ProjectService projectService;
+    private ImChannelMemberRepository channelMemberRepository;
+    private ObjectMapper objectMapper;
     private UnifiedSearchService service;
 
     private final String tenantId = "tenant_default";
@@ -56,9 +61,12 @@ class UnifiedSearchServiceTest {
         collectionService = mock(CollectionService.class);
         automationRuleService = mock(AutomationRuleService.class);
         projectService = mock(ProjectService.class);
+        channelMemberRepository = mock(ImChannelMemberRepository.class);
+        objectMapper = new ObjectMapper();
         service = new UnifiedSearchService(
                 messageService, wikiPageService, collectionService,
-                automationRuleService, projectService, indexRepo);
+                automationRuleService, projectService, indexRepo,
+                channelMemberRepository, objectMapper);
     }
 
     // ---- 辅助：构造索引命中实体 ----
@@ -133,7 +141,7 @@ class UnifiedSearchServiceTest {
             return t;
         });
 
-        Map<String, Object> result = service.search("content", tenantId, null, 20);
+        Map<String, Object> result = service.search("content", tenantId, null, null, 20);
         assertThat(result.get("total")).isEqualTo(5);
         assertThat(facets(result).keySet())
                 .containsExactlyInAnyOrder("im", "wiki", "record", "project", "automation");
@@ -157,12 +165,12 @@ class UnifiedSearchServiceTest {
                 idx("automation", ruleId.toString(), "订单自动流转", "当创建订单时自动流转")
         ));
 
-        Map<String, Object> hit = service.search("订单", tenantId, List.of("automation"), 10);
+        Map<String, Object> hit = service.search("订单", tenantId, null, List.of("automation"), 10);
         assertThat(results(hit)).hasSize(1);
         assertThat(results(hit).get(0).get("title")).isEqualTo("订单自动流转");
 
         // 不相关关键词 → 结果为空
-        Map<String, Object> miss = service.search("zzz", tenantId, List.of("automation"), 10);
+        Map<String, Object> miss = service.search("zzz", tenantId, null, List.of("automation"), 10);
         assertThat(results(miss)).isEmpty();
     }
 
@@ -179,13 +187,13 @@ class UnifiedSearchServiceTest {
                 idx("wiki", wikiId.toString(), "公开文档", "公开内容")
         ));
 
-        Map<String, Object> result = service.search("公开", tenantId, List.of("wiki"), 10);
+        Map<String, Object> result = service.search("公开", tenantId, null, List.of("wiki"), 10);
         assertThat(results(result)).hasSize(1);
         assertThat(results(result).get(0).get("title")).isEqualTo("公开文档");
 
         // 页面已删除/不存在 → 被过滤
         when(wikiPageService.get(wikiId)).thenReturn(null);
-        Map<String, Object> empty = service.search("公开", tenantId, List.of("wiki"), 10);
+        Map<String, Object> empty = service.search("公开", tenantId, null, List.of("wiki"), 10);
         assertThat(results(empty)).isEmpty();
     }
 
@@ -201,14 +209,14 @@ class UnifiedSearchServiceTest {
                 idx("im", msgId.toString(), "频道消息", "频道内容")
         ));
 
-        Map<String, Object> result = service.search("频道", tenantId, List.of("im"), 10);
+        Map<String, Object> result = service.search("频道", tenantId, null, List.of("im"), 10);
         assertThat(results(result)).hasSize(1);
         assertThat(results(result).get(0).get("type")).isEqualTo("im");
         assertThat(results(result).get(0).get("id")).isEqualTo(msgId);
 
         // 消息不存在 → 被过滤
         when(messageService.mustGet(msgId)).thenThrow(new RuntimeException("404"));
-        Map<String, Object> empty = service.search("频道", tenantId, List.of("im"), 10);
+        Map<String, Object> empty = service.search("频道", tenantId, null, List.of("im"), 10);
         assertThat(results(empty)).isEmpty();
     }
 

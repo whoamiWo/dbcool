@@ -66,7 +66,7 @@ public class WikiPageEntity {
 
     // FTS 字段 — 由触发器自动维护
     // 测试环境(H2)不支持 tsvector,用 TEXT 兼容;生产环境(PG)用 Flyway migration 定义 tsvector
-    @Column(name = "content_tsv", columnDefinition = "TEXT")
+    @Column(name = "content_tsv", columnDefinition = "TEXT", insertable = false, updatable = false)
     private String contentTsv;
 
     @Column(name = "is_template", nullable = false)

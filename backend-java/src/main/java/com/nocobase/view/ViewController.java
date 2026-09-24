@@ -87,6 +87,23 @@ public class ViewController {
         return Map.of("code", 0, "message", "success", "data", dto);
     }
 
+    @GetMapping("/{id}/timeline-records")
+    public Map<String, Object> timelineRecords(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(defaultValue = "200") int limit,
+            @RequestParam(required = false) String filterStart,
+            @RequestParam(required = false) String filterEnd
+    ) {
+        ViewEntity view = service.get(id, user.tenantId());
+        if (view.getType() != ViewEntity.Type.TIMELINE) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "视图类型不是 TIMELINE");
+        }
+        var records = service.listTimelineRecords(view, limit, filterStart, filterEnd);
+        return Map.of("code", 0, "message", "success", "data", records);
+    }
+
     @PutMapping("/{id}")
     public Map<String, Object> update(
             @PathVariable UUID id,

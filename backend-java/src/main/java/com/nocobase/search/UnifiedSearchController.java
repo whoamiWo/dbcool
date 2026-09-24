@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 跨模块统一搜索 REST API。
@@ -32,7 +33,7 @@ public class UnifiedSearchController {
             @AuthenticationPrincipal AuthenticatedUser user) {
         
         Map<String, Object> result = searchService.search(
-                keyword, user.tenantId(), types, limit);
+                keyword, user.tenantId(), user.userId(), types, limit);
         
         return ResponseEntity.ok(Map.of(
                 "code", 0,

@@ -1,5 +1,7 @@
 package com.nocobase.search;
 
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.im.ImChannelMemberRepository;
 import com.nocobase.wiki.WikiPageService;
 import com.nocobase.wiki.WikiPageEntity;
 import com.nocobase.im.MessageService;
@@ -17,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 跨模块统一搜索服务 — 参考 Algolia / Elasticsearch 设计。
@@ -47,6 +51,8 @@ public class UnifiedSearchService {
     private final AutomationRuleService automationRuleService;
     private final ProjectService projectService;
     private final UnifiedSearchIndexRepository searchIndexRepository;
+    private final ImChannelMemberRepository channelMemberRepository;
+    private final ObjectMapper objectMapper;
 
     public UnifiedSearchService(
             MessageService messageService,
@@ -54,7 +60,9 @@ public class UnifiedSearchService {
             CollectionService collectionService,
             AutomationRuleService automationRuleService,
             ProjectService projectService,
-            UnifiedSearchIndexRepository searchIndexRepository
+            UnifiedSearchIndexRepository searchIndexRepository,
+            ImChannelMemberRepository channelMemberRepository,
+            ObjectMapper objectMapper
     ) {
         this.messageService = messageService;
         this.wikiPageService = wikiPageService;
@@ -62,6 +70,8 @@ public class UnifiedSearchService {
         this.automationRuleService = automationRuleService;
         this.projectService = projectService;
         this.searchIndexRepository = searchIndexRepository;
+        this.channelMemberRepository = channelMemberRepository;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -69,12 +79,13 @@ public class UnifiedSearchService {
      *
      * @param keyword  搜索关键词
      * @param tenantId 租户 ID
+     * @param userId   当前用户 ID（用于 IM 频道成员权限过滤）
      * @param types    搜索类型列表(null=全部)
      * @param limit    结果数量限制
      * @return 搜索结果
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> search(String keyword, String tenantId,
+    public Map<String, Object> search(String keyword, String tenantId, UUID userId,
                                       List<String> types, int limit) {
         Map<String, Object> result = new HashMap<>();
         List<Map<String, Object>> allResults = new ArrayList<>();
@@ -82,12 +93,12 @@ public class UnifiedSearchService {
         int safeLimit = Math.max(1, Math.min(limit, 100));
         int perTypeLimit = Math.max(1, safeLimit / 5);
 
-        // 全部类型：走索引统一检索
+        // 全部类型：走索引统一检索（IM 需按用户已加入频道过滤）
         if (types == null || types.isEmpty()) {
-            allResults.addAll(searchIndex(tenantId, keyword, safeLimit));
+            allResults.addAll(searchIndex(tenantId, keyword, safeLimit, userId));
         } else {
             for (String type : types) {
-                allResults.addAll(searchByType(tenantId, keyword, type, perTypeLimit));
+                allResults.addAll(searchByType(tenantId, keyword, type, perTypeLimit, userId));
             }
         }
 
@@ -124,10 +135,15 @@ public class UnifiedSearchService {
     /**
      * 统一索引检索（无类型过滤）。
      */
-    private List<Map<String, Object>> searchIndex(String tenantId, String keyword, int limit) {
+    private List<Map<String, Object>> searchIndex(String tenantId, String keyword, int limit, UUID userId) {
         try {
             List<UnifiedSearchIndexEntity> hits = searchIndexRepository.searchAllTypes(keyword, tenantId, limit);
-            return toResultMaps(hits);
+            List<Map<String, Object>> results = toResultMaps(hits);
+            // IM 类型需按用户已加入频道过滤
+            if (userId != null) {
+                filterImByChannelMembership(results, userId);
+            }
+            return results;
         } catch (Exception e) {
             log.warn("[SEARCH] 全局索引检索失败 keyword={} tenantId={} error={}", keyword, tenantId, e.getMessage(), e);
             return List.of();
@@ -137,10 +153,10 @@ public class UnifiedSearchService {
     /**
      * 按类型检索（走索引 + ts_headline 高亮）。
      */
-    private List<Map<String, Object>> searchByType(String tenantId, String keyword, String type, int limit) {
+    private List<Map<String, Object>> searchByType(String tenantId, String keyword, String type, int limit, UUID userId) {
         return switch (type) {
             case "wiki" -> searchWiki(tenantId, keyword, limit);
-            case "im" -> searchIm(tenantId, keyword, limit);
+            case "im" -> searchIm(tenantId, keyword, limit, userId);
             case "record" -> searchRecord(tenantId, keyword, limit);
             case "automation" -> searchAutomation(tenantId, keyword, limit);
             case "project" -> searchProject(tenantId, keyword, limit);
@@ -180,15 +196,22 @@ public class UnifiedSearchService {
     }
 
     /** IM 消息：走索引 + 频道成员过滤（防越权读取他频道消息）。 */
-    private List<Map<String, Object>> searchIm(String tenantId, String keyword, int limit) {
+    private List<Map<String, Object>> searchIm(String tenantId, String keyword, int limit, UUID userId) {
         try {
             List<UnifiedSearchIndexEntity> hits = searchIndexRepository.searchByKeywordAndType("im", keyword, tenantId, limit);
             List<Map<String, Object>> results = new ArrayList<>();
+            // 预取用户已加入的频道 ID 集合，用于成员权限过滤
+            Set<UUID> joinedChannelIds = (userId != null)
+                    ? channelMemberRepository.findByTenantIdAndUserId(tenantId, userId)
+                            .stream().map(m -> m.getChannelId()).collect(Collectors.toSet())
+                    : null;
             for (UnifiedSearchIndexEntity idx : hits) {
                 ImMessageEntity msg = messageService.mustGet(UUID.fromString(idx.getEntityId()));
                 if (msg == null) continue;
-                // 权限过滤：仅返回用户已加入的频道消息（当前 search() 无 userId，暂跳过）
-                // TODO: 后续在 Controller 层传入 user.userId() 以启用成员过滤
+                // 权限过滤：仅返回用户已加入的频道消息
+                if (userId != null && joinedChannelIds != null && !joinedChannelIds.contains(msg.getChannelId())) {
+                    continue;
+                }
                 Map<String, Object> map = new HashMap<>();
                 map.put("type", "im");
                 map.put("id", msg.getId());
@@ -292,6 +315,24 @@ public class UnifiedSearchService {
         return results.stream().filter(r -> type.equals(r.get("type"))).count();
     }
 
+    /**
+     * 全局（无类型过滤）检索结果中的 IM 消息按频道成员关系过滤 — 防越权。
+     *
+     * <p>索引不带 channelId 列，需回表查消息取 channelId，再校验用户是否在该频道。
+     */
+    private void filterImByChannelMembership(List<Map<String, Object>> results, UUID userId) {
+        results.removeIf(r -> {
+            if (!"im".equals(r.get("type"))) return false;
+            try {
+                ImMessageEntity m = messageService.mustGet(UUID.fromString(String.valueOf(r.get("id"))));
+                if (m == null) return true;
+                return !channelMemberRepository.existsByChannelIdAndUserId(m.getChannelId(), userId);
+            } catch (Exception e) {
+                return true;
+            }
+        });
+    }
+
     // ============================================================
     //  索引写入/删除（不变）
     // ============================================================
@@ -310,7 +351,11 @@ public class UnifiedSearchService {
         index.setTenantId(tenantId);
         index.setTitle(title);
         index.setContent(content);
-        index.setMetadataJson(metadata != null ? metadata.toString() : "{}");
+        try {
+            index.setMetadataJson(metadata != null ? objectMapper.writeValueAsString(metadata) : "{}");
+        } catch (Exception e) {
+            index.setMetadataJson("{}");
+        }
         index.setCreatedAt(Instant.now());
         index.setUpdatedAt(Instant.now());
         searchIndexRepository.save(index);

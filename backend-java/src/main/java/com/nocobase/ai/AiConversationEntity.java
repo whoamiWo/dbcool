@@ -17,7 +17,7 @@ import org.hibernate.type.SqlTypes;
  * <p>存储多轮对话消息(JSONB),支持频道内 @ai 触发的上下文记忆。
  */
 @Entity
-@Table(name = "ai_conversations")
+@Table(name = "ai_conversation")
 public class AiConversationEntity {
 
     @Id

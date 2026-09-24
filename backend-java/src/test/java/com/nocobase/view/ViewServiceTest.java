@@ -3,10 +3,12 @@ package com.nocobase.view;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.meta.CollectionService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -24,14 +26,18 @@ import org.springframework.web.server.ResponseStatusException;
 class ViewServiceTest {
 
     private ViewRepository repo;
+    private CollectionService collSvc;
     private ViewService service;
     private final ObjectMapper json = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         repo = mock(ViewRepository.class);
-        service = new ViewService(repo, json);
+        collSvc = mock(CollectionService.class);
+        service = new ViewService(repo, json, collSvc);
         when(repo.save(any(ViewEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        // 默认返回空列表（listTimelineRecords 需要）
+        when(collSvc.listRecords(any(), any(), anyInt(), any(), any())).thenReturn(List.of());
     }
 
     private ViewEntity makeView(String name) {
@@ -169,5 +175,24 @@ class ViewServiceTest {
         ViewEntity v = makeView("v1");
         v.setConfigJson("not valid json{");
         assertThrows(RuntimeException.class, () -> service.parseConfig(v));
+    }
+
+    @Test
+    void listTimelineRecords_normalDelegates() {
+        ViewEntity v = makeView("tl");
+        v.setType(ViewEntity.Type.TIMELINE);
+        // 键名须用驼峰 dateField（ViewService:111 读的是 dateField，非 date_field）
+        v.setConfigJson("{\"dateField\":\"due_date\"}");
+
+        service.listTimelineRecords(v, 50, null, null);
+
+        // TIMELINE 按配置日期字段生成 sortExpr 传给后端（ViewService:117），故第 4 参非 null
+        org.mockito.Mockito.verify(collSvc).listRecords(
+                org.mockito.ArgumentMatchers.eq("posts"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(50),
+                org.mockito.ArgumentMatchers.eq("due_date"),
+                org.mockito.ArgumentMatchers.isNull()
+        );
     }
 }

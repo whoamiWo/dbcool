@@ -34,7 +34,7 @@ public class UnifiedSearchIndexEntity {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
-    @Column(name = "content_tsv", insertable = false, updatable = false)
+    @Column(name = "content_tsv", columnDefinition = "TEXT", insertable = false, updatable = false)
     private String contentTsv;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
@@ -48,8 +48,10 @@ public class UnifiedSearchIndexEntity {
     private Instant updatedAt;
 
     /** 高亮片段（由 ts_headline 生成，来自原生查询别名）。 */
+    @Transient
     private String snippet;
     /** 相关度分数（来自 ts_rank，来自原生查询别名）。 */
+    @Transient
     private Double rank;
 
     public UnifiedSearchIndexEntity() {}

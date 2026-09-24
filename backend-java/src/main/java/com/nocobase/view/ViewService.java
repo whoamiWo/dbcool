@@ -2,6 +2,7 @@ package com.nocobase.view;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.meta.CollectionService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -19,10 +20,13 @@ public class ViewService {
 
     private final ViewRepository repository;
     private final ObjectMapper objectMapper;
+    private final com.nocobase.meta.CollectionService collectionService;
 
-    public ViewService(ViewRepository repository, ObjectMapper objectMapper) {
+    public ViewService(ViewRepository repository, ObjectMapper objectMapper,
+                       com.nocobase.meta.CollectionService collectionService) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.collectionService = collectionService;
     }
 
     @Transactional
@@ -84,5 +88,55 @@ public class ViewService {
         } catch (Exception e) {
             throw new RuntimeException("config 解析失败", e);
         }
+    }
+
+    /**
+     * 时间线视图专用查询 — 按开始/结束日期字段排序 + 区间过滤。
+     *
+     * <p>config 支持字段：
+     * <ul>
+     *   <li>dateField / startDateField / endDateField：时间字段名</li>
+     *   <li>sortDirection：asc / desc（默认 asc）</li>
+     *   <li>filterStart / filterEnd：区间过滤（ISO 日期字符串，可选）</li>
+     * </ul>
+     * 排序表达式转为后端 CollectionService 支持的 `field,-field` 逗号格式。
+     */
+    public List<Map<String, Object>> listTimelineRecords(
+            ViewEntity view,
+            int limit,
+            String filterStart,
+            String filterEnd
+    ) {
+        Map<String, Object> cfg = parseConfig(view);
+        String dateField = (String) cfg.getOrDefault("dateField", "created_at");
+        String startDateField = (String) cfg.getOrDefault("startDateField", dateField);
+        String endDateField = (String) cfg.getOrDefault("endDateField", dateField);
+        String sortDirection = String.valueOf(cfg.getOrDefault("sortDirection", "asc"));
+
+        // 转为后端 sortExpr 格式：逗号分隔，- 前缀表示 DESC
+        String sortExpr = "-".equalsIgnoreCase(sortDirection) ? "-" + startDateField : startDateField;
+
+        // 复用 CollectionService 已确认签名（:305 / :315）
+        List<Map<String, Object>> records = collectionService.listRecords(
+                view.getCollectionName(), view.getTenantId(), limit, sortExpr, null);
+
+        // 区间过滤（应用层，因 DynamicTableManager 无动态日期过滤参数）
+        if (filterStart != null && !filterStart.isBlank()) {
+            records = records.stream()
+                    .filter(r -> {
+                        Object v = r.get(startDateField);
+                        return v != null && v.toString().compareTo(filterStart) >= 0;
+                    })
+                    .toList();
+        }
+        if (filterEnd != null && !filterEnd.isBlank()) {
+            records = records.stream()
+                    .filter(r -> {
+                        Object v = r.get(endDateField);
+                        return v != null && v.toString().compareTo(filterEnd) <= 0;
+                    })
+                    .toList();
+        }
+        return records;
     }
 }

@@ -43,7 +43,8 @@ class ApiEndpointContractTest {
     @Test
     void searchService_methodsExist() throws Exception {
         Class<?> svc = Class.forName("com.nocobase.search.UnifiedSearchService");
-        assertThat(svc.getMethod("search", String.class, String.class, java.util.List.class, int.class))
+        assertThat(svc.getMethod("search", String.class, String.class, java.util.UUID.class,
+                java.util.List.class, int.class))
                 .isNotNull();
         assertThat(svc.getMethod("indexEntity", String.class, String.class, String.class,
                 String.class, String.class, java.util.Map.class))

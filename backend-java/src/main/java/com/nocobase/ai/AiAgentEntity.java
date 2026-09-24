@@ -18,7 +18,7 @@ import org.hibernate.type.SqlTypes;
  * 通过 AgentToolRegistry 调用工具执行多步任务。
  */
 @Entity
-@Table(name = "ai_agents")
+@Table(name = "ai_agent")
 public class AiAgentEntity {
 
     @Id
@@ -42,7 +42,7 @@ public class AiAgentEntity {
     private Status status = Status.ACTIVE;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "allowed_tools", columnDefinition = "jsonb", nullable = false)
+    @Column(name = "tools", columnDefinition = "jsonb", nullable = false)
     private String allowedToolsJson = "[]";
 
     @Column(name = "created_at", nullable = false)
