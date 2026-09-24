@@ -85,65 +85,65 @@ class QuotaService:
     async def _get_daily(self, redis, user_id: str) -> UserQuota:
         """获取或初始化日配额."""
         daily_key = self._daily_key(user_id)
-        data = await redis.get(daily_key)
-        if data is None:
+        data = await redis.hgetall(daily_key)
+        if not data:
             return UserQuota()
-        d = json.loads(data)
         # 检查日期是否过期
         today = time.strftime("%Y-%m-%d")
-        if d.get("date") != today:
+        if data.get("date") != today:
             return UserQuota()
         return UserQuota(
-            daily_calls=d["calls"],
-            daily_tokens=d["tokens"],
-            last_call_ts=d["last_ts"],
+            daily_calls=int(data.get("calls", 0)),
+            daily_tokens=int(data.get("tokens", 0)),
+            last_call_ts=float(data.get("last_ts", 0.0)),
         )
 
     async def _get_monthly(self, redis, user_id: str) -> UserQuota:
         """获取或初始化月配额."""
         monthly_key = self._monthly_key(user_id)
-        data = await redis.get(monthly_key)
-        if data is None:
+        data = await redis.hgetall(monthly_key)
+        if not data:
             return UserQuota()
-        m = json.loads(data)
         # 检查月份是否过期
         this_month = time.strftime("%Y-%m")
-        if m.get("month") != this_month:
+        if data.get("month") != this_month:
             return UserQuota()
         return UserQuota(
-            monthly_calls=m["calls"],
-            monthly_tokens=m["tokens"],
-            last_call_ts=m["last_ts"],
+            monthly_calls=int(data.get("calls", 0)),
+            monthly_tokens=int(data.get("tokens", 0)),
+            last_call_ts=float(data.get("last_ts", 0.0)),
         )
 
     async def _update_daily(self, redis, user_id: str, calls: int, tokens: int, now: float) -> None:
-        """更新日配额."""
+        """原子累加日配额 (INCR + SETEX)."""
         daily_key = self._daily_key(user_id)
         today = time.strftime("%Y-%m-%d")
-        data = {
-            "date": today,
-            "calls": calls,
-            "tokens": tokens,
-            "last_ts": now,
-        }
-        await redis.setex(daily_key, 86400 * 2, json.dumps(data))  # 2 天过期
+
+        # 原子累加 calls 和 tokens
+        await redis.hincrby(daily_key, "calls", calls)
+        await redis.hincrby(daily_key, "tokens", tokens)
+        await redis.hset(daily_key, "date", today)
+        await redis.hset(daily_key, "last_ts", str(now))
+        # 过期时间设为 2 天，确保跨日可见
+        await redis.expire(daily_key, 86400 * 2)
 
     async def _update_monthly(self, redis, user_id: str, calls: int, tokens: int) -> None:
-        """更新月配额."""
+        """原子累加月配额 (INCR + SETEX)."""
         monthly_key = self._monthly_key(user_id)
         this_month = time.strftime("%Y-%m")
-        data = {
-            "month": this_month,
-            "calls": calls,
-            "tokens": tokens,
-            "last_ts": time.time(),
-        }
+
+        # 原子累加 calls 和 tokens
+        await redis.hincrby(monthly_key, "calls", calls)
+        await redis.hincrby(monthly_key, "tokens", tokens)
+        await redis.hset(monthly_key, "month", this_month)
+        await redis.hset(monthly_key, "last_ts", str(time.time()))
+
         # 计算到下个月 1 号的秒数
         year, month = map(int, this_month.split("-"))
         _, last_day = calendar.monthrange(year, month)
         day = int(time.strftime("%d"))
         expire_at = 86400 * (last_day - day + 2)
-        await redis.setex(monthly_key, expire_at, json.dumps(data))
+        await redis.expire(monthly_key, expire_at)
 
     async def remaining(self, user_id: str) -> dict:
         """返回剩余配额."""
