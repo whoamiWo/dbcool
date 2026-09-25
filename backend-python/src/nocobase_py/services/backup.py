@@ -20,8 +20,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
-import subprocess
 import tarfile
 import time
 from datetime import UTC, datetime
@@ -52,10 +50,14 @@ def _ensure_dir() -> Path:
     return _BACKUP_DIR
 
 
-def _redis_snapshot() -> bytes | None:
-    """触发 Redis 持久化快照，返回 dump.rdb 字节内容。"""
+def _redis_snapshot() -> bytes:
+    """触发 Redis 持久化快照，返回 dump.rdb 字节内容。
+
+    fail-closed：Redis 未启用或快照失败时抛出异常，禁止静默返回空值后
+    误报「备份成功」。
+    """
     if not _settings.redis_enabled:
-        return None
+        raise RuntimeError("Redis is not enabled (redis_enabled=false); cannot take snapshot")
     try:
         import redis.asyncio as redis
         client = redis.Redis(host=_REDIS_HOST, port=_REDIS_PORT, decode_responses=False)
@@ -63,15 +65,14 @@ def _redis_snapshot() -> bytes | None:
         # 读取 dump.rdb（默认位置在工作目录）
         rdb = Path("dump.rdb")
         if rdb.exists():
-            data = rdb.read_bytes()
-            return data
-        return None
+            return rdb.read_bytes()
+        raise FileNotFoundError(f"dump.rdb not found after redis save at {rdb.resolve()}")
     except Exception as e:
-        logger.warning("[backup] Redis snapshot failed: %s", e)
-        return None
+        logger.error("[backup] Redis snapshot failed: %s", e)
+        raise
 
 
-def create_backup(name: str | None = None) -> dict[str, Any]:
+def create_backup() -> dict[str, Any]:
     """创建全量备份。
 
     返回：

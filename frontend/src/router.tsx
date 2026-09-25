@@ -149,8 +149,13 @@ function Lazy({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={null}>{children}</Suspense>;
 }
 
+const DingTalkLoginPage = lazy(() =>
+  import('./pages/auth/DingTalkLoginPage').then(m => ({ default: m.DingTalkLoginPage } as { default: React.ComponentType })),
+);
+
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/auth/dingtalk', element: <DingTalkLoginPage /> },
   {
     path: '/',
     element: <AppLayout />,
@@ -203,9 +208,9 @@ export const router = createBrowserRouter([
       // Wiki
       { path: 'wiki/kb', element: <Lazy><KnowledgeBaseListPage /></Lazy> },
       { path: 'wiki/kb/:id', element: <Lazy><WikiPageListPage /></Lazy> },
-      { path: 'wiki/:slug', element: <Lazy><WikiPageReadPage /></Lazy> },
-      { path: 'wiki/:slug/edit', element: <Lazy><WikiPageEditPage /></Lazy> },
       { path: 'wiki/:slug/versions', element: <Lazy><WikiVersionHistoryPage /></Lazy> },
+      { path: 'wiki/:slug/edit', element: <Lazy><WikiPageEditPage /></Lazy> },
+      { path: 'wiki/:slug', element: <Lazy><WikiPageReadPage /></Lazy> },
       { path: 'wiki/search', element: <Lazy><WikiSearchPage /></Lazy> },
       { path: 'wiki/kb/:kbId/categories', element: <Lazy><WikiCategoryManagementPage /></Lazy> },
       { path: 'bi', element: <Lazy><BiReportPage /></Lazy> },

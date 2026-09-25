@@ -197,6 +197,25 @@ export function LoginPage() {
           {loading ? '登录中…' : '登录'}
         </button>
 
+        {/* W8: 钉钉扫码登录入口（跳转到 /auth/dingtalk） */}
+        <button
+          type="button"
+          onClick={() => navigate('/auth/dingtalk')}
+          style={{
+            width: '100%',
+            padding: 10,
+            marginTop: 12,
+            background: 'transparent',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border-light)',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontSize: 14,
+          }}
+        >
+          钉钉扫码登录
+        </button>
+
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 16, textAlign: 'center' }}>
           Week 3 脚手架版:任意非空账号密码可登录
         </p>

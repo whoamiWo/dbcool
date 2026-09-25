@@ -43,7 +43,7 @@ export function WikiPageListPage() {
   const [newContent, setNewContent] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { data: kbData, isLoading: kbLoading } = useQuery({
+  const { data: kbData, isLoading: kbLoading, error: kbError } = useQuery({
     queryKey: ['wiki-kb', kbId],
     queryFn: () => wikiApi.getKb(kbId!),
     enabled: !!kbId,
@@ -114,6 +114,10 @@ export function WikiPageListPage() {
         <Box>
           {kbLoading ? (
             <CircularProgress size={24} />
+          ) : kbError ? (
+            <Alert severity="error">
+              无权限访问 / 拒绝访问（403）
+            </Alert>
           ) : (
             <Typography variant="h4" component="h1">
               📚 {(kb as any)?.name || kb?.name}

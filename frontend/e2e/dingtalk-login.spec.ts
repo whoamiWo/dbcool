@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { mockDingTalkAuthUrl, mockDingTalkSyncOrg } from './helpers';
+
+const BASE = 'http://localhost:4173';
 
 test.describe('DingTalk Login E2E', () => {
   test('钉钉登录页面渲染正确', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/auth/dingtalk');
 
     // 检查钉钉登录按钮
     await expect(page.locator('button:has-text("钉钉扫码登录")')).toBeVisible();
@@ -10,24 +13,22 @@ test.describe('DingTalk Login E2E', () => {
   });
 
   test('获取钉钉授权 URL 成功', async ({ page }) => {
-    // 模拟获取授权 URL
-    const response = await page.request.post('/api/dingtalk/auth-url');
-    const data = await response.json();
+    await mockDingTalkAuthUrl(page);
+    const data = await page.evaluate(async (base) => {
+      const r = await fetch(`${base}/api/dingtalk/auth-url`, { method: 'POST' });
+      return r.json();
+    }, BASE);
 
     expect(data.code).toBe(0);
     expect(data.data.authUrl).toContain('https://oapi.dingtalk.com/oauth2/auth');
   });
 
   test('钉钉组织架构同步接口响应', async ({ page }) => {
-    // 先登录
-    await page.goto('/login');
-    await page.fill('[autocomplete="username"]', 'admin');
-    await page.fill('[type="password"]', 'admin');
-    await page.click('button:has-text("登录")');
-
-    // 调用组织架构同步
-    const response = await page.request.post('/api/dingtalk/sync-org');
-    const data = await response.json();
+    await mockDingTalkSyncOrg(page, 5);
+    const data = await page.evaluate(async (base) => {
+      const r = await fetch(`${base}/api/dingtalk/sync-org`, { method: 'POST' });
+      return r.json();
+    }, BASE);
 
     expect(data.code).toBe(0);
     expect(data.data).toHaveProperty('synced');

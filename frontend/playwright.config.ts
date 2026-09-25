@@ -25,7 +25,7 @@ export default defineConfig({
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
   ],
   webServer: {
-    command: 'pnpm build && pnpm preview --port 4173',
+    command: 'VITE_E2E=true pnpm build && VITE_E2E=true pnpm preview --port 4173',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
