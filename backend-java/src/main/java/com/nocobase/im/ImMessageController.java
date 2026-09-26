@@ -95,6 +95,8 @@ public class ImMessageController {
         int safeLimit = Math.max(1, Math.min(limit, 100));
         Instant cursorAt = cursor == null || cursor.isBlank() ? null : Instant.parse(cursor);
 
+        // 归属校验:非频道成员不得拉取该频道消息(防跨租户越权)
+        messageService.assertMember(channelId, user.userId());
         List<ImMessageEntity> msgs =
                 messageService.list(channelId, cursorAt, safeLimit);
         String next = msgs.isEmpty()
@@ -160,7 +162,13 @@ public class ImMessageController {
 
     /** 线程回复。 */
     @GetMapping("/{id}/thread")
-    public Map<String, Object> thread(@PathVariable UUID id) {
+    public Map<String, Object> thread(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        // 归属校验:入参是 messageId,先取消息再校验其所属频道(防跨租户越权)
+        ImMessageEntity msg = messageService.mustGet(id);
+        messageService.assertMember(msg.getChannelId(), user.userId());
         List<ImMessageDto> replies = messageService.thread(id).stream()
                 .map(ImMessageDto::from).toList();
         return Map.of("code", 0, "message", "success", "data", Map.of("replies", replies));
@@ -170,8 +178,11 @@ public class ImMessageController {
     public Map<String, Object> search(
             @RequestParam UUID channelId,
             @RequestParam String keyword,
-            @RequestParam(defaultValue = "20") int limit
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
+        // 归属校验:非频道成员不得搜索该频道消息(防跨租户越权)
+        messageService.assertMember(channelId, user.userId());
         List<ImMessageDto> hits = messageService.search(channelId, keyword, limit).stream()
                 .map(ImMessageDto::from).toList();
         return Map.of("code", 0, "message", "success", "data", Map.of("messages", hits));

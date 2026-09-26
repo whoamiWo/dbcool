@@ -148,9 +148,11 @@ class ImMessageControllerTest {
 
     @Test
     void thread_returnsReplies() {
+        UUID messageId = UUID.randomUUID();
+        when(messageService.mustGet(messageId)).thenReturn(message());
         when(messageService.thread(any())).thenReturn(List.of(message()));
 
-        Map<String, Object> resp = controller.thread(UUID.randomUUID());
+        Map<String, Object> resp = controller.thread(messageId, user);
 
         assertThat(resp.get("code")).isEqualTo(0);
     }
@@ -159,9 +161,54 @@ class ImMessageControllerTest {
     void search_returnsHits() {
         when(messageService.search(eq(channelId), eq("kw"), anyInt())).thenReturn(List.of(message()));
 
-        Map<String, Object> resp = controller.search(channelId, "kw", 20);
+        Map<String, Object> resp = controller.search(channelId, "kw", 20, user);
 
         assertThat(resp.get("code")).isEqualTo(0);
+    }
+
+    // ============ 越权防护（跨租户）============
+
+    /**
+     * 越权防护:非频道成员拉取消息列表必须 403。
+     *
+     * <p>该端点此前虽有 AuthenticatedUser 参数却未使用,任意登录用户传 channelId
+     * 即可读取他租户频道的全部消息内容。
+     */
+    @Test
+    void list_nonMember_returns403() {
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员"))
+                .when(messageService).assertMember(any(), any());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.list(channelId, null, 50, user));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    /** 越权防护:非频道成员读取线程回复必须 403。 */
+    @Test
+    void thread_nonMember_returns403() {
+        UUID messageId = UUID.randomUUID();
+        when(messageService.mustGet(messageId)).thenReturn(message());
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员"))
+                .when(messageService).assertMember(any(), any());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.thread(messageId, user));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    /** 越权防护:非频道成员搜索消息必须 403。 */
+    @Test
+    void search_nonMember_returns403() {
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员"))
+                .when(messageService).assertMember(any(), any());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.search(channelId, "kw", 20, user));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
