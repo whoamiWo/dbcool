@@ -2,13 +2,11 @@ package com.nocobase.integration.wecom;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
 import java.util.Optional;
@@ -77,7 +75,7 @@ class WeComAppServiceTest {
 
     @Test
     void loginFromWeCom_newUser_createsAccount() {
-        when(restTemplate.getForObject(anyString(), String.class))
+        when(restTemplate.getForObject(anyString(), eq(String.class)))
                 .thenReturn(json("userid", "zhangsan"))
                 .thenReturn(json("name", "张三", "email", "zhang@example.com"));
 

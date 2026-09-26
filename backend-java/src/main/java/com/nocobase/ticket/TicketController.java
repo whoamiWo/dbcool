@@ -52,7 +52,9 @@ public class TicketController {
             @AuthenticationPrincipal AuthenticatedUser user) {
         String sessionId = (String) body.get("sessionId");
         String customerName = user.username();
-        String customerEmail = user.username() + "@nocobase.local";
+        // PHASE 55 Stage 4: 禁伪造邮箱(@nocobase.local)；取请求传入，回退为租户域
+        String customerEmail = (String) body.getOrDefault("customerEmail",
+                user.username() + "@" + user.tenantId() + ".local");
         String message = (String) body.get("message");
 
         TicketEntity ticket = ticketService.createTicket(

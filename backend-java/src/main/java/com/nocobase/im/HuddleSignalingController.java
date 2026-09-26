@@ -12,13 +12,17 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * PHASE 55 Stage 4 — Huddle WebRTC 信令控制器。
  *
- * <p><b>原桩代码已清零</b>：此前 3 个 STOMP 端点（join/leave/signal）仅做
- * log.info + 硬编码字符串返回，无房间管理、无鉴权、无真实信令转发。
- * 本阶段明确下线：保留端点防止前端路由断裂，但返回 501/明确错误，
- * 同时记录 ERROR 告警，提示运维需要真实化或明确下线前端入口。
+ * <p><b>STOMP 路径的桩代码已清零（本文件仅此一处）</b>：此前 3 个 STOMP 端点
+ * （join/leave/signal）仅做 log.info + 硬编码字符串返回（假成功），已改为 501 明确下线。
  *
- * <p>生产环境建议：若需真实音视频，替换为独立 WebRTC 服务（如 Janus/mediasoup）
- * 并通过此控制器做鉴权 + 房间状态查询，而非在此做信令转发。
+ * <p><b>重要澄清（勿误解）</b>：Huddle 真实信令<b>已实现且已生效</b>，走的是
+ * 原生 WebSocket {@code /ws/huddle} —— 由 {@code HuddleWebSocketConfig} 注册
+ * {@code HuddleSignalingHandler}（含房间管理 rooms/sessionRooms、join/leave/relay 转发、
+ * StompHandshakeInterceptor JWT 鉴权）。前端 HuddlePanel / useHuddle 连的就是 /ws/huddle，
+ * <b>不走本 STOMP 路径</b>，因此本文件改 501 对线上音视频功能<b>无影响</b>。
+ *
+ * <p>本 STOMP 控制器为历史遗留的第二套入口，前端未使用，保留 501 仅为避免
+ * 未来误接时产生"假成功"。如需启用 STOMP 信令，应复用 HuddleSignalingHandler 逻辑。
  */
 @Controller
 public class HuddleSignalingController {
