@@ -53,11 +53,14 @@ public class KeyRingService {
     private final AtomicReference<String> activeKid = new AtomicReference<>();
     private volatile long lastRotationAt = 0;
     private final SecureRandom random = new SecureRandom();
+    private final org.springframework.core.env.Environment env;
 
     public KeyRingService(
             @Value("${app.jwt.secret}") String initialSecret,
-            @Value("${app.jwt.previous-secret:}") String previousSecret
+            @Value("${app.jwt.previous-secret:}") String previousSecret,
+            org.springframework.core.env.Environment env
     ) {
+        this.env = env;
         if (initialSecret == null || initialSecret.isBlank()) {
             throw new IllegalStateException("app.jwt.secret 必须配置");
         }
@@ -65,9 +68,16 @@ public class KeyRingService {
             log.warn("[keyring] app.jwt.secret 强度不足(< {} bytes),生产环境必须 ≥ 32 字节",
                     MIN_SECRET_BYTES);
         }
-        // 启动时强制 warning dev secret — 防止误用占位符到生产
+        // Stage 1 安全收口:dev 占位 secret 必须硬阻断生产启动。
+        // 仅 dev profile 允许;生产环境检测到即抛异常退出(禁 warn-and-continue)。
+        boolean isDevProfile = java.util.Arrays.asList(env.getActiveProfiles()).contains("dev");
+        if (initialSecret.contains("dev_jwt_secret") && !isDevProfile) {
+            throw new IllegalStateException(
+                    "[keyring] ⛔  检测到 dev 占位 secret(app.jwt.secret) — "
+                            + "生产环境禁止使用占位符,必须由 KMS 注入真实密钥");
+        }
         if (initialSecret.contains("dev_jwt_secret")) {
-            log.warn("[keyring] ⚠️  检测到 dev 占位 secret — 生产部署前必须替换为 KMS 注入值");
+            log.warn("[keyring] 开发环境使用 dev 占位 secret — 生产部署前必须替换为 KMS 注入值");
         }
 
         registerInitial(initialSecret, "k-0", KeyRingEntry.Status.ACTIVE);

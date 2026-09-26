@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
@@ -32,16 +34,35 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 @Service
 public class AclEnforcer {
 
+    private static final Logger log = LoggerFactory.getLogger(AclEnforcer.class);
+
     private final UserRoleRepository userRoleRepository;
     private final AclPolicyRepository policyRepository;
     private final RoleRepository roleRepository;
 
+    /**
+     * fail-open 开关(Stage 1 安全收口).
+     *
+     * <p><code>true</code>: 无策略/异常时放行(历史默认行为,仅用于灰度回滚窗口)。
+     * <p><code>false</code>: 无策略/异常时拒绝 —— fail-closed,生产默认。
+     *
+     * <p>由 <code>app.acl.fail-open</code> 控制,默认 <b>false</b>(fail-closed)。
+     */
+    private final boolean failOpen;
+
     public AclEnforcer(UserRoleRepository userRoleRepository,
                        AclPolicyRepository policyRepository,
-                       RoleRepository roleRepository) {
+                       RoleRepository roleRepository,
+                       @org.springframework.beans.factory.annotation.Value("${app.acl.fail-open:false}") boolean failOpen) {
         this.userRoleRepository = userRoleRepository;
         this.policyRepository = policyRepository;
         this.roleRepository = roleRepository;
+        this.failOpen = failOpen;
+        if (!failOpen) {
+            log.info("[acl] fail-closed 生效:无策略/异常一律拒绝(默认)");
+        } else {
+            log.warn("[acl] ⚠️  fail-open 开启:无策略/异常将放行 — 仅灰度回滚窗口使用");
+        }
     }
 
     /**
@@ -67,14 +88,18 @@ public class AclEnforcer {
                 .filter(p -> collectionName.equals(p.getSubject()))
                 .toList();
         if (relevant.isEmpty()) {
-            return true; // 无 policy 配置 → 默认允许
+            // Stage 1 安全收口:无策略时 fail-closed(默认拒绝)。
+            // 仅 fail-open=true(灰度回滚窗口)时保持放行。
+            return failOpen;
         }
         // 白名单语义:查所有 type=ACTION policy
         List<AclPolicyEntity> actionPolicies = relevant.stream()
                 .filter(p -> p.getType() == AclPolicyEntity.Type.ACTION)
                 .toList();
         if (actionPolicies.isEmpty()) {
-            return true; // 只有 FIELD/ROW policy → 不限制 CRUD,默认允许
+            // 只有 FIELD/ROW policy → 不限制 CRUD。
+            // fail-closed 下同样拒绝(无显式 ACTION 允许 = 拒绝)。
+            return failOpen;
         }
         // 有 ACTION policy 需显式包含目标 action
         return actionPolicies.stream().anyMatch(p -> p.getAction() == action);
@@ -233,7 +258,13 @@ public class AclEnforcer {
             try {
                 List<UUID> ancestors = roleRepository.findSelfAndAncestors(rid, tenantId);
                 all.addAll(ancestors);
-            } catch (Exception ignored) { /* CTE 失败时不影响直接角色 */ }
+            } catch (Exception e) {
+                // Stage 1 安全收口:CTE 失败必须告警,不得静默吞异常。
+                // 角色继承链断裂 = 该角色的祖先策略全部丢失 → 可能越权放行。
+                // fail-closed:继承查询失败时该角色的祖先策略视为不存在(保守)。
+                log.error("[acl] 角色继承查询失败 rid={} tenant={} — 该角色祖先策略将丢失",
+                        rid, tenantId, e);
+            }
         }
         return new ArrayList<>(all);
     }
@@ -250,7 +281,12 @@ public class AclEnforcer {
                 for (Object o : list) if (o != null) s.add(o.toString());
                 return s;
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            // Stage 1 安全收口:FIELD policy 配置解析失败必须告警。
+            // 解析失败 → 该 policy 的 hidden 字段集合为空 = 无字段隐藏 = 可能越权读。
+            log.error("[acl] FIELD policy 配置解析失败 configJson={} — 该策略字段隐藏失效",
+                    configJson, e);
+        }
         return Set.of();
     }
 }

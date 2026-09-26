@@ -123,7 +123,11 @@ public class RowAclService {
         List<AclRowPolicyEntity> policies = repository.findApplicable(
                 tenantId, collection, action);
         if (policies.isEmpty()) {
-            return true; // 无策略 = 放行
+            // Stage 1 安全收口:无行级 policy 时 fail-closed(默认拒绝)。
+            // 原「无 policy = 放行」语义存在越权风险。
+            log.warn("[row-acl] 无策略放行已关闭:tenant={} collection={} action={} — 拒绝请求",
+                    tenantId, collection, action);
+            return false; // 无 policy = 拒绝
         }
         return matchesAny(policies, record, principal);
     }

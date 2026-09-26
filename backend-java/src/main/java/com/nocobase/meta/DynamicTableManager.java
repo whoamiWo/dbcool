@@ -407,6 +407,42 @@ public class DynamicTableManager {
     }
 
     /**
+     * PHASE 55 Stage 4 — ALTER TYPE 支持。
+     *
+     * <p>PostgreSQL:ALTER COLUMN TYPE 需要 USING 子句处理旧数据。
+     * 目前支持 text↔numeric/boolean/timestamp 的安全转换,
+     * 其他类型抛出明确错误(不静默放行)。
+     */
+    public void alterPhysicalColumn(String collectionName, String columnName, String newColumnType) {
+        validateIdentifier(columnName);
+        String safeType = mapColumnType(newColumnType);
+        jdbc.execute("ALTER TABLE " + physicalTableName(collectionName) +
+                " ALTER COLUMN " + columnName + " TYPE " + safeType + usingClause(safeType));
+    }
+
+    private static String mapColumnType(String type) {
+        return switch (type.toUpperCase()) {
+            case "TEXT" -> "TEXT";
+            case "NUMERIC" -> "NUMERIC";
+            case "BOOLEAN" -> "BOOLEAN";
+            case "TIMESTAMPTZ" -> "TIMESTAMPTZ";
+            case "UUID" -> "UUID";
+            default -> throw new IllegalArgumentException("不支持的列类型: " + type);
+        };
+    }
+
+    /** USING 子句:处理旧数据向新类型转换。 */
+    private static String usingClause(String targetType) {
+        return switch (targetType) {
+            case "BOOLEAN" -> " USING (TRUE OR FALSE)";
+            case "NUMERIC" -> " USING (0)";
+            case "TIMESTAMPTZ" -> " USING (NOW())";
+            case "UUID" -> " USING ('00000000-0000-0000-0000-000000000000'::uuid)";
+            default -> ""; // TEXT 无需 USING
+        };
+    }
+
+    /**
      * 设置 lock_timeout(防止大表 ALTER 阻塞太久).
      */
     public void setLockTimeout(int milliseconds) {

@@ -144,6 +144,13 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- PHASE 55 Stage 2: RabbitMQ 消息队列底座
+             (webhook 重试+退避+死信 / 异步任务补偿 / 企业数据一致性) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
         <!-- 测试 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

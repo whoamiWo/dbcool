@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.CannotAcquireLockException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.config.AsyncTaskPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -41,7 +42,8 @@ class AsyncMigrationServiceTest {
     void setUp() throws Exception {
         tableManager = mock(DynamicTableManager.class);
         jobRepository = mock(MigrationJobRepository.class);
-        service = new AsyncMigrationService(jobRepository, tableManager, new ObjectMapper());
+        AsyncTaskPublisher publisher = mock(AsyncTaskPublisher.class);
+        service = new AsyncMigrationService(jobRepository, tableManager, new ObjectMapper(), publisher);
         // 反射设 lockTimeoutMs(避免 @Value)
         java.lang.reflect.Field f = AsyncMigrationService.class.getDeclaredField("lockTimeoutMs");
         f.setAccessible(true);

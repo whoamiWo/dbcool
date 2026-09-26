@@ -36,6 +36,26 @@ public class TicketService {
         return ticketRepository.findByTenantId(tenantId);
     }
 
+    /** 保存会话消息（Livechat 真实持久化）。 */
+    @Transactional
+    public TicketEntity saveMessage(String sessionId, String tenantId, UUID userId,
+                                     String message, String customerEmail) {
+        List<TicketEntity> existing = ticketRepository.findBySessionIdAndTenantId(sessionId, tenantId);
+        TicketEntity ticket = existing.isEmpty() ? new TicketEntity() : existing.get(0);
+        ticket.setTenantId(tenantId);
+        ticket.setSessionId(sessionId);
+        if (ticket.getCustomerEmail() == null || ticket.getCustomerEmail().isBlank()) {
+            ticket.setCustomerEmail(customerEmail);
+        }
+        if (ticket.getCustomerName() == null || ticket.getCustomerName().isBlank()) {
+            ticket.setCustomerName(userId != null ? userId.toString() : "unknown");
+        }
+        ticket.setMessage(message);
+        ticket.setStatus(TicketEntity.Status.OPEN);
+        if (ticket.getCreatedAt() == null) ticket.setCreatedAt(Instant.now());
+        return ticketRepository.save(ticket);
+    }
+
     /** 更新工单状态。 */
     @Transactional
     public TicketEntity updateStatus(UUID id, TicketEntity.Status status) {

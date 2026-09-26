@@ -32,6 +32,9 @@ public class FeishuAppService {
     @Value("${feishu.redirect-uri:}")
     private String redirectUri;
 
+    @Value("${feishu.encrypt-key:}")
+    private String encryptKey;
+
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -111,8 +114,7 @@ public class FeishuAppService {
             return false;
         }
         // 飞书签名算法：SHA256(timestamp + nonce + encrypt_key + body)
-        String encryptKey = ""; // 加密 key（如果启用加密模式，需配置）
-        String signingString = timestamp + nonce + encryptKey + body;
+        String signingString = timestamp + nonce + (encryptKey != null ? encryptKey : "") + body;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(signingString.getBytes(StandardCharsets.UTF_8));

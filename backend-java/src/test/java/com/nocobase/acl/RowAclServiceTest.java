@@ -41,9 +41,10 @@ class RowAclServiceTest {
     /* === evaluate 入口 === */
 
     @Test
-    void evaluateRead_noPolicy_passes() {
+    void evaluateRead_noPolicy_failClosed_denies() {
+        // Stage 1 安全收口:无行级 policy 时 fail-closed(默认拒绝)。
         assertThat(service.evaluateRead(TENANT, COLLECTION, Map.of("name", "alice"),
-                new RowAclService.Principal(USER.toString(), List.of(ROLE)))).isTrue();
+                new RowAclService.Principal(USER.toString(), List.of(ROLE)))).isFalse();
     }
 
     @Test

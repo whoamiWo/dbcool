@@ -37,7 +37,10 @@ public class TicketController {
             @AuthenticationPrincipal AuthenticatedUser user) {
         String sessionId = (String) body.get("sessionId");
         String message = (String) body.get("message");
-        // 消息暂存，实际场景中可存入 Redis 或消息表
+        String customerEmail = (String) body.getOrDefault("customerEmail",
+                user.username() + "@" + user.tenantId() + ".local");
+        // PHASE 55 Stage 4: 消息真实持久化（禁丢弃）
+        ticketService.saveMessage(sessionId, user.tenantId(), user.userId(), message, customerEmail);
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("sessionId", sessionId));
     }

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nocobase.auth.keystore.KeyRingService;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import java.lang.reflect.Field;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,10 +17,16 @@ class JwtKeyRotationControllerTest {
     private KeyRingService keyRing;
     private JwtKeyRotationController controller;
 
+    private static org.springframework.core.env.Environment mockEnv() {
+        org.springframework.core.env.Environment env = mock(org.springframework.core.env.Environment.class);
+        when(env.getActiveProfiles()).thenReturn(new String[0]);
+        return env;
+    }
+
     @BeforeEach
     void setUp() {
         keyRing = new KeyRingService(
-                "this-is-a-32-byte-secret-key-for-hmac-sha256!!", "");
+                "this-is-a-32-byte-secret-key-for-hmac-sha256!!", "", mockEnv());
         controller = new JwtKeyRotationController(keyRing);
     }
 

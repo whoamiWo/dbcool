@@ -2,21 +2,30 @@ package com.nocobase.auth.keystore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
 
 class KeyRingServiceTest {
 
     private static final String STRONG_SECRET = "this-is-a-strong-test-secret-of-at-least-32-bytes!";
 
     private KeyRingService newRing() {
-        return new KeyRingService(STRONG_SECRET, "");
+        return new KeyRingService(STRONG_SECRET, "", mockEnv());
     }
 
     private KeyRingService newRingWithPrevious() {
-        return new KeyRingService(STRONG_SECRET, "previous-secret-thats-also-long-enough-1234");
+        return new KeyRingService(STRONG_SECRET, "previous-secret-thats-also-long-enough-1234", mockEnv());
+    }
+
+    private static Environment mockEnv() {
+        Environment env = mock(Environment.class);
+        when(env.getActiveProfiles()).thenReturn(new String[0]);
+        return env;
     }
 
     @Test
@@ -39,7 +48,7 @@ class KeyRingServiceTest {
 
     @Test
     void weakSecret_doesNotFailStartup() {
-        KeyRingService r = new KeyRingService("weak!!!", "");
+        KeyRingService r = new KeyRingService("weak!!!", "", mockEnv());
         assertThat(r.size()).isEqualTo(1);
     }
 

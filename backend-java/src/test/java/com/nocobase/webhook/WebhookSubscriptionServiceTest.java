@@ -1,121 +1,102 @@
 package com.nocobase.webhook;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.config.AsyncTask;
+import com.nocobase.config.AsyncTaskPublishException;
+import com.nocobase.config.AsyncTaskPublisher;
 import com.nocobase.event.RecordChangeEvent;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 /**
- * WebhookSubscriptionService 单元测试(Week 41 复核 D5.3)。
+ * WebhookSubscriptionService 单元测试(PHASE 55 Stage 2 — MQ 改造后)。
+ *
+ * <p>改造后:dispatch 将任务发布到 MQ,不再同步 HTTP POST。
+ * 测试 mock AsyncTaskPublisher 而非 RestTemplate。
  */
 class WebhookSubscriptionServiceTest {
 
     private WebhookSubscriptionRepository repository;
+    private AsyncTaskPublisher publisher;
     private WebhookSubscriptionService service;
-    private RestTemplate restTemplate;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         repository = mock(WebhookSubscriptionRepository.class);
-        service = new WebhookSubscriptionService(repository);
-        // restTemplate 是 final 字段,反射替换
-        restTemplate = mock(RestTemplate.class);
-        Field f = WebhookSubscriptionService.class.getDeclaredField("restTemplate");
-        f.setAccessible(true);
-        f.set(service, restTemplate);
+        publisher = mock(AsyncTaskPublisher.class);
+        service = new WebhookSubscriptionService(repository, publisher);
     }
 
     @Test
     void dispatch_noMatchingSubscriptions_doesNothing() {
         when(repository.findByTenantIdAndCollectionNameAndEventAndEnabledTrue(
                 anyString(), anyString(), anyString())).thenReturn(List.of());
-
-        service.dispatch(event(RecordChangeEvent.ChangeType.CREATE));
-
-        verifyNoInteractions(restTemplate);
+        assertDoesNotThrow(() -> service.dispatch(event(RecordChangeEvent.ChangeType.CREATE)));
     }
 
     @Test
-    void dispatch_createEvent_mapsToOnCreate() {
+    void dispatch_createEvent_publishesToMq() {
         when(repository.findByTenantIdAndCollectionNameAndEventAndEnabledTrue(
-                eq("tenant_default"), eq("orders"), eq("on_create")))
+                anyString(), anyString(), anyString()))
                 .thenReturn(List.of(sub("https://example.com/hook", null)));
-
         service.dispatch(event(RecordChangeEvent.ChangeType.CREATE));
-
-        verify(restTemplate).exchange(eq("https://example.com/hook"), eq(HttpMethod.POST),
-                any(HttpEntity.class), eq(String.class));
+        verify(publisher).publish(any(AsyncTask.class));
     }
 
     @Test
-    void dispatch_updateEvent_mapsToOnUpdate() {
-        when(repository.findByTenantIdAndCollectionNameAndEventAndEnabledTrue(
-                eq("tenant_default"), eq("orders"), eq("on_update")))
-                .thenReturn(List.of(sub("https://example.com/hook", null)));
-
-        service.dispatch(event(RecordChangeEvent.ChangeType.UPDATE));
-
-        verify(restTemplate).exchange(eq("https://example.com/hook"), eq(HttpMethod.POST),
-                any(HttpEntity.class), eq(String.class));
-    }
-
-    @Test
-    void dispatch_withSecret_addsSignatureHeader() {
+    void dispatch_withSecret_includesSecretInPayload() {
         when(repository.findByTenantIdAndCollectionNameAndEventAndEnabledTrue(
                 anyString(), anyString(), anyString()))
                 .thenReturn(List.of(sub("https://example.com/hook", "s3cret")));
 
+        org.mockito.ArgumentCaptor<AsyncTask> captor =
+                org.mockito.ArgumentCaptor.forClass(AsyncTask.class);
         service.dispatch(event(RecordChangeEvent.ChangeType.CREATE));
+        verify(publisher).publish(captor.capture());
 
-        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).exchange(anyString(), eq(HttpMethod.POST),
-                captor.capture(), eq(String.class));
-        assertNotNull(captor.getValue().getHeaders().getFirst("X-Webhook-Signature"));
+        Map<String, Object> payload = captor.getValue().getPayload();
+        assert "s3cret".equals(payload.get("secret"));
+        assert "https://example.com/hook".equals(payload.get("targetUrl"));
+        assert "on_create".equals(payload.get("event"));
+        assert "orders".equals(payload.get("collection"));
     }
 
     @Test
-    void dispatch_withoutSecret_noSignatureHeader() {
+    void dispatch_withoutSecret_noSecretInPayload() {
         when(repository.findByTenantIdAndCollectionNameAndEventAndEnabledTrue(
                 anyString(), anyString(), anyString()))
                 .thenReturn(List.of(sub("https://example.com/hook", null)));
 
+        org.mockito.ArgumentCaptor<AsyncTask> captor =
+                org.mockito.ArgumentCaptor.forClass(AsyncTask.class);
         service.dispatch(event(RecordChangeEvent.ChangeType.CREATE));
+        verify(publisher).publish(captor.capture());
 
-        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).exchange(anyString(), eq(HttpMethod.POST),
-                captor.capture(), eq(String.class));
-        assertNull(captor.getValue().getHeaders().getFirst("X-Webhook-Signature"));
+        Map<String, Object> payload = captor.getValue().getPayload();
+        assert payload.get("secret") == null || "".equals(payload.get("secret"));
     }
 
     @Test
-    void dispatch_sendFailure_doesNotPropagate() {
+    void dispatch_mqUnavailable_throwsException() {
         when(repository.findByTenantIdAndCollectionNameAndEventAndEnabledTrue(
                 anyString(), anyString(), anyString()))
                 .thenReturn(List.of(sub("https://example.com/hook", null)));
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST),
-                any(HttpEntity.class), eq(String.class)))
-                .thenThrow(new RestClientException("boom"));
+        doThrow(new AsyncTaskPublishException("MQ 不可达", null))
+                .when(publisher).publish(any(AsyncTask.class));
 
-        // Webhook 是尽力而为,失败不应冒泡
-        service.dispatch(event(RecordChangeEvent.ChangeType.CREATE));
+        assertThrows(AsyncTaskPublishException.class,
+                () -> service.dispatch(event(RecordChangeEvent.ChangeType.CREATE)));
     }
 
     private RecordChangeEvent event(RecordChangeEvent.ChangeType type) {

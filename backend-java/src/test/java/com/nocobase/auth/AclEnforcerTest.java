@@ -29,7 +29,8 @@ class AclEnforcerTest {
     private UserRoleRepository userRoleRepo;
     private AclPolicyRepository policyRepo;
     private RoleRepository roleRepo;
-    private AclEnforcer enforcer;
+    private AclEnforcer enforcer;       // fail-closed (default)
+    private AclEnforcer enforcerOpen;   // fail-open (灰度回滚窗口)
 
     private static final UUID USER = UUID.randomUUID();
     private static final UUID ROLE = UUID.randomUUID();
@@ -42,7 +43,8 @@ class AclEnforcerTest {
         userRoleRepo = mock(UserRoleRepository.class);
         policyRepo = mock(AclPolicyRepository.class);
         roleRepo = mock(RoleRepository.class);
-        enforcer = new AclEnforcer(userRoleRepo, policyRepo, roleRepo);
+        enforcer = new AclEnforcer(userRoleRepo, policyRepo, roleRepo, false);
+        enforcerOpen = new AclEnforcer(userRoleRepo, policyRepo, roleRepo, true);
 
         var ur = mock(UserRoleEntity.class);
         var urId = mock(UserRoleEntity.UserRoleId.class);
@@ -82,9 +84,16 @@ class AclEnforcerTest {
     /* ============================================================ */
 
     @Test
-    void isAllowed_noPolicy_returnsTrue() {
+    void isAllowed_noPolicy_failClosed_returnsFalse() {
         when(policyRepo.findByRoleIdAndTenantId(any(), any())).thenReturn(List.of());
         assertThat(enforcer.isAllowed(USER, TENANT, COLLECTION, AclPolicyEntity.Action.READ))
+                .isFalse();
+    }
+
+    @Test
+    void isAllowed_noPolicy_failOpen_returnsTrue() {
+        when(policyRepo.findByRoleIdAndTenantId(any(), any())).thenReturn(List.of());
+        assertThat(enforcerOpen.isAllowed(USER, TENANT, COLLECTION, AclPolicyEntity.Action.READ))
                 .isTrue();
     }
 
@@ -106,11 +115,22 @@ class AclEnforcerTest {
 
     @Test
     void isAllowed_fieldOrRowOnly_allowsCrud() {
+        // fail-open 语义:仅 FIELD/ROW 策略时 crud 仍放行(灰度回滚窗口)。
+        when(policyRepo.findByRoleIdAndTenantId(ROLE, TENANT)).thenReturn(List.of(
+                fieldPolicy(AclPolicyEntity.Action.READ, "{\"hidden\":[\"x\"]}"),
+                rowPolicy("{\"filters\":[]}")));
+        assertThat(enforcerOpen.isAllowed(USER, TENANT, COLLECTION, AclPolicyEntity.Action.UPDATE))
+                .isTrue();
+    }
+
+    @Test
+    void isAllowed_fieldOrRowOnly_failClosed_deniesCrud() {
+        // fail-closed(默认):仅 FIELD/ROW 策略,无 ACTION(UPDATE)策略 → 拒绝。
         when(policyRepo.findByRoleIdAndTenantId(ROLE, TENANT)).thenReturn(List.of(
                 fieldPolicy(AclPolicyEntity.Action.READ, "{\"hidden\":[\"x\"]}"),
                 rowPolicy("{\"filters\":[]}")));
         assertThat(enforcer.isAllowed(USER, TENANT, COLLECTION, AclPolicyEntity.Action.UPDATE))
-                .isTrue();
+                .isFalse();
     }
 
     @Test
@@ -121,13 +141,24 @@ class AclEnforcerTest {
     }
 
     @Test
-    void isAllowed_wrongSubject_ignored() {
+    void isAllowed_wrongSubject_failClosed_returnsFalse() {
         AclPolicyEntity p = new AclPolicyEntity();
         p.setId(UUID.randomUUID()); p.setRoleId(ROLE);
         p.setType(AclPolicyEntity.Type.ACTION); p.setAction(AclPolicyEntity.Action.READ);
         p.setSubject("other"); p.setConfigJson("{}"); p.setTenantId(TENANT);
         when(policyRepo.findByRoleIdAndTenantId(ROLE, TENANT)).thenReturn(List.of(p));
         assertThat(enforcer.isAllowed(USER, TENANT, COLLECTION, AclPolicyEntity.Action.READ))
+                .isFalse();
+    }
+
+    @Test
+    void isAllowed_wrongSubject_failOpen_returnsTrue() {
+        AclPolicyEntity p = new AclPolicyEntity();
+        p.setId(UUID.randomUUID()); p.setRoleId(ROLE);
+        p.setType(AclPolicyEntity.Type.ACTION); p.setAction(AclPolicyEntity.Action.READ);
+        p.setSubject("other"); p.setConfigJson("{}"); p.setTenantId(TENANT);
+        when(policyRepo.findByRoleIdAndTenantId(ROLE, TENANT)).thenReturn(List.of(p));
+        assertThat(enforcerOpen.isAllowed(USER, TENANT, COLLECTION, AclPolicyEntity.Action.READ))
                 .isTrue();
     }
 
@@ -241,6 +272,15 @@ class AclEnforcerTest {
 
     @Test
     void assertCanWriteFields_noPolicy_passes() {
+        when(policyRepo.findByRoleIdAndTenantId(any(), any())).thenReturn(List.of());
+        Map<String, Object> data = new HashMap<>();
+        data.put("salary", 99999);
+        enforcer.assertCanWriteFields(USER, TENANT, COLLECTION, data,
+                AclPolicyEntity.Action.UPDATE);
+    }
+
+    @Test
+    void assertCanWriteFields_noFieldPolicy_failClosed_allowsAll() {
         when(policyRepo.findByRoleIdAndTenantId(any(), any())).thenReturn(List.of());
         Map<String, Object> data = new HashMap<>();
         data.put("salary", 99999);

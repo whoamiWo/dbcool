@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.nocobase.auth.keystore.KeyRingService;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -28,8 +30,14 @@ class JwtServiceTest {
         return newServiceWithSecret(VALID_SECRET);
     }
 
+    private static org.springframework.core.env.Environment mockEnv() {
+        org.springframework.core.env.Environment env = mock(org.springframework.core.env.Environment.class);
+        when(env.getActiveProfiles()).thenReturn(new String[0]);
+        return env;
+    }
+
     private JwtService newServiceWithSecret(String secret) {
-        KeyRingService keyRing = new KeyRingService(secret, "");
+        KeyRingService keyRing = new KeyRingService(secret, "", mockEnv());
         return new JwtService(keyRing, 15L);
     }
 
@@ -108,7 +116,7 @@ class JwtServiceTest {
     @Test
     void rotation_oldKidStillVerifies() {
         // 服务 A 签发,kid=k-0
-        KeyRingService keyRing = new KeyRingService(VALID_SECRET, "");
+        KeyRingService keyRing = new KeyRingService(VALID_SECRET, "", mockEnv());
         JwtService svcA = new JwtService(keyRing, 15L);
         UUID userId = UUID.randomUUID();
         String token = svcA.issueAccessToken(userId, "alice", "tenant_default");
@@ -140,7 +148,7 @@ class JwtServiceTest {
     @Test
     void rotation_revokedKid_returnsNull() {
         // 服务 A 签发 + 轮换 + 撤销 k-0
-        KeyRingService keyRing = new KeyRingService(VALID_SECRET, "");
+        KeyRingService keyRing = new KeyRingService(VALID_SECRET, "", mockEnv());
         JwtService svc = new JwtService(keyRing, 15L);
         String token = svc.issueAccessToken(UUID.randomUUID(), "u", "t");
 
@@ -159,7 +167,7 @@ class JwtServiceTest {
 
     @Test
     void getAccessTtl_returnsConfiguredDuration() {
-        JwtService svc = new JwtService(new KeyRingService(VALID_SECRET, ""), 30L);
+        JwtService svc = new JwtService(new KeyRingService(VALID_SECRET, "", mockEnv()), 30L);
         assertEquals(Duration.ofMinutes(30L), svc.getAccessTtl());
     }
 
@@ -186,7 +194,7 @@ class JwtServiceTest {
     @Test
     void issue_whenNoActive_throws() {
         // 用反射清空 keyRing entries,然后 issue
-        KeyRingService keyRing = new KeyRingService(VALID_SECRET, "");
+        KeyRingService keyRing = new KeyRingService(VALID_SECRET, "", mockEnv());
         try {
             java.lang.reflect.Field f = KeyRingService.class.getDeclaredField("entries");
             f.setAccessible(true);
@@ -222,7 +230,7 @@ class JwtServiceTest {
         // 但若进程切换 secret(previous=新),旧 token 仍可验证
         String oldSecret = "previous-secret-from-old-deployment-1234567890!";
         String newSecret = "this-is-a-new-different-32-byte-secret-key-abcdef";
-        KeyRingService ring = new KeyRingService(newSecret, oldSecret);
+        KeyRingService ring = new KeyRingService(newSecret, oldSecret, mockEnv());
         JwtService svc = new JwtService(ring, 15L);
 
         // 模拟老进程签发的 token(用 oldSecret,无 kid — 走 fallback)

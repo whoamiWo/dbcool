@@ -61,6 +61,10 @@ app:
   pool-monitor:
     warn-utilization: 0.85     # 活跃连接占比达到 85% 触发 WARN
     interval-ms: 30000        # 扫描间隔 30s
+  # Stage 1 安全收口:ACL fail-open 开关。
+  # false(默认)=fail-closed(无策略/异常一律拒绝);true=灰度回滚窗口用。
+  acl:
+    fail-open: ${ACL_FAIL_OPEN:false}
 
   # 钉钉集成配置(Week 1-4 Phase 4)
   # 凭证从钉钉开发者后台获取: https://open-dev.dingtalk.com

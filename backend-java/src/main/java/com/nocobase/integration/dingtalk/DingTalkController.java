@@ -305,7 +305,7 @@ public class DingTalkController {
                 taskRepository.save(task);
             }
         } catch (Exception e) {
-            // 记录日志，不阻塞回调响应
+            log.error("[dingtalk] 更新工作流任务状态失败 instanceId={}: {}", instanceId, e.getMessage(), e);
         }
     }
 }
