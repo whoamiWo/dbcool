@@ -1,0 +1,152 @@
+# ============================================================
+#  Java 后端（核心引擎）+ Service + HPA + PDB
+#
+#  探针说明：application.yml 已开启 management.endpoint.health.probes.enabled=true，
+#  因此 /actuator/health/readiness 与 /actuator/health/liveness 可直接使用。
+#  liveness 失败才重启；readiness 失败仅摘流量（避免依赖抖动导致误重启）。
+# ============================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-java
+  namespace: nocobase
+  labels:
+    app: backend-java
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-java
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 # 零停机滚动更新
+  template:
+    metadata:
+      labels:
+        app: backend-java
+      annotations:
+        # 指标采集（Prometheus 自动发现）
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      # 优雅停机：先摘流量，等待在途请求完成
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: backend-java
+          image: nocobase/backend-java:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: nocobase-config
+            - secretRef:
+                name: nocobase-secret
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # 启动探针：慢启动期间不触发 liveness，避免启动未完就被重启
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30 # 最多等 150s 启动
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits: { cpu: "2", memory: "3Gi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-java
+  namespace: nocobase
+spec:
+  selector:
+    app: backend-java
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+
+---
+# 水平自动扩缩（需集群已部署 metrics-server）
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-java
+  namespace: nocobase
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-java
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300 # 防抖动，5 分钟观察期
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+
+---
+# 滚动更新/驱逐时至少保留 2 个副本可用
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-java
+  namespace: nocobase
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: backend-java

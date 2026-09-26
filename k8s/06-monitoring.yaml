@@ -1,0 +1,100 @@
+# ============================================================
+#  可观测性 —— 指标采集与告警
+#
+#  指标来源：
+#    - Java 后端已引入 micrometer-registry-prometheus，
+#      暴露 /actuator/prometheus（application.yml 已加进 exposure）
+#    - Deployment 上已加 prometheus.io/scrape 注解，兼容原生 Prometheus 抓取
+#
+#  若集群装了 Prometheus Operator（kube-prometheus-stack），
+#  下面的 ServiceMonitor / PrometheusRule 会直接生效。
+# ============================================================
+
+---
+# Prometheus Operator 抓取规则
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-java
+  namespace: nocobase
+  labels:
+    release: prometheus # 需与 Prometheus Operator 的 release 标签一致
+spec:
+  selector:
+    matchLabels:
+      app: backend-java
+  namespaceSelector:
+    matchNames:
+      - nocobase
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 30s
+      scrapeTimeout: 10s
+
+---
+# 关键告警规则
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: nocobase-alerts
+  namespace: nocobase
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: nocobase.rules
+      rules:
+        # ---- 可用性 ----
+        - alert: NocoBaseJavaDown
+          expr: up{job="backend-java"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Java 后端实例不可用"
+            description: "实例 {{ $labels.instance }} 已掉线超过 2 分钟"
+
+        - alert: NocoBaseHighErrorRate
+          expr: |
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+              / sum(rate(http_server_requests_seconds_count[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "5xx 错误率超过 5%"
+            description: "当前错误率 {{ $value | humanizePercentage }}，持续 5 分钟"
+
+        # ---- 性能（依赖 percentiles-histogram，已在 application.yml 开启）----
+        - alert: NocoBaseHighLatency
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(http_server_requests_seconds_bucket[5m])) by (le)
+            ) > 3
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "HTTP P99 延迟超过 3s"
+            description: "P99 = {{ $value }}s，持续 10 分钟"
+
+        # ---- 资源 ----
+        - alert: NocoBasePodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="nocobase"}[30m]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod 频繁重启"
+            description: "{{ $labels.container }} 30 分钟内重启超过 3 次"
+
+        # ---- MQ（PHASE 55 Stage 2）----
+        - alert: NocoBaseMqDown
+          expr: up{job="rabbitmq"} == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "RabbitMQ 不可用"
+            description: "异步任务与 webhook 发布将失败，需立即处理"

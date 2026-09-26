@@ -72,6 +72,31 @@ services:
     restart: unless-stopped
 
   # ============================================================
+  #  消息队列 — RabbitMQ
+  #  PHASE 55 Stage 2 MQ 底座(异步任务/webhook 发布/迁移)依赖;
+  #  此前缺失该服务,导致 MQ 相关功能在本地与容器环境均不可用。
+  # ============================================================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: nocobase-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - nocobase-net
+    restart: unless-stopped
+
+  # ============================================================
   #  后端 — Java (核心引擎)
   # ============================================================
   backend-java:
@@ -88,6 +113,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_at_least_32_characters_long_for_hs256}
       JAVA_PORT: 8080
       NOCOBASE_ALERTS_PATH: /tmp/alerts.db
@@ -97,6 +124,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - nocobase-net
@@ -147,6 +176,8 @@ volumes:
     name: nocobase-redisdata
   miniodata:
     name: nocobase-miniodata
+  rabbitmqdata:
+    name: nocobase-rabbitmqdata
 
 networks:
   nocobase-net:

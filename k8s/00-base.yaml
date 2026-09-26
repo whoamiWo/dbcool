@@ -1,0 +1,59 @@
+# ============================================================
+#  NocoBase K8s 基础：Namespace / ConfigMap / Secret
+#  PHASE 55 P0 可观测性与编排
+# ============================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nocobase
+  labels:
+    app.kubernetes.io/name: nocobase
+
+---
+# 非敏感配置（供所有工作负载引用）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nocobase-config
+  namespace: nocobase
+data:
+  # ---- 应用 ----
+  SPRING_PROFILES_ACTIVE: "prod"
+  JAVA_PORT: "8080"
+  PYTHON_PORT: "8000"
+  # ---- 数据库 ----
+  POSTGRES_HOST: "postgres.nocobase.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "nocobase"
+  # ---- 缓存 ----
+  REDIS_HOST: "redis.nocobase.svc.cluster.local"
+  REDIS_PORT: "6379"
+  # ---- 消息队列（PHASE 55 Stage 2 MQ 底座依赖）----
+  RABBITMQ_HOST: "rabbitmq.nocobase.svc.cluster.local"
+  RABBITMQ_PORT: "5672"
+  # ---- 对象存储 ----
+  MINIO_ENDPOINT: "http://minio.nocobase.svc.cluster.local:9000"
+  # ---- 服务间调用 ----
+  JAVA_BACKEND_URL: "http://backend-java.nocobase.svc.cluster.local:8080"
+  API_BASE_URL: "/"
+
+---
+# 敏感配置 —— 示例模板，生产必须替换为真实值并纳入密钥管理（Sealed Secrets / Vault）
+# 部署前请复制为 secret.yaml 并填入真实值；切勿把真实密钥提交进仓库。
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nocobase-secret
+  namespace: nocobase
+type: Opaque
+stringData:
+  # ⚠️ 以下均为占位符，生产环境必须替换
+  POSTGRES_USER: "nocobase"
+  POSTGRES_PASSWORD: "CHANGE_ME"
+  JWT_SECRET: "CHANGE_ME_at_least_32_characters_long_for_hs256"
+  MINIO_ROOT_USER: "CHANGE_ME"
+  MINIO_ROOT_PASSWORD: "CHANGE_ME"
+  RABBITMQ_USER: "guest"
+  RABBITMQ_PASSWORD: "CHANGE_ME"

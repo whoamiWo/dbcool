@@ -1,0 +1,61 @@
+# ============================================================
+#  Ingress —— 外部流量入口
+#  路径需与 frontend/nginx.conf 保持一致：
+#    /api/ai/*  → Python 后端（AI），必须比 /api/ 更具体
+#    /api/*     → Java 后端
+#    /          → 前端静态资源
+# ============================================================
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nocobase
+  namespace: nocobase
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # 上传体积（附件/导入场景）
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    # 超时（长轮询 / 工作流执行）
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    # WebSocket 支持（IM / Huddle 信令 / 协同）
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    # TLS：若集群已装 cert-manager，取消下一行注释并替换 issuer
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # tls:
+  #   - hosts:
+  #       - nocobase.example.com
+  #     secretName: nocobase-tls
+  rules:
+    - host: nocobase.example.com # ⚠️ 替换为真实域名
+      http:
+        paths:
+          # 1) AI 端点：更具体，须排在 /api/ 之前
+          - path: /api/ai
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-python
+                port:
+                  number: 8000
+          # 2) 业务 API
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-java
+                port:
+                  number: 8080
+          # 3) 前端
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

@@ -92,15 +92,28 @@ app:
       secret-key: ${MINIO_SECRET_KEY:}
       bucket: ${MINIO_BUCKET:nocobase}
 
-# Actuator(健康检查)
+# Actuator(健康检查 + 可观测性)—— PHASE 55 P0
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
+      # 开启 K8s readiness/liveness 分组(/actuator/health/readiness、/liveness)
+      probes:
+        enabled: true
+  metrics:
+    # 全局 tag,便于 Prometheus/Grafana 按应用/租户聚合
+    tags:
+      application: ${spring.application.name:nocobase}
+    distribution:
+      # 记录 P95/P99,用于 SLO 观测(默认仅 count/sum/max)
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,300ms,1s,3s
 
 # Springdoc / Swagger UI(Week 14.5)
 springdoc:
