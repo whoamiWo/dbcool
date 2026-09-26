@@ -130,7 +130,8 @@ def list_backups() -> list[dict[str, Any]]:
     for f in sorted(_BACKUP_DIR.glob("backup_*.tar.gz"), reverse=True):
         stat = f.stat()
         result.append({
-            "backup_id": f.stem,
+            # 用 .tar.gz 后缀匹配 restore_backup 的查找模式
+            "backup_id": f.name.removesuffix(".tar.gz"),
             "path": str(f),
             "size_bytes": stat.st_size,
             "created_at": datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(),
