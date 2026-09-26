@@ -64,7 +64,8 @@ public class AutomationRuleController {
                 (String) body.get("name"),
                 (String) body.get("description"),
                 (List<Map<String, Object>>) body.get("conditions"),
-                (List<Map<String, Object>>) body.get("actions")
+                (List<Map<String, Object>>) body.get("actions"),
+                user.tenantId()
         );
         
         return ResponseEntity.ok(Map.of(
@@ -82,7 +83,7 @@ public class AutomationRuleController {
             @AuthenticationPrincipal AuthenticatedUser user) {
         
         boolean enabled = Boolean.parseBoolean(String.valueOf(body.get("enabled")));
-        AutomationRuleEntity rule = automationService.toggleRule(ruleId, enabled);
+        AutomationRuleEntity rule = automationService.toggleRule(ruleId, enabled, user.tenantId());
         
         return ResponseEntity.ok(Map.of(
                 "code", 0,
@@ -94,8 +95,9 @@ public class AutomationRuleController {
     /** 删除规则 */
     @DeleteMapping("/{ruleId}")
     public ResponseEntity<Map<String, Object>> delete(
-            @PathVariable UUID ruleId) {
-        automationService.deleteRule(ruleId);
+            @PathVariable UUID ruleId,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        automationService.deleteRule(ruleId, user.tenantId());
         
         return ResponseEntity.ok(Map.of(
                 "code", 0,

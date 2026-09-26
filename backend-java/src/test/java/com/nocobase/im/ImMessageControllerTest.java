@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 /** 消息控制器测试:覆盖 REST 契约与参数夹取。 */
 class ImMessageControllerTest {
@@ -205,11 +208,32 @@ class ImMessageControllerTest {
 
     @Test
     void listReactions_returnsList() {
-        when(reactionService.list(any())).thenReturn(List.of());
+        UUID messageId = UUID.randomUUID();
+        when(messageService.mustGet(messageId)).thenReturn(message());
+        when(reactionService.list(messageId)).thenReturn(List.of());
 
-        Map<String, Object> resp = controller.listReactions(UUID.randomUUID());
+        Map<String, Object> resp = controller.listReactions(messageId, user);
 
         assertThat(resp.get("code")).isEqualTo(0);
+    }
+
+    /**
+     * 越权防护:非频道成员读取消息的表情回应必须 403。
+     *
+     * <p>该端点此前无任何鉴权参数,任意登录用户传 messageId 即可读取他租户消息的
+     * reaction(userId 集合);现通过「消息 → 频道 → 成员」链路校验归属。
+     */
+    @Test
+    void listReactions_nonMember_returns403() {
+        UUID messageId = UUID.randomUUID();
+        when(messageService.mustGet(messageId)).thenReturn(message());
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员"))
+                .when(messageService).assertMember(any(), any());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.listReactions(messageId, user));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     private ImMessageEntity message() {

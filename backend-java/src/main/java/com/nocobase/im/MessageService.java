@@ -186,7 +186,7 @@ public class MessageService {
         return messageRepository.findById(lastId).map(ImMessageEntity::getCreatedAt).orElse(null);
     }
 
-    private void assertMember(UUID channelId, UUID userId) {
+    public void assertMember(UUID channelId, UUID userId) {
         if (!memberRepository.existsByChannelIdAndUserId(channelId, userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员");
         }

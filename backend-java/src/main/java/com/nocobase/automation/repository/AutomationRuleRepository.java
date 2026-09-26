@@ -8,6 +8,8 @@ import java.util.UUID;
 public interface AutomationRuleRepository extends JpaRepository<AutomationRuleEntity, UUID> {
     List<AutomationRuleEntity> findByTenantIdOrderByUpdatedAtDesc(String tenantId);
 
+    java.util.Optional<AutomationRuleEntity> findByIdAndTenantId(UUID id, String tenantId);
+
     List<AutomationRuleEntity> findByCollectionNameAndTenantIdAndEnabledTrue(
             String collectionName, String tenantId);
 }

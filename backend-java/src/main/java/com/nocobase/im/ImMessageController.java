@@ -248,7 +248,11 @@ public class ImMessageController {
     }
 
     @GetMapping("/{id}/reactions")
-    public Map<String, Object> listReactions(@PathVariable UUID id) {
+    public Map<String, Object> listReactions(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        ImMessageEntity msg = messageService.mustGet(id);
+        messageService.assertMember(msg.getChannelId(), user.userId());
         List<Map<String, Object>> data = reactionService.list(id).stream()
                 .map(r -> Map.<String, Object>of(
                         "userId", r.getUserId().toString(),

@@ -167,7 +167,7 @@ public class ImHuddleController {
     public ResponseEntity<Map<String, Object>> listParticipants(
             @PathVariable UUID huddleId,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        List<ImHuddleParticipantEntity> participants = huddleService.listParticipants(huddleId);
+        List<ImHuddleParticipantEntity> participants = huddleService.listParticipants(huddleId, user.tenantId());
         
         return ResponseEntity.ok(Map.of(
                 "code", 0,

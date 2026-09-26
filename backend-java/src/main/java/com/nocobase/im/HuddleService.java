@@ -186,7 +186,9 @@ public class HuddleService {
     /**
      * 获取会话参与者列表。
      */
-    public List<ImHuddleParticipantEntity> listParticipants(UUID huddleId) {
+    public List<ImHuddleParticipantEntity> listParticipants(UUID huddleId, String tenantId) {
+        // 归属校验:参与者实体无 tenantId 字段,通过父实体(huddle)间接隔离
+        getHuddle(huddleId, tenantId);
         return participantRepository.findByHuddleId(huddleId);
     }
 

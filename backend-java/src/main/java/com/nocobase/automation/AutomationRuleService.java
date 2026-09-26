@@ -112,8 +112,8 @@ public class AutomationRuleService {
      */
     @Transactional
     public AutomationRuleEntity updateRule(UUID ruleId, String name, String description,
-            List<Map<String, Object>> conditions, List<Map<String, Object>> actions) {
-        AutomationRuleEntity rule = getRule(ruleId);
+            List<Map<String, Object>> conditions, List<Map<String, Object>> actions, String tenantId) {
+        AutomationRuleEntity rule = getRule(ruleId, tenantId);
         
         if (name != null) rule.setName(name);
         if (description != null) rule.setDescription(description);
@@ -128,8 +128,8 @@ public class AutomationRuleService {
      * 启用/禁用规则。
      */
     @Transactional
-    public AutomationRuleEntity toggleRule(UUID ruleId, boolean enabled) {
-        AutomationRuleEntity rule = getRule(ruleId);
+    public AutomationRuleEntity toggleRule(UUID ruleId, boolean enabled, String tenantId) {
+        AutomationRuleEntity rule = getRule(ruleId, tenantId);
         rule.setEnabled(enabled);
         rule.setUpdatedAt(Instant.now());
         return ruleRepository.save(rule);
@@ -139,8 +139,9 @@ public class AutomationRuleService {
      * 删除规则。
      */
     @Transactional
-    public void deleteRule(UUID ruleId) {
-        ruleRepository.deleteById(ruleId);
+    public void deleteRule(UUID ruleId, String tenantId) {
+        AutomationRuleEntity rule = getRule(ruleId, tenantId);
+        ruleRepository.delete(rule);
     }
 
     /**
@@ -149,6 +150,14 @@ public class AutomationRuleService {
     public AutomationRuleEntity getRule(UUID ruleId) {
         return ruleRepository.findById(ruleId)
                 .orElseThrow(() -> new RuntimeException("规则不存在: " + ruleId));
+    }
+
+    /**
+     * 获取租户下的规则详情。
+     */
+    public AutomationRuleEntity getRule(UUID ruleId, String tenantId) {
+        return ruleRepository.findByIdAndTenantId(ruleId, tenantId)
+                .orElseThrow(() -> new RuntimeException("规则不存在或无权访问"));
     }
 
     /**
@@ -163,7 +172,7 @@ public class AutomationRuleService {
      */
     @Transactional
     public AutomationExecutionEntity executeRule(UUID ruleId, Map<String, Object> triggerData, UUID triggeredBy) {
-        AutomationRuleEntity rule = getRule(ruleId);
+        AutomationRuleEntity rule = getRule(ruleId);  // 内部调用不传 tenantId，仅用于手动触发
         
         if (!rule.getEnabled()) {
             throw new RuntimeException("规则已禁用");
@@ -400,6 +409,8 @@ public class AutomationRuleService {
      * 获取规则执行历史。
      */
     public List<AutomationExecutionEntity> listExecutions(UUID ruleId, String tenantId) {
+        // 归属校验:执行记录实体无 tenantId 字段,通过父实体(rule)间接隔离
+        getRule(ruleId, tenantId);
         return executionRepository.findByRuleIdOrderByCreatedAtDesc(ruleId);
     }
 }

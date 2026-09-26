@@ -90,8 +90,21 @@ Pod 频繁重启、RabbitMQ 不可用。
 其中延迟告警依赖 `management.metrics.distribution.percentiles-histogram.http.server.requests`
 （已在 `application.yml` 中开启）。
 
-## 尚未覆盖
-- 性能压测基线（无 QPS / P99 容量数据）
-- 日志采集（建议补 EFK / Loki）
-- 分布式追踪（建议补 OpenTelemetry + Jaeger）
-- 备份恢复演练（备份链路代码完整，但**从未做过真实恢复验证**）
+## 安全注意事项
+
+### Actuator 端点保护
+`/actuator/prometheus` 等敏感端点**不应暴露给公网**：
+- 已通过 `05-ingress.yaml` 限制仅内部可访问 `/actuator/*` 路径
+- 生产环境建议：
+  - 使用 NetworkPolicy 限制指标采集来源（仅 Prometheus Pod 可访问）
+  - 启用 Basic Auth 或 mTLS 保护 actuator 端点
+  - 将 actuator 端口与主业务端口分离，独立 Service 暴露
+
+### 密钥管理
+- `00-base.yaml` 中的 Secret 为占位符，**必须替换**为真实值
+- 推荐使用 Sealed Secrets、External Secrets Operator 或云厂商 KMS
+- 切勿将真实密钥提交到 Git 仓库
+
+### 网络隔离
+- 建议使用 NetworkPolicy 限制 Pod 间通信
+- 数据库、缓存等有状态服务应仅允许应用 Pod 访问

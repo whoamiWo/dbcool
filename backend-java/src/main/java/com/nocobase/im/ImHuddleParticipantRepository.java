@@ -14,6 +14,6 @@ public interface ImHuddleParticipantRepository extends JpaRepository<ImHuddlePar
     Optional<ImHuddleParticipantEntity> findByHuddleIdAndUserId(UUID huddleId, UUID userId);
     
     List<ImHuddleParticipantEntity> findByHuddleId(UUID huddleId);
-    
+
     List<ImHuddleParticipantEntity> findByHuddleIdAndLeftAtIsNull(UUID huddleId);
 }
