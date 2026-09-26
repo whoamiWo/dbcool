@@ -174,7 +174,7 @@ public class WorkflowEngine {
                 }
             } else if (equalsIgnoreCase(nodeType, "APPROVAL")) {
                 // ↓↓↓ 以下为 legacy 兼容兜底:仅当 registry 未命中时执行
-                createApprovalTask(instance.getId(), current, defaultAssignee);
+                createApprovalTask(instance.getId(), current, defaultAssignee, instance.getTenantId());
                 instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                 instanceRepository.save(instance);
                 return NodeResult.NEEDS_APPROVAL;
@@ -260,7 +260,7 @@ public class WorkflowEngine {
                 }
                 i++;
             } else if (equalsIgnoreCase(nodeType, "APPROVAL")) {
-                createApprovalTask(instance.getId(), (String) node.get("id"), defaultAssignee);
+                createApprovalTask(instance.getId(), (String) node.get("id"), defaultAssignee, instance.getTenantId());
                 instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                 instanceRepository.save(instance);
                 return NodeResult.NEEDS_APPROVAL;
@@ -283,10 +283,11 @@ public class WorkflowEngine {
         return NodeResult.CONTINUE;
     }
 
-    private void createApprovalTask(UUID instanceId, String nodeId, UUID assignee) {
+    private void createApprovalTask(UUID instanceId, String nodeId, UUID assignee, String tenantId) {
         WorkflowTaskEntity task = new WorkflowTaskEntity();
         task.setId(UUID.randomUUID());
         task.setInstanceId(instanceId);
+        task.setTenantId(tenantId); // 继承实例租户,供按 assignee 查询时下推租户过滤
         task.setNodeId(nodeId);
         task.setNodeType("APPROVAL");
         task.setAssignee(assignee);

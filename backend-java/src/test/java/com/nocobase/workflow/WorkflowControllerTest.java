@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -370,8 +371,8 @@ class WorkflowControllerTest {
 
     @Test
     void myTasks_returnsPending() {
-        when(taskRepository.findByAssigneeAndStatus(testUser.userId(),
-                WorkflowTaskEntity.Status.PENDING))
+        when(taskRepository.findByTenantIdAndAssigneeAndStatus(
+                testUser.tenantId(), testUser.userId(), WorkflowTaskEntity.Status.PENDING))
                 .thenReturn(List.of(makeTask(UUID.randomUUID(), WorkflowTaskEntity.Status.PENDING)));
 
         Map<String, Object> resp = controller.myTasks(testUser);
@@ -379,6 +380,31 @@ class WorkflowControllerTest {
         assertEquals(0, resp.get("code"));
         assertEquals(1, ((List<?>) resp.get("data")).size());
     }
+
+    /**
+     * 多租户隔离:myTasks 必须带当前会话租户查询,
+     * 否则用户经 UserTenantEntity 切换租户后会看到其他租户的待办(跨租户越权)。
+     */
+    @Test
+    void myTasks_scopesQueryToCurrentTenant() {
+        AuthenticatedUser otherTenantUser =
+                new AuthenticatedUser(testUser.userId(), testUser.username(), "tenant_other");
+
+        when(taskRepository.findByTenantIdAndAssigneeAndStatus(
+                "tenant_other", testUser.userId(), WorkflowTaskEntity.Status.PENDING))
+                .thenReturn(List.of());
+        // 不带租户的旧查询若被调用会返回数据,用于证明它已不被使用
+        when(taskRepository.findByAssigneeAndStatus(testUser.userId(), WorkflowTaskEntity.Status.PENDING))
+                .thenReturn(List.of(makeTask(UUID.randomUUID(), WorkflowTaskEntity.Status.PENDING)));
+
+        Map<String, Object> resp = controller.myTasks(otherTenantUser);
+
+        assertEquals(0, ((List<?>) resp.get("data")).size());
+        verify(taskRepository).findByTenantIdAndAssigneeAndStatus(
+                "tenant_other", testUser.userId(), WorkflowTaskEntity.Status.PENDING);
+        verify(taskRepository, never()).findByAssigneeAndStatus(any(), any());
+    }
+
 
     // ============ approve ============
 

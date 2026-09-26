@@ -299,8 +299,9 @@ public class WorkflowController {
 
     @GetMapping("/tasks/my")
     public Map<String, Object> myTasks(@AuthenticationPrincipal AuthenticatedUser user) {
-        List<WorkflowTaskEntity> tasks = taskRepository.findByAssigneeAndStatus(
-                user.userId(), WorkflowTaskEntity.Status.PENDING);
+        // 多租户隔离:必须带当前会话租户,否则用户切换租户后会看到其他租户的待办
+        List<WorkflowTaskEntity> tasks = taskRepository.findByTenantIdAndAssigneeAndStatus(
+                user.tenantId(), user.userId(), WorkflowTaskEntity.Status.PENDING);
         return Map.of("code", 0, "message", "success",
                 "data", tasks.stream().map(this::taskToDto).toList());
     }
@@ -366,6 +367,7 @@ public class WorkflowController {
                 WorkflowTaskEntity nextTask = new WorkflowTaskEntity();
                 nextTask.setId(UUID.randomUUID());
                 nextTask.setInstanceId(instance.getId());
+                nextTask.setTenantId(instance.getTenantId());
                 nextTask.setNodeId((String) node.get("id"));
                 nextTask.setNodeType("APPROVAL");
                 nextTask.setAssignee(w.getCreatedBy());

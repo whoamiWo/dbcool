@@ -22,6 +22,16 @@ public class WorkflowTaskEntity {
     @Column(name = "instance_id", nullable = false)
     private UUID instanceId;
 
+    /**
+     * 租户 ID(冗余自 {@code workflow_instance.tenant_id})。
+     *
+     * <p>存在意义:任务按 assignee(用户)查询时不经过父实体,若不带 tenant 条件,
+     * 用户在多租户间切换后会看到其他租户的任务 —— 跨租户越权。
+     * 该字段用于把租户过滤下推到 SQL,见 {@code findByTenantIdAndAssigneeAndStatus}。
+     */
+    @Column(name = "tenant_id", length = 64)
+    private String tenantId;
+
     @Column(name = "node_id", nullable = false, length = 64)
     private String nodeId;
 
@@ -59,6 +69,8 @@ public class WorkflowTaskEntity {
     public void setId(UUID id) { this.id = id; }
     public UUID getInstanceId() { return instanceId; }
     public void setInstanceId(UUID instanceId) { this.instanceId = instanceId; }
+    public String getTenantId() { return tenantId; }
+    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
     public String getNodeId() { return nodeId; }
     public void setNodeId(String nodeId) { this.nodeId = nodeId; }
     public String getNodeType() { return nodeType; }

@@ -61,6 +61,7 @@ public class ApprovalNodeHandler implements WorkflowNodeHandler {
             WorkflowTaskEntity task = new WorkflowTaskEntity();
             task.setId(UUID.randomUUID());
             task.setInstanceId(instance.getId());
+            task.setTenantId(instance.getTenantId());
             task.setNodeId(nodeId);
             // nodeType / createdAt 均为 NOT NULL,漏设会在 save 时触发约束冲突
             task.setNodeType("APPROVAL");
