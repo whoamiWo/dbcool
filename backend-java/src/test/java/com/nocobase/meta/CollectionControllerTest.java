@@ -262,12 +262,13 @@ class CollectionControllerTest {
         job.setCollectionName("posts");
         job.setOperation(MigrationJobEntity.Operation.ADD_FIELD);
         job.setStatus(MigrationJobEntity.Status.RUNNING);
+        job.setTenantId("tenant_default");
         job.setCreatedAt(Instant.now());
         job.setStartedAt(Instant.now());
         job.setFinishedAt(Instant.now());
         when(migrationService.getJob(jobId)).thenReturn(job);
 
-        Map<String, Object> resp = controller.getJob(jobId);
+        Map<String, Object> resp = controller.getJob(jobId, testUser);
 
         assertEquals(0, resp.get("code"));
         @SuppressWarnings("unchecked")
@@ -281,8 +282,41 @@ class CollectionControllerTest {
         when(migrationService.getJob(jobId)).thenReturn(null);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> controller.getJob(jobId));
+                () -> controller.getJob(jobId, testUser));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    /**
+     * 多租户隔离:getJob 此前无鉴权也无租户校验,
+     * 拿到 jobId 即可读取他租户的迁移任务详情与错误信息(越权读取)。
+     */
+    @Test
+    void getJob_otherTenant_returns403() {
+        UUID jobId = UUID.randomUUID();
+        MigrationJobEntity job = new MigrationJobEntity();
+        job.setId(jobId);
+        job.setTenantId("other-tenant");
+        job.setStatus(MigrationJobEntity.Status.RUNNING);
+        job.setCreatedAt(Instant.now());
+        when(migrationService.getJob(jobId)).thenReturn(job);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.getJob(jobId, testUser));
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+    }
+
+    @Test
+    void getJob_unauthenticated_returns401() {
+        UUID jobId = UUID.randomUUID();
+        MigrationJobEntity job = new MigrationJobEntity();
+        job.setId(jobId);
+        job.setTenantId("tenant_default");
+        job.setCreatedAt(Instant.now());
+        when(migrationService.getJob(jobId)).thenReturn(job);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.getJob(jobId, null));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
     }
 
     // ============ Records ============

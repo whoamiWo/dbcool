@@ -183,10 +183,21 @@ public class CollectionController {
      * 查 migration job 状态(异步任务轮询).
      */
     @GetMapping("/_jobs/{jobId}")
-    public Map<String, Object> getJob(@PathVariable UUID jobId) {
+    public Map<String, Object> getJob(
+            @PathVariable UUID jobId,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
         MigrationJobEntity job = migrationService.getJob(jobId);
         if (job == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "job 不存在");
+        }
+        // 多租户隔离:本端点此前既无鉴权也无租户校验(同文件其余端点均有),
+        // 任何拿到 jobId 的人都能读取他租户的迁移任务详情与错误信息 —— 越权读取。
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "未认证");
+        }
+        if (!job.getTenantId().equals(user.tenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该任务");
         }
         return Map.of("code", 0, "message", "success", "data", Map.of(
                 "id", job.getId().toString(),
