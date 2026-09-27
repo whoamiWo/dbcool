@@ -1,0 +1,131 @@
+# ============================================================
+#  Grafana —— 可观测性可视化层
+#  PHASE 56 P1-3
+#
+#  依赖前置：
+#  - 已安装 Prometheus Operator 或原生 Prometheus
+#  - 已安装 Loki（日志）、Jaeger（追踪）
+#
+#  使用：
+#  1. 首次登录：kubectl port-forward svc/grafana 3000:3000
+#  2. 默认 admin/admin，首次登录请立即修改密码
+#  3. 添加 Prometheus 数据源：URL=http://prometheus-server:9090
+#  4. Dashboard 会自动导入（从 ConfigMap）
+# ============================================================
+
+---
+# Grafana 命名空间 Secret（首次登录凭据）
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: nocobase
+type: Opaque
+stringData:
+  admin-user: admin
+  admin-password: admin
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: nocobase
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.0.3
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-password
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_AUTH_DISABLE_LOGIN_FORM
+              value: "false"
+          ports:
+            - containerPort: 3000
+              name: http
+          volumeMounts:
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: grafana-dashboards
+              mountPath: /etc/dashboards/nocobase
+          resources:
+            limits:
+              memory: 512Mi
+              cpu: 500m
+            requests:
+              memory: 256Mi
+              cpu: 250m
+      volumes:
+        - name: grafana-config
+          configMap:
+            name: grafana-dashboard-providers
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboard-nocobase
+            items:
+              - key: nocobase-overview.json
+                path: nocobase-overview.json
+
+---
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: nocobase
+  labels:
+    app: grafana
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+      name: http
+  selector:
+    app: grafana
+
+---
+# Grafana Ingress（可选：外部访问）
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: grafana
+#   namespace: nocobase
+#   annotations:
+#     nginx.ingress.kubernetes.io/auth-type: basic
+#     nginx.ingress.kubernetes.io/auth-secret: grafana-basic-auth
+#     nginx.ingress.kubernetes.io/auth-realm: "Grafana Authentication Required"
+# spec:
+#   rules:
+#     - host: grafana.local
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: grafana
+#                 port:
+#                   number: 80

@@ -26,13 +26,13 @@
 
 | 门禁 | 命令 | 结果 |
 |---|---|---|
-| 后端单测 | `mvn -o test` | ✅ **1149 / 0 / 0 BUILD SUCCESS** |
-| 前端单测 | `npm run test:run` | ✅ **250 passed / 32 files** |
+| 后端单测 | `mvn -o test` | ✅ **1162 / 0 / 0 BUILD SUCCESS**（1149→1162，+13） |
+| 前端单测 | `npm run test:run` | ✅ **262 passed / 34 files**（250→262，+6） |
 | 类型检查 | `npx tsc --noEmit` | ✅ **0 errors** |
 | E2E（双浏览器） | `npx playwright test` | ✅ **64 passed / 0 failed** |
 | Python 编译 | `python3 -m py_compile` | ✅ OK |
 
-**基线演进（只增不减）**：1075 → 1104 → 1125 → 1142 → 1143 → 1145 → 1146 → **1149**
+**基线演进（只增不减）**：1075 → 1104 → 1125 → 1142 → 1143 → 1145 → 1146 → 1149 → **1162**
 
 **反作弊闸门**：新增 `it.skip` 0 / 删测试 0 / 弱化断言 0
 （唯一 skip 为 `BiReportServiceTest` 既存项，非本轮引入）
@@ -130,7 +130,7 @@
 ### 🟢 P2 — 体验 / 对标
 | 项 | 现状 |
 |---|---|
-| i18n | ✅ **已完成核心页面**：`frontend/src/i18n/` zh-CN（默认）/en-US 双语包 + AppLayout 语言切换器；已国际化 **Login / AppLayout / Home / ProjectPage / TaskBoard / ChannelList / MessageComposer**；i18n 在 `src/test-setup.ts` 全局初始化（默认 zh-CN，不破坏既有中文断言）。剩余：MessageList / ImLayout 等次要页面仍为中文 |
+| i18n | ✅ **已完成核心页面**：`frontend/src/i18n/` zh-CN（默认）/en-US 双语包 + AppLayout 语言切换器；已国际化 **Login / AppLayout / Home / ProjectPage / TaskBoard / ChannelList / MessageComposer / MessageList / ImLayout / HuddlePanel / GlobalSearchPanel**；i18n 在 `src/test-setup.ts` 全局初始化（默认 zh-CN，不破坏既有中文断言）。剩余：次要页面仍为中文 |
 | Airtable 公式/汇总字段 | 后端可算，**前端 UI 未接线** |
 | Notion 协同 | CRDT 未做服务端合并，多人编辑会互相覆盖 |
 | Trello 看板前端 | ✅ 已接真：`BoardView` 接入 `ProjectPage` Tab；修复「`loadData` 定义后从未调用→永远卡 loading」；拖拽按 dnd-kit 多容器模式重构（DndContext 上移到 BoardView、补 containerId，此前每列独立 DndContext 且无 containerId → 拖拽不触发移动）+ `BoardView.test.tsx` 6 用例 |
@@ -140,6 +140,7 @@
 | FTS 中文分词 | ✅ 已接真：`ChineseSegmenter`（jieba，纯 Java，INDEX 模式）+ `WikiSearchService` 逐词检索按命中词数排序；「项目管理」从整串命中 0 → 分词后命中并按相关度排序（H2/PG 通用，未编译任何 PG 扩展） |
 | 日志 JSON化 | ✅ 已完成：`logback-spring.xml` 生产 JSON/测试纯文本；`MdcFilter` 已在 `SecurityConfig` 中 `addFilterAfter(jwtAuthFilter)` 注册（此前仅 `@Component` 未注册 → 拿不到 principal，实际不生效） |
 | 分布式追踪 | ✅ 已完成：pom 添加 micrometer-tracing-bridge-otel + otlp，Jaeger K8s 部署 |
+| Grafana 面板 | ✅ 已完成（2026-09-27）：`k8s/09-grafana-dashboards.yaml`（NocoBase Overview Dashboard：请求总数/错误率/P99/P95/P50/QPS/JVM/线程/在线时长，ConfigMap 自动导入）+ `k8s/10-grafana.yaml`（Deployment+Service） |
 
 ---
 

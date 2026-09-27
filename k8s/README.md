@@ -13,6 +13,10 @@
 | `04-frontend.yaml` | 前端 Nginx Deployment + Service + HPA |
 | `05-ingress.yaml` | Ingress 路由（含 WebSocket 与超时配置） |
 | `06-monitoring.yaml` | ServiceMonitor + PrometheusRule 告警规则 |
+| `07-logging.yaml` | Loki + Fluent Bit 日志采集 |
+| `08-tracing.yaml` | Jaeger 分布式追踪 |
+| `09-grafana-dashboards.yaml` | Grafana 面板 JSON + 自动导入配置 |
+| `10-grafana.yaml` | Grafana Deployment + Service |
 
 ## 前置条件
 
@@ -50,8 +54,14 @@ kubectl apply -f 03-backend-python.yaml
 kubectl apply -f 04-frontend.yaml
 kubectl apply -f 05-ingress.yaml
 
-# 6) 开启监控（需 Prometheus Operator）
+# 6) 开启监控与可观测性（需 Prometheus Operator）
 kubectl apply -f 06-monitoring.yaml
+kubectl apply -f 07-logging.yaml
+kubectl apply -f 08-tracing.yaml
+
+# 7) 部署 Grafana（可选：生产环境推荐）
+kubectl apply -f 09-grafana-dashboards.yaml
+kubectl apply -f 10-grafana.yaml
 ```
 
 ## 验证
