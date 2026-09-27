@@ -2,6 +2,7 @@ package com.nocobase.config;
 
 import com.nocobase.apikey.ApiKeyFilter;
 import com.nocobase.auth.JwtAuthFilter;
+import com.nocobase.auth.MdcFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -93,7 +94,10 @@ public class SecurityConfig {
                 )
                 // Week 42 D5.2: API Key filter 先于 JWT — 外部系统用 X-Api-Key
                 .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // PHASE 56 P1-1: MDC 必须在 JWT 鉴权之后,才能从 SecurityContext
+                // 读到 AuthenticatedUser 并注入 tenantId/userId 到日志 MDC。
+                .addFilterAfter(new MdcFilter(), JwtAuthFilter.class);
 
         return http.build();
     }
