@@ -141,23 +141,27 @@ export function AppLayout() {
               🔄 切换应用({user.tenant_id})
             </button>
           )}
-          <select
-            value={i18n.language}
-            onChange={(e) => changeLanguage(e.target.value as 'zh-CN' | 'en-US')}
-            style={{
-              padding: '6px 10px',
-              background: 'var(--color-bg-secondary)',
-              color: 'var(--color-text-primary)',
-              border: '1px solid var(--color-border-light)',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              fontSize: 12,
-              fontWeight: 500,
-            }}
-          >
-            <option value="zh-CN">中文</option>
-            <option value="en-US">English</option>
-          </select>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {['zh-CN', 'en-US'].map((lang) => (
+              <button
+                key={lang}
+                onClick={() => changeLanguage(lang as 'zh-CN' | 'en-US')}
+                style={{
+                  padding: '6px 10px',
+                  background: i18n.language === lang ? 'var(--color-primary-500)' : 'var(--color-bg-secondary)',
+                  color: i18n.language === lang ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  border: '1px solid var(--color-border-light)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  transition: 'all var(--transition-fast)',
+                }}
+              >
+                {lang === 'zh-CN' ? '中文' : 'EN'}
+              </button>
+            ))}
+          </div>
           <button
             onClick={handleLogout}
             style={{
