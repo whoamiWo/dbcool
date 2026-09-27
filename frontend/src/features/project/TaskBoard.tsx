@@ -24,14 +24,17 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useTranslation } from 'react-i18next';
 import { projectApi, type Task, type TaskStatus } from './api';
 import { Add, DragIndicator } from '@mui/icons-material';
 
-const COLUMNS: Array<{ key: TaskStatus; label: string; color: string }> = [
-  { key: 'TODO', label: '待办', color: 'var(--color-text-muted)' },
-  { key: 'IN_PROGRESS', label: '进行中', color: 'var(--color-info)' },
-  { key: 'BLOCKED', label: '阻塞', color: 'var(--color-error)' },
-  { key: 'DONE', label: '已完成', color: 'var(--color-success)' },
+// labelKey 而非 label：常量定义在组件外，无法使用 useTranslation hook，
+// 故存 i18n key，在渲染处再 t(col.labelKey)。
+const COLUMNS: Array<{ key: TaskStatus; labelKey: string; color: string }> = [
+  { key: 'TODO', labelKey: 'board.todo', color: 'var(--color-text-muted)' },
+  { key: 'IN_PROGRESS', labelKey: 'board.inProgress', color: 'var(--color-info)' },
+  { key: 'BLOCKED', labelKey: 'board.blocked', color: 'var(--color-error)' },
+  { key: 'DONE', labelKey: 'board.done', color: 'var(--color-success)' },
 ];
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -111,6 +114,8 @@ function Column({
   onTaskClick: (task: Task) => void;
   onAddClick: () => void;
 }) {
+  // Column 是独立组件，需自行取 t（父组件的 t 不在此作用域）
+  const { t } = useTranslation();
   return (
     <Box sx={{ flex: 1, minWidth: 280 }}>
       <Card className="glass-card" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -132,7 +137,7 @@ function Column({
               ))}
               {tasks.length === 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', py: 2, textAlign: 'center' }}>
-                  暂无任务
+                  {t('board.noTasks')}
                 </Typography>
               )}
             </Stack>
@@ -145,6 +150,7 @@ function Column({
 
 export default function TaskBoard({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newTaskForm, setNewTaskForm] = useState({
@@ -227,13 +233,13 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
   }
 
   if (isError) {
-    return <Alert severity="error">加载失败</Alert>;
+    return <Alert severity="error">{t('common.loadFailed')}</Alert>;
   }
 
   return (
     <Box>
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>看板视图</Typography>
+        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>{t('board.viewTitle')}</Typography>
         <Button
           variant="contained"
           size="small"
@@ -241,7 +247,7 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
           onClick={() => setDialogOpen(true)}
           sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
         >
-          新建任务
+          {t('task.newTask')}
         </Button>
       </Stack>
 
@@ -256,7 +262,7 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
             <Column
               key={col.key}
               status={col.key}
-              label={col.label}
+              label={t(col.labelKey)}
               color={col.color}
               tasks={col.tasks}
               onTaskClick={(task) => console.log('click', task)}
@@ -275,18 +281,18 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
 
       {/* 新建任务对话框 */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>新建任务</DialogTitle>
+        <DialogTitle>{t('task.newTask')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
               autoFocus
-              label="标题"
+              label={t('task.title')}
               value={newTaskForm.title}
               onChange={(e) => setNewTaskForm({ ...newTaskForm, title: e.target.value })}
-              placeholder="例如：完成需求评审"
+              placeholder={t('task.titlePlaceholder')}
             />
             <TextField
-              label="描述"
+              label={t('task.description')}
               multiline
               rows={3}
               value={newTaskForm.description}
@@ -294,17 +300,17 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
             />
             <TextField
               select
-              label="优先级"
+              label={t('task.priority')}
               value={newTaskForm.priority}
               onChange={(e) => setNewTaskForm({ ...newTaskForm, priority: e.target.value as Task['priority'] })}
             >
-              <MenuItem value="LOW">低</MenuItem>
-              <MenuItem value="MEDIUM">中</MenuItem>
-              <MenuItem value="HIGH">高</MenuItem>
-              <MenuItem value="CRITICAL">紧急</MenuItem>
+              <MenuItem value="LOW">{t('task.low')}</MenuItem>
+              <MenuItem value="MEDIUM">{t('task.medium')}</MenuItem>
+              <MenuItem value="HIGH">{t('task.high')}</MenuItem>
+              <MenuItem value="CRITICAL">{t('task.urgent')}</MenuItem>
             </TextField>
             <TextField
-              label="截止日期"
+              label={t('task.dueDate')}
               type="date"
               value={newTaskForm.endDate}
               onChange={(e) => setNewTaskForm({ ...newTaskForm, endDate: e.target.value })}
@@ -313,7 +319,7 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>取消</Button>
+          <Button onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button
             variant="contained"
             onClick={() => {
@@ -330,7 +336,7 @@ export default function TaskBoard({ projectId }: { projectId: string }) {
             disabled={!newTaskForm.title.trim() || createMut.isPending}
             sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
           >
-            {createMut.isPending ? <CircularProgress size={20} /> : '创建'}
+            {createMut.isPending ? <CircularProgress size={20} /> : t('common.create')}
           </Button>
         </DialogActions>
       </Dialog>

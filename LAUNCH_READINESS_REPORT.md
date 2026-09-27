@@ -130,7 +130,7 @@
 ### 🟢 P2 — 体验 / 对标
 | 项 | 现状 |
 |---|---|
-| i18n | ⚠️ **部分完成**：`frontend/src/i18n/` zh-CN/en-US 双语包 + AppLayout 语言切换器 + `Login` 页面已国际化；**Home / IM / 项目页面仍为中文硬编码**（`grep useTranslation` 仅命中 2 个文件） |
+| i18n | ✅ **已完成核心页面**：`frontend/src/i18n/` zh-CN（默认）/en-US 双语包 + AppLayout 语言切换器；已国际化 **Login / AppLayout / Home / ProjectPage / TaskBoard / ChannelList / MessageComposer**；i18n 在 `src/test-setup.ts` 全局初始化（默认 zh-CN，不破坏既有中文断言）。剩余：MessageList / ImLayout 等次要页面仍为中文 |
 | Airtable 公式/汇总字段 | 后端可算，**前端 UI 未接线** |
 | Notion 协同 | CRDT 未做服务端合并，多人编辑会互相覆盖 |
 | Trello 看板前端 | ✅ 已接真：`BoardView` 接入 `ProjectPage` Tab；修复「`loadData` 定义后从未调用→永远卡 loading」；拖拽按 dnd-kit 多容器模式重构（DndContext 上移到 BoardView、补 containerId，此前每列独立 DndContext 且无 containerId → 拖拽不触发移动）+ `BoardView.test.tsx` 6 用例 |

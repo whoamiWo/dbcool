@@ -5,6 +5,7 @@ import {
   Box, Button, Card, Stack, Tab, Tabs, TextField, Typography,
   Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import TaskBoard from './TaskBoard';
 import GanttView from './GanttView';
 import { GanttLegend } from './GanttView';
@@ -20,7 +21,8 @@ export default function ProjectPage() {
   const [tab, setTab] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
-  
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
 
   // 从 URL 取 projectId，若为空则显示项目列表
@@ -65,7 +67,7 @@ export default function ProjectPage() {
     <Box sx={{ p: 3 }}>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          🗂️ 项目协同
+          🗂️ {t('project.title')}
         </Typography>
         <Button
           variant="contained"
@@ -73,7 +75,7 @@ export default function ProjectPage() {
           onClick={() => setDialogOpen(true)}
           sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
         >
-          新建项目
+          {t('project.newProject')}
         </Button>
       </Stack>
 
@@ -81,12 +83,12 @@ export default function ProjectPage() {
       {!selectedProjectId && (
         <Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 2 }}>
-            我的项目
+            {t('project.myProjects')}
           </Typography>
           
           {projects && projects.length === 0 ? (
             <Alert severity="info" sx={{ bgcolor: 'var(--color-info)', border: '1px solid var(--color-info)' }}>
-              暂无项目，点击上方按钮创建第一个项目
+              {t('project.emptyProjects')}
             </Alert>
           ) : (
             <Stack spacing={2}>
@@ -150,7 +152,7 @@ export default function ProjectPage() {
               onClick={() => setParams({})}
               sx={{ mr: 2, color: 'text.secondary' }}
             >
-              ← 返回列表
+              {t('project.backToList')}
             </Button>
             <Typography variant="body2" color="text.secondary">
               {projects?.find((p) => p.id === selectedProjectId)?.name ?? selectedProjectId}
@@ -176,36 +178,36 @@ export default function ProjectPage() {
 
       {/* 新建项目对话框 */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>新建项目</DialogTitle>
+        <DialogTitle>{t('project.newProject')}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <TextField
               autoFocus
-              label="项目名称"
+              label={t('project.projectName')}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="例如：Q4 产品发布计划"
-              helperText="必填"
+              placeholder={t('project.projectNamePlaceholder')}
+              helperText={t('project.required')}
             />
             <TextField
-              label="项目描述"
+              label={t('project.projectDesc')}
               multiline
               rows={3}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="简要描述项目目标和范围..."
+              placeholder={t('project.projectDescPlaceholder')}
             />
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>取消</Button>
+          <Button onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
           <Button
             variant="contained"
             onClick={handleCreate}
             disabled={!form.name.trim() || createMut.isPending}
             sx={{ bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
           >
-            {createMut.isPending ? <CircularProgress size={20} /> : '创建'}
+            {createMut.isPending ? <CircularProgress size={20} /> : t('project.create')}
           </Button>
         </DialogActions>
       </Dialog>

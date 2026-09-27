@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { sendMessage, uploadAttachment, listSlashCommands, type SlashCommand } from './api';
 
 interface MessageComposerProps {
@@ -17,6 +18,8 @@ const SlashPanel = ({
   position: { top: number; left: number };
 }) => {
   void onClose;
+  // SlashPanel 是独立组件，需自行取 t（父组件的 t 不在此作用域）
+  const { t } = useTranslation();
   const [filter, setFilter] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +50,7 @@ const SlashPanel = ({
         autoFocus
         value={filter}
         onChange={(e) => setFilter(e.currentTarget.value)}
-        placeholder="搜索命令..."
+        placeholder={t('im.searchCommand')}
         className="input-glass"
         style={{ width: '100%', padding: '6px 8px', marginBottom: 4 }}
       />
@@ -80,13 +83,14 @@ const SlashPanel = ({
         ))
       )}
       <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: '4px 8px', borderTop: '1px solid var(--color-border-light)', marginTop: 4 }}>
-        ↑↓ 选择 · Enter 确认 · Esc 关闭
+        {t('im.commandHint')}
       </div>
     </div>
   );
 };
 
 export function MessageComposer({ channelId, onSent, disabled, onAttachment }: MessageComposerProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
@@ -111,7 +115,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     } catch (error) {
       console.error('发送消息失败', error);
-      alert('发送消息失败，请重试');
+      alert(t('im.sendFailed'));
     } finally {
       setIsSending(false);
     }
@@ -159,7 +163,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
     const files = Array.from(e.dataTransfer.files);
     for (const file of files) {
       if (file.size > 50 * 1024 * 1024) {
-        alert('文件大小不能超过 50MB');
+        alert(t('im.fileTooLarge'));
         continue;
       }
       try {
@@ -169,7 +173,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
         }
       } catch (err) {
         console.error('上传失败', err);
-        alert('上传失败，请重试');
+        alert(t('im.uploadFailed'));
       }
     }
   };
@@ -242,7 +246,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             value={content}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder={disabled ? '请选择频道以发送消息' : '输入消息...  (输入 / 打开命令面板)'}
+            placeholder={disabled ? t('im.selectChannelPlaceholder') : t('im.inputPlaceholder')}
             disabled={disabled}
             className="textarea-glass"
           />
@@ -258,11 +262,11 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
               fontWeight: 500,
             }}
           >
-            {isSending ? '发送中...' : '发送'}
+            {isSending ? t('im.sending') : t('im.send')}
           </button>
         </div>
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, textAlign: 'right' }}>
-          按 Enter 发送，Shift + Enter 换行 · 拖拽文件到此处上传
+          {t('im.inputHint')}
         </div>
       </div>
     </>

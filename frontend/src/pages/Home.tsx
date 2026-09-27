@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import type { CollectionMeta } from '@/types/collection';
@@ -13,6 +14,7 @@ interface ApiEnvelope<T> { code: number; message: string; data: T; }
 
 export function HomePage() {
   const { user } = useAuthStore();
+  const { t } = useTranslation();
 
   const meQuery = useQuery({ queryKey: ['me'], queryFn: () => apiClient.get<ApiEnvelope<UserInfo>>('/users/me') });
   const colsQuery = useQuery({ queryKey: ['collections'], queryFn: () => apiClient.get<ApiEnvelope<CollectionMeta[]>>('/collections') });
@@ -36,22 +38,22 @@ export function HomePage() {
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-        👋 欢迎,{(user as { display_name?: string })?.display_name ?? user?.username ?? '游客'}
+        👋 {t('home.welcome')},{(user as { display_name?: string })?.display_name ?? user?.username ?? t('home.guest')}
       </h1>
 
       {/* 摘要卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
-        <SummaryCard color="var(--color-info)" icon="📋" label="未读站内信" value={unreadQuery.data?.data?.unread_count} link="/messages" />
-        <SummaryCard color="var(--color-warning)" icon="📝" label="待我审批" value={pendingTasks.length} link="/tasks/my" />
-        <SummaryCard color="var(--color-success)" icon="📊" label="运行中工作流" value={runningInstances.length} link="/designer/instances" />
-        <SummaryCard color="var(--color-secondary-500)" icon="📐" label="Collection 数" value={colsQuery.data?.data?.length} link="/designer/schemas" />
-        <SummaryCard color="var(--color-primary-500)" icon="🔧" label="工作流数" value={wfQuery.data?.data?.length} link="/designer/workflows" />
+        <SummaryCard color="var(--color-info)" icon="📋" label={t('home.unreadMessages')} value={unreadQuery.data?.data?.unread_count} link="/messages" />
+        <SummaryCard color="var(--color-warning)" icon="📝" label={t('home.pendingApprovals')} value={pendingTasks.length} link="/tasks/my" />
+        <SummaryCard color="var(--color-success)" icon="📊" label={t('home.runningWorkflows')} value={runningInstances.length} link="/designer/instances" />
+        <SummaryCard color="var(--color-secondary-500)" icon="📐" label={t('home.collectionCount')} value={colsQuery.data?.data?.length} link="/designer/schemas" />
+        <SummaryCard color="var(--color-primary-500)" icon="🔧" label={t('home.workflowCount')} value={wfQuery.data?.data?.length} link="/designer/workflows" />
       </div>
 
       {/* 待办 + 运行中 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-        <Panel title="⏳ 待审批任务" link="/tasks/my" linkText="查看全部">
-          {pendingTasks.length === 0 && <Empty text="当前无待审批 🎉" />}
+        <Panel title={`⏳ ${t('home.pendingTasks')}`} link="/tasks/my" linkText={t('home.viewAll')}>
+          {pendingTasks.length === 0 && <Empty text={t('home.noPendingTasks')} />}
           {pendingTasks.slice(0, 5).map((t) => (
             <Link key={t.id} to={`/designer/instances/${t.instance_id}`} style={itemLink}>
               <span style={{ fontWeight: 500 }}>{t.workflow_title}</span>
@@ -61,8 +63,8 @@ export function HomePage() {
           ))}
         </Panel>
 
-        <Panel title="🔄 运行中实例" link="/designer/instances" linkText="查看全部">
-          {runningInstances.length === 0 && <Empty text="无运行中实例" />}
+        <Panel title={`🔄 ${t('home.runningInstances')}`} link="/designer/instances" linkText={t('home.viewAll')}>
+          {runningInstances.length === 0 && <Empty text={t('home.noRunningInstances')} />}
           {runningInstances.slice(0, 5).map((i) => (
             <Link key={i.id} to={`/designer/instances/${i.id}`} style={itemLink}>
               <span style={{ fontWeight: 500 }}>{i.workflow_title}</span>
@@ -77,8 +79,8 @@ export function HomePage() {
 
       {/* 未读站内信 + 最近审计 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-        <Panel title="📨 未读站内信" link="/messages" linkText="查看全部">
-          {(unreadQuery.data?.data?.messages ?? []).length === 0 && <Empty text="无未读消息" />}
+        <Panel title={`📨 ${t('home.unreadMessages')}`} link="/messages" linkText={t('home.viewAll')}>
+          {(unreadQuery.data?.data?.messages ?? []).length === 0 && <Empty text={t('home.noUnread')} />}
           {(unreadQuery.data?.data?.messages ?? []).map((m) => (
             <div key={m.id} style={itemLink}>
               <span style={{ fontWeight: 500 }}>{m.title}</span>
@@ -91,9 +93,9 @@ export function HomePage() {
 
       {/* 系统状态 */}
       <div style={{ marginTop: 16, padding: 12, background: 'var(--glass-bg-medium)', borderRadius: 'var(--radius-md)', color: 'var(--color-text-muted)', fontSize: 12, backdropFilter: 'blur(10px)' }}>
-        系统状态: {meQuery.isError ? '❌ 鉴权失败' : '✅ 已认证'} |{' '}
+        {t('home.systemStatus')}: {meQuery.isError ? t('home.authFailed') : t('home.authenticated')} |{' '}
         tenant: <strong style={{ color: 'var(--color-text-primary)' }}>{user?.tenant_id ?? '-'}</strong> |{' '}
-        <a href="/api/health" target="_blank" rel="noreferrer">API 健康</a>
+        <a href="/api/health" target="_blank" rel="noreferrer">{t('home.apiHealth')}</a>
       </div>
     </div>
   );
@@ -157,6 +159,7 @@ const itemLink: React.CSSProperties = {
 };
 
 function AuditWidget() {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ['audit-recent'],
     queryFn: async () => {
@@ -169,11 +172,11 @@ function AuditWidget() {
   return (
     <div className="glass-card" style={{ padding: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-primary)' }}>🔍 最近审计 ({data?.total ?? '…'})</h3>
-        <Link to="/admin/audit" style={{ fontSize: 11, color: 'var(--color-primary-400)' }}>查看全部 →</Link>
+        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-primary)' }}>🔍 {t('home.recentAudit')} ({data?.total ?? '…'})</h3>
+        <Link to="/admin/audit" style={{ fontSize: 11, color: 'var(--color-primary-400)' }}>{t('home.viewAll')} →</Link>
       </div>
-      {isLoading && <Empty text="加载中…" />}
-      {!isLoading && logs.length === 0 && <Empty text="暂无审计记录" />}
+      {isLoading && <Empty text={t('home.loading')} />}
+      {!isLoading && logs.length === 0 && <Empty text={t('home.noAudit')} />}
       {logs.map((l: AuditPreview) => {
         const color = l.action.startsWith('CREATE') || l.action === 'APPROVE' ? 'var(--color-success)'
           : l.action.startsWith('DELETE') || l.action === 'REJECT' ? 'var(--color-error)'
