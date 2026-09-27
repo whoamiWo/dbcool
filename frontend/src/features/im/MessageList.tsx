@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   addReaction,
   removeReaction,
@@ -31,6 +32,7 @@ export function MessageList({
   pinnedMessageIds,
   onBurnExpired,
 }: MessageListProps) {
+  const { t } = useTranslation();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [pickerFor, setPickerFor] = useState<string | null>(null);
@@ -132,10 +134,10 @@ export function MessageList({
 
   const formatBurnTime = (ms: number) => {
     const s = Math.max(0, Math.ceil(ms / 1000));
-    if (s < 60) return `${s}秒`;
+    if (s < 60) return `${s}${t("im.seconds")}`;
     const m = Math.floor(s / 60);
     const r = s % 60;
-    return `${m}分${r}秒`;
+    return `${m}${t("im.minutes")}${r}${t("im.seconds")}`;
   };
 
   const formatTime = (time: string) => {
@@ -166,7 +168,7 @@ export function MessageList({
             className="glass-button"
             style={{ padding: "6px 16px", fontSize: 12, opacity: isLoadingMore ? 0.6 : 1 }}
           >
-            {isLoadingMore ? "加载中..." : "加载更早消息"}
+            {isLoadingMore ? t("common.loading") : t("im.loadOlder")}
           </button>
         </div>
       )}
@@ -201,7 +203,7 @@ export function MessageList({
                   border: '1px solid var(--color-warning)',
                 }}
               >
-                📌 已置顶
+                📌 {t("im.pinned")}
               </div>
             )}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -238,10 +240,10 @@ export function MessageList({
                   <div
                     style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}
                   >
-                    用户 {msg.senderId.substring(0, 8)}
+                    {t("im.userPrefix")} {msg.senderId.substring(0, 8)}
                     {isReply && (
                       <span style={{ marginLeft: 8, color: 'var(--color-warning)' }}>
-                        回复
+                        {t("im.reply")}
                       </span>
                     )}
                   </div>
@@ -261,19 +263,19 @@ export function MessageList({
                         className="glass-button-primary"
                         style={{ padding: "4px 8px", fontSize: 12 }}
                       >
-                        保存
+                        {t("common.save")}
                       </button>
                       <button
                         onClick={() => setEditingId(null)}
                         className="glass-button"
                         style={{ padding: "4px 8px", fontSize: 12 }}
                       >
-                        取消
+                        {t("common.cancel")}
                       </button>
                     </div>
                   ) : (
                     <div style={{ fontSize: 14, color: isDeleted ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }}>
-                      {renderContent(isDeleted ? "该消息已删除" : msg.content, !!msg.expiresAt && burnRemaining[msg.id] === 0)}
+                      {renderContent(isDeleted ? t("im.messageDeleted") : msg.content, !!msg.expiresAt && burnRemaining[msg.id] === 0)}
                       {msg.expiresAt && burnRemaining[msg.id] !== undefined && burnRemaining[msg.id] > 0 && (
                         <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-error)' }}>
                           🔥 {formatBurnTime(burnRemaining[msg.id])}
@@ -316,7 +318,7 @@ export function MessageList({
                         color: 'var(--color-text-muted)',
                         padding: 0,
                       }}
-                      title="加表情"
+                      title={t("im.addEmoji")}
                     >
                       😊
                     </button>
@@ -336,13 +338,13 @@ export function MessageList({
                             color: 'var(--color-text-muted)',
                             padding: 0,
                           }}
-                          title="编辑"
+                          title={t("im.edit")}
                         >
-                          编辑
+                          {t("im.edit")}
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm("确定删除该消息?")) {
+                            if (window.confirm(t("im.confirmDelete"))) {
                               onDeleteMessage?.(msg.id);
                             }
                           }}
@@ -354,9 +356,9 @@ export function MessageList({
                             color: 'var(--color-error)',
                             padding: 0,
                           }}
-                          title="删除"
+                          title={t("im.delete")}
                         >
-                          删除
+                          {t("im.delete")}
                         </button>
                       </>
                     )}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
@@ -29,6 +30,7 @@ import { HuddlePanel } from './HuddlePanel';
 
 /** IM 聊天主布局，三栏：频道列表 | 消息流 | 线程面板 */
 export function ImChatPage() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const { channelId: routeChannelId } = useParams();
   const navigate = useNavigate();
@@ -213,7 +215,7 @@ export function ImChatPage() {
         <div className="im-header">
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {currentChannel?.name || '选择频道'}
+              {currentChannel?.name || t('im.selectChannel')}
             </h3>
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
               {currentChannel?.topic || ''}
@@ -223,7 +225,7 @@ export function ImChatPage() {
             <input
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="搜索消息…"
+              placeholder={t('im.searchMessages')}
               aria-label="搜索消息"
               className="input-glass"
               style={{ width: 160 }}
@@ -240,12 +242,12 @@ export function ImChatPage() {
                   }
                 }}
               >
-                {huddleRoomId ? '离开 Huddle' : '加入 Huddle'}
+                {huddleRoomId ? t('im.leaveHuddle') : t('im.joinHuddle')}
               </button>
             )}
             <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
               <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--color-success)', marginRight: 4 }} />
-              在线
+              {t('im.online')}
             </div>
           </div>
         </div>
@@ -290,7 +292,7 @@ export function ImChatPage() {
                 fontSize: 14,
               }}
             >
-              {currentChannel ? '暂无消息' : '请选择频道开始聊天'}
+              {currentChannel ? t('im.noMessages') : t('im.selectChannelToChat')}
             </div>
           )}
 
@@ -346,7 +348,7 @@ export function ImChatPage() {
             <input
               value={newChannelName}
               onChange={(e) => setNewChannelName(e.target.value)}
-              placeholder="频道名称"
+              placeholder={t('im.channelName')}
               autoFocus
               className="input-glass"
               style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', fontSize: 13 }}
@@ -357,7 +359,7 @@ export function ImChatPage() {
                 className="glass-button"
                 style={{ padding: '6px 12px', fontSize: 12 }}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleCreateChannel}
@@ -370,7 +372,7 @@ export function ImChatPage() {
                   cursor: newChannelName.trim() ? 'pointer' : 'not-allowed',
                 }}
               >
-                创建
+                {t('common.create')}
               </button>
             </div>
           </div>
