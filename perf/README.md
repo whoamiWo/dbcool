@@ -29,11 +29,28 @@ cd perf
 export BASE_URL=https://staging.example.com
 export TOKEN=$(curl -s -X POST "$BASE_URL/api/auth/login" \
   -H 'Content-Type: application/json' \
-  -d '{"username":"<user>","password":"<pass>"}' | jq -r .data.token)
+  -d '{"username":"<user>","password":"<pass>"}' | jq -r .data.access_token)
 
 # 阶梯加压：20 → 50 并发
 k6 run --env BASE_URL=$BASE_URL --env TOKEN=$TOKEN load-test.js
 ```
+
+### 本地环境临时压测结果（仅供参考，非正式基线）
+
+**环境**：单机 Docker Compose（Java 后端单副本 + Postgres/Redis/RabbitMQ 同主机），无 LDAP 服务。  
+**时间**：2026-09-27  
+**VU 范围**：20 → 50  
+
+| 指标 | 结果 | 阈值 | 状态 |
+|---|---|---|---|
+| QPS | 55.52 | - | ✅ |
+| P95 | 3ms | <500ms | ✅ |
+| P99 | 0ms | <3000ms | ✅ |
+| 错误率 | 0.00% | <1% | ✅ |
+
+**说明**：
+- 本地环境资源受限，且无生产级别的 CPU/内存规格，此数字不能作为生产容量基线。
+- 正式基线需在 staging 环境（多副本、独立压测机、接近生产数据量）执行。
 
 ## 判定阈值（写死在脚本里，超限即失败）
 

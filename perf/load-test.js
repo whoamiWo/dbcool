@@ -33,7 +33,7 @@ const params = {
 };
 
 export default function () {
-  // 1) 只读：集合列表（最典型的读路径）
+  // 1) 只读：集合列表（最典型的读路径，受认证保护）
   const list = http.get(`${BASE}/api/collections`, params);
   const listOk = check(list, {
     'list status 200': (r) => r.status === 200,
@@ -42,9 +42,9 @@ export default function () {
   errorRate.add(!listOk);
   listLatency.add(list.timings.duration);
 
-  // 2) 健康检查（不依赖登录，用于分离"应用本身"与"鉴权链路"的开销）
-  const health = http.get(`${BASE}/actuator/health`);
-  check(health, { 'health status 200': (r) => r.status === 200 });
+  // 2) 业务健康检查（/api/health，不依赖 LDAP/actuator 探针）
+  const health = http.get(`${BASE}/api/health`);
+  check(health, { 'api/health status 200': (r) => r.status === 200 });
 
   sleep(1);
 }

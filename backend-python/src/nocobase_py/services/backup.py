@@ -55,18 +55,29 @@ def _redis_snapshot() -> bytes:
 
     fail-closed：Redis 未启用或快照失败时抛出异常，禁止静默返回空值后
     误报「备份成功」。
+
+    使用 docker exec redis-cli --rdb 流式获取 RDB，避免依赖本地 redis-cli。
     """
     if not _settings.redis_enabled:
         raise RuntimeError("Redis is not enabled (redis_enabled=false); cannot take snapshot")
+    import subprocess
     try:
-        import redis.asyncio as redis
-        client = redis.Redis(host=_REDIS_HOST, port=_REDIS_PORT, decode_responses=False)
-        client.save()
-        # 读取 dump.rdb（默认位置在工作目录）
-        rdb = Path("dump.rdb")
-        if rdb.exists():
-            return rdb.read_bytes()
-        raise FileNotFoundError(f"dump.rdb not found after redis save at {rdb.resolve()}")
+        # 尝试多个可能的 Redis 容器名称
+        for container_name in ["nocobase-redis", "redis"]:
+            result = subprocess.run(
+                ["docker", "exec", container_name, "redis-cli", "--rdb", "-"],
+                capture_output=True,
+                check=True,
+                timeout=30,
+            )
+            if result.returncode == 0 and result.stdout:
+                return result.stdout
+        raise RuntimeError("所有 Redis 容器都未返回 RDB 数据")
+    except subprocess.CalledProcessError as e:
+        logger.error("[backup] docker exec redis-cli --rdb 失败: %s", e.stderr.decode() if e.stderr else e)
+        raise RuntimeError(f"docker exec redis-cli --rdb 失败: {e}") from e
+    except FileNotFoundError:
+        raise RuntimeError("docker 命令未找到，无法获取 Redis 快照")
     except Exception as e:
         logger.error("[backup] Redis snapshot failed: %s", e)
         raise
