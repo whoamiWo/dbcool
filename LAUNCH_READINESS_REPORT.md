@@ -130,15 +130,15 @@
 ### 🟢 P2 — 体验 / 对标
 | 项 | 现状 |
 |---|---|
-| i18n | ✅ 已完成：`frontend/src/i18n/` zh-CN/en-US 双语包，AppLayout 语言切换器，Login 页面已国际化 |
+| i18n | ⚠️ **部分完成**：`frontend/src/i18n/` zh-CN/en-US 双语包 + AppLayout 语言切换器 + `Login` 页面已国际化；**Home / IM / 项目页面仍为中文硬编码**（`grep useTranslation` 仅命中 2 个文件） |
 | Airtable 公式/汇总字段 | 后端可算，**前端 UI 未接线** |
 | Notion 协同 | CRDT 未做服务端合并，多人编辑会互相覆盖 |
-| Trello 看板前端 | ✅ 已完成：`BoardView` 接入 `ProjectPage` Tab 看板视图，拖拽可用 |
-| 批量操作 API | ✅ 已实现（`CollectionController` L582/597/612），测试覆盖 17 用例 |
+| Trello 看板前端 | ✅ 已接真：`BoardView` 接入 `ProjectPage` Tab；修复「`loadData` 定义后从未调用→永远卡 loading」；拖拽按 dnd-kit 多容器模式重构（DndContext 上移到 BoardView、补 containerId，此前每列独立 DndContext 且无 containerId → 拖拽不触发移动）+ `BoardView.test.tsx` 6 用例 |
+| 批量操作 API | ✅ 已实现（`CollectionController` L582/597/612）+ **测试已补**：`CollectionBatchControllerTest` 7 用例（含 403 越权透传、租户下传、ACL 拒绝） |
 | 微信客服 | 未独立于微信小程序 |
 | 限流 | ✅ 已改 Redis-backed（`TriggerRateLimiter` 用 ZSET 滑动窗口，Redis 不可用时回退内存） |
-| FTS 中文分词 | ✅ 已完成：V38 迁移 `search_vector tsvector` + GIN 索引，H2 测试回退 ILIKE |
-| 日志 JSON化 | ✅ 已完成：`logback-spring.xml` 生产 JSON/测试纯文本，MDC Filter 注入 tenantId/userId |
+| FTS 中文分词 | ✅ 已接真：`ChineseSegmenter`（jieba，纯 Java，INDEX 模式）+ `WikiSearchService` 逐词检索按命中词数排序；「项目管理」从整串命中 0 → 分词后命中并按相关度排序（H2/PG 通用，未编译任何 PG 扩展） |
+| 日志 JSON化 | ✅ 已完成：`logback-spring.xml` 生产 JSON/测试纯文本；`MdcFilter` 已在 `SecurityConfig` 中 `addFilterAfter(jwtAuthFilter)` 注册（此前仅 `@Component` 未注册 → 拿不到 principal，实际不生效） |
 | 分布式追踪 | ✅ 已完成：pom 添加 micrometer-tracing-bridge-otel + otlp，Jaeger K8s 部署 |
 
 ---
