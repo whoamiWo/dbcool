@@ -161,7 +161,9 @@
 4. ~~FTS 中文分词~~ **已完成**（2026-09-27）：V38 迁移 + GIN 索引，H2 回退 ILIKE
 5. ~~日志 JSON 化~~ **已完成**（2026-09-27）：logback-spring.xml + MDC Filter
 6. ~~Trello 看板前端~~ **已完成**（2026-09-27）：BoardView 接线
-7. 多租户持续审计（新增接口须带归属校验）
+7. ~~Airtable 公式前端 UI~~ **已完成**（2026-09-27）：SchemaDesigner + FormRuntime 接线
+8. ~~Grafana 面板~~ **已完成**（2026-09-27）：09-grafana-dashboards.yaml + 10-grafana.yaml
+9. 多租户持续审计（新增接口须带归属校验）
 
 ---
 
