@@ -1,0 +1,89 @@
+{
+  "app": {
+    "title": "NocoBase",
+    "description": "Visual Low-Code Platform"
+  },
+  "login": {
+    "title": "Login",
+    "username": "Username",
+    "Noticeabld": "",
+    "password": "Password",
+    "submit": "Login",
+    "loading": "Logging in...",
+    "error": "Login failed. Please check your credentials.",
+    "subtitle": "Sign in to get started",
+    "remember": "Remember username",
+    "forgot": "Forgot password?",
+    "dingtalk": "DingTalk QR Login",
+    "resetHint": "Please contact administrator to reset password",
+    "scaffoldHint": "Week 3 scaffold: any non-empty credentials work",
+    "successHint": "Login successful, redirecting…",
+    "networkError": "Login failed, please check network",
+    "validation": {
+      "usernameRequired": "Please enter username",
+      "passwordRequired": "Please enter password"
+    }
+  },
+  "nav": {
+    "home": "Home",
+    "project": "Project",
+    "im": "IM",
+    "settings": "Settings",
+    "profile": "Profile"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "board": {
+    "title": "Board",
+    "todo": "Todo",
+    "inProgress": "In Progress",
+    "done": "Done",
+    "addColumn": "Add Column",
+    "addTask": "Add Task"
+  },
+  "task": {
+    "title": "Task",
+    "newTask": "New Task",
+    "titlePlaceholder": "Task Title",
+    "description": "Description",
+    "assignee": "Assignee",
+    "dueDate": "Due Date",
+    "priority": "Priority",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "urgent": "Urgent"
+  },
+  "im": {
+    "title": "Instant Messaging",
+    "channels": "Channels",
+    "threads": "Threads",
+    "messages": "Messages",
+    "type": "Type",
+    "private": "Private Chat",
+    "group": "Group",
+    "send": "Send",
+    "attach": "Attachment",
+    "emoji": "Emoji"
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "language": "Language",
+    "chinese": "Chinese",
+    "english": "English",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark"
+  }
+}

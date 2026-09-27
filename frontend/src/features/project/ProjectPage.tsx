@@ -8,6 +8,7 @@ import {
 import TaskBoard from './TaskBoard';
 import GanttView from './GanttView';
 import { GanttLegend } from './GanttView';
+import { BoardView } from './BoardView';
 import { projectApi } from './api';
 
 /**
@@ -157,12 +158,14 @@ export default function ProjectPage() {
           </Box>
 
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-            <Tab label="看板" />
+            <Tab label="Trello 看板" />
+            <Tab label="简易看板" />
             <Tab label="甘特图" />
           </Tabs>
 
-          {tab === 0 && <TaskBoard projectId={selectedProjectId} />}
-          {tab === 1 && (
+          {tab === 0 && <BoardView projectId={selectedProjectId} />}
+          {tab === 1 && <TaskBoard projectId={selectedProjectId} />}
+          {tab === 2 && (
             <Box>
               <GanttLegend />
               <GanttView projectId={selectedProjectId} />

@@ -1,0 +1,88 @@
+{
+  "app": {
+    "title": "NocoBase",
+    "description": "可视化低代码平台"
+  },
+  "login": {
+    "title": "登录",
+    "username": "用户名",
+    "password": "密码",
+    "submit": "登录",
+    "loading": "登录中...",
+    "error": "登录失败，请检查用户名和密码",
+    "subtitle": "登录开始使用",
+    "remember": "记住用户名",
+    "forgot": "忘记密码?",
+    "dingtalk": "钉钉扫码登录",
+    "resetHint": "请联系管理员重置密码",
+    "scaffoldHint": "Week 3 脚手架版:任意非空账号密码可登录",
+    "successHint": "登录成功,正在跳转…",
+    "networkError": "登录失败,请检查网络",
+    "validation": {
+      "usernameRequired": "请输入用户名",
+      "passwordRequired": "请输入密码"
+    }
+  },
+  "nav": {
+    "home": "首页",
+    "project": "项目",
+    "im": "即时通讯",
+    "settings": "设置",
+    "profile": "个人中心"
+  },
+  "common": {
+    "cancel": "取消",
+    "confirm": "确定",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "add": "添加",
+    "loading": "加载中...",
+    "retry": "重试",
+    "yes": "是",
+    "no": "否"
+  },
+  "board": {
+    "title": "看板",
+    "todo": "待办",
+    "inProgress": "进行中",
+    "done": "已完成",
+    "addColumn": "添加栏",
+    "addTask": "添加任务"
+  },
+  "task": {
+    "title": "任务",
+    "newTask": "新建任务",
+    "titlePlaceholder": "任务标题",
+    "description": "描述",
+    "assignee": "指派给",
+    "dueDate": "到期日",
+    "priority": "优先级",
+    "low": "低",
+    "medium": "中",
+    "high": "高",
+    "urgent": "紧急"
+  },
+  "im": {
+    "title": "即时通讯",
+    "channels": "频道",
+    "threads": "讨论",
+    "messages": "消息",
+    "type": "类型",
+    "private": "私聊",
+    "group": "群组",
+    "send": "发送",
+    "attach": "附件",
+    "emoji": "表情"
+  },
+  "settings": {
+    "title": "设置",
+    "general": "通用",
+    "language": "语言",
+    "chinese": "中文",
+    "english": "English",
+    "theme": "主题",
+    "light": "浅色",
+    "dark": "深色"
+  }
+}

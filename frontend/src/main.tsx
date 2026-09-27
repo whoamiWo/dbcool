@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { router } from './router';
 import { darkTheme } from './theme';
+import './i18n';
 import './styles.css';
 import './theme/glass.css';
 

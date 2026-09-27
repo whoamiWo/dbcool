@@ -5,6 +5,8 @@ import { useMediaQuery } from '@mui/material';
 import { useAuthStore } from '@/stores/auth';
 import { disconnectStomp } from '@/lib/stompClient';
 import { GlobalSearchPanel } from '@/components/GlobalSearchPanel';
+import { useTranslation } from 'react-i18next';
+import { changeLanguage } from '@/i18n';
 
 /** AppLayout 内部的 QueryClient（测试覆盖用） */
 const queryClient = new QueryClient({
@@ -27,6 +29,7 @@ export function AppLayout() {
   const location = useLocation();
   const [switching, setSwitching] = useState(false);
   const isMobile = useMediaQuery('(max-width:768px)');
+  const { i18n } = useTranslation();
 
   const handleLogout = () => {
     disconnectStomp();
@@ -138,6 +141,23 @@ export function AppLayout() {
               🔄 切换应用({user.tenant_id})
             </button>
           )}
+          <select
+            value={i18n.language}
+            onChange={(e) => changeLanguage(e.target.value as 'zh-CN' | 'en-US')}
+            style={{
+              padding: '6px 10px',
+              background: 'var(--color-bg-secondary)',
+              color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border-light)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 500,
+            }}
+          >
+            <option value="zh-CN">中文</option>
+            <option value="en-US">English</option>
+          </select>
           <button
             onClick={handleLogout}
             style={{

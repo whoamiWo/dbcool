@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { useTranslation } from 'react-i18next';
 
 const REMEMBER_KEY = 'nocobase:login:lastUsername';
 
@@ -22,6 +23,7 @@ export function LoginPage() {
   const [successHint, setSuccessHint] = useState<string | null>(null);
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const { t } = useTranslation();
 
   const {
     register,
@@ -105,8 +107,8 @@ export function LoginPage() {
           border: '1px solid var(--color-border-light)',
         }}
       >
-        <h1 style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>🛠 NocoBase</h1>
-        <p style={{ color: 'var(--color-text-muted)', marginTop: 0 }}>登录开始使用</p>
+        <h1 style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>{t('app.title')}</h1>
+        <p style={{ color: 'var(--color-text-muted)', marginTop: 0 }}>{t('login.subtitle')}</p>
 
         {error && (
           <div
@@ -140,7 +142,7 @@ export function LoginPage() {
         )}
 
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4, color: 'var(--color-text-secondary)' }}>用户名</label>
+          <label style={{ display: 'block', marginBottom: 4, color: 'var(--color-text-secondary)' }}>{t('login.username')}</label>
           <input
             {...register('username')}
             autoComplete="username"
@@ -152,7 +154,7 @@ export function LoginPage() {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4, color: 'var(--color-text-secondary)' }}>密码</label>
+          <label style={{ display: 'block', marginBottom: 4, color: 'var(--color-text-secondary)' }}>{t('login.password')}</label>
           <input
             {...register('password')}
             type="password"
@@ -172,11 +174,11 @@ export function LoginPage() {
             <input type="checkbox" checked={remember}
                    onChange={(e) => setRemember(e.target.checked)}
                    style={{ marginRight: 6 }} />
-            记住用户名
+            {t('login.remember')}
           </label>
-          <a href="#" onClick={(e) => { e.preventDefault(); alert('请联系管理员重置密码'); }}
+          <a href="#" onClick={(e) => { e.preventDefault(); alert(t('login.resetHint')); }}
              style={{ color: 'var(--color-primary-400)', textDecoration: 'none', fontSize: 13 }}>
-            忘记密码?
+            {t('login.forgot')}
           </a>
         </div>
 
@@ -194,7 +196,7 @@ export function LoginPage() {
             fontSize: 14,
           }}
         >
-          {loading ? '登录中…' : '登录'}
+          {loading ? t('login.loading') : t('login.submit')}
         </button>
 
         {/* W8: 钉钉扫码登录入口（跳转到 /auth/dingtalk） */}
@@ -213,11 +215,11 @@ export function LoginPage() {
             fontSize: 14,
           }}
         >
-          钉钉扫码登录
+          {t('login.dingtalk')}
         </button>
 
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 16, textAlign: 'center' }}>
-          Week 3 脚手架版:任意非空账号密码可登录
+          {t('login.scaffoldHint')}
         </p>
       </form>
     </div>

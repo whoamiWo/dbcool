@@ -71,6 +71,21 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- PHASE 56 P1-1 日志采集：JSON 结构化日志（LoggingEventCompositeJsonEncoder） -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>8.0</version>
+        </dependency>
+        <!-- PHASE 56 P1-2 分布式追踪：Micrometer Tracing + OTel 桥接 + OTLP 导出 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
@@ -143,6 +158,13 @@
             <version>8.5.17</version>
         </dependency>
 
+        <!-- PHASE 56 P2-3 FTS 中文分词：纯 Java jieba 分析器 (Alpine 无 gcc，禁编译 PG 扩展) -->
+        <dependency>
+            <groupId>com.huaban</groupId>
+            <artifactId>jieba-analysis</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
         <!-- Week 41 复核 D5.1:Email 真实发送
              (此前配了 smtp_host 也只是打日志,从不真正投递) -->
         <dependency>
@@ -155,6 +177,23 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <!-- P1-1 日志：Logstash JSON encoder (生产 profile 用) -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
+        <!-- P1-2 追踪：Micrometer + OpenTelemetry bridge -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
 
         <!-- 测试 -->
