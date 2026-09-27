@@ -13,7 +13,7 @@ import {
   MoreHoriz,
   DragIndicator,
 } from '@mui/icons-material';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -33,12 +33,15 @@ interface BoardColumnProps {
   title: string;
   type: string;
   cards: CardItem[];
-  onMoveCard: (cardId: string, fromCol: string, toCol: string, toIndex: number) => void;
   onAddCard: (columnId: string) => void;
 }
 
-function SortableCard({ card }: { card: CardItem; columnId?: string }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+function SortableCard({ card, columnId }: { card: CardItem; columnId: string }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    // 关键：带上所属列的 containerId，父级 onDragEnd 才能判断跨列拖拽
+    data: { sortable: { containerId: columnId } },
+  });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
@@ -78,11 +81,13 @@ function SortableCard({ card }: { card: CardItem; columnId?: string }) {
   );
 }
 
-export function BoardColumn({ columnId, title, cards, onMoveCard, onAddCard }: BoardColumnProps) {
-
+export function BoardColumn({ columnId, title, cards, onAddCard }: BoardColumnProps) {
+  // 列本身作为放置目标（拖到空列也能接收卡片）。
+  // 注意：DndContext 已上移到 BoardView（否则每列独立上下文，无法跨列拖拽）。
+  const { setNodeRef: setDropRef } = useDroppable({ id: columnId });
 
   return (
-    <Paper sx={{ p: 1.5, minWidth: 280, maxWidth: 320, height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'var(--color-bg-tertiary)' }}>
+    <Paper ref={setDropRef} sx={{ p: 1.5, minWidth: 280, maxWidth: 320, height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'var(--color-bg-tertiary)' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="subtitle2" component="div">
           {title}
@@ -92,26 +97,12 @@ export function BoardColumn({ columnId, title, cards, onMoveCard, onAddCard }: B
       <Divider sx={{ mb: 1 }} />
 
       <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 200 }}>
-        <DndContext
-          sensors={useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor))}
-          collisionDetection={closestCenter}
-          onDragEnd={({ active, over }) => {
-            if (over && active.id !== over.id) {
-              const fromCol = active.data.current?.sortable?.containerId as string;
-              const toCol = over.data.current?.sortable?.containerId as string;
-              const toIndex = cards.findIndex(c => c.id === over.id);
-              if (fromCol && toCol) {
-                onMoveCard(String(active.id), fromCol, toCol, toIndex);
-              }
-            }
-          }}
-        >
-          <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
-            {cards.map(card => (
-              <SortableCard key={card.id} card={card} columnId={columnId} />
-            ))}
-          </SortableContext>
-        </DndContext>
+        {/* id=columnId —— 让本列成为可识别的排序容器，父级据此判断跨列拖拽 */}
+        <SortableContext id={columnId} items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
+          {cards.map(card => (
+            <SortableCard key={card.id} card={card} columnId={columnId} />
+          ))}
+        </SortableContext>
       </Box>
 
       <Button
