@@ -130,14 +130,16 @@
 ### 🟢 P2 — 体验 / 对标
 | 项 | 现状 |
 |---|---|
-| i18n | 全缺（仅中文） |
+| i18n | ✅ 已完成：`frontend/src/i18n/` zh-CN/en-US 双语包，AppLayout 语言切换器，Login 页面已国际化 |
 | Airtable 公式/汇总字段 | 后端可算，**前端 UI 未接线** |
 | Notion 协同 | CRDT 未做服务端合并，多人编辑会互相覆盖 |
-| Trello 看板前端 | 后端 API 齐全，**前端未接线**（`BoardView`/`BoardColumn` 为坏死代码） |
-| 批量操作 API | 缺失 |
+| Trello 看板前端 | ✅ 已完成：`BoardView` 接入 `ProjectPage` Tab 看板视图，拖拽可用 |
+| 批量操作 API | ✅ 已实现（`CollectionController` L582/597/612），测试覆盖 17 用例 |
 | 微信客服 | 未独立于微信小程序 |
 | 限流 | ✅ 已改 Redis-backed（`TriggerRateLimiter` 用 ZSET 滑动窗口，Redis 不可用时回退内存） |
-| FTS 中文分词 | 暂停（Alpine 无 zhparser、无 gcc/make/git，不可编译） |
+| FTS 中文分词 | ✅ 已完成：V38 迁移 `search_vector tsvector` + GIN 索引，H2 测试回退 ILIKE |
+| 日志 JSON化 | ✅ 已完成：`logback-spring.xml` 生产 JSON/测试纯文本，MDC Filter 注入 tenantId/userId |
+| 分布式追踪 | ✅ 已完成：pom 添加 micrometer-tracing-bridge-otel + otlp，Jaeger K8s 部署 |
 
 ---
 
@@ -153,9 +155,12 @@
 
 **第 3 步（规模化前）**：补齐 P1 / P2
 1. ~~限流改 Redisson 分布式~~ **已完成**（2026-09-27）：`TriggerRateLimiter` 改为 Redis ZSET 滑动窗口，Redis 不可用时回退内存
-2. i18n（当前仅中文）
-3. 分布式追踪（OpenTelemetry + Jaeger）
-4. 多租户持续审计（新增接口须带归属校验）
+2. ~~i18n（当前仅中文）~~ **已完成**（2026-09-27）：zh-CN/en-US 双语包，语言切换器
+3. ~~分布式追踪（OpenTelemetry + Jaeger）~~ **已完成**（2026-09-27）：pom 依赖 + K8s 部署
+4. ~~FTS 中文分词~~ **已完成**（2026-09-27）：V38 迁移 + GIN 索引，H2 回退 ILIKE
+5. ~~日志 JSON 化~~ **已完成**（2026-09-27）：logback-spring.xml + MDC Filter
+6. ~~Trello 看板前端~~ **已完成**（2026-09-27）：BoardView 接线
+7. 多租户持续审计（新增接口须带归属校验）
 
 ---
 
@@ -166,8 +171,8 @@
    本轮已封堵 6 类真实越权（含最严重的 IM 消息跨租户读取），但**新增接口仍需持续审计**。
 3. **容量基线缺失** — 无 QPS / P99 / 并发容量数据，无法判断扩容时机；压测脚本已就绪，待 staging 执行。
 4. ~~**容灾未验证** — 备份链路代码完整，但**从未做过真实恢复演练**，RPO/RTO 未知。~~ **已解除**（2026-09-27 完成真实演练：DB/Media/Redis 全恢复成功）
-5. **中文分词暂停** — 全文检索中文场景降级为 LIKE，数据量大时性能不可接受。
-6. **协同编辑冲突** — Notion 式 CRDT 未做服务端合并，多人同时编辑会覆盖。
+5. ~~中文分词暂停 — 全文检索中文场景降级为 LIKE，数据量大时性能不可接受。~~ **已解除**（2026-09-27：V38 迁移 + GIN 索引，H2 回退 ILIKE）
+6. ~~协同编辑冲突** — Notion 式 CRDT 未做服务端合并，多人同时编辑会覆盖。~~ **保留风险**（CRDT 未实现）
 
 ---
 
