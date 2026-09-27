@@ -4,10 +4,10 @@ import zhCN from './locales/zh-CN.json';
 import enUS from './locales/en-US.json';
 
 describe('i18n', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
     // 每个用例前重置为默认语言，避免互相污染
-    return i18n.changeLanguage('zh-CN');
+    await i18n.changeLanguage('zh-CN');
   });
 
   it('默认语言为 zh-CN（保证既有中文断言与 E2E 不被破坏）', () => {

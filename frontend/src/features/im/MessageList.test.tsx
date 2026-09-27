@@ -10,6 +10,20 @@ vi.mock('./api', () => ({
   getReactions: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
+// 为 MessageList 测试提供中文翻译（test-setup.ts 的 i18n 在单测里 t(key) 返回 key）
+import zhCN from '../../i18n/locales/zh-CN.json';
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const parts = key.split('.');
+      let val: unknown = zhCN;
+      for (const p of parts) val = (val as Record<string, unknown>)?.[p];
+      return typeof val === 'string' ? val : key;
+    },
+    i18n: { language: 'zh-CN' },
+  }),
+}));
+
 const msg = (over: Partial<ImMessage> = {}): ImMessage => ({
   id: 'm1',
   channelId: 'c1',

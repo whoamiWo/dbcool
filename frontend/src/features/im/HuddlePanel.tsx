@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Box, IconButton, Typography, Chip, Tooltip } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import {
   Mic as MicIcon,
   MicOff as MicOffIcon,
@@ -22,6 +23,7 @@ function sendWs(ws: WebSocket | null, msg: Record<string, unknown>): void {
 }
 
 export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
+  const { t } = useTranslation();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(true);
@@ -57,7 +59,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
       });
     } catch (e) {
       console.warn('[Huddle] 无法获取媒体流:', e);
-      setError('无法访问麦克风/摄像头，请检查浏览器权限');
+      setError(t('im.micError'));
     }
   }, [isVideoOff, localStream]);
 
@@ -170,7 +172,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
           break;
         }
         case 'error':
-          setError(String(msg.msg ?? '信令错误'));
+          setError(String(msg.msg ?? t('im.signalError')));
           break;
         case 'left':
         case 'peer-left': {
@@ -192,7 +194,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
       peerConnections.current.clear();
     };
 
-    ws.onerror = () => setError('WebSocket 连接失败，请检查网络连接');
+    ws.onerror = () => setError(t('im.wsError'));
 
     return () => {
       ws.close();
@@ -245,8 +247,8 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
   if (!roomId) return null;
 
   const activePeers = peers.length > 0
-    ? [...peers, { id: 'self', name: '我' }]
-    : [{ id: 'self', name: '我' }];
+    ? [...peers, { id: 'self', name: t('im.me') }]
+    : [{ id: 'self', name: t('im.me') }];
 
   return (
     <Box
@@ -277,12 +279,12 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
             }}
           />
           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Huddle 通话
+            {t('im.huddleTitle')}
           </Typography>
           <Chip label={roomId} size="small" sx={{ fontSize: 10, height: 18 }} />
         </Box>
         <Typography variant="caption" sx={{ color: 'var(--color-text-muted)' }}>
-          {activePeers.length - 1} 位参与者
+          {activePeers.length - 1} {t('im.participants')}
         </Typography>
       </Box>
 
@@ -365,7 +367,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
 
       {/* 控制面板 */}
       <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-        <Tooltip title={isMuted ? '取消静音' : '静音'}>
+        <Tooltip title={isMuted ? t('im.unmute') : t('im.mute')}>
           <IconButton
             onClick={toggleMute}
             sx={{
@@ -377,7 +379,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
             {isMuted ? <MicOffIcon /> : <MicIcon />}
           </IconButton>
         </Tooltip>
-        <Tooltip title={isVideoOff ? '开启摄像头' : '关闭摄像头'}>
+        <Tooltip title={isVideoOff ? t('im.enableVideo') : t('im.disableVideo')}>
           <IconButton
             onClick={toggleVideo}
             sx={{
@@ -389,7 +391,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
             {isVideoOff ? <VideoOffIcon /> : <VideoIcon />}
           </IconButton>
         </Tooltip>
-        <Tooltip title="挂断">
+        <Tooltip title={t('im.hangup')}>
           <IconButton
             onClick={onLeave}
             sx={{ bgcolor: 'var(--color-error)', color: 'var(--color-text-primary)', '&:hover': { bgcolor: 'var(--color-error)' } }}

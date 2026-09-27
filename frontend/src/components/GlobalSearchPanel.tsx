@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -24,10 +25,10 @@ import {
   Build as AutomationIcon,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
-import { searchApi, SEARCH_FACET_COLORS, SEARCH_FACET_LABELS, type SearchResult } from '@/api/search';
+import { searchApi, SEARCH_FACET_COLORS, type SearchResult } from '@/api/search';
 
 /** 搜索结果项组件 */
-function SearchResultItem({ result, onClick }: { result: SearchResult; onClick: () => void }) {
+function SearchResultItem({ result, onClick, t }: { result: SearchResult; onClick: () => void; t: (k: string) => string }) {
   const getTypeIcon = () => {
     switch (result.type) {
       case 'wiki': return <WikiIcon />;
@@ -55,11 +56,11 @@ function SearchResultItem({ result, onClick }: { result: SearchResult; onClick: 
         primary={
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              {result.title || '(无标题)'}
+              {result.title || t('common.untitled')}
             </Typography>
             <Chip
               size="small"
-              label={SEARCH_FACET_LABELS[result.type] || result.type}
+              label={t(`search.${result.type}`) || result.type}
               sx={{
                 bgcolor: `${color}20`,
                 color,
@@ -81,6 +82,7 @@ function SearchResultItem({ result, onClick }: { result: SearchResult; onClick: 
 
 /** 全局搜索面板 — 从 AppLayout 触发 */
 export function GlobalSearchPanel() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
@@ -152,14 +154,14 @@ export function GlobalSearchPanel() {
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          全局搜索
+          {t('globalSearch.title')}
           <CloseIcon sx={{ cursor: 'pointer' }} onClick={handleClose} />
         </DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             fullWidth
-            placeholder="搜索文档、数据、消息、任务..."
+            placeholder={t('globalSearch.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             variant="outlined"
@@ -170,20 +172,20 @@ export function GlobalSearchPanel() {
           {data && (
             <>
               <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {Object.entries(SEARCH_FACET_LABELS).map(([type, label]) => (
+                {Object.keys(SEARCH_FACET_COLORS).map((type) => (
                   <Chip
                     key={type}
-                    label={`${label} (${data.data.facets[type as keyof typeof data.data.facets] || 0})`}
+                    label={`${t(`search.${type}`)} (${data.data.facets[type as keyof typeof data.data.facets] || 0})`}
                     size="small"
                     sx={{
-                      bgcolor: `${SEARCH_FACET_COLORS[type]}20`,
-                      color: SEARCH_FACET_COLORS[type],
+                      bgcolor: `${SEARCH_FACET_COLORS[type as keyof typeof SEARCH_FACET_COLORS]}20`,
+                      color: SEARCH_FACET_COLORS[type as keyof typeof SEARCH_FACET_COLORS],
                     }}
                   />
                 ))}
               </Box>
               <Typography variant="body2" color="text.secondary">
-                找到 {data.data.total} 条结果
+                {t('globalSearch.resultsCount', { count: data.data.total })}
               </Typography>
               <List sx={{ pt: 1 }}>
                 {data.data.results.map((r) => (
@@ -191,6 +193,7 @@ export function GlobalSearchPanel() {
                     key={r.id}
                     result={r}
                     onClick={() => handleResultClick(r)}
+                    t={t}
                   />
                 ))}
               </List>
@@ -198,7 +201,7 @@ export function GlobalSearchPanel() {
           )}
           {query.trim() && !isFetching && (!data || data.data.results.length === 0) && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              没有找到相关结果
+              {t('globalSearch.noResults')}
             </Typography>
           )}
         </DialogContent>
