@@ -43,8 +43,15 @@ public class RealtimeService {
 
     private final SimpMessagingTemplate messagingTemplate;
 
-    public RealtimeService(@Lazy SimpMessagingTemplate messagingTemplate) {
+    /** CRDT 服务端合并服务 WebClient（可为 null，降级为增量透传）。 */
+    private final WebClient crdtWebClient;
+
+    public RealtimeService(@Lazy SimpMessagingTemplate messagingTemplate,
+                           @Value("${crdt.service.url:}") String crdtServiceUrl) {
         this.messagingTemplate = messagingTemplate;
+        this.crdtWebClient = (crdtServiceUrl != null && !crdtServiceUrl.isBlank())
+                ? WebClient.builder().baseUrl(crdtServiceUrl).build()
+                : null;
     }
 
     // ============================================================
