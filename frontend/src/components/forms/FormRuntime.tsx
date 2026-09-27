@@ -297,6 +297,17 @@ export function FormRuntime({
             ))}
           </select>
         );
+      case 'formula':
+        // US-107: 公式字段运行时显示表达式 (只读)
+        const formulaExpr = typeof f.options?.formula === 'string' ? f.options.formula : '';
+        return (
+          <div style={{ padding: 8, background: 'var(--color-bg-secondary)', borderRadius: 4, fontSize: 13 }}>
+            <code>{formulaExpr || '(未配置公式)'}</code>
+            <div style={{ color: 'var(--color-text-muted)', fontSize: 11, marginTop: 2 }}>
+              此字段由公式自动计算
+            </div>
+          </div>
+        );
       default:
         return (
           <input

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { FormulaEditor } from '@/components/views/FormulaEditor';
 import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 
 const FIELD_TYPES: FieldType[] = [
@@ -17,6 +18,8 @@ export function SchemaDesignerPage() {
   const [title, setTitle] = useState('');
   const [fields, setFields] = useState<FieldDef[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** US-107: 公式编辑器状态(仅 formula 字段触发)。 */
+  const [formulaTarget, setFormulaTarget] = useState<number | null>(null);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -151,6 +154,23 @@ export function SchemaDesignerPage() {
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
+                  {f.type === 'formula' && (
+                    <button
+                      onClick={() => setFormulaTarget(i)}
+                      style={{
+                        marginLeft: 4,
+                        padding: '2px 6px',
+                        fontSize: 12,
+                        background: 'var(--color-bg-secondary)',
+                        border: '1px solid var(--color-border-light)',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                      }}
+                      title="编辑公式表达式"
+                    >
+                      🧮
+                    </button>
+                  )}
                 </td>
                 <td style={{ padding: 8 }}>
                   <input
@@ -197,6 +217,19 @@ export function SchemaDesignerPage() {
             {createMutation.isPending ? '创建中…' : '保存 Collection'}
           </button>
         </div>
+
+        {/* US-107: 公式编辑器弹窗 */}
+        {formulaTarget !== null && (
+          <FormulaEditor
+            open={true}
+            onClose={() => setFormulaTarget(null)}
+            onSave={(expr) => {
+              updateField(formulaTarget, { options: { ...fields[formulaTarget].options, formula: expr } });
+              setFormulaTarget(null);
+            }}
+            initialValue={fields[formulaTarget]?.options?.formula as string | undefined}
+          />
+        )}
       </div>
     </div>
   );
