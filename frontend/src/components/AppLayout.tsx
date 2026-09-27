@@ -13,14 +13,14 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, staleTime: Infinity } },
 });
 
-/** 移动端底部导航 — 固定 5 个高频入口。 */
+/** 移动端底部导航 — 固定 6 个高频入口（用 labelKey 而非 label，渲染时再 t()） */
 const MOBILE_BOTTOM_NAV = [
-  { path: '/workbench', label: '工作台', icon: '🏠' },
-  { path: '/im', label: '消息', icon: '💬' },
-  { path: '/wiki/kb', label: '知识库', icon: '📚' },
-  { path: '/projects', label: '项目', icon: '📋' },
-  { path: '/admin/automations', label: '自动化', icon: '⚙️' },
-  { path: '/profile', label: '我的', icon: '👤' },
+  { path: '/workbench', labelKey: 'im.workbench', icon: '🏠' },
+  { path: '/im', labelKey: 'im.messages', icon: '💬' },
+  { path: '/wiki/kb', labelKey: 'im.wiki', icon: '📚' },
+  { path: '/projects', labelKey: 'im.projects', icon: '📋' },
+  { path: '/admin/automations', labelKey: 'im.automations', icon: '⚙️' },
+  { path: '/profile', labelKey: 'im.profile', icon: '👤' },
 ];
 
 export function AppLayout() {
@@ -29,7 +29,7 @@ export function AppLayout() {
   const location = useLocation();
   const [switching, setSwitching] = useState(false);
   const isMobile = useMediaQuery('(max-width:768px)');
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
 
   const handleLogout = () => {
     disconnectStomp();
@@ -38,23 +38,23 @@ export function AppLayout() {
   };
 
   const navItems = [
-    { path: '/home', label: '首页' },
-    { path: '/designer/schemas', label: 'Tables' },
-    { path: '/wiki/kb', label: 'Docs' },
-    { path: '/im', label: 'Chat' },
-    { path: '/projects', label: 'Projects' },
-    { path: '/designer/workflows', label: 'Automations' },
-    { path: '/agent', label: 'AI' },
-    { path: '/admin/users', label: '用户' },
-    { path: '/admin/roles', label: '角色' },
-    { path: '/admin/acl', label: '权限' },
-    { path: '/admin/audit', label: '审计' },
-    { path: '/admin/row-acl', label: '行级 ACL' },
-    { path: '/admin/er', label: 'ER 图' },
-    { path: '/admin/notifications', label: '通知渠道' },
-    { path: '/swagger', label: 'API 文档', external: 'http://localhost:8080/swagger-ui/index.html' },
-    { path: '/messages', label: '站内信' },
-    { path: '/profile', label: '我的' },
+    { path: '/home', labelKey: 'nav.home' },
+    { path: '/designer/schemas', labelKey: 'nav.tables' },
+    { path: '/wiki/kb', labelKey: 'nav.wiki' },
+    { path: '/im', labelKey: 'nav.im' },
+    { path: '/projects', labelKey: 'nav.projects' },
+    { path: '/designer/workflows', labelKey: 'nav.workflows' },
+    { path: '/agent', labelKey: 'nav.agent' },
+    { path: '/admin/users', labelKey: 'nav.users' },
+    { path: '/admin/roles', labelKey: 'nav.roles' },
+    { path: '/admin/acl', labelKey: 'nav.permissions' },
+    { path: '/admin/audit', labelKey: 'nav.audit' },
+    { path: '/admin/row-acl', labelKey: 'nav.rowAcl' },
+    { path: '/admin/er', labelKey: 'nav.er' },
+    { path: '/admin/notifications', labelKey: 'nav.notifications' },
+    { path: '/swagger', labelKey: 'nav.apiDocs', external: 'http://localhost:8080/swagger-ui/index.html' },
+    { path: '/messages', labelKey: 'nav.inAppMessages' },
+    { path: '/profile', labelKey: 'nav.profile' },
   ];
 
   return (
@@ -88,7 +88,7 @@ export function AppLayout() {
                     (e.currentTarget as HTMLElement).style.background = 'transparent';
                   }}
                 >
-                  {item.label} ↗
+                  {t(item.labelKey)} ↗
                 </a>
               );
             }
@@ -106,7 +106,7 @@ export function AppLayout() {
                   borderBottom: active ? '2px solid var(--color-primary-500)' : '2px solid transparent',
                 }}
               >
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}
@@ -114,7 +114,7 @@ export function AppLayout() {
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <GlobalSearchPanel />
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-            {user?.username ?? '游客'}({user?.roles.join(', ') ?? 'no role'})
+            {user?.username ?? t('im.guest')}({user?.roles.join(', ') ?? t('im.noRole')})
           </span>
           {user && (
             <button
@@ -138,7 +138,7 @@ export function AppLayout() {
                 (e.currentTarget as HTMLElement).style.background = 'var(--color-primary-500)';
               }}
             >
-              🔄 切换应用({user.tenant_id})
+              {t('im.switchApp')} ({user.tenant_id})
             </button>
           )}
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
@@ -158,7 +158,7 @@ export function AppLayout() {
                   transition: 'all var(--transition-fast)',
                 }}
               >
-                {lang === 'zh-CN' ? '中文' : 'EN'}
+                {lang === 'zh-CN' ? t('im.langZh') : t('im.langEn')}
               </button>
             ))}
           </div>
@@ -182,7 +182,7 @@ export function AppLayout() {
               (e.currentTarget as HTMLElement).style.opacity = '1';
             }}
           >
-            登出
+            {t('im.logout')}
           </button>
         </div>
       </header>
@@ -218,7 +218,7 @@ export function AppLayout() {
                 }}
               >
                 <span style={{ fontSize: 20 }}>{item.icon}</span>
-                {item.label}
+                {t(item.labelKey)}
               </button>
             );
           })}
@@ -241,9 +241,9 @@ export function AppLayout() {
           }}
         >
           <div className="glass-strong" style={{ padding: 24, width: 400 }}>
-            <h3 style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>🔄 切换应用</h3>
+            <h3 style={{ marginTop: 0, color: 'var(--color-text-primary)' }}>{t('im.switchApp')}</h3>
             <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: 0 }}>
-              选择要切换的应用(租户)。切换后将刷新页面以加载新应用上下文。
+              {t('im.switchAppHint')}
             </p>
             <TenantSwitcher
               currentTenantId={user.tenant_id}
@@ -270,6 +270,7 @@ function TenantSwitcher({
   onSelect: (tenantId: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -301,9 +302,9 @@ function TenantSwitcher({
         </div>
       )}
       {loading ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>加载中…</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{t('im.loadingApps')}</p>
       ) : tenants.length === 0 ? (
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>暂无可切换的应用</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{t('im.noApps')}</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tenants.map((t) => (
@@ -331,7 +332,7 @@ function TenantSwitcher({
       )}
       <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button onClick={onClose} style={{ padding: '6px 14px', background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
-          关闭
+          {t('im.close')}
         </button>
       </div>
     </div>

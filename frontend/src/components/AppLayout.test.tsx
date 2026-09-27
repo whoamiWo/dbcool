@@ -14,6 +14,21 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: vi.fn(),
 }));
 
+// Mock i18next
+vi.mock('i18next', () => ({
+  default: {
+    t: (key: string) => key, // 直接返回 key 作为翻译
+    language: 'zh-CN',
+  },
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: 'zh-CN' },
+  }),
+}));
+
 describe('AppLayout', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -55,12 +70,12 @@ describe('AppLayout', () => {
 
     expect(screen.getByText('🛠 NocoBase')).toBeInTheDocument();
     expect(screen.getByText(/alice\(/)).toBeInTheDocument();
-    // 主要导航项（实际 label 已国际化）
-    expect(screen.getByText('首页')).toBeInTheDocument();
-    expect(screen.getByText('Tables')).toBeInTheDocument();
-    expect(screen.getByText('Docs')).toBeInTheDocument();
-    expect(screen.getByText('Chat')).toBeInTheDocument();
-    expect(screen.getByText('Projects')).toBeInTheDocument();
+    // 主要导航项（t() 返回 key，所以断言用 key）
+    expect(screen.getByText('nav.home')).toBeInTheDocument();
+    expect(screen.getByText('nav.tables')).toBeInTheDocument();
+    expect(screen.getByText('nav.wiki')).toBeInTheDocument();
+    expect(screen.getByText('nav.im')).toBeInTheDocument();
+    expect(screen.getByText('nav.projects')).toBeInTheDocument();
   });
 
   it('退出登录:点击退出 → 调用 clear()', () => {
@@ -96,8 +111,8 @@ describe('AppLayout', () => {
       </QueryClientProvider>,
     );
 
-    // "Docs" link 在 /designer/views 路径下应是 active
-    const docsLink = screen.getByText('Docs').closest('a');
+    // "nav.wiki" link 在 /designer/views 路径下应是 active
+    const docsLink = screen.getByText('nav.wiki').closest('a');
     expect(docsLink).toBeInTheDocument();
   });
 });
