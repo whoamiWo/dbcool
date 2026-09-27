@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.util.Map;
@@ -26,9 +27,11 @@ public class RealtimeCollabController {
     private static final Logger log = LoggerFactory.getLogger(RealtimeCollabController.class);
 
     private final RealtimeService realtimeService;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public RealtimeCollabController(RealtimeService realtimeService) {
+    public RealtimeCollabController(RealtimeService realtimeService, SimpMessagingTemplate messagingTemplate) {
         this.realtimeService = realtimeService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /** 加入文档协作房间:body = {docId} */
@@ -40,6 +43,25 @@ public class RealtimeCollabController {
         String docId = str(body.get("docId"));
         if (docId == null) return;
         realtimeService.joinRoom(docId, p.userId(), String.valueOf(attrs.get("sessionId")));
+
+        // P2-5: 获取服务端文档初始状态，广播给新成员
+        String initialState = realtimeService.getDocumentState(docId);
+        if (initialState != null) {
+            Map<String, Object> initPayload = Map.of(
+                    "type", "init",
+                    "docId", docId,
+                    "state", initialState,
+                    "username", p.username() == null ? "" : p.username(),
+                    "activeUsers", realtimeService.getActiveUsers(docId)
+            );
+            // 发送给新成员自己（目标：/user/{userId}/queue/collab-init）
+            messagingTemplate.convertAndSendToUser(
+                    p.userId().toString(),
+                    "/queue/collab-init",
+                    initPayload
+            );
+        }
+
         // 通知房间内其他人有新成员加入
         realtimeService.broadcastUpdate(docId, p.tenantId(), p.userId(),
                 Map.of("type", "presence", "action", "join",

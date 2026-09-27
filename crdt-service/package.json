@@ -1,0 +1,20 @@
+{
+  "name": "nocobase-crdt-service",
+  "version": "1.0.0",
+  "description": "NocoBase CRDT 服务端合并服务 - Yjs 增量合并 + PostgreSQL 持久化",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "yjs": "^13.6.15",
+    "pg": "^8.13.0",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.3"
+  },
+  "keywords": ["crdt", "yjs", "collaboration", "realtime"],
+  "license": "MIT"
+}

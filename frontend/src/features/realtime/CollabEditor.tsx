@@ -87,9 +87,21 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
       unsub = subscribeToCollab(docId, (body) => {
         try {
           const msg = JSON.parse(body) as {
-            userId?: string; update?: string; type?: string;
+            userId?: string; update?: string; state?: string; type?: string;
             username?: string; action?: string;
           };
+
+          // P2-5: 服务端下发的初始状态 (服务端合并后返回的完整文档)
+          if (msg.type === 'init' && msg.state) {
+            applyingRemote.current = true;
+            const stateBytes = fromBase64(msg.state);
+            Y.applyUpdate(ydoc, stateBytes, 'remote');
+            setText(ytext.toString());
+            applyingRemote.current = false;
+            console.log('[collab] 收到服务端初始状态:', docId);
+            return;
+          }
+
           // 在线状态事件
           if (msg.type === 'presence') {
             const uid = msg.userId ?? '';
@@ -102,6 +114,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
             });
             return;
           }
+
           // 文档增量:忽略自己发出的
           if (msg.userId && msg.userId === myId) return;
           if (!msg.update) return;

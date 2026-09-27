@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -94,6 +96,7 @@ public class RealtimeService {
 
     /**
      * 应用一条 CRDT 增量并广播给房间其他成员。
+     * <p>P2-5: 服务端合并 (Week 58) —— 调用 CRDT 服务完成增量合并，广播合并后状态。
      *
      * @param docId        文档 ID(Wiki 页面 ID 等)
      * @param tenantId     租户 ID(决定 destination 租户段)
@@ -102,16 +105,81 @@ public class RealtimeService {
      * @return 本次更新被分配的版本号
      */
     public long applyUpdate(String docId, String tenantId, UUID userId, String updateBase64) {
+        // P2-5: 调用 CRDT 服务服务端合并
+        String mergedStateBase64 = callCrdtService(docId, updateBase64);
+        if (mergedStateBase64 == null) {
+            // 降级：CRDT 服务不可用，回退增量透传
+            log.warn("[Realtime] CRDT 服务不可达，回退增量透传模式");
+            long version = docVersions.merge(docId, 1L, Long::sum);
+            Map<String, Object> payload = Map.of(
+                    "docId", docId,
+                    "userId", userId == null ? "" : userId.toString(),
+                    "update", updateBase64 == null ? "" : updateBase64,
+                    "version", version,
+                    "ts", Instant.now().toString()
+            );
+            broadcast(StompDestinations.collabTopic(tenantId, docId), payload);
+            return version;
+        }
+
+        // 服务端合并成功：广播完整状态给房间成员
         long version = docVersions.merge(docId, 1L, Long::sum);
         Map<String, Object> payload = Map.of(
                 "docId", docId,
                 "userId", userId == null ? "" : userId.toString(),
-                "update", updateBase64 == null ? "" : updateBase64,
+                "state", mergedStateBase64,
                 "version", version,
                 "ts", Instant.now().toString()
         );
         broadcast(StompDestinations.collabTopic(tenantId, docId), payload);
         return version;
+    }
+
+    /**
+     * 调用 CRDT 服务完成服务端合并。
+     * @return 合并后的完整状态 (Base64)，失败返回 null
+     */
+    private String callCrdtService(String docId, String updateBase64) {
+        try {
+            Map<String, String> response = crdtWebClient.post()
+                    .uri("/docs/{docId}/update", docId)
+                    .bodyValue(Map.of("update", updateBase64))
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block(java.time.Duration.ofSeconds(5));
+
+            if (response != null) {
+                String state = (String) response.get("state");
+                log.debug("[Realtime] CRDT 合并成功: doc={}, version={}", docId, response.get("version"));
+                return state;
+            }
+        } catch (Exception e) {
+            log.warn("[Realtime] CRDT 服务调用失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * 获取文档初始状态 (供新成员获取完整文档)。
+     * @return 完整状态 (Base64)，失败返回 null
+     */
+    public String getDocumentState(String docId) {
+        try {
+            Map<String, String> response = crdtWebClient.get()
+                    .uri("/docs/{docId}/state", docId)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block(java.time.Duration.ofSeconds(5));
+
+            if (response != null) {
+                String state = (String) response.get("state");
+                log.debug("[Realtime] 获取文档状态: doc={}, version={}", docId, response.get("version"));
+                return state;
+            }
+        } catch (Exception e) {
+            log.warn("[Realtime] 获取文档状态失败: {}", e.getMessage());
+        }
+        return null;
     }
 
     /** 广播任意事件到文档房间(如光标位置 / 在线状态)。 */

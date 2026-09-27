@@ -17,6 +17,7 @@
 | `08-tracing.yaml` | Jaeger 分布式追踪 |
 | `09-grafana-dashboards.yaml` | Grafana 面板 JSON + 自动导入配置 |
 | `10-grafana.yaml` | Grafana Deployment + Service |
+| `11-crdt-service.yaml` | CRDT 服务端合并服务 (Yjs 文档持久化) |
 
 ## 前置条件
 
@@ -62,6 +63,9 @@ kubectl apply -f 08-tracing.yaml
 # 7) 部署 Grafana（可选：生产环境推荐）
 kubectl apply -f 09-grafana-dashboards.yaml
 kubectl apply -f 10-grafana.yaml
+
+# 8) 部署 CRDT 服务端合并（需 PostgreSQL 就绪）
+kubectl apply -f 11-crdt-service.yaml
 ```
 
 ## 验证
