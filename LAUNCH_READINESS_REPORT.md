@@ -136,7 +136,7 @@
 | Trello 看板前端 | 后端 API 齐全，**前端未接线**（`BoardView`/`BoardColumn` 为坏死代码） |
 | 批量操作 API | 缺失 |
 | 微信客服 | 未独立于微信小程序 |
-| 限流 | 内存态（多实例部署失效，需 Redisson） |
+| 限流 | ✅ 已改 Redis-backed（`TriggerRateLimiter` 用 ZSET 滑动窗口，Redis 不可用时回退内存） |
 | FTS 中文分词 | 暂停（Alpine 无 zhparser、无 gcc/make/git，不可编译） |
 
 ---
@@ -152,7 +152,7 @@
 3. （可选）Grafana 面板 + 日志采集（EFK / Loki）
 
 **第 3 步（规模化前）**：补齐 P1 / P2
-1. 限流改 Redisson 分布式（当前内存态，多实例部署失效）
+1. ~~限流改 Redisson 分布式~~ **已完成**（2026-09-27）：`TriggerRateLimiter` 改为 Redis ZSET 滑动窗口，Redis 不可用时回退内存
 2. i18n（当前仅中文）
 3. 分布式追踪（OpenTelemetry + Jaeger）
 4. 多租户持续审计（新增接口须带归属校验）
