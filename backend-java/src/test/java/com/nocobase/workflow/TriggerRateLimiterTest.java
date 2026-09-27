@@ -1,10 +1,12 @@
 package com.nocobase.workflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * TriggerRateLimiter 单元测试(Week 41 D4a.3 — 死循环防护).
@@ -12,10 +14,13 @@ import org.junit.jupiter.api.Test;
 class TriggerRateLimiterTest {
 
     private TriggerRateLimiter limiter;
+    private StringRedisTemplate redisTemplate;
 
     @BeforeEach
     void setUp() {
-        limiter = new TriggerRateLimiter();
+        // Mock RedisTemplate，使其返回 null connection factory (触发内存回退)
+        redisTemplate = mock(StringRedisTemplate.class);
+        limiter = new TriggerRateLimiter(redisTemplate);
     }
 
     @Test
