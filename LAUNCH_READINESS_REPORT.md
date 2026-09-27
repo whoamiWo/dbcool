@@ -131,7 +131,7 @@
 | 项 | 现状 |
 |---|---|
 | i18n | ✅ **已完成核心页面**：`frontend/src/i18n/` zh-CN（默认）/en-US 双语包 + AppLayout 语言切换器；已国际化 **Login / AppLayout / Home / ProjectPage / TaskBoard / ChannelList / MessageComposer / MessageList / ImLayout / HuddlePanel / GlobalSearchPanel**；i18n 在 `src/test-setup.ts` 全局初始化（默认 zh-CN，不破坏既有中文断言）。剩余：次要页面仍为中文 |
-| Airtable 公式/汇总字段 | 后端可算，**前端 UI 未接线** |
+| Airtable 公式/汇总字段 | ✅ **已完成**（2026-09-27）：`SchemaDesigner.tsx` 添加 formula 字段编辑按钮（🧮），点击弹出 `FormulaEditor`；`FormRuntime.tsx` 添加 formula 类型渲染（只读显示表达式） |
 | Notion 协同 | CRDT 未做服务端合并，多人编辑会互相覆盖 |
 | Trello 看板前端 | ✅ 已接真：`BoardView` 接入 `ProjectPage` Tab；修复「`loadData` 定义后从未调用→永远卡 loading」；拖拽按 dnd-kit 多容器模式重构（DndContext 上移到 BoardView、补 containerId，此前每列独立 DndContext 且无 containerId → 拖拽不触发移动）+ `BoardView.test.tsx` 6 用例 |
 | 批量操作 API | ✅ 已实现（`CollectionController` L582/597/612）+ **测试已补**：`CollectionBatchControllerTest` 7 用例（含 403 越权透传、租户下传、ACL 拒绝） |
