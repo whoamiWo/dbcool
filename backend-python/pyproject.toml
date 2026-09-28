@@ -32,6 +32,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# PHASE 57: 真实语义向量（可选）。torch 体积大（~800MB），故不进主依赖；
+# 需要真语义检索时用 `uv sync --extra semantic` 安装，代码会自动优先使用
+# （未安装时回退确定性哈希，接口仍可用）。基础镜像为 python:3.12-slim(glibc)，可安装。
+semantic = [
+    "sentence-transformers>=3.0.0",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",

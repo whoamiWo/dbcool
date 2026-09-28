@@ -4,6 +4,13 @@
 
 FROM python:3.12-slim AS base
 
+# PHASE 57: 是否安装真实语义向量依赖(sentence-transformers / torch)。
+# 默认 false —— torch 体积大(~800MB)，未安装时 /api/ai/embedding 自动回退
+# 确定性哈希向量(接口仍可用)。需要真语义检索时:
+#   docker build --build-arg INSTALL_SEMANTIC=true ...
+# 代码侧为可插拔设计，安装后自动优先使用真模型，无需改代码。
+ARG INSTALL_SEMANTIC=false
+
 # 安装 uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -11,11 +18,19 @@ WORKDIR /app
 
 # 安装依赖(利用 Docker 缓存)
 COPY pyproject.toml README.md ./
-RUN uv sync --no-install-project --no-dev
+RUN if [ "$INSTALL_SEMANTIC" = "true" ]; then \
+        uv sync --no-install-project --no-dev --extra semantic; \
+    else \
+        uv sync --no-install-project --no-dev; \
+    fi
 
 # 复制源码
 COPY src ./src
-RUN uv sync --no-dev
+RUN if [ "$INSTALL_SEMANTIC" = "true" ]; then \
+        uv sync --no-dev --extra semantic; \
+    else \
+        uv sync --no-dev; \
+    fi
 
 # 运行时
 FROM python:3.12-slim

@@ -418,6 +418,52 @@ async def ws_stats(user: AuthUser = Depends(get_current_user)) -> dict:
 # ── PHASE 57: 向量嵌入 & RAG 搜索 ────────────────────────────────────
 
 
+_MODEL_CACHE = None
+_MODEL_LOAD_FAILED = False
+
+
+def _load_sentence_model():
+    """尝试加载 sentence-transformers 语义模型；不可用则返回 None（回退哈希向量）。
+
+    设计为"可插拔"：镜像若已安装 sentence-transformers（torch），自动使用真语义向量；
+    未安装或加载失败则回退确定性哈希，保证 /api/ai/embedding 始终可用（不阻断业务）。
+    """
+    global _MODEL_CACHE, _MODEL_LOAD_FAILED
+    if _MODEL_LOAD_FAILED:
+        return None
+    if _MODEL_CACHE is not None:
+        return _MODEL_CACHE
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        _MODEL_CACHE = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+        return _MODEL_CACHE
+    except Exception as e:  # noqa: BLE001
+        _MODEL_LOAD_FAILED = True
+        print(f"[Embedding] 语义模型不可用，回退哈希向量: {e}")
+        return None
+
+
+def _generate_embedding(text: str, dimensions: int = 768) -> list[float]:
+    """生成向量：优先真语义模型，不可用回退哈希（保证非零）。"""
+    model = _load_sentence_model()
+    if model is not None:
+        try:
+            import numpy as np
+
+            vec = model.encode([text], normalize_embeddings=True)[0]
+            vec = np.asarray(vec, dtype=float).tolist()
+            # 对齐维度：不足补 0，超出截断（pgvector 列固定 768 维）
+            if len(vec) < dimensions:
+                vec = vec + [0.0] * (dimensions - len(vec))
+            elif len(vec) > dimensions:
+                vec = vec[:dimensions]
+            return [float(x) for x in vec]
+        except Exception as e:  # noqa: BLE001
+            print(f"[Embedding] 模型推理失败，回退哈希向量: {e}")
+    return _generate_hash_embedding(text, dimensions)
+
+
 def _generate_hash_embedding(text: str, dimensions: int = 768) -> list[float]:
     """Generate deterministic non-zero embedding using SHA-256 hashing.
     
@@ -457,18 +503,17 @@ async def embedding(
     user: AuthUser = Depends(get_current_user),
 ) -> EmbeddingResponse:
     """生成文本的向量嵌入 (768 维).
-    
-    - 使用确定性哈希算法生成非零向量（无需 ML 依赖）
-    - 相同输入产生相同输出，不同输入产生不同向量
-    - 生产环境可替换为 sentence-transformers 获取真实语义向量
+
+    - 优先使用 sentence-transformers 生成真实语义向量（若镜像已安装）
+    - 未安装/推理失败时回退确定性哈希向量（保证接口始终可用）
     """
-    s = get_settings()
-    
-    # 生成非零向量（哈希方式）
-    embedding = _generate_hash_embedding(req.text, 768)
-    
+    embedding = _generate_embedding(req.text, 768)
+
+    model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" \
+        if _MODEL_CACHE is not None else "hash-sha256-deterministic"
+
     return EmbeddingResponse(
-        model="hash-sha256-deterministic",
+        model=model_name,
         embedding=embedding,
         tokens=len(req.text) // 4 + 100,
     )
