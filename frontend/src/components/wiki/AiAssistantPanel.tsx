@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { ReactElement } from 'react';
 import {
   Box,
   Paper,
@@ -51,7 +50,8 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
     setError(null);
     try {
       // TODO: 调用后端 API 生成大纲
-      const response = await fetch(`/api/wiki/${pageId}/generate-outline`, {
+      // 对齐后端：/api/wiki/pages/{pageId}/generate-outline
+      const response = await fetch(`/api/wiki/pages/${pageId}/generate-outline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: pageContent }),
@@ -75,7 +75,8 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/wiki/${pageId}/ask`, {
+      // 对齐后端 WikiController：类级 @RequestMapping("/api/wiki") + 方法 @PostMapping("/pages/{pageId}/ask")
+      const response = await fetch(`/api/wiki/pages/${pageId}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -102,7 +103,8 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/ai/polish', {
+      // 对齐后端：WikiController 下的 /api/wiki/ai/polish
+      const response = await fetch('/api/wiki/ai/polish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: polishText }),
@@ -134,6 +136,9 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <SmartToyIcon sx={{ color: '#1976d2' }} />
           <Typography variant="h6">AI 助手</Typography>
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 130 }}>
+            {pageTitle}
+          </Typography>
         </Box>
         <IconButton size="small" onClick={() => setExpanded(!expanded)} aria-label={expanded ? '收起' : '展开'}>
           {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}

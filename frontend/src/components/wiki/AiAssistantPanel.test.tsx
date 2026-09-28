@@ -63,7 +63,7 @@ describe('AiAssistantPanel', () => {
     fireEvent.click(askBtn);
     
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/wiki/1/ask', expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith('/api/wiki/pages/1/ask', expect.any(Object));
     });
     
     expect(await screen.findByText('这是 AI 的回答')).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('AiAssistantPanel', () => {
     fireEvent.click(generateBtn);
     
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/wiki/1/generate-outline', expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith('/api/wiki/pages/1/generate-outline', expect.any(Object));
     });
   });
 
@@ -111,7 +111,7 @@ describe('AiAssistantPanel', () => {
     fireEvent.click(polishBtn);
     
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/ai/polish', expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith('/api/wiki/ai/polish', expect.any(Object));
     });
     
     expect(await screen.findByText('经过润色的更好表达')).toBeInTheDocument();
