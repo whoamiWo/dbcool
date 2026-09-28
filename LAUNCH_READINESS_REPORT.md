@@ -136,10 +136,9 @@
 | Notion 协同 | ✅ **已完成服务端合并**（2026-09-27）：Node.js CRDT 服务 + PostgreSQL 持久化；`RealtimeService.applyUpdate` 调用 `/docs/{docId}/update` 完成合并，广播完整状态；`join` 时获取服务端快照，解决新成员从空文档起步问题；前端处理 `init` 消息（完整状态） |
 | Trello 看板前端 | ✅ 已接真：`BoardView` 接入 `ProjectPage` Tab；修复「`loadData` 定义后从未调用→永远卡 loading」；拖拽按 dnd-kit 多容器模式重构（DndContext 上移到 BoardView、补 containerId，此前每列独立 DndContext 且无 containerId → 拖拽不触发移动）+ `BoardView.test.tsx` 6 用例 |
 | 批量操作 API | ✅ 已实现（`CollectionController` L582/597/612）+ **测试已补**：`CollectionBatchControllerTest` 7 用例（含 403 越权透传、租户下传、ACL 拒绝） |
-| 项 | 现状 |
-|---|---|
-| RAG 语义检索 / FTS + pgvector 混合排序 | ⚠️ **部分就绪**：`WikiEmbeddingService.hybridSearch` 存在，但 `/api/ai/embedding` 之前永远返回零向量 → `executeVectorSearch` 从未执行 → pgvector SQL 零参与。PHASE 57 修复后 `/api/ai/embedding` 现返回非零向量，向量检索路径已接通，但生产环境需 pgvector extension + V39 migration 才能真正搜到数据 |
-| 微信通知 | ⚠️ **部分就绪**：`WECHAT_PERSONAL` 枚举存在，但 PHASE 57 修复前无 Dispatcher 实现类（0%）。PHASE 57 补充 `WeChatPersonalDispatcher` 后，个人微信通知已实现并自动注册 |
+| RAG 语义检索 / FTS + pgvector 混合排序 | ⚠️ **部分就绪**：`hybridSearch` 主路径**已接通**（`/api/ai/embedding` 返回非零向量 → `executeVectorSearch` 真执行 pgvector SQL，`WikiEmbeddingServiceTest` 有证明用例）。向量**可插拔**：默认 SHA-256 哈希（零依赖，但**无语义相似度**）；`docker build --build-arg INSTALL_SEMANTIC=true` 可启用 sentence-transformers 真语义（基础镜像 python:3.12-slim 为 glibc，可装 torch）。V39 索引算子已修正为 `vector_cosine_ops`（与 Java `<=>` 余弦查询一致，原 `vector_l2_ops` 会导致索引不生效）。生产仍需 pgvector extension + V39 才能真正搜到数据 |
+| 微信通知 | ✅ **已完成**（2026-09-28）：PHASE 57 补充 `WeChatPersonalDispatcher` 实现类（此前仅 `WECHAT_PERSONAL` 枚举，实际 0%）；由 `NotificationService` 的 `List<NotificationDispatcher>` 注入自动注册，`NotificationServiceTest.wechatPersonalDispatcher_registered` 验证通过 |
+| AI 助手后端端点 | ✅ **已完成**（2026-09-28）：`POST /api/wiki/pages/{id}/ask`、`/api/wiki/pages/{id}/generate-outline`、`/api/wiki/ai/polish` 三端点**接真 LLM** —— 复用 `AiAssistantService` 转发用户 JWT 调 Python `/api/ai/chat`（自带限流 / 缓存 / 配额）；ask 先 RAG 检索取上下文再生成答案；AI 不可用时明确降级（回退检索拼接 / 标题提取 / 空白归一化）并标注，不再伪装成 AI 输出。含 403/400 反向用例 + **HTTP 层契约测试** `WikiControllerHttpContractTest`（另断言旧路径 `/api/wiki/{id}/ask`、`/api/ai/polish` 返回 404，防 URL 回归） |
 | 微信客服 | 未独立于微信小程序 |
 | 限流 | ✅ 已改 Redis-backed（`TriggerRateLimiter` 用 ZSET 滑动窗口，Redis 不可用时回退内存） |
 | FTS 中文分词 | ✅ 已接真：`ChineseSegmenter`（jieba，纯 Java，INDEX 模式）+ `WikiSearchService` 逐词检索按命中词数排序；「项目管理」从整串命中 0 → 分词后命中并按相关度排序（H2/PG 通用，未编译任何 PG 扩展） |
