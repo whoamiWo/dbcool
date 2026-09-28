@@ -77,6 +77,47 @@ class ChatResponse(BaseModel):
     quota: dict
 
 
+class EmbeddingRequest(BaseModel):
+    """向量嵌入请求."""
+
+    text: str
+    tenant_id: str
+    model: str | None = None
+
+
+class EmbeddingResponse(BaseModel):
+    """向量嵌入响应."""
+
+    model: str
+    embedding: list[float]
+    tokens: int
+
+
+class RAGSearchRequest(BaseModel):
+    """RAG 语义搜索请求."""
+
+    query: str
+    tenant_id: str
+    kb_id: str | None = None
+    top_k: int = 10
+
+
+class RAGResult(BaseModel):
+    """RAG 搜索结果项."""
+
+    document_id: str | None
+    title: str
+    snippet: str
+    similarity: float
+
+
+class RAGSearchResponse(BaseModel):
+    """RAG 搜索响应."""
+
+    results: list[RAGResult]
+    total: int
+
+
 @router.get("/echo", response_model=ApiResponse)
 async def echo(
     msg: str = "hello",
@@ -372,3 +413,113 @@ async def ws_stats(user: AuthUser = Depends(get_current_user)) -> dict:
         return {"connections": get_broadcaster().connection_count()}
     except Exception as e:  # noqa: BLE001
         return {"error": str(e)}
+
+
+# ── PHASE 57: 向量嵌入 & RAG 搜索 ────────────────────────────────────
+
+
+@router.post("/embedding", response_model=EmbeddingResponse)
+async def embedding(
+    req: EmbeddingRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> EmbeddingResponse:
+    """生成文本的向量嵌入 (768 维).
+    
+    - 使用 sentence-transformers 模型生成多语言向量
+    - 若未配置 LLM，返回零向量（降级处理）
+    """
+    s = get_settings()
+    
+    # 降级：返回零向量
+    if not s.llm_api_key or not s.llm_base_url:
+        return EmbeddingResponse(
+            model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            embedding=[0.0] * 768,
+            tokens=len(req.text) // 4 + 100,
+        )
+    
+    try:
+        import httpx
+        
+        # 调用本地 embedding 服务（假设运行在 localhost:8001）
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                "http://localhost:8001/api/embed",
+                json={"text": req.text, "model": req.model or "multilingual-minilm"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            
+        return EmbeddingResponse(
+            model=data.get("model", "multilingual-minilm"),
+            embedding=data["embedding"],
+            tokens=data.get("tokens", len(req.text) // 4),
+        )
+    except Exception as e:  # noqa: BLE001
+        # 失败时返回零向量
+        return EmbeddingResponse(
+            model="fallback",
+            embedding=[0.0] * 768,
+            tokens=len(req.text) // 4,
+        )
+
+
+@router.post("/rag/search", response_model=RAGSearchResponse)
+async def rag_search(
+    req: RAGSearchRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> RAGSearchResponse:
+    """RAG 语义搜索 — 委托给 Java 后端执行 pgvector 查询.
+
+    Python 层无 PostgreSQL 连接，仅生成向量后由 Java 侧执行混合检索。
+    此端点返回空结果，实际检索由 Java WikiEmbeddingService.hybridSearch 完成。
+    """
+    # 生成向量（验证 embedding 端点可用）
+    embedding_resp = await embedding(
+        EmbeddingRequest(
+            text=req.query,
+            tenant_id=req.tenant_id,
+            model="multilingual-minilm",
+        ),
+        user=user,
+    )
+
+    if all(v == 0.0 for v in embedding_resp.embedding):
+        return RAGSearchResponse(results=[], total=0)
+
+    # 向量已生成，Java 侧将使用此向量执行 pgvector 查询
+    # 此处返回空结果，实际搜索由 Java WikiSearchService 完成
+    return RAGSearchResponse(results=[], total=0)
+
+
+async def _keyword_fallback_search(session, req: RAGSearchRequest) -> RAGSearchResponse:
+    """向量不可用时的关键字 fallback（配合 PostgreSQL FTS）。"""
+    from sqlalchemy import text
+
+    sql = text(
+        """
+        SELECT
+            w.id,
+            w.title,
+            w.content,
+            0.0 AS similarity
+        FROM wiki_page w
+        WHERE w.tenant_id = :tenant_id
+          AND w.content ILIKE :pattern
+        ORDER BY w.updated_at DESC
+        LIMIT :top_k
+        """
+    )
+    pattern = f"%{req.query}%"
+    result = await session.execute(sql, {"tenant_id": req.tenant_id, "pattern": pattern, "top_k": req.top_k})
+    rows = result.fetchall()
+    rag_results = [
+        RAGResult(
+            document_id=str(row[0]),
+            title=row[1],
+            snippet=(row[2][:200] + "...") if len(row[2] or "") > 200 else (row[2] or ""),
+            similarity=0.0,
+        )
+        for row in rows
+    ]
+    return RAGSearchResponse(results=rag_results, total=len(rag_results))

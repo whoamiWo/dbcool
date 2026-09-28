@@ -3,6 +3,7 @@ package com.nocobase.wiki;
 import com.nocobase.wiki.WikiTemplateService;
 import com.nocobase.wiki.WikiBacklinkRepository;
 import com.nocobase.wiki.WikiBacklinkEntity;
+import com.nocobase.wiki.WikiEmbeddingService;
 import com.nocobase.auth.AclEnforcer;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
@@ -51,6 +52,7 @@ public class WikiController {
     private final ApplicationEventPublisher eventPublisher;
     private final WikiTemplateService templateService;
     private final WikiBacklinkRepository backlinkRepository;
+    private final WikiEmbeddingService embeddingService;
 
     public WikiController(
             KnowledgeBaseService knowledgeBaseService,
@@ -64,7 +66,8 @@ public class WikiController {
             AuditService auditService,
             ApplicationEventPublisher eventPublisher,
             WikiTemplateService templateService,
-            WikiBacklinkRepository backlinkRepository
+            WikiBacklinkRepository backlinkRepository,
+            WikiEmbeddingService embeddingService
     ) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.pageService = pageService;
@@ -78,6 +81,7 @@ public class WikiController {
         this.eventPublisher = eventPublisher;
         this.templateService = templateService;
         this.backlinkRepository = backlinkRepository;
+        this.embeddingService = embeddingService;
     }
 
     // ============================================================
@@ -551,6 +555,32 @@ public class WikiController {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
         var result = searchService.search(q, kbId, user.tenantId(), page - 1, size);
+        List<Map<String, Object>> items = result.getContent().stream()
+                .map(this::toPageDto).toList();
+        return Map.of(
+                "code", 0, "message", "success",
+                "data", items,
+                "total", result.getTotalElements(),
+                "page", page,
+                "size", size);
+    }
+
+    /**
+     * 混合搜索：结合 FTS 和向量检索（AI 增强）。
+     */
+    @GetMapping("/search/hybrid")
+    public Map<String, Object> hybridSearch(
+            @RequestParam String q,
+            @RequestParam(required = false) UUID kbId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        
+        // 使用 WikiEmbeddingService.hybridSearch 进行混合检索
+        var result = embeddingService.hybridSearch(q, kbId, user.tenantId(), page - 1, size);
         List<Map<String, Object>> items = result.getContent().stream()
                 .map(this::toPageDto).toList();
         return Map.of(
