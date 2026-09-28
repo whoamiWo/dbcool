@@ -4,6 +4,7 @@ import com.nocobase.wiki.WikiTemplateService;
 import com.nocobase.wiki.WikiBacklinkRepository;
 import com.nocobase.wiki.WikiBacklinkEntity;
 import com.nocobase.wiki.WikiEmbeddingService;
+import com.nocobase.ai.AiAssistantService;
 import com.nocobase.auth.AclEnforcer;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -53,6 +56,7 @@ public class WikiController {
     private final WikiTemplateService templateService;
     private final WikiBacklinkRepository backlinkRepository;
     private final WikiEmbeddingService embeddingService;
+    private final AiAssistantService aiAssistantService;
 
     public WikiController(
             KnowledgeBaseService knowledgeBaseService,
@@ -67,7 +71,8 @@ public class WikiController {
             ApplicationEventPublisher eventPublisher,
             WikiTemplateService templateService,
             WikiBacklinkRepository backlinkRepository,
-            WikiEmbeddingService embeddingService
+            WikiEmbeddingService embeddingService,
+            AiAssistantService aiAssistantService
     ) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.pageService = pageService;
@@ -82,6 +87,7 @@ public class WikiController {
         this.templateService = templateService;
         this.backlinkRepository = backlinkRepository;
         this.embeddingService = embeddingService;
+        this.aiAssistantService = aiAssistantService;
     }
 
     // ============================================================
@@ -707,6 +713,7 @@ public class WikiController {
     public Map<String, Object> askQuestion(
             @PathVariable UUID pageId,
             @RequestBody Map<String, Object> body,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
@@ -724,34 +731,52 @@ public class WikiController {
         
         String context = (String) body.get("context");
         
-        // 使用 hybridSearch 进行基于上下文的问答
+        // RAG：先用混合检索（FTS + 向量）取回相关页面作为上下文
         var searchResults = embeddingService.hybridSearch(question, page.getKnowledgeBaseId(),
                 user.tenantId(), 0, 5);
         
-        StringBuilder answer = new StringBuilder();
-        if (searchResults.isEmpty()) {
-            answer.append("未找到相关答案。");
-        } else {
-            answer.append("根据以下内容回答：\n\n");
+        StringBuilder retrieved = new StringBuilder();
+        if (searchResults != null && !searchResults.isEmpty()) {
             for (var result : searchResults.getContent()) {
-                answer.append("【").append(result.getTitle()).append("】\n");
-                answer.append(result.getContent().substring(0, Math.min(200, result.getContent().length()))).append("\n\n");
+                retrieved.append("【").append(result.getTitle()).append("】\n");
+                String c = result.getContent();
+                retrieved.append(c == null ? "" : c.substring(0, Math.min(500, c.length()))).append("\n\n");
             }
-            answer.append("问题：").append(question).append("\n");
-            answer.append("建议查看相关页面获取详细信息。");
+        }
+        String ragContext = (context == null ? "" : context + "\n\n") + retrieved;
+        
+        // 调用真 LLM（AiAssistantService → Python /api/ai/chat，带限流/缓存/配额 + 降级）
+        Map<String, Object> aiResult = aiAssistantService.askQuestion(question, ragContext, auth);
+        String answer = extractAiText(aiResult, "answer");
+        
+        // AI 不可用（未启用/调用失败）时回退到检索结果拼接，保证功能不劣化且诚实标注
+        if (isUnavailable(answer)) {
+            StringBuilder fallback = new StringBuilder();
+            if (searchResults == null || searchResults.isEmpty()) {
+                fallback.append("未找到相关答案。");
+            } else {
+                fallback.append("（AI 服务不可用，以下为知识库检索结果）\n\n");
+                for (var result : searchResults.getContent()) {
+                    fallback.append("【").append(result.getTitle()).append("】\n");
+                    String c = result.getContent();
+                    fallback.append(c == null ? "" : c.substring(0, Math.min(200, c.length()))).append("\n\n");
+                }
+            }
+            answer = fallback.toString();
         }
         
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "ASK", "wiki_page", pageId.toString(), Map.of("question", question));
         
         return Map.of("code", 0, "message", "success", "data",
-                Map.of("answer", answer.toString()));
+                Map.of("answer", answer));
     }
 
     @PostMapping("/pages/{pageId}/generate-outline")
     public Map<String, Object> generateOutline(
             @PathVariable UUID pageId,
             @RequestBody Map<String, Object> body,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
@@ -767,8 +792,13 @@ public class WikiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "content 必填");
         }
         
-        // 基于内容生成大纲（简化版：提取标题级别）
-        String outline = extractOutline(content);
+        // 调用真 LLM 生成大纲；不可用时回退为“提取 Markdown 标题级别”
+        String outline;
+        Map<String, Object> aiResult = aiAssistantService.chat(
+                "请根据以下内容生成结构化的 Markdown 大纲（层级标题 + 要点），只输出大纲本身：\n\n" + content,
+                null, 1024, auth);
+        String aiText = extractAiText(aiResult, "result");
+        outline = isUnavailable(aiText) ? extractOutline(content) : aiText;
         
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "GENERATE_OUTLINE", "wiki_page", pageId.toString(),
@@ -781,6 +811,7 @@ public class WikiController {
     @PostMapping("/ai/polish")
     public Map<String, Object> polishText(
             @RequestBody Map<String, Object> body,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
@@ -791,8 +822,12 @@ public class WikiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "text 必填");
         }
         
-        // 文本润色（简化版：保持原文，添加格式优化）
-        String polished = polishTextSimple(text);
+        // 调用真 LLM 润色；不可用时回退为空白归一化（明确降级，不再伪装成 AI 润色）
+        Map<String, Object> aiResult = aiAssistantService.chat(
+                "请润色以下文本，保持原意、修正语病并使其更通顺专业，只输出润色后的文本：\n\n" + text,
+                null, 1024, auth);
+        String aiText = extractAiText(aiResult, "result");
+        String polished = isUnavailable(aiText) ? polishTextSimple(text) : aiText;
         
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "POLISH", "wiki_content", null,
@@ -800,6 +835,25 @@ public class WikiController {
         
         return Map.of("code", 0, "message", "success", "data",
                 Map.of("polishedText", polished));
+    }
+
+    /**
+     * 从 AiAssistantService 返回的统一信封 {code,message,data:{...}} 中取文本字段。
+     */
+    @SuppressWarnings("unchecked")
+    private String extractAiText(Map<String, Object> aiResult, String field) {
+        if (aiResult == null) return null;
+        Object data = aiResult.get("data");
+        if (data instanceof Map<?, ?> m) {
+            Object v = m.get(field);
+            return v == null ? null : String.valueOf(v);
+        }
+        return null;
+    }
+
+    /** 判断 AI 结果是否为“不可用”降级文案（AiAssistantService 内部降级时的提示）。 */
+    private boolean isUnavailable(String text) {
+        return text == null || text.isBlank() || text.contains("暂未启用") || text.contains("不可用");
     }
 
     private String extractOutline(String content) {

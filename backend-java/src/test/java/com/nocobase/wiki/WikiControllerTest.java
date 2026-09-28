@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.nocobase.ai.AiAssistantService;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.AclEnforcer;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
@@ -40,6 +41,7 @@ class WikiControllerTest {
     private WikiTemplateService wikiTemplateService;
     private WikiBacklinkRepository wikiBacklinkRepository;
     private WikiEmbeddingService wikiEmbeddingService;
+    private AiAssistantService aiAssistantService;
     private WikiController controller;
 
     private AuthenticatedUser testUser;
@@ -68,6 +70,7 @@ class WikiControllerTest {
         wikiTemplateService = mock(WikiTemplateService.class);
         wikiBacklinkRepository = mock(WikiBacklinkRepository.class);
         wikiEmbeddingService = mock(WikiEmbeddingService.class);
+        aiAssistantService = mock(AiAssistantService.class);
 
         doNothing().when(aclEnforcer).assertCan(any(), anyString(), anyString(), any());
         doNothing().when(eventPublisher).publishEvent(any());
@@ -79,7 +82,7 @@ class WikiControllerTest {
         controller = new WikiController(kbService, pageService, categoryService,
                 searchService, aclEnforcer, permissionService, attachmentService,
                 wikiBlockService, auditService, eventPublisher, wikiTemplateService, 
-                wikiBacklinkRepository, wikiEmbeddingService);
+                wikiBacklinkRepository, wikiEmbeddingService, aiAssistantService);
     }
 
     // ---- 知识库 CRUD ----
