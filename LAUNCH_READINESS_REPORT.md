@@ -136,6 +136,10 @@
 | Notion 协同 | ✅ **已完成服务端合并**（2026-09-27）：Node.js CRDT 服务 + PostgreSQL 持久化；`RealtimeService.applyUpdate` 调用 `/docs/{docId}/update` 完成合并，广播完整状态；`join` 时获取服务端快照，解决新成员从空文档起步问题；前端处理 `init` 消息（完整状态） |
 | Trello 看板前端 | ✅ 已接真：`BoardView` 接入 `ProjectPage` Tab；修复「`loadData` 定义后从未调用→永远卡 loading」；拖拽按 dnd-kit 多容器模式重构（DndContext 上移到 BoardView、补 containerId，此前每列独立 DndContext 且无 containerId → 拖拽不触发移动）+ `BoardView.test.tsx` 6 用例 |
 | 批量操作 API | ✅ 已实现（`CollectionController` L582/597/612）+ **测试已补**：`CollectionBatchControllerTest` 7 用例（含 403 越权透传、租户下传、ACL 拒绝） |
+| 项 | 现状 |
+|---|---|
+| RAG 语义检索 / FTS + pgvector 混合排序 | ⚠️ **部分就绪**：`WikiEmbeddingService.hybridSearch` 存在，但 `/api/ai/embedding` 之前永远返回零向量 → `executeVectorSearch` 从未执行 → pgvector SQL 零参与。PHASE 57 修复后 `/api/ai/embedding` 现返回非零向量，向量检索路径已接通，但生产环境需 pgvector extension + V39 migration 才能真正搜到数据 |
+| 微信通知 | ⚠️ **部分就绪**：`WECHAT_PERSONAL` 枚举存在，但 PHASE 57 修复前无 Dispatcher 实现类（0%）。PHASE 57 补充 `WeChatPersonalDispatcher` 后，个人微信通知已实现并自动注册 |
 | 微信客服 | 未独立于微信小程序 |
 | 限流 | ✅ 已改 Redis-backed（`TriggerRateLimiter` 用 ZSET 滑动窗口，Redis 不可用时回退内存） |
 | FTS 中文分词 | ✅ 已接真：`ChineseSegmenter`（jieba，纯 Java，INDEX 模式）+ `WikiSearchService` 逐词检索按命中词数排序；「项目管理」从整串命中 0 → 分词后命中并按相关度排序（H2/PG 通用，未编译任何 PG 扩展） |

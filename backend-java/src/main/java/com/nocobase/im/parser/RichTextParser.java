@@ -15,6 +15,9 @@ import java.util.regex.Pattern;
  *   <li>链接：http(s)://...</li>
  *   <li>代码块：```code```</li>
  * </ul>
+ *
+ * <p>PHASE 57 备注：该类暂不接入生产代码（@提及链路将在后续迭代），
+ * 但保留方法供后续使用。MessageSearchService 中已删除对 formatMention 的死引用调用。
  */
 public class RichTextParser {
 

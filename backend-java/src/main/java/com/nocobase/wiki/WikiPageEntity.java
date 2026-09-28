@@ -64,12 +64,19 @@ public class WikiPageEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    // FTS 字段 — 由触发器自动维护
+    // FTS 字段 — 由触发器自主维护
     // 测试环境(H2)不支持 tsvector,用 TEXT 兼容;生产环境(PG)用 Flyway migration 定义 tsvector
     @Column(name = "content_tsv", columnDefinition = "TSVECTOR", insertable = false, updatable = false)
     @JdbcTypeCode(SqlTypes.OTHER)
     @Transient
     private String contentTsv;
+
+    // pgvector embedding column — 768维语义向量(V39 migration)
+    // H2 测试环境无 vector 类型,标注 @Transient 避免 JPA 持久化冲突
+    @Column(name = "embedding", columnDefinition = "vector(768)", insertable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.OTHER)
+    @Transient
+    private String embedding;
 
     @Column(name = "is_template", nullable = false)
     private Boolean isTemplate = false;
@@ -126,6 +133,8 @@ public class WikiPageEntity {
 
     public String getContentTsv() { return contentTsv; }
     public void setContentTsv(String contentTsv) { this.contentTsv = contentTsv; }
+    public String getEmbedding() { return embedding; }
+    public void setEmbedding(String embedding) { this.embedding = embedding; }
     public Boolean getIsTemplate() { return isTemplate; }
     public void setIsTemplate(Boolean isTemplate) { this.isTemplate = isTemplate; }
     public Instant getDeletedAt() { return deletedAt; }

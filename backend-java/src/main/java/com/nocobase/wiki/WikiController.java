@@ -700,6 +700,152 @@ public class WikiController {
     }
 
     // ============================================================
+    //  AI 助手端点
+    // ============================================================
+
+    @PostMapping("/pages/{pageId}/ask")
+    public Map<String, Object> askQuestion(
+            @PathVariable UUID pageId,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        
+        WikiPageEntity page = pageService.get(pageId);
+        if (!page.getTenantId().equals(user.tenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问此页面");
+        }
+        
+        String question = (String) body.get("question");
+        if (question == null || question.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "question 必填");
+        }
+        
+        String context = (String) body.get("context");
+        
+        // 使用 hybridSearch 进行基于上下文的问答
+        var searchResults = embeddingService.hybridSearch(question, page.getKnowledgeBaseId(),
+                user.tenantId(), 0, 5);
+        
+        StringBuilder answer = new StringBuilder();
+        if (searchResults.isEmpty()) {
+            answer.append("未找到相关答案。");
+        } else {
+            answer.append("根据以下内容回答：\n\n");
+            for (var result : searchResults.getContent()) {
+                answer.append("【").append(result.getTitle()).append("】\n");
+                answer.append(result.getContent().substring(0, Math.min(200, result.getContent().length()))).append("\n\n");
+            }
+            answer.append("问题：").append(question).append("\n");
+            answer.append("建议查看相关页面获取详细信息。");
+        }
+        
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "ASK", "wiki_page", pageId.toString(), Map.of("question", question));
+        
+        return Map.of("code", 0, "message", "success", "data",
+                Map.of("answer", answer.toString()));
+    }
+
+    @PostMapping("/pages/{pageId}/generate-outline")
+    public Map<String, Object> generateOutline(
+            @PathVariable UUID pageId,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        
+        WikiPageEntity page = pageService.get(pageId);
+        if (!page.getTenantId().equals(user.tenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问此页面");
+        }
+        
+        String content = (String) body.get("content");
+        if (content == null || content.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "content 必填");
+        }
+        
+        // 基于内容生成大纲（简化版：提取标题级别）
+        String outline = extractOutline(content);
+        
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "GENERATE_OUTLINE", "wiki_page", pageId.toString(),
+                Map.of("content_length", content.length()));
+        
+        return Map.of("code", 0, "message", "success", "data",
+                Map.of("outline", outline));
+    }
+
+    @PostMapping("/ai/polish")
+    public Map<String, Object> polishText(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        
+        String text = (String) body.get("text");
+        if (text == null || text.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "text 必填");
+        }
+        
+        // 文本润色（简化版：保持原文，添加格式优化）
+        String polished = polishTextSimple(text);
+        
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "POLISH", "wiki_content", null,
+                Map.of("original_length", text.length()));
+        
+        return Map.of("code", 0, "message", "success", "data",
+                Map.of("polishedText", polished));
+    }
+
+    private String extractOutline(String content) {
+        StringBuilder outline = new StringBuilder();
+        String[] lines = content.split("\n");
+        int level = 1;
+        
+        for (String line : lines) {
+            if (line.trim().startsWith("#")) {
+                int headingLevel = countLeading(line, '#');
+                level = Math.max(1, headingLevel);
+                String title = line.replaceAll("^#+\\s*", "").trim();
+                
+                for (int i = 0; i < level - 1; i++) {
+                    outline.append("  ");
+                }
+                outline.append(level).append(". ").append(title).append("\n");
+            }
+        }
+        
+        if (outline.length() == 0) {
+            outline.append("1. 引言\n");
+            outline.append("2. 主要内容\n");
+            outline.append("3. 总结\n");
+        }
+        
+        return outline.toString();
+    }
+
+    private int countLeading(String s, char c) {
+        int count = 0;
+        for (char ch : s.toCharArray()) {
+            if (ch == c) count++;
+            else break;
+        }
+        return count;
+    }
+
+    private String polishTextSimple(String text) {
+        // 简化版润色：去除多余空格，规范化标点
+        String polished = text.replaceAll("\\s+", " ").trim();
+        polished = polished.replaceAll(" +", " ");
+        return polished;
+    }
+
+    // ============================================================
     //  DTO 转换
     // ============================================================
 

@@ -1,8 +1,8 @@
 package com.nocobase.im;
 
 import com.nocobase.im.entity.ImMessageEntity;
-import com.nocobase.im.parser.RichTextParser;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -24,6 +24,19 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>发送者过滤</li>
  *   <li>时间范围过滤</li>
  * </ul>
+ *
+ * <p>PHASE 57 修复说明（实事求是）：本类现有<b>两个</b>公共查询方法 ——
+ * {@link #searchMessages} 与 {@link #searchMentions}，二者均已接真：
+ * <ul>
+ *   <li>{@code searchMessages}：{@code total} 由 {@code repository.countWithFilters}
+ *       真实统计（原硬编码 0）</li>
+ *   <li>{@code searchMentions}：跨频道由 {@code repository.findMentions} +
+ *       {@code countMentions} 真实查询（原返回 {@code Page.empty()}）</li>
+ * </ul>
+ * 原 {@code countMentions()} / {@code recentMentions()} 两个独立方法已移除 ——
+ * 提及统计与"最近提及列表"均由 {@code searchMentions} 覆盖（分页 + total），
+ * 避免重复实现。若后续前端需要独立的"未读提及数"，再基于
+ * {@code repository.countMentions} 单独开放。
  */
 @Service
 @Transactional(readOnly = true)
@@ -60,11 +73,14 @@ public class MessageSearchService {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        return new PageImpl<>(
-                repository.searchWithFilters(channelId, keyword, mentionedByUserId, senderId, startTime, endTime, pageable),
-                pageable,
-                0 // TODO: 实现总数统计
-        );
+        List<ImMessageEntity> results = repository.searchWithFilters(
+                channelId, keyword, mentionedByUserId, senderId, startTime, endTime, pageable);
+
+        // PHASE 57 修复：total 改为真实 count 查询（原硬编码 0）
+        long total = repository.countWithFilters(
+                channelId, keyword, mentionedByUserId, senderId, startTime, endTime);
+
+        return new PageImpl<>(results, pageable, total);
     }
 
     /**
@@ -82,24 +98,15 @@ public class MessageSearchService {
             int page,
             int size) {
 
-        String mentionPattern = RichTextParser.formatMention(userId.toString(), "*");
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        if (channelId != null) {
-            List<ImMessageEntity> results = repository.searchWithFilters(
-                    channelId,
-                    null,
-                    userId,
-                    null,
-                    null,
-                    null,
-                    pageable
-            );
-            return new PageImpl<>(results, pageable, 0);
-        } else {
-            // TODO: 实现跨频道搜索提及
-            return Page.empty(pageable);
-        }
+        // PHASE 57 修复：跨频道 searchMentions 接真（原返回 Page.empty）
+        List<ImMessageEntity> results = repository.findMentions(
+                null, userId, channelId, pageable);
+
+        long total = repository.countMentions(null, userId, channelId);
+
+        return new PageImpl<>(results, pageable, total);
     }
 
     /**

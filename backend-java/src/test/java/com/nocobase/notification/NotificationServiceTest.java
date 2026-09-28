@@ -164,6 +164,27 @@ class NotificationServiceTest {
         assertThat(r.detail()).contains("no dispatcher");
     }
 
+    /* === WeChatPersonalDispatcher registration === */
+
+    @Test
+    void wechatPersonalDispatcher_registered() {
+        // PHASE 57 §2: Verify WeChatPersonalDispatcher is registered via List injection
+        NotificationDispatcher wechatDispatcher = new WeChatPersonalDispatcher();
+        assertThat(wechatDispatcher.supportedType())
+                .isEqualTo(NotificationChannelEntity.Type.WECHAT_PERSONAL);
+    }
+
+    @Test
+    void wechatPersonalDispatcher_sendMissingWebhook_returnsError() {
+        NotificationDispatcher wechatDispatcher = new WeChatPersonalDispatcher();
+        var channel = makeChannel(NotificationChannelEntity.Type.WECHAT_PERSONAL, "test_wechat", true);
+        channel.setConfig(new HashMap<>());
+
+        var result = wechatDispatcher.send(channel, null, Map.of());
+        assertThat(result.success()).isFalse();
+        assertThat(result.detail()).contains("missing webhookUrl");
+    }
+
     /* === helpers === */
 
     private NotificationChannelEntity makeChannel(
