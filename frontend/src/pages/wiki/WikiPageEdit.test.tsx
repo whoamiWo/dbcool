@@ -12,6 +12,10 @@ vi.mock('@/api/wiki', () => ({
   },
 }));
 
+vi.mock('@/components/wiki/AiAssistantPanel', () => ({
+  AiAssistantPanel: vi.fn(() => <div data-testid="ai-assistant-panel">AI Assistant</div>),
+}));
+
 describe('WikiPageEditPage', () => {
   let qc: QueryClient;
 

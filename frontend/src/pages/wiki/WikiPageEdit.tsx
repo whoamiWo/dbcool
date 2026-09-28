@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { wikiApi } from '@/api/wiki';
 import { EnhancedMarkdownEditor } from '@/components/wiki/EnhancedMarkdownEditor';
+import { AiAssistantPanel } from '@/components/wiki/AiAssistantPanel';
 
 export function WikiPageEditPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -116,6 +117,11 @@ export function WikiPageEditPage() {
         onTitleChange={setTitle}
         content={content}
         onContentChange={setContent}
+      />
+      <AiAssistantPanel
+        pageId={data.id}
+        pageTitle={title}
+        pageContent={content}
       />
     </Box>
   );
