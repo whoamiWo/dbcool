@@ -37,6 +37,9 @@ dependencies = [
 # （未安装时回退确定性哈希，接口仍可用）。基础镜像为 python:3.12-slim(glibc)，可安装。
 semantic = [
     "sentence-transformers>=3.0.0",
+    # 显式声明 torch，使下方 [tool.uv.sources] 的 CPU 源覆盖生效
+    # （仅作为传递依赖时 uv 不会应用 source override）
+    "torch>=2.0",
 ]
 dev = [
     "pytest>=8.3.0",
@@ -55,6 +58,17 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nocobase_py"]
+
+[[tool.uv.index]]
+# PHASE 57: 默认 PyPI 的 torch 会连带拉取约 2GB 的 nvidia-* CUDA 包。
+# 本项目为 CPU 推理（768 维小模型），显式指定 PyTorch CPU 源可显著减小
+# 镜像体积与构建耗时（去掉 CUDA 依赖）。仅对 torch 生效（explicit = true）。
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [tool.ruff]
 line-length = 100
