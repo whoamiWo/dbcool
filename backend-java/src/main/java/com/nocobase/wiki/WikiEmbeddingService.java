@@ -41,6 +41,13 @@ public class WikiEmbeddingService {
     @org.springframework.beans.factory.annotation.Value("${ai.internal-token:}")
     private String internalToken;
 
+    /**
+     * 用于把向量检索得到的 id 回查成完整实体（避免手工构造实体导致字段缺失）。
+     * 字段注入而非构造器注入：保持构造签名稳定，不影响既有单元测试。
+     */
+    @Autowired
+    private WikiPageRepository wikiPageRepository;
+
     @Autowired
     public WikiEmbeddingService(WebClient.Builder builder, JdbcTemplate jdbcTemplate, WikiSearchService wikiSearchService) {
         this.aiWebClient = builder
@@ -115,7 +122,7 @@ public class WikiEmbeddingService {
         // 1. 向量检索（原生 SQL，使用 JdbcTemplate）
         List<WikiPageEntity> semanticResults = Collections.emptyList();
         if (hasEmbedding) {
-            semanticResults = executeVectorSearch(tenantId, embedding, size * 2);
+            semanticResults = executeVectorSearch(tenantId, kbId, embedding, size * 2);
         }
 
         // 2. FTS 结果（作为补充召回）
@@ -150,9 +157,16 @@ public class WikiEmbeddingService {
     }
 
     /**
-     * 执行 pgvector 向量检索。
+     * 执行 pgvector 向量检索，返回**完整**实体（保持向量相似度顺序）。
+     *
+     * <p>注意：早期实现用 RowMapper 手工 new 了只有 id/title/content 的“半成品”
+     * 实体，导致 Controller 的 {@code toPageDto()} 调用
+     * {@code getKnowledgeBaseId().toString()} 时 NPE（500）。
+     * 此处只取 id，再回查 Repository 得到完整实体，避免字段缺失。
      */
-    private List<WikiPageEntity> executeVectorSearch(String tenantId, float[] embedding, int limit) {
+    private List<WikiPageEntity> executeVectorSearch(
+            String tenantId, UUID kbId, float[] embedding, int limit
+    ) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < embedding.length; i++) {
             if (i > 0) sb.append(",");
@@ -161,23 +175,51 @@ public class WikiEmbeddingService {
         sb.append("]");
         String vectorStr = sb.toString();
 
-        String sql = "SELECT id, title, content FROM wiki_page "
-                + "WHERE tenant_id = ? AND embedding IS NOT NULL "
-                + "ORDER BY embedding <=> ?::vector LIMIT ?";
+        StringBuilder sql = new StringBuilder(
+                "SELECT id FROM wiki_page WHERE tenant_id = ? AND embedding IS NOT NULL ");
+        List<Object> args = new ArrayList<>();
+        args.add(tenantId);
+        if (kbId != null) {
+            sql.append("AND knowledge_base_id = ? ");
+            args.add(kbId);
+        }
+        sql.append("ORDER BY embedding <=> ?::vector LIMIT ?");
+        args.add(vectorStr);
+        args.add(limit);
 
-        RowMapper<WikiPageEntity> rowMapper = (rs, rowNum) -> {
-            WikiPageEntity entity = new WikiPageEntity();
-            entity.setId(UUID.fromString(rs.getString("id")));
-            entity.setTitle(rs.getString("title"));
-            entity.setContent(rs.getString("content"));
-            return entity;
-        };
-
+        List<UUID> orderedIds;
         try {
-            return jdbcTemplate.query(sql, rowMapper, tenantId, vectorStr, limit);
+            List<String> rows = jdbcTemplate.queryForList(
+                    sql.toString(), String.class, args.toArray());
+            orderedIds = new ArrayList<>();
+            for (String r : rows) {
+                try {
+                    orderedIds.add(UUID.fromString(r));
+                } catch (IllegalArgumentException ignore) {
+                    // 非法 uuid 跳过
+                }
+            }
         } catch (Exception e) {
+            // pgvector 未启用 / SQL 异常：降级为空，交由 FTS 兜底
             return Collections.emptyList();
         }
+
+        if (orderedIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<UUID, WikiPageEntity> byId = new HashMap<>();
+        for (WikiPageEntity e : wikiPageRepository.findAllById(orderedIds)) {
+            byId.put(e.getId(), e);
+        }
+        List<WikiPageEntity> ordered = new ArrayList<>();
+        for (UUID id : orderedIds) {
+            WikiPageEntity e = byId.get(id);
+            if (e != null) {
+                ordered.add(e);
+            }
+        }
+        return ordered;
     }
 
     private boolean isAllZero(float[] arr) {
