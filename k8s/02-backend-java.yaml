@@ -14,6 +14,10 @@ metadata:
   namespace: nocobase
   labels:
     app: backend-java
+  annotations:
+    # P0-4 临时方案：HPA + 多副本下 WebSocket 信令依赖会话粘滞（Ingress cookie affinity）
+    # TODO: 迁移到 Redis pub/sub 跨实例广播信令（参考 PresenceService 的 Redis 用法）
+    # 见：HuddleSignalingHandler.java 注释，当前内存路由在多副本下会导致同房间用户互相看不见
 spec:
   replicas: 3
   selector:

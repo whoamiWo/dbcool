@@ -24,6 +24,11 @@ metadata:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
+    # P0-4 临时方案：会话粘滞保持 WebSocket 连接到同一副本
+    # TODO: 迁移到 Redis pub/sub 跨实例广播信令（见 HuddleSignalingHandler 注释）
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "BACKEND_JAVA_STICKY"
+    nginx.ingress.kubernetes.io/session-cookie-exchange: "true"
     # TLS：若集群已装 cert-manager，取消下一行注释并替换 issuer
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
