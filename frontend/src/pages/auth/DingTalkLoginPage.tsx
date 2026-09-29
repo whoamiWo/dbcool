@@ -23,16 +23,15 @@ export function DingTalkLoginPage({ onError }: DingTalkLoginPageProps) {
     setLoading(true);
     setError(null);
     try {
-      // 调用后端钉钉授权 URL
+      // 调用后端钉钉授权 URL（GET，与 DingTalkPage 一致）
       const response = await fetch('/api/dingtalk/auth-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'GET',
       });
       const data = await response.json();
 
-      if (data.code === 0 && data.data?.authUrl) {
+      if (data.code === 0 && data.data?.url) {
         // 重定向到钉钉授权页面
-        window.location.href = data.data.authUrl;
+        window.location.href = data.data.url;
       } else {
         throw new Error(data.message || '获取钉钉授权链接失败');
       }

@@ -48,7 +48,7 @@ export interface DingTalkApprovalCallbackResponse {
 export const dingtalkApi = {
   /** 获取钉钉授权 URL */
   getAuthUrl: (): Promise<DingTalkAuthUrlResponse> =>
-    client.post('/api/dingtalk/auth-url'),
+    client.get('/api/dingtalk/auth-url'),
 
   /** 钉钉登录回调 */
   login: (code: string): Promise<DingTalkLoginResponse> =>
@@ -153,7 +153,7 @@ export interface WeComSyncContactsResponse {
 export const wecomApi = {
   /** 获取企业微信授权 URL */
   getAuthUrl: (): Promise<WeComAuthUrlResponse> =>
-    client.post('/api/wecom/auth-url'),
+    client.get('/api/wecom/auth-url'),
 
   /** 企业微信登录回调 */
   login: (code: string): Promise<WeComLoginResponse> =>

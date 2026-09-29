@@ -14,6 +14,7 @@ import {
   ListItemIcon,
   ListItemText,
   Chip,
+  Alert,
 } from '@mui/material';
 import {
   FormatBold,
@@ -217,6 +218,7 @@ export function NotionStyleEditor({
   const [slashAnchor, setSlashAnchor] = useState<{ blockId: string; top: number; left: number } | null>(null);
   const [slashFilter, setSlashFilter] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [backlinks, setBacklinks] = useState<Array<{ id: string; sourcePageId: string; sourceTitle?: string; sourceSlug?: string; targetPageId?: string; targetSlug?: string; createdAt: string }>>([]);
   const [backlinksLoading, setBacklinksLoading] = useState(false);
   const [templates, setTemplates] = useState<Array<{ id: string; title: string; kbId?: string }>>([]);
@@ -258,17 +260,17 @@ export function NotionStyleEditor({
   //  Block API 自动保存（防抖）
   // ============================================================
   const saveBlocksToBackend = useCallback(async () => {
-    if (!kbId || blocks.length === 0) return;
+    if (!blocks.length || !_page?.id) return;
     setSaving(true);
+    setSaveError(null);
     try {
       // 调用后端 POST /api/wiki/blocks/batch-upsert
       const res = await fetch(`/api/wiki/blocks/batch-upsert`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          kbId,
+          pageId: _page?.id,
           blocks: blocks.map(b => ({
-            pageId: _page?.id,
             type: b.type,
             content: b.content,
             language: b.language,
@@ -276,14 +278,15 @@ export function NotionStyleEditor({
           })),
         }),
       });
-      if (!res.ok) throw new Error('保存失败');
-      console.log('Block 已保存到后端');
+      if (!res.ok) throw new Error(`保存失败 (${res.status})`);
+      setSaveError(null);
     } catch (err) {
-      console.error('保存失败:', err);
+      const msg = err instanceof Error ? err.message : '保存失败';
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
-  }, [kbId, blocks, _page?.id]);
+  }, [blocks, _page?.id]);
 
   // 防抖保存
   useEffect(() => {
@@ -304,7 +307,9 @@ export function NotionStyleEditor({
       const res = await fetch(`/api/wiki/pages/${_page.id}/backlinks`);
       if (!res.ok) throw new Error('加载反向链接失败');
       const data = await res.json();
-      setBacklinks(data || []);
+      // 信封格式 {code:0, data:[...]}，需 unwrap
+      const backlinks = data?.data || [];
+      setBacklinks(backlinks);
     } catch (err) {
       console.error('加载反向链接失败:', err);
     } finally {
@@ -314,18 +319,20 @@ export function NotionStyleEditor({
 
   // 加载模板列表
   const loadTemplates = useCallback(async () => {
+    if (!kbId) return;
     try {
       setTemplatesLoading(true);
-      const res = await fetch('/api/wiki/templates');
-      if (!res.ok) throw new Error('加载模板失败');
+      const res = await fetch(`/api/wiki/kb/${kbId}/templates`);
+      if (!res.ok) throw new Error(`加载模板失败 (${res.status})`);
       const data = await res.json();
-      setTemplates(data || []);
+      // 信封格式 {code:0, data:[...]}，需 unwrap
+      setTemplates(data?.data || []);
     } catch (err) {
       console.error('加载模板失败:', err);
     } finally {
       setTemplatesLoading(false);
     }
-  }, []);
+  }, [kbId]);
 
   // 应用模板（从模板创建新页面）
   const applyTemplate = useCallback(async (templateId: string) => {
@@ -726,6 +733,11 @@ export function NotionStyleEditor({
         <Chip label={`${blocks.length} 个块`} size="small" variant="outlined" />
         {saving && (
           <Chip label="保存中..." size="small" color="info" variant="filled" />
+        )}
+        {saveError && (
+          <Alert severity="error" sx={{ ml: 1 }} onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
         )}
       </Box>
 
