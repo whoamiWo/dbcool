@@ -106,6 +106,9 @@ services:
     container_name: nocobase-backend-java
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # PHASE 57: Java → Python 内部调用令牌，必须与 backend-python 的
+      # INTERNAL_SERVICE_TOKEN 一致（用于 /api/ai/embedding 等服务间端点）
+      AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
@@ -138,10 +141,20 @@ services:
     build:
       context: ./backend-python
       dockerfile: Dockerfile
+      args:
+        # PHASE 57 真语义向量：true = 构建时安装 sentence-transformers(torch)，
+        # /api/ai/embedding 使用真语义向量；false(默认) = 回退确定性哈希向量。
+        # 启用方式二选一：
+        #   1) docker compose build --build-arg INSTALL_SEMANTIC=true backend-python
+        #   2) .env 中设置 INSTALL_SEMANTIC=true 后 docker compose build
+        INSTALL_SEMANTIC: ${INSTALL_SEMANTIC:-false}
     container_name: nocobase-backend-python
     environment:
       JAVA_BACKEND_URL: http://backend-java:8080
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_at_least_32_characters_long_for_hs256}
+      # PHASE 57: 服务间调用令牌，必须与 backend-java 的 AI_INTERNAL_TOKEN 一致
+      # Java 携带它调用 /api/ai/embedding；未设置时该端点仅接受用户 JWT
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     ports:
       - "${PYTHON_PORT:-8000}:8000"
     depends_on:

@@ -87,6 +87,37 @@ async def get_optional_user(
     )
 
 
+async def get_service_or_user(
+    authorization: Annotated[str | None, Header()] = None,
+) -> AuthUser:
+    """服务间调用 或 用户 JWT 认证(二者取其一)。
+
+    用于 Java → Python 的内部端点(如 `/api/ai/embedding`):
+
+    1. 若配置了 `internal_service_token` 且请求携带的 token 与其一致,
+       视为可信的服务间调用(不消耗用户配额);
+    2. 否则按普通用户 JWT 校验,未携带或无效 → 401。
+
+    这样既恢复了对外的认证保护,又允许 Java 侧以服务身份调用。
+    """
+    settings = get_settings()
+    token = (
+        authorization[7:]
+        if (authorization is not None and authorization.startswith("Bearer "))
+        else None
+    )
+
+    if (
+        token is not None
+        and settings.internal_service_token
+        and token == settings.internal_service_token
+    ):
+        return AuthUser(user_id="internal-service", username="internal", tenant_id="")
+
+    # 回退:按用户 JWT 校验(无效会抛 401)
+    return await get_current_user(authorization)
+
+
 async def get_current_admin_user(
     authorization: Annotated[str | None, Header()] = None,
 ) -> AuthUser:

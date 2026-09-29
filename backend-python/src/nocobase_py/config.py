@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_model: str = "gpt-4o"
 
+    # PHASE 57: 服务间调用令牌(Java → Python 内部端点,如 /api/ai/embedding)。
+    # 必须与 Java 侧 ai.internal-token 配置一致;未配置时内部端点仅接受用户 JWT。
+    internal_service_token: str = ""
+
     # Slack 连接器配置
     slack_signing_secret: str = ""
     slack_bot_token: str = ""

@@ -31,6 +31,16 @@ public class WikiEmbeddingService {
     private final JdbcTemplate jdbcTemplate;
     private final WikiSearchService wikiSearchService;
 
+    /**
+     * PHASE 57: 服务间调用令牌(与 Python 侧 internal_service_token 一致)。
+     *
+     * <p>Java → Python `/api/ai/embedding` 属内部调用,需携带此令牌;
+     * 未配置则请求不带 Authorization,Python 侧会按用户 JWT 校验并拒绝(401),
+     * 此时向量降级为零、混合检索退化为纯 FTS(不阻断业务)。
+     */
+    @org.springframework.beans.factory.annotation.Value("${ai.internal-token:}")
+    private String internalToken;
+
     @Autowired
     public WikiEmbeddingService(WebClient.Builder builder, JdbcTemplate jdbcTemplate, WikiSearchService wikiSearchService) {
         this.aiWebClient = builder
@@ -50,8 +60,14 @@ public class WikiEmbeddingService {
      */
     public float[] generateEmbedding(String text, String tenantId) {
         try {
-            EmbeddingResponse response = aiWebClient.post()
-                    .uri("/api/ai/embedding")
+            var request = aiWebClient.post()
+                    .uri("/api/ai/embedding");
+            // 携带服务间令牌（Python 侧 internal_service_token 校验）
+            if (internalToken != null && !internalToken.isBlank()) {
+                request = request.header(
+                        org.springframework.http.HttpHeaders.AUTHORIZATION, "Bearer " + internalToken);
+            }
+            EmbeddingResponse response = request
                     .bodyValue(Map.of(
                             "text", text,
                             "tenant_id", tenantId,

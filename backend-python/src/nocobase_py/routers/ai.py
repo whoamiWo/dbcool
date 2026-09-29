@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from nocobase_py.config import get_settings
 from nocobase_py.middleware.rate_limit import SlidingWindowRateLimiter
-from nocobase_py.security import AuthUser, get_current_user
+from nocobase_py.security import AuthUser, get_current_user, get_service_or_user
 from nocobase_py.services.llm_cache import LLMCache
 from nocobase_py.services.quota import QuotaService
 
@@ -91,6 +91,82 @@ class EmbeddingResponse(BaseModel):
     model: str
     embedding: list[float]
     tokens: int
+
+
+# ============================================================
+#  PHASE 57: 可插拔向量嵌入
+#  - 优先使用 sentence-transformers 真语义模型；
+#  - 未安装/加载失败 → 回退确定性哈希向量（保证接口始终可用）
+# ============================================================
+
+_MODEL: "SentenceTransformer | None" = None
+_MODEL_LOAD_FAILED = False
+
+
+def _load_sentence_model() -> "SentenceTransformer | None":
+    """尝试加载 sentence-transformers 语义模型；不可用返回 None（回退哈希）。"""
+    global _MODEL, _MODEL_LOAD_FAILED
+    if _MODEL_LOAD_FAILED:
+        return None
+    if _MODEL is not None:
+        return _MODEL
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        import numpy as np
+
+        _MODEL = SentenceTransformer(
+            "paraphrase-multilingual-MiniLM-L12-v2",
+            device="cuda" if _has_gpu() else "cpu",
+        )
+        return _MODEL
+    except Exception as e:  # noqa: BLE001
+        _MODEL_LOAD_FAILED = True
+        print(f"[Embedding] 语义模型不可用，回退哈希向量: {e}")
+        return None
+
+
+def _has_gpu() -> bool:
+    """检测是否有可用的 GPU。"""
+    try:
+        import torch
+
+        return torch.cuda.is_available()
+    except ImportError:
+        return False
+
+
+def _generate_hash_embedding(text: str, dimensions: int = 768) -> list[float]:
+    """Generate deterministic non-zero embedding using SHA-256 hashing."""
+    import hashlib
+
+    hash_hex = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    embedding: list[float] = []
+    for i in range(dimensions):
+        byte_pos = (i % (len(hash_hex) // 2)) * 2
+        byte_val = int(hash_hex[byte_pos:byte_pos + 2], 16)
+        float_val = (byte_val / 127.5) - 1.0
+        embedding.append(float_val)
+    return embedding
+
+
+def _generate_embedding(text: str, dimensions: int = 768) -> list[float]:
+    """生成向量：优先真语义模型，不可用回退哈希（保证非零）。"""
+    import numpy as np
+
+    model = _load_sentence_model()
+    if model is not None:
+        try:
+            vec = model.encode([text], normalize_embeddings=True)[0]
+            vec = np.asarray(vec, dtype=float).tolist()
+            if len(vec) < dimensions:
+                vec = vec + [0.0] * (dimensions - len(vec))
+            elif len(vec) > dimensions:
+                vec = vec[:dimensions]
+            return [float(x) for x in vec]
+        except Exception as e:  # noqa: BLE001
+            print(f"[Embedding] 模型推理失败，回退哈希向量: {e}")
+    return _generate_hash_embedding(text, dimensions)
 
 
 class RAGSearchRequest(BaseModel):
@@ -418,7 +494,7 @@ async def ws_stats(user: AuthUser = Depends(get_current_user)) -> dict:
 # ── PHASE 57: 向量嵌入 & RAG 搜索 ────────────────────────────────────
 
 
-_MODEL_CACHE = None
+_MODEL = None
 _MODEL_LOAD_FAILED = False
 
 
@@ -428,16 +504,16 @@ def _load_sentence_model():
     设计为"可插拔"：镜像若已安装 sentence-transformers（torch），自动使用真语义向量；
     未安装或加载失败则回退确定性哈希，保证 /api/ai/embedding 始终可用（不阻断业务）。
     """
-    global _MODEL_CACHE, _MODEL_LOAD_FAILED
+    global _MODEL, _MODEL_LOAD_FAILED
     if _MODEL_LOAD_FAILED:
         return None
-    if _MODEL_CACHE is not None:
-        return _MODEL_CACHE
+    if _MODEL is not None:
+        return _MODEL
     try:
         from sentence_transformers import SentenceTransformer
 
-        _MODEL_CACHE = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
-        return _MODEL_CACHE
+        _MODEL = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+        return _MODEL
     except Exception as e:  # noqa: BLE001
         _MODEL_LOAD_FAILED = True
         print(f"[Embedding] 语义模型不可用，回退哈希向量: {e}")
@@ -500,17 +576,19 @@ def _generate_hash_embedding(text: str, dimensions: int = 768) -> list[float]:
 @router.post("/embedding", response_model=EmbeddingResponse)
 async def embedding(
     req: EmbeddingRequest,
-    user: AuthUser = Depends(get_current_user),
+    user: AuthUser = Depends(get_service_or_user),
 ) -> EmbeddingResponse:
     """生成文本的向量嵌入 (768 维).
 
+    - 认证: 服务间 token(`internal_service_token`) 或 用户 JWT,二者必备其一
+      (此前为调试临时跳过认证,已恢复 —— 无凭据调用将返回 401)
     - 优先使用 sentence-transformers 生成真实语义向量（若镜像已安装）
     - 未安装/推理失败时回退确定性哈希向量（保证接口始终可用）
     """
     embedding = _generate_embedding(req.text, 768)
 
     model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" \
-        if _MODEL_CACHE is not None else "hash-sha256-deterministic"
+        if _MODEL is not None else "hash-sha256-deterministic"
 
     return EmbeddingResponse(
         model=model_name,
