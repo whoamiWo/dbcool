@@ -48,10 +48,23 @@ public class WikiEmbeddingService {
     @Autowired
     private WikiPageRepository wikiPageRepository;
 
+    /**
+     * 构造器参数注入 AI 服务地址(而非硬编码)。
+     *
+     * <p>此前硬编码 {@code http://localhost:8000}:本机直接跑 Spring Boot 时可以连通
+     * (Python 映射在宿主机 8000),但**容器部署下 localhost 指向 Java 容器自身**,
+     * 永远连不到 Python → embedding 请求失败 → 降级零向量 → 跳过 pgvector,
+     * 混合检索静默退化为纯 FTS(实测容器内 hybrid total=0,本机 total=1)。
+     * 现由 {@code ai.service-url} 配置,容器环境注入 http://backend-python:8000。
+     */
     @Autowired
-    public WikiEmbeddingService(WebClient.Builder builder, JdbcTemplate jdbcTemplate, WikiSearchService wikiSearchService) {
+    public WikiEmbeddingService(WebClient.Builder builder,
+                                JdbcTemplate jdbcTemplate,
+                                WikiSearchService wikiSearchService,
+                                @org.springframework.beans.factory.annotation.Value("${ai.service-url:http://localhost:8000}")
+                                String aiServiceUrl) {
         this.aiWebClient = builder
-                .baseUrl("http://localhost:8000")
+                .baseUrl(aiServiceUrl)
                 .defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
                 .build();
         this.jdbcTemplate = jdbcTemplate;

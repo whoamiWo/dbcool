@@ -32,8 +32,10 @@ USER nocobase
 EXPOSE 8080
 
 # 健康检查
+# 注意: 探 /api/health(应用实际暴露的端点)而非 /actuator/health ——
+# actuator 未暴露 health 端点,用它会让容器永远标记 unhealthy。
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/actuator/health || exit 1
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
 ENTRYPOINT ["java", \
     "-XX:+UseContainerSupport", \

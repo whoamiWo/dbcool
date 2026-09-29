@@ -1,0 +1,30 @@
+# ============================================================
+#  NocoBase Java 后端 — 离线（零网络）重建镜像
+# ============================================================
+#
+# 背景：主 Dockerfile 需要拉取 eclipse-temurin:21-{jdk,jre}-alpine，
+#       该镜像在国内网络下极慢（实测 597s 仅下载 8.39MB / 53.26MB，
+#       配置的 4 个 registry-mirrors 对它均未命中缓存），导致 `docker compose build`
+#       长时间卡死后被取消。
+#
+# 方案：本机已用 JDK 21 完成 `mvn package`（产物在本地，依赖已在 ~/.m2），
+#       直接以**本地已存在的** nocobase-backend-java 镜像作为 base（已含
+#       JRE 21 + curl + nocobase 用户），仅覆盖新的 app.jar。
+#       → 构建全程不访问网络，秒级完成。
+#
+# 用法（在 backend-java/ 目录下）：
+#     mvn -o package -DskipTests
+#     docker build -f Dockerfile.offline -t nocobase-backend-java:latest .
+#     docker compose up -d --no-build backend-java
+#
+# 注意：这是应急/离线构建路径；网络通畅时仍应使用主 Dockerfile
+#       （从源码多阶段构建，产物可复现、不依赖本机环境）。
+
+FROM nocobase-backend-java:latest
+
+# 覆盖为新构建的 jar（主机 target/ 下由 mvn package 产出）
+COPY target/*.jar /app/app.jar
+
+# 覆盖 base 镜像继承的健康检查: /actuator/health 未暴露, 会让容器永远 unhealthy
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/api/health || exit 1

@@ -109,6 +109,9 @@ services:
       # PHASE 57: Java → Python 内部调用令牌，必须与 backend-python 的
       # INTERNAL_SERVICE_TOKEN 一致（用于 /api/ai/embedding 等服务间端点）
       AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      # PHASE 57: 容器内必须用服务名访问 Python（localhost 指向容器自身，连不通）。
+      # 本机直跑 Spring Boot 时用默认 http://localhost:8000 即可。
+      AI_SERVICE_URL: http://backend-python:8000
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
@@ -155,6 +158,12 @@ services:
       # PHASE 57: 服务间调用令牌，必须与 backend-java 的 AI_INTERNAL_TOKEN 一致
       # Java 携带它调用 /api/ai/embedding；未设置时该端点仅接受用户 JWT
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      # PHASE 57: 模型已在构建期(INSTALL_SEMANTIC=true)下载到 /app/.cache/huggingface。
+      # 运行时容器外网不可达，若不禁用联网，SentenceTransformer 每次启动都会尝试
+      # 补全 video_preprocessor_config.json 等可选配置 → 5 次重试 × 多文件 → 启动卡死。
+      # 离线模式下直接用本地缓存，缺的可选配置走默认值，启动秒起。
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     ports:
       - "${PYTHON_PORT:-8000}:8000"
     depends_on:
