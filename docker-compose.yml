@@ -164,6 +164,16 @@ services:
       # 离线模式下直接用本地缓存，缺的可选配置走默认值，启动秒起。
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
+      # PHASE 58 P0-1: 备份服务(pg_dump / redis-cli)需要连到真实 Postgres 与 Redis。
+      # 关键: 容器内 localhost 指向容器自身, 必须用 compose 服务名, 否则备份必然
+      # Connection refused(与 AI_SERVICE_URL 硬编码 localhost 是同款问题)。
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "${PYTHON_PORT:-8000}:8000"
     depends_on:

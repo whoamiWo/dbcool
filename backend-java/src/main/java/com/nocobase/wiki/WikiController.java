@@ -459,6 +459,29 @@ public class WikiController {
                 "data", blocks.stream().map(this::toBlockDto).toList());
     }
 
+    @PostMapping("/blocks/batch-upsert")
+    public Map<String, Object> batchUpsertBlocks(
+            @RequestBody BatchUpsertRequest req,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        List<WikiBlockEntity> blocks = blockService.batchUpsertBlocks(
+                req.pageId(),
+                req.blocks().stream()
+                        .map(b -> {
+                            Map<String, Object> m = new HashMap<String, Object>();
+                            m.put("type", b.type());
+                            m.put("content", b.content());
+                            if (b.language() != null) m.put("language", b.language());
+                            if (b.checked() != null) m.put("checked", b.checked());
+                            return m;
+                        }).toList(),
+                user.tenantId(), user.userId());
+        return Map.of("code", 0, "message", "saved",
+                "data", blocks.stream().map(this::toBlockDto).toList());
+    }
+
     private Map<String, Object> toBlockDto(WikiBlockEntity block) {
         Map<String, Object> dto = new HashMap<>();
         dto.put("id", block.getId().toString());
@@ -902,6 +925,9 @@ public class WikiController {
     // ============================================================
     //  DTO 转换
     // ============================================================
+
+    public record BatchUpsertRequest(UUID pageId, List<BlockData> blocks) {}
+    public record BlockData(String type, Object content, String language, Boolean checked) {}
 
     private Map<String, Object> toKbDto(KnowledgeBaseEntity e) {
         Map<String, Object> m = new java.util.HashMap<>();

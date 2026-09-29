@@ -1,5 +1,7 @@
 package com.nocobase.wiki;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,11 +23,40 @@ public class WikiBlockService {
 
     private final WikiBlockRepository blockRepository;
     private final WikiPageRepository pageRepository;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     public WikiBlockService(WikiBlockRepository blockRepository, WikiPageRepository pageRepository) {
         this.blockRepository = blockRepository;
         this.pageRepository = pageRepository;
+    }
+
+    /** R4: 安全地将 content 转换为合法的 JSON 字符串。 */
+    private String toJsonString(Object content) {
+        if (content == null) {
+            return "{}";
+        }
+        // 如果是 String，直接包裹成 {"text": "..."}
+        if (content instanceof String str) {
+            try {
+                // 先尝试解析：如果已经是合法 JSON，直接返回
+                Object parsed = objectMapper.readValue(str, Object.class);
+                return objectMapper.writeValueAsString(parsed);
+            } catch (JsonProcessingException e) {
+                // 不是合法 JSON，包装成 {"text": "..."}
+                try {
+                    return objectMapper.writeValueAsString(Map.of("text", str));
+                } catch (JsonProcessingException ex) {
+                    return "{\"error\": \"serialization failed\"}";
+                }
+            }
+        }
+        // Map/List 等其他类型，直接序列化为 JSON
+        try {
+            return objectMapper.writeValueAsString(content);
+        } catch (JsonProcessingException e) {
+            return "{}";
+        }
     }
 
     /**
@@ -50,7 +81,7 @@ public class WikiBlockService {
             entity.setPageId(pageId);
             entity.setParentId(null);
             entity.setType((String) b.getOrDefault("type", "paragraph"));
-            entity.setContentJson(b.getOrDefault("content", new java.util.HashMap<>()).toString());
+            entity.setContentJson(toJsonString(b.get("content")));
             entity.setSortOrder(sortOrder++);
             entity.setTenantId(tenantId);
             entity.setCreatedBy(createdBy);
@@ -123,6 +154,48 @@ public class WikiBlockService {
             block.setSortOrder(sortOrder++);
             block.setUpdatedAt(Instant.now());
             result.add(blockRepository.save(block));
+        }
+        return result;
+    }
+
+    /**
+     * PHASE 58 P0-3：批量 upsert Block（块编辑器自动保存专用）。
+     *
+     * 策略：delete-then-insert（与 createBlocksForPage 一致），单事务。
+     * 页面不存在 → 404；租户不匹配 → 403；blocks 为空 → 400。
+     */
+    @Transactional
+    public List<WikiBlockEntity> batchUpsertBlocks(UUID pageId, List<Map<String, Object>> blocks,
+                                                    String tenantId, UUID createdBy) {
+        if (pageId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pageId 不能为空");
+        }
+        if (blocks == null || blocks.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "blocks 不能为空");
+        }
+        WikiPageEntity page = pageRepository.findById(pageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "页面不存在"));
+        if (!page.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权操作");
+        }
+        // 单事务内先删除旧 Block，再批量写入新 Block（顺序即列表顺序）
+        blockRepository.deleteByPageId(pageId);
+        List<WikiBlockEntity> result = new ArrayList<>();
+        int sortOrder = 0;
+        for (Map<String, Object> b : blocks) {
+            WikiBlockEntity entity = new WikiBlockEntity();
+            entity.setId(UUID.randomUUID());
+            entity.setPageId(pageId);
+            entity.setParentId(null);
+            entity.setType((String) b.getOrDefault("type", "paragraph"));
+            Object content = b.get("content");
+            entity.setContentJson(toJsonString(content));
+            entity.setSortOrder(sortOrder++);
+            entity.setTenantId(tenantId);
+            entity.setCreatedBy(createdBy);
+            entity.setCreatedAt(Instant.now());
+            entity.setUpdatedAt(Instant.now());
+            result.add(blockRepository.save(entity));
         }
         return result;
     }
