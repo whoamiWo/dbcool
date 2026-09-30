@@ -22,17 +22,20 @@ class AuthUser(BaseModel):
 
 
 def _decode_token(token: str) -> dict | None:
-    """解码 JWT,失败返回 None."""
+    """解码 JWT，失败返回 None."""
     settings = get_settings()
     try:
         payload = jwt.decode(
             token,
             settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm],
+            algorithms=settings.jwt_algorithms,
         )
         # 必须为 access token
         if payload.get("typ") != "access":
             return None
+        return payload
+    except JWTError:
+        return None
         return payload
     except JWTError:
         return None

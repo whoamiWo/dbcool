@@ -33,7 +33,8 @@ class Settings(BaseSettings):
         default="dev_jwt_secret_at_least_32_characters_long_for_hs256",
         min_length=32,
     )
-    jwt_algorithm: str = "HS256"
+    jwt_algorithm: str = "HS256"  # 保留兼容既有引用
+    jwt_algorithms: list[str] = ["HS256", "HS384", "HS512"]  # 支持 Java jjwt 自动选择的算法
 
     # CORS
     cors_origins: list[str] = [
