@@ -31,19 +31,19 @@ class MattermostConnector(BaseConnector):
         self.base_url = f"{self.server_url}/api/v4" if self.server_url else ""
 
     def verify_webhook_token(self, token: str) -> bool:
-        """outgoing webhook token 校验（P0-2a）。
-
-        Mattermost outgoing webhook 在每个请求里都带 token 字段，必须严格比对
-        （hmac.compare_digest 防时序攻击）。
-        配置来源：settings.mattermost_webhook_token（统一从环境变量 MATTERMOST_WEBHOOK_TOKEN 注入）。
-        """
+        """outgoing webhook token 校验（P0-2a）。"""
         expected = ""
         try:
             from nocobase_py.config import get_settings
             s = get_settings()
             expected = getattr(s, "mattermost_webhook_token", "") or ""
+            # 测试覆盖：若配置中提供 webhook_token，优先使用
+            if hasattr(self, "webhook_token") and self.webhook_token:
+                expected = self.webhook_token
         except Exception:
-            expected = ""
+            pass
+        if hasattr(self, "config") and hasattr(self.config, "webhook_token") and self.config.webhook_token:
+            expected = self.config.webhook_token
         if not expected or not token:
             return False
         import hmac

@@ -69,7 +69,7 @@ def test_feishu_signature_invalid():
     assert c.verify_signature_hex("deadbeef" * 8, "1700000000", "abc", b"{}") is False
     # 时间戳不匹配
     body = b"{}"
-    sig = hmac.new(c.app_secret.encode(), "wrong_ts" + "abc" + "{}", hashlib.sha256).hexdigest()
+    sig = hmac.new(c.app_secret.encode(), ("wrong_ts" + "abc" + "{}").encode(), hashlib.sha256).hexdigest()
     assert c.verify_signature_hex(sig, "1700000000", "abc", body) is False
 
 

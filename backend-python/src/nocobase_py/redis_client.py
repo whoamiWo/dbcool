@@ -54,7 +54,10 @@ class _MemoryRedis:
 
     async def zremrangebyscore(self, name: str, min_score: float, max_score: float) -> int:
         s = self._sets.get(name, {})
-        removed = [k for k, v in s.items() if min_score <= v <= max_score]
+        # Handle special Redis sentinel values "-inf" and "+inf"
+        min_val = float("-inf") if min_score == "-inf" else float(min_score)
+        max_val = float("+inf") if max_score == "+inf" else float(max_score)
+        removed = [k for k, v in s.items() if min_val <= v <= max_val]
         for k in removed:
             del s[k]
         return len(removed)
