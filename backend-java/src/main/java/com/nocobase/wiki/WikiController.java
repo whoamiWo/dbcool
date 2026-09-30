@@ -9,6 +9,8 @@ import com.nocobase.auth.AclEnforcer;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.event.RecordChangeEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/wiki")
 public class WikiController {
+
+    private static final Logger log = LoggerFactory.getLogger(WikiController.class);
 
     private final KnowledgeBaseService knowledgeBaseService;
     private final WikiPageService pageService;
@@ -774,6 +778,7 @@ public class WikiController {
         
         // AI 不可用（未启用/调用失败）时回退到检索结果拼接，保证功能不劣化且诚实标注
         if (isUnavailable(answer)) {
+            log.warn("[Wiki/ask] AI 服务不可用，回退到知识库检索结果");
             StringBuilder fallback = new StringBuilder();
             if (searchResults == null || searchResults.isEmpty()) {
                 fallback.append("未找到相关答案。");

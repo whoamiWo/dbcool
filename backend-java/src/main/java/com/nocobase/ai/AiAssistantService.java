@@ -86,6 +86,7 @@ public class AiAssistantService {
     private Map<String, Object> callLlm(String prompt, String bearerToken,
                                          Function<String, Map<String, Object>> mapper) {
         if (!enabled) {
+            log.warn("[AI] ai.enabled=false, AI 助手未启用。需配置 ai.enabled=true 与 ai.python-url;当前 pythonUrl={}", pythonUrl);
             return Map.of("code", 0, "message", "AI 未启用", "data", mapper.apply(UNAVAILABLE));
         }
         try {
@@ -207,5 +208,11 @@ public class AiAssistantService {
                     "data", Map.of("remaining", 0, "daily", 0, "monthly", 0)
             );
         }
+    }
+
+    /** Test wrapper for unit testing the fallback path. */
+    Map<String, Object> callLlmForTest(String prompt, String bearerToken,
+                                       Function<String, Map<String, Object>> mapper) {
+        return callLlm(prompt, bearerToken, mapper);
     }
 }
