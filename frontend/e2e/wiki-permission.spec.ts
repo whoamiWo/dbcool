@@ -53,6 +53,6 @@ test.describe('Wiki Permission E2E', () => {
     await page.click('button:has-text("登录")');
 
     await page.goto('/wiki/kb');
-    await expect(page.getByRole('heading', { name: '知识库' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '📚 知识库' })).toBeVisible();
   });
 });

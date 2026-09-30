@@ -16,6 +16,7 @@ import {
   History as HistoryIcon,
   Home as HomeIcon,
 } from '@mui/icons-material';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -25,6 +26,7 @@ import '@/theme/glass.css';
 
 export function WikiPageReadPage() {
   const { slug } = useParams<{ slug: string }>();
+  const isMobile = useIsMobile();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['wiki-page', slug],
@@ -57,7 +59,10 @@ export function WikiPageReadPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto', px: 2, py: 4 }} className="bg-primary">
+    <Box
+      className="wiki-page-read"
+      sx={{ maxWidth: isMobile ? '100%' : 900, mx: 'auto', px: isMobile ? 1 : 2, py: isMobile ? 2 : 4 }}
+    >
       <Breadcrumbs separator="›" sx={{ mb: 2 }}>
         <MuiLink component={Link} to="/wiki/kb" color="inherit">
           <HomeIcon fontSize="small" />
@@ -68,9 +73,9 @@ export function WikiPageReadPage() {
         <Typography color="textPrimary">{page.title}</Typography>
       </Breadcrumbs>
 
-      <Paper sx={{ p: 4, background: 'var(--glass-bg-medium)', border: '1px solid var(--color-border-light)', borderRadius: 12 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-          <Typography variant="h3" component="h1" sx={{ color: 'var(--color-text-primary)' }}>{page.title}</Typography>
+      <Paper sx={{ p: isMobile ? 2 : 4, background: 'var(--glass-bg-medium)', border: '1px solid var(--color-border-light)', borderRadius: 12 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, flexDirection: isMobile ? 'column' : 'row', gap: 1 }}>
+          <Typography variant={isMobile ? 'h5' : 'h3'} component="h1" sx={{ color: 'var(--color-text-primary)' }}>{page.title}</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Chip
               label={page.status}
@@ -85,30 +90,29 @@ export function WikiPageReadPage() {
 
         <Divider sx={{ mb: 3, borderColor: 'var(--color-border-light)' }} />
 
-        <Box sx={{ mb: 4 }}>
-          <Box
-            sx={{
-              '& h1': { fontSize: '2rem', fontWeight: 'bold', margin: '1rem 0 0.5rem', color: 'var(--color-text-primary)' },
-              '& h2': { fontSize: '1.5rem', fontWeight: 'bold', margin: '0.75rem 0 0.5rem', color: 'var(--color-text-primary)' },
-              '& h3': { fontSize: '1.25rem', fontWeight: 'bold', margin: '0.5rem 0', color: 'var(--color-text-secondary)' },
-              '& p': { margin: '0.5rem 0', lineHeight: 1.8, color: 'var(--color-text-secondary)' },
-              '& ul': { paddingLeft: 2, margin: '0.5rem 0' },
-              '& ol': { paddingLeft: 2, margin: '0.5rem 0' },
-              '& li': { margin: '0.25rem 0', color: 'var(--color-text-secondary)' },
-              '& code': {
-                background: 'var(--glass-bg-medium)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace', color: 'var(--color-primary-200)',
-              },
-              '& pre': {
-                background: 'var(--color-bg-primary)', padding: 1.5, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
-              },
-              '& blockquote': {
-                borderLeft: '4px solid var(--color-primary-500)', paddingLeft: 1, margin: 0.5, color: 'var(--color-text-muted)',
-              },
-              '& table': { borderCollapse: 'collapse', width: '100%', margin: '0.5rem 0' },
-              '& th, &td': { border: '1px solid var(--color-border-light)', padding: 8, textAlign: 'left', color: 'var(--color-text-secondary)' },
-              '& a': { color: 'var(--color-primary-400)' },
-            }}
-          >
+        <Box
+          sx={{
+            '& h1': { fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 'bold', margin: '1rem 0 0.5rem', color: 'var(--color-text-primary)' },
+            '& h2': { fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: 'bold', margin: '0.75rem 0 0.5rem', color: 'var(--color-text-primary)' },
+            '& h3': { fontSize: isMobile ? '1.1rem' : '1.25rem', fontWeight: 'bold', margin: '0.5rem 0', color: 'var(--color-text-secondary)' },
+            '& p': { margin: '0.5rem 0', lineHeight: 1.8, color: 'var(--color-text-secondary)' },
+            '& ul': { paddingLeft: 2, margin: '0.5rem 0' },
+            '& ol': { paddingLeft: 2, margin: '0.5rem 0' },
+            '& li': { margin: '0.25rem 0', color: 'var(--color-text-secondary)' },
+            '& code': {
+              background: 'var(--glass-bg-medium)', padding: '0.2em 0.4em', borderRadius: 3, fontFamily: 'monospace', color: 'var(--color-primary-200)',
+            },
+            '& pre': {
+              background: 'var(--color-bg-primary)', padding: isMobile ? 1 : 1.5, borderRadius: 1, overflowX: 'auto', margin: '0.5rem 0',
+            },
+            '& blockquote': {
+              borderLeft: '4px solid var(--color-primary-500)', paddingLeft: 1, margin: 0.5, color: 'var(--color-text-muted)',
+            },
+            '& table': { borderCollapse: 'collapse', width: '100%', margin: '0.5rem 0' },
+            '& th, &td': { border: '1px solid var(--color-border-light)', padding: 8, textAlign: 'left', color: 'var(--color-text-secondary)' },
+            '& a': { color: 'var(--color-primary-400)' },
+          }}
+        >
             <ReactMarkdown
               components={{
                 code({ node, className, children, ...props }) {
@@ -132,11 +136,10 @@ export function WikiPageReadPage() {
               {page.content}
             </ReactMarkdown>
           </Box>
-        </Box>
 
         <Divider sx={{ mb: 3, borderColor: 'var(--color-border-light)' }} />
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: isMobile ? 'column' : 'row', gap: 1 }}>
           <Typography variant="caption" sx={{ color: 'var(--color-text-muted)' }}>
             创建于 {new Date(page.created_at).toLocaleString('zh-CN')}
             {page.created_by && ` · 作者: ${page.created_by}`}

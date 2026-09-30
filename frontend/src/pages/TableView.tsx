@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { CollectionMeta } from '@/types/collection';
 import type { ViewFull, SortRule, FilterRule } from '@/types/view';
 import { filtersToQuery, sortToQuery, FilterBar } from '@/components/views/FilterBar';
@@ -14,6 +15,7 @@ export function TableViewPage() {
   const { id } = useParams<{ id: string }>();
   const [filters, setFilters] = useState<FilterRule[]>([]);
   const [sort, setSort] = useState<SortRule[]>([]);
+  const isMobile = useIsMobile();
 
   const { data: viewData } = useQuery({
     queryKey: ['view', id],
@@ -166,7 +168,7 @@ export function TableViewPage() {
         <p style={{ color: 'var(--color-text-muted)' }}>加载中…</p>
       ) : (
         <div
-          className="glass-card"
+          className={isMobile ? 'table-view-container glass-card' : 'glass-card'}
           style={{ borderRadius: 8, overflowX: 'auto' }}
         >
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>

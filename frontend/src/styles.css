@@ -405,14 +405,105 @@ button {
   .im-layout {
     margin: 0;
     border-radius: 0;
+    flex-direction: column;
   }
 
   .im-sidebar {
-    width: 64px;
+    width: 100%;
+    border-right: none;
+    border-bottom: var(--glass-border);
     padding: 8px;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+  }
+
+  .im-main {
+    min-width: 0;
+  }
+
+  .im-header {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .im-header input {
+    width: 100px;
   }
 
   .im-thread-panel {
-    width: 240px;
+    width: 100%;
+    border-left: none;
+    border-top: var(--glass-border);
+  }
+
+  .wiki-page-list {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .wiki-page-list .MuiTableContainer-root {
+    overflow-x: auto;
+  }
+
+  .wiki-page-read {
+    padding: 12px;
+  }
+
+  .wiki-page-read h1 {
+    font-size: 1.25rem;
+  }
+
+  .table-view-container {
+    flex-direction: column;
+    padding: 8px;
+  }
+
+  .table-view-container .MuiPaper-root {
+    overflow-x: auto;
+  }
+
+  .table-view-container table {
+    font-size: 12px;
+  }
+
+  .table-view-container th,
+  .table-view-container td {
+    padding: 4px 6px;
+    white-space: nowrap;
+  }
+
+  .kanban-view-container {
+    grid-auto-columns: 260px;
+    padding: 8px;
+  }
+
+  .kanban-view-container h1 {
+    font-size: 1.25rem;
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+
+  .app-header > div:first-child {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+    padding-bottom: 4px;
+  }
+
+  .app-header a {
+    font-size: 12px;
+    padding: 2px 4px;
+  }
+
+  .app-main {
+    padding: 12px;
+    padding-bottom: 72px;
   }
 }

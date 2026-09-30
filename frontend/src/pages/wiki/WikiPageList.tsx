@@ -31,12 +31,14 @@ import {
   Publish as PublishIcon,
   Archive as ArchiveIcon,
 } from '@mui/icons-material';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { wikiApi } from '@/api/wiki';
 import type { WikiPage } from '@/types/wiki';
 
 export function WikiPageListPage() {
   const { id: kbId } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newSlug, setNewSlug] = useState('');
@@ -110,7 +112,7 @@ export function WikiPageListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexDirection: isMobile ? 'column' : 'row', gap: 1 }}>
         <Box>
           {kbLoading ? (
             <CircularProgress size={24} />
@@ -135,6 +137,7 @@ export function WikiPageListPage() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setOpen(true)}
+          fullWidth={isMobile}
         >
           新建文档
         </Button>
@@ -173,6 +176,33 @@ export function WikiPageListPage() {
             <Typography color="textSecondary">暂无文档，点击上方按钮创建</Typography>
           </Box>
         </Paper>
+      ) : isMobile ? (
+        <Box className="wiki-page-list" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {pages.map((page: WikiPage) => (
+            <Paper key={page.id} sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle1" component={Link} to={`/wiki/${page.slug}`} sx={{ textDecoration: 'none', color: 'var(--color-primary-400)' }}>
+                  {page.title}
+                </Typography>
+                <Chip label={page.status} size="small" color={page.status === 'PUBLISHED' ? 'success' : page.status === 'ARCHIVED' ? 'default' : 'warning'} />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2, fontSize: 12, color: 'var(--color-text-muted)', mb: 1 }}>
+                <span>v{page.version}</span>
+                <span>{new Date(page.updated_at).toLocaleString('zh-CN')}</span>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton size="small" onClick={() => window.location.href = `/wiki/${page.slug}/edit`}><EditIcon fontSize="small" /></IconButton>
+                <IconButton size="small" onClick={() => window.location.href = `/wiki/${page.slug}/versions`}><HistoryIcon fontSize="small" /></IconButton>
+                {page.status === 'DRAFT' ? (
+                  <IconButton size="small" color="success" onClick={() => publishMutation.mutate(page.id)}><PublishIcon fontSize="small" /></IconButton>
+                ) : (
+                  <IconButton size="small" color="default" onClick={() => archiveMutation.mutate(page.id)}><ArchiveIcon fontSize="small" /></IconButton>
+                )}
+                <IconButton size="small" color="error" onClick={() => deleteMutation.mutate(page.id)}><DeleteIcon fontSize="small" /></IconButton>
+              </Box>
+            </Paper>
+          ))}
+        </Box>
       ) : (
         <TableContainer component={Paper}>
           <Table>

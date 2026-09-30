@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { KanbanConfig, ViewFull } from '@/types/view';
 
@@ -9,6 +10,7 @@ interface Record { id: string; [k: string]: unknown; }
 /** 看板视图(US-204) — 极简版:按字段分组 */
 export function KanbanViewPage() {
   const { id } = useParams<{ id: string }>();
+  const isMobile = useIsMobile();
   const { data: viewData } = useQuery({
     queryKey: ['view', id],
     queryFn: () => apiClient.get<ViewFull>(`/views/${id}`),
@@ -54,12 +56,15 @@ export function KanbanViewPage() {
       <div
         style={{
           display: 'grid',
-          gridAutoFlow: 'column',
-          gridAutoColumns: '280px',
+          gridAutoFlow: isMobile ? 'row' : 'column',
+          gridAutoColumns: isMobile ? '1fr' : '280px',
           gap: 12,
-          overflowX: 'auto',
+          overflowX: isMobile ? 'visible' : 'auto',
+          overflowY: isMobile ? 'auto' : 'visible',
+          maxHeight: isMobile ? 'calc(100vh - 140px)' : 'none',
           paddingBottom: 12,
         }}
+        className="kanban-view-container"
       >
         {Array.from(groups.entries()).map(([key, items]) => (
           <div

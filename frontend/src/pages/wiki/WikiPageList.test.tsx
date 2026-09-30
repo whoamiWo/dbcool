@@ -14,6 +14,10 @@ vi.mock('@/api/wiki', () => ({
   },
 }));
 
+vi.mock('@/hooks/useIsMobile', () => ({
+  useIsMobile: vi.fn(() => false),
+}));
+
 describe('WikiPageListPage', () => {
   let qc: QueryClient;
 
@@ -65,5 +69,19 @@ describe('WikiPageListPage', () => {
     fireEvent.click(newBtn);
     expect(screen.getByLabelText(/标题/)).toBeInTheDocument();
     expect(screen.getByText(/^Slug$/)).toBeInTheDocument();
+  });
+
+  it('移动端:渲染卡片布局', async () => {
+    const { useIsMobile } = await import('@/hooks/useIsMobile');
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    vi.mocked(wikiApi.getKb).mockResolvedValue({ data: { id: 'kb1', name: 'KB' } } as any);
+    vi.mocked(wikiApi.listPages).mockResolvedValue({ data: [
+      { id: 'p1', title: '页面一', slug: 'page-1', status: 'PUBLISHED', version: 3, updated_at: '2026-01-01T00:00:00Z' },
+    ], total: 1 } as any);
+    renderPage();
+    expect(await screen.findByText('页面一')).toBeInTheDocument();
+    expect(screen.getByText('v3')).toBeInTheDocument();
+    expect(screen.getByText('PUBLISHED')).toBeInTheDocument();
+    vi.mocked(useIsMobile).mockReturnValue(false);
   });
 });

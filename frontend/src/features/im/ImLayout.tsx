@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   getJoinedChannels,
   getChannelMessages,
@@ -34,6 +35,7 @@ export function ImChatPage() {
   const { user } = useAuthStore();
   const { channelId: routeChannelId } = useParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [currentChannel, setCurrentChannel] = useState<ImChannel | null>(null);
   const [threadMessage, setThreadMessage] = useState<ImMessage | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -200,36 +202,37 @@ export function ImChatPage() {
   }, []);
 
   return (
-    <div className="im-layout">
-      <ChannelList
-        channels={channels}
-        selectedChannel={currentChannel}
-        onSelect={handleChannelSelect}
-        onRefresh={refetchChannels}
-        onCreateChannel={() => setShowCreateDialog(true)}
-        currentUser={user}
-        getUnreadCount={getUnreadCount}
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', height: isMobile ? 'auto' : 'calc(100vh - 64px)', minHeight: 0 }}>
+      <div className="im-layout" style={isMobile ? { flexDirection: 'column', height: 'auto', minHeight: 0, margin: 0, borderRadius: 0 } : {}}>
+        <ChannelList
+          channels={channels}
+          selectedChannel={currentChannel}
+          onSelect={handleChannelSelect}
+          onRefresh={refetchChannels}
+          onCreateChannel={() => setShowCreateDialog(true)}
+          currentUser={user}
+          getUnreadCount={getUnreadCount}
+        />
 
-      <div className="im-main">
-        <div className="im-header">
-          <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {currentChannel?.name || t('im.selectChannel')}
-            </h3>
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-              {currentChannel?.topic || ''}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }} className="im-main">
+          <div className="im-header">
+            <div>
+              <h3 style={{ margin: 0, fontSize: isMobile ? 14 : 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                {currentChannel?.name || t('im.selectChannel')}
+              </h3>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                {currentChannel?.topic || ''}
+              </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder={t('im.searchMessages')}
-              aria-label="搜索消息"
-              className="input-glass"
-              style={{ width: 160 }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder={t('im.searchMessages')}
+                aria-label="搜索消息"
+                className="input-glass"
+                style={{ width: isMobile ? 100 : 160 }}
+              />
             {currentChannel && (
               <button
                 className="glass-button"
@@ -379,5 +382,8 @@ export function ImChatPage() {
         </div>
       )}
     </div>
+    </div>
   );
 }
+
+

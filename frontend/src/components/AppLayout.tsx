@@ -1,8 +1,8 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useMediaQuery } from '@mui/material';
 import { useAuthStore } from '@/stores/auth';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { disconnectStomp } from '@/lib/stompClient';
 import { GlobalSearchPanel } from '@/components/GlobalSearchPanel';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +28,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [switching, setSwitching] = useState(false);
-  const isMobile = useMediaQuery('(max-width:768px)');
+  const isMobile = useIsMobile();
   const { i18n, t } = useTranslation();
 
   const handleLogout = () => {
