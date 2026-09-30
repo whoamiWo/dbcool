@@ -142,8 +142,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_at_least_32_characters_long_for_hs256}
       JAVA_PORT: 8080
       NOCOBASE_ALERTS_PATH: /tmp/alerts.db
-      # PHASE62 R2: 钉钉回调端到端测试密钥
-      APP_DINGTALK_APP_SECRET: testAppSecret123
+      # PHASE62 R2: 集成端到端实测配置（勿提交真实密钥，值放 .env）
+      # 注意 Spring Boot relaxed binding：dingtalk.app-secret → DINGTALK_APP_SECRET，
+      # 写成 APP_DINGTALK_APP_SECRET 不会生效（后端读到的仍是空 → 验签必然 401）。
+      DINGTALK_APP_SECRET: ${DINGTALK_APP_SECRET:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      # 入站消息默认落到的频道（InboundMessageService#resolveTargetChannel）
+      INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID: ${INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID:-}
     ports:
       - "${JAVA_PORT:-8080}:8080"
     depends_on:
