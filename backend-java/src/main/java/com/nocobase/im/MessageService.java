@@ -126,7 +126,7 @@ public class MessageService {
      * @param channelId 可选，指定时只搜该频道（仍校验成员身份）
      */
     public List<ImMessageEntity> searchCrossChannel(String tenantId, UUID userId,
-                                                     UUID channelId, String keyword, int limit) {
+                                                      UUID channelId, String keyword, int limit) {
         if (keyword == null || keyword.isBlank()) return List.of();
         int safeLimit = Math.max(1, Math.min(limit, 50));
         // 指定频道时先校验成员身份，非成员直接返回空
@@ -137,11 +137,17 @@ public class MessageService {
                 .map(ImChannelMemberEntity::getChannelId)
                 .toList();
         if (joined.isEmpty()) return List.of();
-        return messageRepository
-                .searchCrossChannel(tenantId, channelId, keyword, PageRequest.of(0, safeLimit))
-                .stream()
+        // 拉取足够数量以抵消成员过滤，避免先截断后过滤导致结果数不准
+        int fetchSize = Math.min(safeLimit * 5, 500);
+        List<ImMessageEntity> candidates = messageRepository
+                .searchCrossChannel(tenantId, channelId, keyword, PageRequest.of(0, fetchSize));
+        List<ImMessageEntity> filtered = candidates.stream()
                 .filter(m -> joined.contains(m.getChannelId()))
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
+        if (filtered.size() > safeLimit) {
+            return filtered.subList(0, safeLimit);
+        }
+        return filtered;
     }
 
     /** 未读主消息数:以成员的 lastReadMessageId 对应时间为游标。 */

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,13 +36,16 @@ public class ImMessageController {
     private final MessageService messageService;
     private final ReactionService reactionService;
     private final PinService pinService;
+    private final MessageSearchService messageSearchService;
     private final ApplicationEventPublisher eventPublisher;
 
     public ImMessageController(MessageService messageService, ReactionService reactionService,
-                               PinService pinService, ApplicationEventPublisher eventPublisher) {
+                               PinService pinService, MessageSearchService messageSearchService,
+                               ApplicationEventPublisher eventPublisher) {
         this.messageService = messageService;
         this.reactionService = reactionService;
         this.pinService = pinService;
+        this.messageSearchService = messageSearchService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -181,11 +185,85 @@ public class ImMessageController {
             @RequestParam(defaultValue = "20") int limit,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        // 归属校验:非频道成员不得搜索该频道消息(防跨租户越权)
         messageService.assertMember(channelId, user.userId());
         List<ImMessageDto> hits = messageService.search(channelId, keyword, limit).stream()
                 .map(ImMessageDto::from).toList();
         return Map.of("code", 0, "message", "success", "data", Map.of("messages", hits));
+    }
+
+    /**
+     * 高级搜索（支持多维度过滤，使用 MessageSearchService）。
+     *
+     * <p>支持：关键词 + 提及我 + 发送者 + 时间范围，带 total 与分页。
+     */
+    @GetMapping("/advanced-search")
+    public Map<String, Object> advancedSearch(
+            @RequestParam(required = false) UUID channelId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) UUID mentionedBy,
+            @RequestParam(required = false) UUID senderId,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        if (channelId != null) {
+            messageService.assertMember(channelId, user.userId());
+        }
+        Instant start = startTime != null ? Instant.parse(startTime) : null;
+        Instant end = endTime != null ? Instant.parse(endTime) : null;
+        Page<ImMessageEntity> result = messageSearchService.searchMessages(
+                channelId, keyword, mentionedBy, senderId, start, end, page, size);
+        List<Map<String, Object>> messages = result.getContent().stream()
+                .map(m -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("id", m.getId().toString());
+                    data.put("channelId", m.getChannelId().toString());
+                    data.put("senderId", m.getSenderId().toString());
+                    data.put("parentId", m.getParentId() != null ? m.getParentId().toString() : null);
+                    data.put("content", m.getContent());
+                    data.put("contentType", m.getContentType());
+                    data.put("createdAt", m.getCreatedAt().toString());
+                    data.put("editedAt", m.getEditedAt() != null ? m.getEditedAt().toString() : null);
+                    data.put("deletedAt", m.getDeletedAt() != null ? m.getDeletedAt().toString() : null);
+                    return data;
+                }).toList();
+        return Map.of("code", 0, "message", "success", "data", Map.of(
+                "messages", messages,
+                "total", result.getTotalElements(),
+                "page", result.getNumber(),
+                "size", result.getSize(),
+                "totalPages", result.getTotalPages()
+        ));
+    }
+
+    /**
+     * 查询用户被提及的消息（跨频道）。
+     */
+    @GetMapping("/mentions")
+    public Map<String, Object> mentions(
+            @RequestParam(required = false) UUID channelId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        Page<ImMessageEntity> result = messageSearchService.searchMentions(
+                user.tenantId(), user.userId(), channelId, page, size);
+        List<Map<String, Object>> messages = result.getContent().stream()
+                .map(m -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("id", m.getId().toString());
+                    data.put("channelId", m.getChannelId().toString());
+                    data.put("senderId", m.getSenderId().toString());
+                    data.put("content", m.getContent());
+                    data.put("createdAt", m.getCreatedAt().toString());
+                    return data;
+                }).toList();
+        return Map.of("code", 0, "message", "success", "data", Map.of(
+                "messages", messages,
+                "total", result.getTotalElements()
+        ));
     }
 
     /**

@@ -32,6 +32,7 @@ class ImMessageControllerTest {
     private MessageService messageService;
     private ReactionService reactionService;
     private PinService pinService;
+    private MessageSearchService messageSearchService;
     private ApplicationEventPublisher eventPublisher;
     private ImMessageController controller;
 
@@ -44,8 +45,9 @@ class ImMessageControllerTest {
         messageService = mock(MessageService.class);
         reactionService = mock(ReactionService.class);
         pinService = mock(PinService.class);
+        messageSearchService = mock(MessageSearchService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        controller = new ImMessageController(messageService, reactionService, pinService, eventPublisher);
+        controller = new ImMessageController(messageService, reactionService, pinService, messageSearchService, eventPublisher);
     }
 
     @Test

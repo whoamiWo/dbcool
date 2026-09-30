@@ -31,19 +31,19 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
     long countByChannelIdAndParentIdIsNullAndCreatedAtAfterAndDeletedAtIsNull(
             UUID channelId, Instant cursor);
 
-    /** 关键字搜索 (大小写不敏感)。 */
+    /** 关键字搜索 (大小写不敏感，ILIKE)。 */
     @Query("select m from ImMessageEntity m where m.channelId = :channelId "
             + "and m.deletedAt is null "
-            + "and lower(m.content) like lower(concat('%', :kw, '%')) "
+            + "and m.content ilike concat('%', :kw, '%') "
             + "order by m.createdAt desc")
     List<ImMessageEntity> search(@Param("channelId") UUID channelId,
                                  @Param("kw") String kw,
                                  Pageable pageable);
 
-    /** 跨频道搜索 (频道可空，按租户 + 关键词过滤)。 */
+    /** 跨频道搜索 (频道可空，按租户 + 关键词过滤，ILIKE)。 */
     @Query("select m from ImMessageEntity m where m.tenantId = :tenantId "
             + "and m.deletedAt is null "
-            + "and lower(m.content) like lower(concat('%', :kw, '%')) "
+            + "and m.content ilike concat('%', :kw, '%') "
             + "and (:channelId is null or m.channelId = :channelId) "
             + "order by m.createdAt desc")
     List<ImMessageEntity> searchCrossChannel(@Param("tenantId") String tenantId,
@@ -58,7 +58,7 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
      * 高级搜索（支持多维度过滤）。
      *
      * @param channelId 频道 ID
-     * @param keyword 关键词（LIKE 匹配）
+     * @param keyword 关键词（ILIKE 匹配）
      * @param mentionedBy 提及的用户 ID（可选，匹配 @{displayName}:userId）
      * @param senderId 发送者 ID（可选）
      * @param startTime 开始时间（可选）
@@ -66,7 +66,7 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
      */
     @Query("select m from ImMessageEntity m where m.channelId = :channelId "
             + "and m.deletedAt is null "
-            + "and (:keyword is null or lower(m.content) like lower(concat('%', :keyword, '%'))) "
+            + "and (:keyword is null or m.content ilike concat('%', :keyword, '%')) "
             + "and (:mentionedBy is null or m.content like '%@{%' || :mentionedBy || '}%') "
             + "and (:senderId is null or m.senderId = :senderId) "
             + "and (:startTime is null or m.createdAt >= :startTime) "
@@ -85,7 +85,7 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
      */
     @Query("select count(m) from ImMessageEntity m where m.channelId = :channelId "
             + "and m.deletedAt is null "
-            + "and (:keyword is null or lower(m.content) like lower(concat('%', :keyword, '%'))) "
+            + "and (:keyword is null or m.content ilike concat('%', :keyword, '%')) "
             + "and (:mentionedBy is null or m.content like '%@{%' || :mentionedBy || '}%') "
             + "and (:senderId is null or m.senderId = :senderId) "
             + "and (:startTime is null or m.createdAt >= :startTime) "
@@ -98,11 +98,11 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
                           @Param("endTime") Instant endTime);
 
     /**
-     * 跨频道搜索计数。
+     * 跨频道搜索计数 (ILIKE).
      */
     @Query("select count(m) from ImMessageEntity m where m.tenantId = :tenantId "
             + "and m.deletedAt is null "
-            + "and lower(m.content) like lower(concat('%', :kw, '%')) "
+            + "and m.content ilike concat('%', :kw, '%') "
             + "and (:channelId is null or m.channelId = :channelId)")
     long countCrossChannel(@Param("tenantId") String tenantId,
                            @Param("channelId") UUID channelId,
