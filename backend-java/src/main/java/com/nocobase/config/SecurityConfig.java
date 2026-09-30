@@ -3,6 +3,7 @@ package com.nocobase.config;
 import com.nocobase.apikey.ApiKeyFilter;
 import com.nocobase.auth.JwtAuthFilter;
 import com.nocobase.auth.MdcFilter;
+import com.nocobase.ratelimit.GlobalRateLimitFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -28,10 +29,13 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     /** Week 42 D5.2: API Key 鉴权过滤器，先于 JWT 尝试。 */
     private final ApiKeyFilter apiKeyFilter;
+    /** PHASE 60 R1: 全局限流过滤器，早于认证返回 401。 */
+    private final GlobalRateLimitFilter globalRateLimitFilter;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter, GlobalRateLimitFilter globalRateLimitFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.apiKeyFilter = apiKeyFilter;
+        this.globalRateLimitFilter = globalRateLimitFilter;
     }
 
     @Bean
@@ -92,6 +96,7 @@ public class SecurityConfig {
                             res.getWriter().write("{\"code\":1002,\"message\":\"无权限\",\"data\":{}}");
                         })
                 )
+                .addFilterBefore(globalRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 // Week 42 D5.2: API Key filter 先于 JWT — 外部系统用 X-Api-Key
                 .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
