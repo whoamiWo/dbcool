@@ -162,8 +162,12 @@ spring:
   jpa:
     hibernate:
       # Week 42 D5.2: H2 测试环境无 Flyway → 用 create-drop 自动建表
-      # (生产 dev profile 仍用 validate + Flyway,保持 schema 一致性)
+      # (生产 dev profile 仍用 validate + Flyway，保持 schema 一致性)
       ddl-auto: create-drop
+
+# Phase 60 T3-1: 测试环境关闭限流过滤器 (避免 WebMvcTest 加载失败)
+ratelimit:
+  enabled: false
 
 ---
 # Docker profile — 与 dev 一样但日志更克制
@@ -177,3 +181,16 @@ spring:
 logging:
   level:
     com.nocobase: INFO
+
+# Phase 60 T3-1: 全局 API 限流配置
+ratelimit:
+  enabled: true
+  login:
+    limit: 5
+    window-seconds: 300
+  im:
+    limit: 30
+    window-seconds: 60
+  file-upload:
+    limit: 10
+    window-seconds: 60

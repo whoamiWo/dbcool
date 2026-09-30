@@ -26,7 +26,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
-    /** Week 42 D5.2: API Key 鉴权过滤器,先于 JWT 尝试。 */
+    /** Week 42 D5.2: API Key 鉴权过滤器，先于 JWT 尝试。 */
     private final ApiKeyFilter apiKeyFilter;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter) {
