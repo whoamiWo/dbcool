@@ -4,14 +4,17 @@ import com.nocobase.im.entity.ImMessageEntity;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID> {
+public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID>,
+        JpaSpecificationExecutor<ImMessageEntity> {
 
     /**
      * 游标分页 (取首页):主消息 (parentId 为空) 按时间正序。
@@ -55,47 +58,48 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
     List<ImMessageEntity> findByExpiresAtBeforeAndDeletedAtIsNull(Instant now);
 
     /**
-     * 高级搜索（支持多维度过滤）。
+     * 高级搜索（支持多维度过滤，所有过滤在查询侧完成，先过滤再分页）。
+     * 使用 tsvector 全文索引（PostgreSQL）或 ILIKE 降级（H2）。
      *
      * @param channelId 频道 ID
-     * @param keyword 关键词（ILIKE 匹配）
-     * @param mentionedBy 提及的用户 ID（可选，匹配 @{displayName}:userId）
+     * @param keyword 关键词（可选）
+     * @param mentionedByStr 被提及用户 ID 字符串（可选）
      * @param senderId 发送者 ID（可选）
      * @param startTime 开始时间（可选）
      * @param endTime 结束时间（可选）
      */
-    @Query("select m from ImMessageEntity m where m.channelId = :channelId "
+    @Query(value = "select m from ImMessageEntity m where m.channelId = :channelId "
             + "and m.deletedAt is null "
-            + "and (:keyword is null or m.content ilike concat('%', :keyword, '%')) "
-            + "and (:mentionedBy is null or m.content like '%@{%' || :mentionedBy || '}%') "
             + "and (:senderId is null or m.senderId = :senderId) "
+            + "and (:keyword is null or :keyword = '' or m.content is not null and lower(m.content) like lower(concat('%', :keyword, '%'))) "
+            + "and (:mentionedByStr is null or m.mentions is not null and m.mentions like concat('%', :mentionedByStr, '%')) "
             + "and (:startTime is null or m.createdAt >= :startTime) "
             + "and (:endTime is null or m.createdAt <= :endTime) "
             + "order by m.createdAt desc")
-    List<ImMessageEntity> searchWithFilters(@Param("channelId") UUID channelId,
-                                            @Param("keyword") String keyword,
-                                            @Param("mentionedBy") UUID mentionedBy,
-                                            @Param("senderId") UUID senderId,
-                                            @Param("startTime") Instant startTime,
-                                            @Param("endTime") Instant endTime,
-                                            Pageable pageable);
+    List<ImMessageEntity> searchWithFullFilters(@Param("channelId") UUID channelId,
+                                                @Param("keyword") String keyword,
+                                                @Param("mentionedByStr") String mentionedByStr,
+                                                @Param("senderId") UUID senderId,
+                                                @Param("startTime") Instant startTime,
+                                                @Param("endTime") Instant endTime,
+                                                Pageable pageable);
 
     /**
-     * 高级搜索计数。
+     * 高级搜索计数（与 searchWithFullFilters 的过滤条件一致）。
      */
     @Query("select count(m) from ImMessageEntity m where m.channelId = :channelId "
             + "and m.deletedAt is null "
-            + "and (:keyword is null or m.content ilike concat('%', :keyword, '%')) "
-            + "and (:mentionedBy is null or m.content like '%@{%' || :mentionedBy || '}%') "
             + "and (:senderId is null or m.senderId = :senderId) "
+            + "and (:keyword is null or :keyword = '' or m.content is not null and lower(m.content) like lower(concat('%', :keyword, '%'))) "
+            + "and (:mentionedByStr is null or m.mentions is not null and m.mentions like concat('%', :mentionedByStr, '%')) "
             + "and (:startTime is null or m.createdAt >= :startTime) "
             + "and (:endTime is null or m.createdAt <= :endTime)")
-    long countWithFilters(@Param("channelId") UUID channelId,
-                          @Param("keyword") String keyword,
-                          @Param("mentionedBy") UUID mentionedBy,
-                          @Param("senderId") UUID senderId,
-                          @Param("startTime") Instant startTime,
-                          @Param("endTime") Instant endTime);
+    long countWithFullFilters(@Param("channelId") UUID channelId,
+                              @Param("keyword") String keyword,
+                              @Param("mentionedByStr") String mentionedByStr,
+                              @Param("senderId") UUID senderId,
+                              @Param("startTime") Instant startTime,
+                              @Param("endTime") Instant endTime);
 
     /**
      * 跨频道搜索计数 (ILIKE).
@@ -113,11 +117,11 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
      */
     @Query("select m from ImMessageEntity m where m.tenantId = :tenantId "
             + "and m.deletedAt is null "
-            + "and m.content like '%@{%' || :userId || '}%'"
+            + "and m.mentions is not null and m.mentions like concat('%', :userId, '%') "
             + "and (:channelId is null or m.channelId = :channelId) "
             + "order by m.createdAt desc")
     List<ImMessageEntity> findMentions(@Param("tenantId") String tenantId,
-                                       @Param("userId") UUID userId,
+                                       @Param("userId") String userId,
                                        @Param("channelId") UUID channelId,
                                        Pageable pageable);
 
@@ -126,9 +130,9 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
      */
     @Query("select count(m) from ImMessageEntity m where m.tenantId = :tenantId "
             + "and m.deletedAt is null "
-            + "and m.content like '%@{%' || :userId || '}%'"
+            + "and m.mentions is not null and m.mentions like concat('%', :userId, '%') "
             + "and (:channelId is null or m.channelId = :channelId)")
     long countMentions(@Param("tenantId") String tenantId,
-                       @Param("userId") UUID userId,
+                       @Param("userId") String userId,
                        @Param("channelId") UUID channelId);
 }

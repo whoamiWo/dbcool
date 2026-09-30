@@ -64,6 +64,7 @@ export interface ImMessage {
   burnAfterRead?: boolean;
   /** F4：置顶标记 */
   pinned?: boolean;
+  mentions?: Array<{ displayName: string; userId: string }>;
 }
 
 /** 消息分页响应 */
@@ -182,7 +183,6 @@ export interface EnhancedImMessage extends ImMessage {
   expiresAt?: string;
   burnAfterRead?: boolean;
   pinned?: boolean;
-  mentions?: string[];
 }
 
 /** 置顶相关 API */

@@ -3,6 +3,7 @@ package com.nocobase.notification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -79,5 +80,26 @@ public class NotificationService {
             if (e.trim().equalsIgnoreCase(eventName)) return true;
         }
         return false;
+    }
+
+    /**
+     * 创建 @提及通知。
+     *
+     * @param tenantId 租户 ID
+     * @param mentionedUserId 被提及用户 ID
+     * @param messageId 消息 ID
+     * @param senderId 发送者 ID
+     * @param contentSnippet 内容片段（最多 100 字符）
+     */
+    public void createMentionNotification(String tenantId, String mentionedUserId,
+                                           UUID messageId, UUID senderId, String contentSnippet) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", "mention");
+        payload.put("messageId", messageId.toString());
+        payload.put("senderId", senderId.toString());
+        payload.put("content", contentSnippet);
+        payload.put("timestamp", Instant.now().toString());
+        
+        fire(tenantId, "im.mention", mentionedUserId, payload);
     }
 }

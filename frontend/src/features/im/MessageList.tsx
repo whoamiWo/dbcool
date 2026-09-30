@@ -63,15 +63,52 @@ export function MessageList({
         .catch((e) => console.error("添加表情失败", e));
     }
   };
-  const renderContent = (content: string, isBurned: boolean) => {
+  const renderContent = (content: string, isBurned: boolean, mentions?: Array<{displayName: string; userId: string}>) => {
     if (isBurned) {
       return <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>该消息已焚毁</span>;
     }
-    const parts = content.split(/(@[A-Za-z0-9_\-]+)/);
+    
+    if (mentions && mentions.length > 0) {
+      let remaining = content;
+      const elements: JSX.Element[] = [];
+      let key = 0;
+      
+      for (const mention of mentions) {
+        const pattern = new RegExp(`@\\{${mention.displayName}\\}:${mention.userId}`, 'g');
+        const parts = remaining.split(pattern);
+        
+        if (parts.length > 1) {
+          elements.push(<span key={key++}>{parts[0]}</span>);
+          elements.push(
+            <span
+              key={key++}
+              style={{
+                background: 'rgba(99, 102, 241, 0.2)',
+                color: 'var(--color-primary-300)',
+                padding: '1px 6px',
+                borderRadius: 10,
+                fontWeight: 500,
+              }}
+            >
+              @{mention.displayName}
+            </span>
+          );
+          remaining = parts.slice(1).join(`@\\{${mention.displayName}\\}:${mention.userId}`);
+        }
+      }
+      
+      if (remaining) {
+        elements.push(<span key={key}>{remaining}</span>);
+      }
+      
+      return <span>{elements}</span>;
+    }
+    
+    const parts = content.split(/(@\{[^}]+\}:[a-f0-9-]+)/);
     return (
       <span>
         {parts.map((part, i) =>
-          part.startsWith('@') ? (
+          part.startsWith('@{') ? (
             <span
               key={i}
               style={{
@@ -275,7 +312,7 @@ export function MessageList({
                     </div>
                   ) : (
                     <div style={{ fontSize: 14, color: isDeleted ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }}>
-                      {renderContent(isDeleted ? t("im.messageDeleted") : msg.content, !!msg.expiresAt && burnRemaining[msg.id] === 0)}
+                      {renderContent(isDeleted ? t("im.messageDeleted") : msg.content, !!msg.expiresAt && burnRemaining[msg.id] === 0, msg.mentions)}
                       {msg.expiresAt && burnRemaining[msg.id] !== undefined && burnRemaining[msg.id] > 0 && (
                         <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-error)' }}>
                           🔥 {formatBurnTime(burnRemaining[msg.id])}

@@ -2,10 +2,8 @@ package com.nocobase.im;
 
 import com.nocobase.im.entity.ImMessageEntity;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -63,12 +61,13 @@ public class MessageSearchService {
             int size) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        String mentionedByStr = mentionedByUserId != null ? mentionedByUserId.toString() : null;
 
-        List<ImMessageEntity> results = repository.searchWithFilters(
-                channelId, keyword, mentionedByUserId, senderId, startTime, endTime, pageable);
+        List<ImMessageEntity> results = repository.searchWithFullFilters(
+                channelId, keyword, mentionedByStr, senderId, startTime, endTime, pageable);
 
-        long total = repository.countWithFilters(
-                channelId, keyword, mentionedByUserId, senderId, startTime, endTime);
+        long total = repository.countWithFullFilters(
+                channelId, keyword, mentionedByStr, senderId, startTime, endTime);
 
         return new PageImpl<>(results, pageable, total);
     }
@@ -92,10 +91,12 @@ public class MessageSearchService {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        List<ImMessageEntity> results = repository.findMentions(
-                tenantId, userId, channelId, pageable);
+        String userIdStr = userId.toString();
 
-        long total = repository.countMentions(tenantId, userId, channelId);
+        List<ImMessageEntity> results = repository.findMentions(
+                tenantId, userIdStr, channelId, pageable);
+
+        long total = repository.countMentions(tenantId, userIdStr, channelId);
 
         return new PageImpl<>(results, pageable, total);
     }

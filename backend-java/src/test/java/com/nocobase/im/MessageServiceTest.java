@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.nocobase.im.entity.ImChannelMemberEntity;
 import com.nocobase.im.entity.ImMessageEntity;
+import com.nocobase.im.parser.RichTextParser;
+import com.nocobase.notification.NotificationService;
 import com.nocobase.realtime.RedisStompBridge;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,6 +25,8 @@ class MessageServiceTest {
     private ImMessageRepository messageRepo;
     private ImChannelMemberRepository memberRepo;
     private RedisStompBridge bridge;
+    private RichTextParser parser;
+    private NotificationService notificationService;
     private MessageService service;
 
     private final UUID channelId = UUID.randomUUID();
@@ -33,7 +37,9 @@ class MessageServiceTest {
         messageRepo = mock(ImMessageRepository.class);
         memberRepo = mock(ImChannelMemberRepository.class);
         bridge = mock(RedisStompBridge.class);
-        service = new MessageService(messageRepo, memberRepo, bridge);
+        parser = mock(RichTextParser.class);
+        notificationService = mock(NotificationService.class);
+        service = new MessageService(messageRepo, memberRepo, bridge, parser, notificationService);
     }
 
     @Test

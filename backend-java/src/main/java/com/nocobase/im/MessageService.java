@@ -3,6 +3,8 @@ package com.nocobase.im;
 import com.nocobase.im.dto.ImMessageDto;
 import com.nocobase.im.entity.ImChannelMemberEntity;
 import com.nocobase.im.entity.ImMessageEntity;
+import com.nocobase.im.parser.RichTextParser;
+import com.nocobase.notification.NotificationService;
 import com.nocobase.realtime.RedisStompBridge;
 import com.nocobase.realtime.StompDestinations;
 import java.time.Instant;
@@ -27,13 +29,19 @@ public class MessageService {
     private final ImMessageRepository messageRepository;
     private final ImChannelMemberRepository memberRepository;
     private final RedisStompBridge bridge;
+    private final RichTextParser parser;
+    private final NotificationService notificationService;
 
     public MessageService(ImMessageRepository messageRepository,
                           ImChannelMemberRepository memberRepository,
-                          RedisStompBridge bridge) {
+                          RedisStompBridge bridge,
+                          RichTextParser parser,
+                          NotificationService notificationService) {
         this.messageRepository = messageRepository;
         this.memberRepository = memberRepository;
         this.bridge = bridge;
+        this.parser = parser;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -69,6 +77,11 @@ public class MessageService {
             }
         }
 
+        RichTextParser.ParseResult parsed = RichTextParser.parse(body);
+        String mentionsJson = "[" + parsed.mentions().stream()
+                .map(mention -> "\"" + mention.userId() + "\"")
+                .collect(java.util.stream.Collectors.joining(",")) + "]";
+
         ImMessageEntity m = new ImMessageEntity();
         m.setId(UUID.randomUUID());
         m.setChannelId(channelId);
@@ -77,9 +90,21 @@ public class MessageService {
         m.setContent(body);
         m.setContentType(contentType == null || contentType.isBlank() ? "text" : contentType);
         m.setTenantId(tenantId);
+        m.setMentions(mentionsJson);
 
         ImMessageEntity saved = messageRepository.save(m);
         bridge.broadcast(StompDestinations.channelTopic(tenantId, channelId), ImMessageDto.from(saved));
+        
+        parsed.mentions().forEach(mention -> {
+            try {
+                notificationService.createMentionNotification(tenantId, mention.userId(), 
+                        saved.getId(), senderId, body.substring(0, Math.min(100, body.length())));
+            } catch (Exception ex) {
+                java.util.logging.Logger.getLogger(MessageService.class.getName())
+                        .warning("Failed to send mention notification: " + ex.getMessage());
+            }
+        });
+        
         return saved;
     }
 
@@ -88,8 +113,16 @@ public class MessageService {
     public ImMessageEntity edit(String tenantId, UUID messageId, UUID userId, String content) {
         ImMessageEntity m = mustGet(messageId);
         assertOwner(m, userId);
-        m.setContent(requireContent(content));
+        String body = requireContent(content);
+        m.setContent(body);
         m.setEditedAt(Instant.now());
+        
+        RichTextParser.ParseResult parsed = RichTextParser.parse(body);
+        String mentionsJson = "[" + parsed.mentions().stream()
+                .map(mention -> "\"" + mention.userId() + "\"")
+                .collect(java.util.stream.Collectors.joining(",")) + "]";
+        m.setMentions(mentionsJson);
+        
         ImMessageEntity saved = messageRepository.save(m);
         bridge.broadcast(StompDestinations.channelTopic(tenantId, m.getChannelId()),
                 ImMessageDto.from(saved != null ? saved : m));

@@ -5,9 +5,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * 消息传输对象(经 WebSocket 广播的载荷)。
+ * 消息传输对象 (经 WebSocket 广播的载荷)。
  *
- * <p>删除消息仍会广播(带 deletedAt),以便客户端把该条渲染为"已删除"
+ * <p>删除消息仍会广播 (带 deletedAt),以便客户端把该条渲染为"已删除"
  * 而不是从线程中凭空消失。
  */
 public record ImMessageDto(
@@ -17,6 +17,7 @@ public record ImMessageDto(
         UUID parentId,
         String content,
         String contentType,
+        String mentions,
         Instant createdAt,
         Instant editedAt,
         Instant deletedAt
@@ -29,6 +30,7 @@ public record ImMessageDto(
                 e.getParentId(),
                 e.getContent(),
                 e.getContentType(),
+                e.getMentions(),
                 e.getCreatedAt(),
                 e.getEditedAt(),
                 e.getDeletedAt()

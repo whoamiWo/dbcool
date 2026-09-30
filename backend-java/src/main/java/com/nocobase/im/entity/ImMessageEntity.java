@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * 消息。parentId 非空表示线程回复;删除为软删除(deletedAt),
+ * 消息。parentId 非空表示线程回复;删除为软删除 (deletedAt),
  * 以保留线程上下文——父消息被删时子回复仍可展示"回复了已删除消息"。
  */
 @Entity
@@ -33,6 +33,9 @@ public class ImMessageEntity {
 
     @Column(name = "content_type", nullable = false, length = 16)
     private String contentType = "text";
+
+    @Column(name = "mentions")
+    private String mentions;
 
     @Column(name = "edited_at")
     private Instant editedAt;
@@ -64,6 +67,8 @@ public class ImMessageEntity {
     public void setContent(String content) { this.content = content; }
     public String getContentType() { return contentType; }
     public void setContentType(String contentType) { this.contentType = contentType; }
+    public String getMentions() { return mentions; }
+    public void setMentions(String mentions) { this.mentions = mentions; }
     public Instant getEditedAt() { return editedAt; }
     public void setEditedAt(Instant editedAt) { this.editedAt = editedAt; }
     public Instant getDeletedAt() { return deletedAt; }

@@ -22,6 +22,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
@@ -283,6 +285,151 @@ class ImMessageControllerTest {
                 () -> controller.listReactions(messageId, user));
 
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void advancedSearch_returnsHits() {
+        when(messageSearchService.searchMessages(eq(channelId), eq("kw"), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of(message())));
+
+        Map<String, Object> resp = controller.advancedSearch(channelId, "kw", null, null, null, null, 0, 20, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat((List<?>) data.get("messages")).hasSize(1);
+        assertThat(data.get("total")).isEqualTo(1L);
+    }
+
+    @Test
+    void advancedSearch_crossChannelReturnsHits() {
+        when(messageSearchService.searchMessages(eq(null), eq("budget"), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(message())));
+
+        Map<String, Object> resp = controller.advancedSearch(null, "budget", null, null, null, null, 0, 20, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat((List<?>) data.get("messages")).hasSize(1);
+    }
+
+    @Test
+    void advancedSearch_mentionedByFilter() {
+        UUID mentionedBy = UUID.randomUUID();
+        when(messageSearchService.searchMessages(eq(channelId), any(), eq(mentionedBy), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(message())));
+
+        Map<String, Object> resp = controller.advancedSearch(channelId, null, mentionedBy, null, null, null, 0, 20, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        verify(messageSearchService).searchMessages(eq(channelId), any(), eq(mentionedBy), any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void advancedSearch_timeRangeFilter() {
+        Instant start = Instant.now().minusSeconds(3600);
+        Instant end = Instant.now();
+        when(messageSearchService.searchMessages(eq(channelId), any(), any(), any(), eq(start), eq(end), anyInt(), anyInt()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        Map<String, Object> resp = controller.advancedSearch(channelId, null, null, null, start.toString(), end.toString(), 0, 20, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        verify(messageSearchService).searchMessages(eq(channelId), any(), any(), any(), eq(start), eq(end), anyInt(), anyInt());
+    }
+
+    @Test
+    void advancedSearch_totalCorrectness() {
+        List<ImMessageEntity> mockResults = List.of(message(), message(), message());
+        Page<ImMessageEntity> page = new PageImpl<>(mockResults,
+                org.springframework.data.domain.PageRequest.of(0, 10), 47L);
+        when(messageSearchService.searchMessages(eq(channelId), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(page);
+
+        Map<String, Object> resp = controller.advancedSearch(channelId, "test", null, null, null, null, 0, 10, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat(data.get("total")).isEqualTo(47L);
+        assertThat(data.get("totalPages")).isEqualTo(5);
+    }
+
+    @Test
+    void advancedSearch_unauthorizedChannel_returns403() {
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员"))
+                .when(messageService).assertMember(any(), any());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.advancedSearch(channelId, "kw", null, null, null, null, 0, 20, user));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void advancedSearch_emptyKeyword_returnsEmpty() {
+        when(messageSearchService.searchMessages(eq(channelId), eq(""), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of(),
+                        org.springframework.data.domain.PageRequest.of(0, 20), 0L));
+
+        Map<String, Object> resp = controller.advancedSearch(channelId, "", null, null, null, null, 0, 20, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat((List<?>) data.get("messages")).isEmpty();
+        assertThat(data.get("total")).isEqualTo(0L);
+    }
+
+    // ============ T4: Cross-page recall regression test ============
+
+    /**
+     * 跨页召回回归测试：当唯一匹配项在第 2 页时，page=0&size=10 应仍能命中。
+     *
+     * <p>此前 bug：先按 channelId+senderId 取第 1 页 10 条，再在 Java 流里过滤关键词，
+     * 导致第 11 条及以后的匹配项永远搜不到。
+     */
+    @Test
+    void advancedSearch_crossPageRecall() {
+        UUID matchingMsgId = UUID.randomUUID();
+        List<ImMessageEntity> allMessages = List.of(
+                createMessage("no match 1"),
+                createMessage("no match 2"),
+                createMessage("no match 3"),
+                createMessage("no match 4"),
+                createMessage("no match 5"),
+                createMessage("no match 6"),
+                createMessage("no match 7"),
+                createMessage("no match 8"),
+                createMessage("no match 9"),
+                createMessage("no match 10"),
+                createMessage("unique keyword match")  // 第 11 条，唯一匹配项
+        );
+        when(messageSearchService.searchMessages(eq(channelId), eq("keyword"), any(), any(), any(), any(), eq(0), eq(10)))
+                .thenReturn(new PageImpl<>(
+                        List.of(allMessages.get(10)),
+                        org.springframework.data.domain.PageRequest.of(0, 10),
+                        1L));
+
+        Map<String, Object> resp = controller.advancedSearch(channelId, "keyword", null, null, null, null, 0, 10, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertThat((List<?>) data.get("messages")).hasSize(1);
+        assertThat(data.get("total")).isEqualTo(1L);
+    }
+
+    private ImMessageEntity createMessage(String content) {
+        ImMessageEntity m = new ImMessageEntity();
+        m.setId(UUID.randomUUID());
+        m.setChannelId(channelId);
+        m.setSenderId(userId);
+        m.setContent(content);
+        m.setContentType("text");
+        m.setCreatedAt(Instant.now());
+        return m;
     }
 
     private ImMessageEntity message() {

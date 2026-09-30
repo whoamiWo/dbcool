@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.stereotype.Component;
 
 /**
  * 富文本消息解析器。
@@ -18,7 +19,10 @@ import java.util.regex.Pattern;
  *
  * <p>PHASE 57 备注：该类暂不接入生产代码（@提及链路将在后续迭代），
  * 但保留方法供后续使用。MessageSearchService 中已删除对 formatMention 的死引用调用。
+ * 
+ * <p>PHASE 61: Now activated for @mention parsing pipeline.
  */
+@Component
 public class RichTextParser {
 
     private static final Pattern MENTION_PATTERN = Pattern.compile("@\\{([^}]+)}:([a-f0-9-]+)");
