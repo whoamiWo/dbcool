@@ -25,6 +25,8 @@ export interface TableConfig {
   pageSize?: number; // 默认 20
   sort?: SortRule[];
   filters?: FilterRule[];
+  groupBy?: string; // T2: 分组字段
+  groupAggregations?: Array<{ field: string; operator: 'sum' | 'avg' | 'min' | 'max' }>; // T2: 数值聚合
 }
 
 export interface KanbanConfig {
@@ -36,6 +38,12 @@ export interface KanbanConfig {
 export interface DetailConfig {
   fields: string[]; // 字段顺序
   hiddenFields?: string[];
+}
+
+export interface GalleryConfig {
+  groupBy?: string; // T2: 分组字段
+  cardTitleField?: string;
+  cardFields?: string[];
 }
 
 export interface TimelineConfig {
@@ -50,7 +58,7 @@ export interface TimelineConfig {
   filterEnd?: string;      // 区间过滤结束（ISO 日期字符串，可选）
 }
 
-export type ViewConfig = TableConfig | KanbanConfig | DetailConfig | TimelineConfig;
+export type ViewConfig = TableConfig | KanbanConfig | DetailConfig | GalleryConfig | TimelineConfig;
 
 export interface ViewMeta {
   id: string;
