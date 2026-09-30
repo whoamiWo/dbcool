@@ -120,6 +120,12 @@ services:
       # 未注入时 callLlm 在 L87 直接返回降级文案（该分支不打日志，日志里看不出原因），
       # 导致 /ask、/generate-outline、/polish 一直显示「AI 服务不可用」。
       AI_ENABLED: "true"
+      # PHASE 60: 登录限流阈值可配（GlobalRateLimitProperties 默认 5 次/300s）。
+      # 默认保持 5（生产安全）；跑 E2E/CI 时若反复登录被 429 打断，可临时调高：
+      #   RATELIMIT_LOGIN_LIMIT=100 docker compose up -d --no-build backend-java
+      # 注意：不要在 application-test.properties 里全局放宽 —— GlobalRateLimitFilterE2ETest
+      # 依赖默认阈值 5 来断言 429，全局放宽会让该用例失败。
+      RATELIMIT_LOGIN_LIMIT: ${RATELIMIT_LOGIN_LIMIT:-5}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
