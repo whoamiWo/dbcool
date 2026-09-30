@@ -2,6 +2,8 @@ package com.nocobase.integration.dingtalk;
 
 import com.nocobase.auth.JwtService;
 import com.nocobase.auth.RefreshTokenService;
+import com.nocobase.integration.common.ExternalMessageLogEntity;
+import com.nocobase.integration.common.ExternalMessageLogRepository;
 import com.nocobase.integration.dingtalk.DingTalkApprovalService;
 import com.nocobase.integration.dingtalk.DingTalkOrgSyncService;
 import com.nocobase.integration.dingtalk.UserMappingService;
@@ -10,6 +12,7 @@ import com.nocobase.workflow.WorkflowTaskRepository;
 import com.nocobase.workflow.WorkflowTaskEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,6 +47,13 @@ public class DingTalkController {
 
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+
+    /**
+     * 事件幂等记录（复用入站消息那张带 UNIQUE 约束的表）。
+     * 字段注入而非构造器注入：保持构造签名稳定，不影响既有测试。
+     */
+    @Autowired
+    private ExternalMessageLogRepository externalMessageLogRepository;
 
     public DingTalkController(DingTalkAdapter adapter,
                               DingTalkAppService appService,
@@ -322,9 +332,8 @@ public class DingTalkController {
         
         // 3. 幂等检查（基于 eventId）
         if (eventId != null && !String.valueOf(eventId).isBlank()) {
-            String key = "dingtalk_event_" + eventId;
-            if (isDuplicateEvent(key)) {
-                log.debug("[DingTalk] 检测到重复事件，跳过: id={}", eventId);
+            if (isDuplicateEvent(String.valueOf(eventId))) {
+                log.info("[DingTalk] 检测到重复事件，跳过: id={}", eventId);
                 return Map.of("code", 0, "message", "duplicate ignored");
             }
         }
@@ -338,7 +347,7 @@ public class DingTalkController {
         
         // 5. 记录已处理
         if (eventId != null && !String.valueOf(eventId).isBlank()) {
-            markEventProcessed("dingtalk_event_" + eventId);
+            markEventProcessed(String.valueOf(eventId), tenantId);
         }
         
         return Map.of("code", 0, "message", "success", "data", Map.of("processed", true));
@@ -388,18 +397,29 @@ public class DingTalkController {
     }
     
     /**
-     * 幂等检查（基于内存缓存，生产应使用 Redis）。
+     * 幂等检查：查已处理事件表（UNIQUE(source, external_message_id) 兜底并发）。
+     *
+     * <p>修复前这里是 {@code return false;} 的空壳（TODO 未实现），
+     * 导致钉钉重投时事件被**重复处理**（审批状态被反复更新）。
      */
-    private boolean isDuplicateEvent(String key) {
-        // TODO: 使用 Redis 存储已处理的事件 ID
-        return false;
+    private boolean isDuplicateEvent(String externalMessageId) {
+        return externalMessageLogRepository
+                .findBySourceAndExternalMessageId("dingtalk", externalMessageId)
+                .isPresent();
     }
-    
+
     /**
-     * 标记事件已处理。
+     * 标记事件已处理。修复前是空方法。
      */
-    private void markEventProcessed(String key) {
-        // TODO: 持久化事件处理记录
+    private void markEventProcessed(String externalMessageId, String tenantId) {
+        try {
+            externalMessageLogRepository.save(
+                    new ExternalMessageLogEntity("dingtalk", externalMessageId, tenantId));
+        } catch (Exception e) {
+            // 并发下 UNIQUE 约束冲突：说明已被其它实例/线程处理，忽略即可
+            log.warn("[DingTalk] 记录事件处理标记失败(可能并发重复): id={}, err={}",
+                    externalMessageId, e.getMessage());
+        }
     }
     
     /**

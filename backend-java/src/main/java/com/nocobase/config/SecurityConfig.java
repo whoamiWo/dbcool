@@ -61,6 +61,19 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/dingtalk/auth-url").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/approval-callback").permitAll()
+                        // PHASE62: 第三方 webhook 回调端点必须匿名放行 ——
+                        // Slack / 飞书 / 钉钉 / 企微 / Mattermost 的回调请求**不可能**携带我方 JWT,
+                        // 若不放行则全部 401,入站链路在生产上形同虚设(实测:不带 token → 401)。
+                        // 安全防线**不在**这里,而在各 Controller 内的签名校验:
+                        //   - Slack    : SlackController:129 verifySignature(HMAC-SHA256 + 5 分钟窗)
+                        //   - 钉钉     : DingTalkController events(HMAC-SHA256 + Base64)
+                        //   - Mattermost: token 校验,且 require-token 默认 true(fail-close)
+                        // 签名无效一律 401,故放行不等于裸奔。
+                        .requestMatchers(HttpMethod.POST, "/api/slack/events").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/feishu/events").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/mattermost/webhook/incoming").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/wecom/callback").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/dingtalk/events").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         // 统一实时消息总线:WS 握手无法携带 Authorization 头,
                         // 鉴权交由 StompHandshakeInterceptor 在握手阶段完成。

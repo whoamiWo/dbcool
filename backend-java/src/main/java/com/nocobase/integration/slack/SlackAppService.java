@@ -126,7 +126,19 @@ public class SlackAppService {
         );
     }
 
-    public void handleEvent(JsonNode event) {
+    public void handleEvent(JsonNode payload) {
+        // 真实 Slack 事件是**两层**结构:
+        //   {"type":"event_callback","event_id":"Ev...",
+        //    "event":{"type":"message","text":...,"channel":...,"user":...,"ts":...}}
+        // 早期实现直接取顶层 type 判 "message",而顶层恒为 "event_callback"
+        // → 真实消息永远进不了处理分支:接口照样返回 200,但什么都没落地
+        //   (实测:用真实格式 POST → 200,消息命中 0,日志无任何 [Inbound])。
+        // 这里先展开 event 子对象,同时兼容扁平格式(单测/简化调用)。
+        JsonNode event = payload;
+        if ("event_callback".equals(payload.path("type").asText("")) && payload.hasNonNull("event")) {
+            event = payload.path("event");
+        }
+
         String type = event.path("type").asText();
         String subtype = event.path("subtype").asText("");
 
@@ -135,7 +147,8 @@ public class SlackAppService {
             String text = event.path("text").asText("");
             String channel = event.path("channel").asText("");
             String user = event.path("user").asText("");
-            String eventId = event.path("event_id").asText(event.path("ts").asText(""));
+            // event_id 位于**外层**;缺失时回退到 event.ts(同样具备唯一性)
+            String eventId = payload.path("event_id").asText(event.path("ts").asText(""));
 
             // 使用 InboundMessageService 进行落库 + 广播
             if (inboundMessageService != null && eventId != null && !eventId.isBlank()) {
