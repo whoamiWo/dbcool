@@ -23,19 +23,25 @@ export function CalendarViewPage() {
     enabled: !!collectionName,
   });
 
-  const { data: recordsData } = useQuery({
-    queryKey: ['records', collectionName, 'all'],
-    queryFn: () => apiClient.get<any[]>(`/collections/${collectionName}/records?limit=500`),
-    enabled: !!collectionName,
-  });
-
   if (!viewData || !collectionData) return <p>加载中…</p>;
 
   const fields = collectionData.fields ?? [];
-  const allRecords = recordsData ?? [];
   const config = (viewData.config ?? {}) as { dateField?: string; titleField?: string };
   const dateField = config.dateField ?? fields.find((f) => f.type === 'date' || f.type === 'datetime')?.name;
   const titleField = config.titleField ?? fields.find((f) => f.type === 'text')?.name ?? 'id';
+
+  const { data: monthRecordsData } = useQuery({
+    queryKey: ['records', collectionName, currentMonth.toISOString().slice(0, 7)],
+    queryFn: () => {
+      // R5 T3: Query by month to avoid limit=500 truncation
+      const year = currentMonth.getFullYear();
+      const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
+      return apiClient.get<any[]>(`/collections/${collectionName}/records?limit=5000&filter=${encodeURIComponent(dateField + '_gte=' + year + '-' + month + '-01')}&filter=${encodeURIComponent(dateField + '_lte=' + year + '-' + month + '-31')}`);
+    },
+    enabled: !!collectionName && !!dateField,
+  });
+
+  const allRecords = monthRecordsData ?? [];
 
   const { weeks, monthName } = useMemo(
     () => buildCalendar(allRecords, currentMonth, dateField, titleField),
