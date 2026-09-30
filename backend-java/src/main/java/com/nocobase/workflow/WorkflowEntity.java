@@ -59,6 +59,9 @@ public class WorkflowEntity {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    @Column(name = "last_triggered_at")
+    private Instant lastTriggeredAt;
+
     public WorkflowEntity() {}
 
     public UUID getId() { return id; }
@@ -85,4 +88,6 @@ public class WorkflowEntity {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public UUID getCreatedBy() { return createdBy; }
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
+    public Instant getLastTriggeredAt() { return lastTriggeredAt; }
+    public void setLastTriggeredAt(Instant lastTriggeredAt) { this.lastTriggeredAt = lastTriggeredAt; }
 }
