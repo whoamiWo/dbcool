@@ -3,25 +3,29 @@ package com.nocobase.meta;
 import java.util.Map;
 
 /**
- * Collection 字段定义(运行时).
+ * Collection 字段定义 (运行时).
  *
- * <p>字段类型(Week 41 D1 扩展):
+ * <p>字段类型 (Week 41 D1 扩展):
  * <ul>
- *   <li>基础: text / number / boolean / date / datetime</li>
- *   <li>枚举: select / multiSelect</li>
- *   <li>关联: belongsTo / hasMany</li>
- *   <li>派生: formula(Week 42 与 D4b 表达式引擎一并实现)</li>
- *   <li>文件: attachment(Week 41 D1.1 新增 — 存文件 key 到 JSONB 字段)</li>
+ *   <li>基础：text / number / boolean / date / datetime</li>
+ *   <li>枚举：select / multiSelect</li>
+ *   <li>关联：belongsTo / hasMany</li>
+ *   <li>派生：formula(Week 42 与 D4b 表达式引擎一并实现)</li>
+ *   <li>文件：attachment(Week 41 D1.1 新增 — 存文件 key 到 JSONB 字段)</li>
+ *   <li>格式：email / url / phone</li>
+ *   <li>数值：currency / percent / duration</li>
+ *   <li>评分：rating</li>
+ *   <li>系统：createdTime / lastModifiedTime / createdBy / lastModifiedBy / autonumber</li>
  * </ul>
  *
- * <p>基础字段(id / created_at / created_by / updated_at / updated_by)由系统自动加.
+ * <p>基础字段 (id / created_at / created_by / updated_at / updated_by) 由系统自动加.
  * 用户定义的"动态字段"存到 JSONB 的 extra 字段里.
  *
- * <p>attachment 字段的物理列映射: TEXT(存文件 key 或 JSON 元数据,Week 41 D1)。
+ * <p>attachment 字段的物理列映射：TEXT(存文件 key 或 JSON 元数据，Week 41 D1)。
  *
  * <p>US-003:新增 primaryKey / unique / defaultValue 三个约束字段。
- * 为保持向后兼容,保留 5 参数便捷构造器(缺省 primaryKey=false, unique=false, defaultValue=null),
- * 既有调用方(含大量测试)无需修改。
+ * 为保持向后兼容，保留 5 参数便捷构造器 (缺省 primaryKey=false, unique=false, defaultValue=null),
+ * 既有调用方 (含大量测试) 无需修改。
  */
 public record FieldDef(
         String name,
@@ -64,11 +68,17 @@ public record FieldDef(
             // 关联
             case "belongsTo", "hasMany" -> true;
             // 派生
-            case "formula" -> true;
-            case "rollup" -> true;
-            case "lookup" -> true;
-            // 文件 (Week 41 D1)
+            case "formula", "rollup", "lookup" -> true;
+            // 文件
             case "attachment" -> true;
+            // 格式 (T1)
+            case "email", "url", "phone" -> true;
+            // 数值 (T1)
+            case "currency", "percent", "duration" -> true;
+            // 评分 (T1)
+            case "rating" -> true;
+            // 系统 (T1)
+            case "createdTime", "lastModifiedTime", "createdBy", "lastModifiedBy", "autonumber" -> true;
             default -> false;
         };
     }

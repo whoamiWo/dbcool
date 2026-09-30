@@ -13,7 +13,23 @@ export type FieldType =
   | 'hasMany'
   | 'formula'
   | 'rollup'
-  | 'lookup';
+  | 'lookup'
+  // T1 新增格式类型
+  | 'email'
+  | 'url'
+  | 'phone'
+  // T1 新增数值类型
+  | 'currency'
+  | 'percent'
+  | 'duration'
+  // T1 新增评分类型
+  | 'rating'
+  // T1 新增系统类型
+  | 'createdTime'
+  | 'lastModifiedTime'
+  | 'createdBy'
+  | 'lastModifiedBy'
+  | 'autonumber';
 
 export interface FieldDef {
   name: string;

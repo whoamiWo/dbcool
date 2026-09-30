@@ -21,6 +21,22 @@ const FIELD_ICON: Record<FieldType, string> = {
   rollup: '📊',
   lookup: '🔍',
   number: '🔢',
+  // T1 新增格式类型
+  email: '✉️',
+  url: '🔗',
+  phone: '📞',
+  // T1 新增数值类型
+  currency: '💰',
+  percent: '%',
+  duration: '⏱️',
+  // T1 新增评分类型
+  rating: '⭐',
+  // T1 新增系统类型 (只读)
+  createdTime: '🕐',
+  lastModifiedTime: '🕐',
+  createdBy: '👤',
+  lastModifiedBy: '👤',
+  autonumber: '#️⃣',
 };
 
 export function FormDesignerPage() {
