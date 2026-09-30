@@ -100,6 +100,7 @@ export interface IntegrationMarketResponse {
       name: string;
       description: string;
       icon: string;
+      kind: string;
       installed: boolean;
     }>;
   };

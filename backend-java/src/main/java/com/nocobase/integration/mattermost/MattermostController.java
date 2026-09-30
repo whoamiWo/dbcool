@@ -3,6 +3,8 @@ package com.nocobase.integration.mattermost;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,17 +16,13 @@ import java.util.Map;
 
 /**
  * Mattermost 集成 REST API。
- *
- * <p>提供：
- * <ul>
- *   <li>Webhook 接收（Incoming Webhooks）</li>
- *   <li>消息发送（Outgoing Webhooks/API）</li>
- * </ul>
  */
 @RestController
 @Tag(name = "Mattermost Integration", description = "Mattermost 集成")
 @RequestMapping("/api/mattermost")
 public class MattermostController {
+
+    private static final Logger log = LoggerFactory.getLogger(MattermostController.class);
 
     private final MattermostAppService mattermostAppService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -51,8 +49,9 @@ public class MattermostController {
         }
 
         try {
-            // 验证 token（如果配置了）
+            // 验证 token（如果配置了）- T3: fail-close
             if (!mattermostAppService.verifyWebhookToken(token)) {
+                log.warn("[Mattermost] Webhook 未授权，拒绝请求");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"text\":\"unauthorized\"}");
             }
 

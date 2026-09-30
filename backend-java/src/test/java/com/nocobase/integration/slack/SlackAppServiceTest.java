@@ -1,7 +1,9 @@
 package com.nocobase.integration.slack;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import com.nocobase.integration.common.InboundMessageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,10 +13,12 @@ import org.junit.jupiter.api.Test;
 class SlackAppServiceTest {
 
     private SlackAppService service;
+    private InboundMessageService inboundMessageService;
 
     @BeforeEach
     void setUp() {
-        service = new SlackAppService();
+        inboundMessageService = mock(InboundMessageService.class);
+        service = new SlackAppService(inboundMessageService);
         setField(service, "clientId", "testClientId");
         setField(service, "clientSecret", "testClientSecret");
         setField(service, "redirectUri", "https://example.com/callback");

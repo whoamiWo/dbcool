@@ -2,6 +2,7 @@ package com.nocobase.integration.mattermost;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.integration.common.InboundMessageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,8 +32,22 @@ public class MattermostAppService {
     @Value("${mattermost.webhook-token:}")
     private String webhookToken;
 
+    @Value("${mattermost.default-tenant-id:tenant_default}")
+    private String defaultTenantId;
+
+    @Value("${mattermost.default-channel-id:}")
+    private String defaultChannelId;
+
+    @Value("${integration.mattermost.require-token:true}")
+    private boolean requireToken;
+
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final InboundMessageService inboundMessageService;
+
+    public MattermostAppService(InboundMessageService inboundMessageService) {
+        this.inboundMessageService = inboundMessageService;
+    }
 
     public String getIncomingWebhookUrl() {
         return incomingWebhookUrl;
@@ -44,8 +59,12 @@ public class MattermostAppService {
     }
 
     public boolean verifyWebhookToken(String token) {
+        if (requireToken && (webhookToken == null || webhookToken.isBlank())) {
+            log.warn("[Mattermost] Webhook 校验：requireToken=true 但未配置 webhook-token，拒绝请求");
+            return false; // T3 修复：fail-close
+        }
         if (webhookToken == null || webhookToken.isBlank()) {
-            return true; // 未配置 token 时不验证
+            return true; // 未配置 token 且 requireToken=false 时不验证
         }
         return webhookToken.equals(token);
     }
@@ -54,9 +73,22 @@ public class MattermostAppService {
         String text = json.path("text").asText("");
         String channelId = json.path("channel_id").asText("");
         String userId = json.path("user_id").asText("");
+        String postId = json.path("id").asText(json.path("post_id").asText(""));
 
-        // 事件记录到日志，便于运营审计与 AI Copilot 异步消费
-        log.info("[Mattermost] 入站消息: channel={}, user={}, text={}", channelId, userId, text);
+        // 使用 InboundMessageService 进行落库 + 广播
+        if (inboundMessageService != null && !postId.isBlank()) {
+            inboundMessageService.processInboundMessage(
+                    defaultTenantId,
+                    null, // 使用 defaultChannelId
+                    "mattermost",
+                    postId,
+                    userId,
+                    text,
+                    null
+            );
+        } else {
+            log.warn("[Mattermost] 入站消息无法处理：缺少 postId 或 inboundMessageService=null");
+        }
     }
 
     public Map<String, Object> sendMessage(String channelId, String message) throws Exception {

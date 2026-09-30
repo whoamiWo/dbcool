@@ -51,7 +51,7 @@ public class IntegrationMarketController {
             @PathVariable String id,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        Map<String, Object> result = marketService.installApp(id, user == null ? null : user.tenantId());
+        Map<String, Object> result = marketService.installApp(id, user == null ? null : user.tenantId(), user == null ? null : user.userId());
         int code = (int) result.getOrDefault("code", 0);
         return ResponseEntity.status(code >= 400 ? code : 200).body(result);
     }

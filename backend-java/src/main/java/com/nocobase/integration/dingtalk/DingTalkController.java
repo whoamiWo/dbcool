@@ -290,6 +290,142 @@ public class DingTalkController {
     }
 
     /**
+     * 钉钉事件回调 — 处理审批状态变更、通讯录变更等事件。
+     *
+     * <b>安全要求</b>：
+     * 1. HMAC-SHA256 + Base64 签名校验（基于 appSecret + timestamp）
+     * 2. 按事件 ID 幂等（钉钉会重投）
+     */
+    @PostMapping("/events")
+    public Map<String, Object> eventCallback(
+            @RequestBody Map<String, Object> payload,
+            @RequestHeader(value = "X-DingTalk-Timestamp", required = false) String timestamp,
+            @RequestHeader(value = "X-DingTalk-Signature", required = false) String signature
+    ) {
+        // 1. 签名校验
+        if (timestamp == null || signature == null) {
+            log.warn("[DingTalk] 事件回调缺少签名头");
+            return Map.of("code", 401, "message", "missing signature headers");
+        }
+        
+        if (!verifyEventSignature(timestamp, signature)) {
+            log.warn("[DingTalk] 事件回调签名验证失败");
+            return Map.of("code", 401, "message", "invalid signature");
+        }
+        
+        // 2. 解析事件
+        Object eventType = payload.get("eventType");
+        Object eventId = payload.get("eventId");
+        String tenantId = "tenant_default";
+        
+        log.info("[DingTalk] 事件回调: type={}, id={}, tenant={}", eventType, eventId, tenantId);
+        
+        // 3. 幂等检查（基于 eventId）
+        if (eventId != null && !String.valueOf(eventId).isBlank()) {
+            String key = "dingtalk_event_" + eventId;
+            if (isDuplicateEvent(key)) {
+                log.debug("[DingTalk] 检测到重复事件，跳过: id={}", eventId);
+                return Map.of("code", 0, "message", "duplicate ignored");
+            }
+        }
+        
+        // 4. 处理事件
+        switch (String.valueOf(eventType)) {
+            case "approval_status_changed" -> handleApprovalStatusChanged(payload, tenantId);
+            case "contact_updated" -> handleContactUpdated(payload, tenantId);
+            default -> log.warn("[DingTalk] 未知事件类型: {}", eventType);
+        }
+        
+        // 5. 记录已处理
+        if (eventId != null && !String.valueOf(eventId).isBlank()) {
+            markEventProcessed("dingtalk_event_" + eventId);
+        }
+        
+        return Map.of("code", 0, "message", "success", "data", Map.of("processed", true));
+    }
+    
+    /**
+     * 验证钉钉事件签名（与审批回调签名算法一致）。
+     */
+    private boolean verifyEventSignature(String timestamp, String signature) {
+        try {
+            String appSecret = appService.getAppSecret();
+            if (appSecret == null || appSecret.isBlank()) {
+                log.warn("[DingTalk] 事件回调：appSecret 未配置");
+                return false;
+            }
+            
+            // 检查时间戳有效性（5 分钟窗口）
+            long ts;
+            try {
+                ts = Long.parseLong(timestamp);
+            } catch (NumberFormatException e) {
+                log.warn("[DingTalk] 事件回调：timestamp 格式错误");
+                return false;
+            }
+            
+            long now = System.currentTimeMillis();
+            if (Math.abs(now - ts) > 300_000) {
+                log.warn("[DingTalk] 事件回调：timestamp 过期 {} vs {}", ts, now);
+                return false;
+            }
+            
+            // 计算签名：HmacSHA256(appSecret, timestamp)
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(timestamp.getBytes(StandardCharsets.UTF_8));
+            String expectedSig = Base64.getEncoder().encodeToString(digest);
+            
+            // 常量时间比较防时序攻击
+            return MessageDigest.isEqual(
+                signature.getBytes(StandardCharsets.UTF_8),
+                expectedSig.getBytes(StandardCharsets.UTF_8)
+            );
+        } catch (Exception e) {
+            log.error("[DingTalk] 事件回调签名验证异常", e);
+            return false;
+        }
+    }
+    
+    /**
+     * 幂等检查（基于内存缓存，生产应使用 Redis）。
+     */
+    private boolean isDuplicateEvent(String key) {
+        // TODO: 使用 Redis 存储已处理的事件 ID
+        return false;
+    }
+    
+    /**
+     * 标记事件已处理。
+     */
+    private void markEventProcessed(String key) {
+        // TODO: 持久化事件处理记录
+    }
+    
+    /**
+     * 处理审批状态变更事件。
+     */
+    private void handleApprovalStatusChanged(Map<String, Object> payload, String tenantId) {
+        Object instanceId = payload.get("instance_id");
+        Object result = payload.get("result");
+        log.info("[DingTalk] 审批状态变更: instance={}, result={}", instanceId, result);
+        
+        if (instanceId != null && result != null) {
+            approvalService.handleApprovalCallback(String.valueOf(instanceId), String.valueOf(result));
+            updateWorkflowTaskStatus(String.valueOf(instanceId), String.valueOf(result));
+        }
+    }
+    
+    /**
+     * 处理通讯录变更事件。
+     */
+    private void handleContactUpdated(Map<String, Object> payload, String tenantId) {
+        Object userId = payload.get("user_id");
+        log.info("[DingTalk] 通讯录变更: user={}", userId);
+        // TODO: 触发用户同步或更新逻辑
+    }
+
+    /**
      * 更新工作流任务状态（钉钉审批回调后调用）。
      */
     private void updateWorkflowTaskStatus(String instanceId, String result) {

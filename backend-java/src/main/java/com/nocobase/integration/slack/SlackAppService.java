@@ -2,6 +2,8 @@ package com.nocobase.integration.slack;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.im.ImMessageRepository;
+import com.nocobase.integration.common.InboundMessageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +22,12 @@ public class SlackAppService {
     private static final Logger log = LoggerFactory.getLogger(SlackAppService.class);
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${slack.default-tenant-id:tenant_default}")
+    private String defaultTenantId;
+
+    @Value("${slack.default-channel-id:}")
+    private String defaultChannelId;
 
     @Value("${slack.client-id:}")
     private String clientId;
@@ -40,9 +48,14 @@ public class SlackAppService {
     private String teamId;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final InboundMessageService inboundMessageService;
 
     /** 存储已安装的 Slack 工作区配置 */
     private final Map<String, SlackWorkspaceConfig> workspaces = new ConcurrentHashMap<>();
+
+    public SlackAppService(InboundMessageService inboundMessageService) {
+        this.inboundMessageService = inboundMessageService;
+    }
 
     public String getOAuthUrl() {
         if (clientId == null || clientId.isBlank()) {
@@ -122,13 +135,25 @@ public class SlackAppService {
             String text = event.path("text").asText("");
             String channel = event.path("channel").asText("");
             String user = event.path("user").asText("");
+            String eventId = event.path("event_id").asText(event.path("ts").asText(""));
 
-            // 事件记录到日志，便于运营审计与 AI Copilot 异步消费
-            // 真实转发由异步 Consumer 接管（如 @Async onApplicationEvent）
-            log.info("[Slack] 入站消息: channel={}, user={}, text={}", channel, user, text);
+            // 使用 InboundMessageService 进行落库 + 广播
+            if (inboundMessageService != null && eventId != null && !eventId.isBlank()) {
+                inboundMessageService.processInboundMessage(
+                        defaultTenantId,
+                        null, // 使用 defaultChannelId
+                        "slack",
+                        eventId,
+                        user,
+                        text,
+                        null
+                );
+            } else {
+                log.warn("[Slack] 入站消息无法处理：缺少 eventId 或 inboundMessageService=null");
+            }
         }
 
-        log.debug("[Slack] 事件类型: type={}, subtype={}", type, subtype);
+        log.debug("[Slack] 事件类型：type={}, subtype={}", type, subtype);
     }
 
     public boolean isConfigured() {

@@ -1,7 +1,9 @@
 package com.nocobase.integration.mattermost;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import com.nocobase.integration.common.InboundMessageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,10 +13,12 @@ import org.junit.jupiter.api.Test;
 class MattermostAppServiceTest {
 
     private MattermostAppService service;
+    private InboundMessageService inboundMessageService;
 
     @BeforeEach
     void setUp() {
-        service = new MattermostAppService();
+        inboundMessageService = mock(InboundMessageService.class);
+        service = new MattermostAppService(inboundMessageService);
         setField(service, "siteUrl", "https://mattermost.example.com");
         setField(service, "botToken", "testBotToken");
         setField(service, "webhookToken", "testWebhookToken");
