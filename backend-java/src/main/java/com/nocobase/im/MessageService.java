@@ -7,8 +7,10 @@ import com.nocobase.im.parser.RichTextParser;
 import com.nocobase.notification.NotificationService;
 import com.nocobase.realtime.RedisStompBridge;
 import com.nocobase.realtime.StompDestinations;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
@@ -78,9 +80,15 @@ public class MessageService {
         }
 
         RichTextParser.ParseResult parsed = RichTextParser.parse(body);
-        String mentionsJson = "[" + parsed.mentions().stream()
-                .map(mention -> "\"" + mention.userId() + "\"")
-                .collect(java.util.stream.Collectors.joining(",")) + "]";
+        List<Map<String, String>> mentionsList = parsed.mentions().stream()
+                .map(mention -> Map.of("displayName", mention.displayName(), "userId", mention.userId()))
+                .toList();
+        String mentionsJson;
+        try {
+            mentionsJson = new ObjectMapper().writeValueAsString(mentionsList);
+        } catch (Exception e) {
+            mentionsJson = "[]";
+        }
 
         ImMessageEntity m = new ImMessageEntity();
         m.setId(UUID.randomUUID());
@@ -118,9 +126,15 @@ public class MessageService {
         m.setEditedAt(Instant.now());
         
         RichTextParser.ParseResult parsed = RichTextParser.parse(body);
-        String mentionsJson = "[" + parsed.mentions().stream()
-                .map(mention -> "\"" + mention.userId() + "\"")
-                .collect(java.util.stream.Collectors.joining(",")) + "]";
+        List<Map<String, String>> mentionsList = parsed.mentions().stream()
+                .map(mention -> Map.of("displayName", mention.displayName(), "userId", mention.userId()))
+                .toList();
+        String mentionsJson;
+        try {
+            mentionsJson = new ObjectMapper().writeValueAsString(mentionsList);
+        } catch (Exception e) {
+            mentionsJson = "[]";
+        }
         m.setMentions(mentionsJson);
         
         ImMessageEntity saved = messageRepository.save(m);

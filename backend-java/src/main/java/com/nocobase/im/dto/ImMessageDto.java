@@ -1,7 +1,9 @@
 package com.nocobase.im.dto;
 
 import com.nocobase.im.entity.ImMessageEntity;
+import com.nocobase.im.entity.ImMessageEntity.MentionDto;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -17,7 +19,7 @@ public record ImMessageDto(
         UUID parentId,
         String content,
         String contentType,
-        String mentions,
+        List<MentionDto> mentions,
         Instant createdAt,
         Instant editedAt,
         Instant deletedAt
@@ -30,7 +32,7 @@ public record ImMessageDto(
                 e.getParentId(),
                 e.getContent(),
                 e.getContentType(),
-                e.getMentions(),
+                e.getMentionsParsed(),
                 e.getCreatedAt(),
                 e.getEditedAt(),
                 e.getDeletedAt()

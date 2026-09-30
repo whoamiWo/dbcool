@@ -35,6 +35,8 @@ backend-python/__pycache__/
 backend-python/**/__pycache__/
 backend-python/.pytest_cache/
 backend-python/.mypy_cache/
+tests/__pycache__/
+tests/**/__pycache__/
 backend-python/.ruff_cache/
 backend-python/.venv/
 backend-python/venv/

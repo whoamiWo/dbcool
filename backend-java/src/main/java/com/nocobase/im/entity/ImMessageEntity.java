@@ -1,10 +1,12 @@
 package com.nocobase.im.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -36,6 +38,9 @@ public class ImMessageEntity {
 
     @Column(name = "mentions")
     private String mentions;
+
+    // 注: 不要在此处缓存解析结果(@Transient 字段) —— JPA 不会填充它,
+    // 从库里读出的实体该字段恒为 null。解析一律走 getMentionsParsed() 懒解析。
 
     @Column(name = "edited_at")
     private Instant editedAt;
@@ -69,6 +74,33 @@ public class ImMessageEntity {
     public void setContentType(String contentType) { this.contentType = contentType; }
     public String getMentions() { return mentions; }
     public void setMentions(String mentions) { this.mentions = mentions; }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper MENTION_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+    private static final java.util.logging.Logger MENTION_LOG =
+            java.util.logging.Logger.getLogger(ImMessageEntity.class.getName());
+
+    /**
+     * 解析落库的 mentions JSON 为结构化列表（供 DTO 序列化给前端）。
+     *
+     * <p>必须**懒解析**：JPA 不会填充 {@code @Transient} 字段，从数据库读出的实体
+     * 若只返回字段值则恒为 null → 列表/搜索接口返回的 mentions 为空、前端不渲染。
+     *
+     * <p>解析失败时降级为空列表并打 WARN —— 此前静默返回空，JSON 损坏时无从排查。
+     */
+    @JsonProperty("mentions")
+    public List<MentionDto> getMentionsParsed() {
+        if (mentions == null || mentions.isEmpty()) return List.of();
+        try {
+            return MENTION_MAPPER.readValue(mentions, MENTION_MAPPER.getTypeFactory()
+                .constructCollectionType(java.util.List.class, MentionDto.class));
+        } catch (Exception e) {
+            MENTION_LOG.warning("[im] mentions JSON 解析失败，降级为空列表: " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    public record MentionDto(String displayName, String userId) {}
     public Instant getEditedAt() { return editedAt; }
     public void setEditedAt(Instant editedAt) { this.editedAt = editedAt; }
     public Instant getDeletedAt() { return deletedAt; }

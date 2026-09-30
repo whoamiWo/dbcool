@@ -59,7 +59,8 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
 
     /**
      * 高级搜索（支持多维度过滤，所有过滤在查询侧完成，先过滤再分页）。
-     * 使用 tsvector 全文索引（PostgreSQL）或 ILIKE 降级（H2）。
+     * 注意：关键词匹配使用 LIKE（%kw% 前缀通配，全表扫描），未接 tsvector 全文索引；
+     * 历史 V43 tsvector 迁移已删除（R2 明确决策：避免 Flyway 事务与 GIN 死索引）。
      *
      * @param channelId 频道 ID
      * @param keyword 关键词（可选）

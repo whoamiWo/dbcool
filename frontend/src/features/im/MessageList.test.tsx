@@ -143,4 +143,28 @@ describe('MessageList', () => {
     fireEvent.click(screen.getByText('点我'));
     expect(onMessageClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'click-1' }));
   });
+
+  it('提及消息渲染为 chip 格式', () => {
+    const msgWithMention = {
+      ...msg({ content: '你好 @{Alice}:alice-uuid 欢迎' }),
+      mentions: [{ displayName: 'Alice', userId: 'alice-uuid' }] as Array<{ displayName: string; userId: string }>,
+    };
+    render(<MessageList currentUserId="me" messages={[msgWithMention]} />);
+    expect(screen.getByText('@Alice')).toBeInTheDocument();
+    expect(screen.getByText('你好')).toBeInTheDocument();
+    expect(screen.getByText('欢迎')).toBeInTheDocument();
+  });
+
+  it('无 mentions 时不报错', () => {
+    const msgNoMention = msg({ content: '普通消息', mentions: undefined });
+    render(<MessageList currentUserId="me" messages={[msgNoMention]} />);
+    expect(screen.getByText('普通消息')).toBeInTheDocument();
+  });
+
+  it('空 mentions 数组不渲染 chip', () => {
+    const msgEmptyMention = msg({ content: '无提及消息', mentions: [] });
+    render(<MessageList currentUserId="me" messages={[msgEmptyMention]} />);
+    expect(screen.getByText('无提及消息')).toBeInTheDocument();
+    expect(screen.queryByText('@')).not.toBeInTheDocument();
+  });
 });
