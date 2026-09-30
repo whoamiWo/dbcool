@@ -1,0 +1,20 @@
+# Test profile: disable RabbitMQ, use in-memory Redis mock
+spring:
+  rabbitmq:
+    enabled: false
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+# Rate limit config for tests - HIGH limits to avoid interfering with E2E tests
+ratelimit:
+  login:
+    limit: 100
+    windowSeconds: 300
+  im:
+    limit: 200
+    windowSeconds: 60
+  fileUpload:
+    limit: 100
+    windowSeconds: 60

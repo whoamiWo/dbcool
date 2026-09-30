@@ -2,6 +2,7 @@ package com.nocobase;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
  * NocoBase 核心引擎入口.
@@ -12,6 +13,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @since 0.0.1
  */
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class NocoBaseApplication {
 
     public static void main(String[] args) {

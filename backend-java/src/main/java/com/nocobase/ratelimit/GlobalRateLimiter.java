@@ -47,7 +47,10 @@ public class GlobalRateLimiter {
             return false;
         }
 
-        redisTemplate.boundZSetOps(redisKey).add(String.valueOf(now), now);
+        // member 必须唯一：同一秒内多次请求若共用同一 member 会被 ZSET 去重，
+        // 导致计数永远达不到阈值（Phase 60 R1 实测根因）。
+        String member = now + "-" + System.nanoTime();
+        redisTemplate.boundZSetOps(redisKey).add(member, now);
         redisTemplate.boundZSetOps(redisKey).expire(java.time.Duration.ofSeconds(windowSeconds + 10));
 
         return true;
