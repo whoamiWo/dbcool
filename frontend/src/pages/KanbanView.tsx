@@ -7,7 +7,19 @@ import type { KanbanConfig, ViewFull } from '@/types/view';
 
 interface Record { id: string; [k: string]: unknown; }
 
-/** 看板视图(US-204) — 极简版:按字段分组 */
+/**
+ * 看板视图 (US-204) — 通用视图引擎：按任意字段分组
+ *
+ * 适用场景：
+ * - 浏览任意集合的记录，按自定义 groupBy 字段分组
+ * - 只读展示，无拖拽交互
+ *
+ * 不适用场景：
+ * - 项目任务流转 / 拖拽改变状态 → 请使用 features/project/BoardView
+ *
+ * 入口路由：/views/:id/kanban
+ * 重复度实证（PHASE64 T2-R）：与 BoardView 无成段重复代码，重复率 0%，不合并。
+ */
 export function KanbanViewPage() {
   const { id } = useParams<{ id: string }>();
   const isMobile = useIsMobile();

@@ -25,6 +25,19 @@ interface Card {
   labels?: string[];
 }
 
+/**
+ * 项目管理看板 — 任务流转专用
+ *
+ * 适用场景：
+ * - 管理项目任务，拖拽改变任务状态（DndKit，落库到 /api/project-boards/cards/move）
+ * - 固定状态列（后端返回 lists）
+ *
+ * 不适用场景：
+ * - 通用集合数据浏览 / 自定义字段分组 → 请使用 pages/KanbanView
+ *
+ * 入口：ProjectPage tab=0
+ * 重复度实证（PHASE64 T2-R）：与 KanbanView 无成段重复代码，重复率 0%，不合并。
+ */
 export function BoardView({ projectId }: { projectId: string }) {
   const [columns, setColumns] = useState<Column[]>([
     { id: 'col-todo', title: '待办', type: 'TODO' },
