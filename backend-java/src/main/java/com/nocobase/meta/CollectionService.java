@@ -2,11 +2,15 @@ package com.nocobase.meta;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.auth.AclPolicyEntity;
+import com.nocobase.auth.AclPolicyRepository;
+import com.nocobase.auth.RoleRepository;
 import com.nocobase.common.ExpressionEvaluator;
 import com.nocobase.meta.formula.FormulaEngine;
 import com.nocobase.meta.rollup.RollupEngine;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +39,13 @@ public class CollectionService {
     private final ObjectMapper objectMapper;
     private final ExpressionEvaluator expressionEvaluator;
     private final RelationResolver relationResolver;
-    /** Week 42 D2.2: 自动管理反向关系(belongsTo → hasMany)。 */
+    /** Week 42 D2.2: 自动管理反向关系 (belongsTo → hasMany)。 */
     private final InverseRelationManager inverseManager;
+    /** T1: ACL 播种依赖。 */
+    private final RoleRepository roleRepository;
+    private final AclPolicyRepository aclPolicyRepository;
 
-    /** 兼容既有测试:自建无状态依赖实例。 */
+    /** 兼容既有测试：自建无状态依赖实例。 */
     public CollectionService(
             CollectionRepository repository,
             DynamicTableManager tableManager,
@@ -48,7 +55,8 @@ public class CollectionService {
         this(repository, tableManager, migrationService, objectMapper,
                 new ExpressionEvaluator(),
                 new RelationResolver(repository, tableManager, objectMapper),
-                new InverseRelationManager(repository, objectMapper));
+                new InverseRelationManager(repository, objectMapper),
+                null, null);
     }
 
     @Autowired
@@ -59,7 +67,9 @@ public class CollectionService {
             ObjectMapper objectMapper,
             ExpressionEvaluator expressionEvaluator,
             RelationResolver relationResolver,
-            InverseRelationManager inverseManager
+            InverseRelationManager inverseManager,
+            RoleRepository roleRepository,
+            AclPolicyRepository aclPolicyRepository
     ) {
         this.repository = repository;
         this.tableManager = tableManager;
@@ -68,6 +78,8 @@ public class CollectionService {
         this.expressionEvaluator = expressionEvaluator;
         this.relationResolver = relationResolver;
         this.inverseManager = inverseManager;
+        this.roleRepository = roleRepository;
+        this.aclPolicyRepository = aclPolicyRepository;
     }
 
     @Transactional
@@ -92,7 +104,60 @@ public class CollectionService {
         meta.setTenantId(tenantId);
         meta.setCreatedAt(Instant.now());
         meta.setCreatedBy(createdBy);
-        return repository.save(meta);
+        CollectionMetaEntity saved = repository.save(meta);
+
+        // T1: 创建成功后为 admin 角色播种 ACL 策略 (READ/CREATE/UPDATE/DELETE)
+        seedAdminAclForCollection(name, tenantId);
+
+        return saved;
+    }
+
+    /** T1: 为指定集合的 admin 角色播种 ACL 策略 (幂等)。 */
+    private void seedAdminAclForCollection(String collectionName, String tenantId) {
+        log.info("[ACL] seedAdminAclForCollection called: collection={}, tenant={}, roleRepo={}, aclRepo={}",
+                collectionName, tenantId,
+                roleRepository != null ? "present" : "null",
+                aclPolicyRepository != null ? "present" : "null");
+        if (roleRepository == null || aclPolicyRepository == null) {
+            // 测试环境或手动构造时可能为 null，跳过播种
+            log.warn("[ACL] Skipping seeding: repositories are null");
+            return;
+        }
+        var adminRoleOpt = roleRepository.findByNameAndTenantId("admin", tenantId);
+        if (adminRoleOpt.isEmpty()) {
+            log.warn("[ACL] admin role not found for tenant={}", tenantId);
+            return;
+        }
+        UUID adminRoleId = adminRoleOpt.get().getId();
+        AclPolicyEntity.Action[] actions = {
+                AclPolicyEntity.Action.READ,
+                AclPolicyEntity.Action.CREATE,
+                AclPolicyEntity.Action.UPDATE,
+                AclPolicyEntity.Action.DELETE
+        };
+
+        for (AclPolicyEntity.Action action : actions) {
+            var existing = aclPolicyRepository.findByRoleIdAndTenantId(adminRoleId, tenantId).stream()
+                    .filter(p -> p.getType() == AclPolicyEntity.Type.ACTION
+                            && collectionName.equals(p.getSubject())
+                            && p.getAction() == action)
+                    .findFirst();
+            if (existing.isPresent()) {
+                continue; // 已存在，跳过
+            }
+            AclPolicyEntity policy = new AclPolicyEntity();
+            policy.setId(UUID.randomUUID());
+            policy.setRoleId(adminRoleId);
+            policy.setType(AclPolicyEntity.Type.ACTION);
+            policy.setSubject(collectionName);
+            policy.setAction(action);
+            policy.setConfigJson("{}");
+            policy.setTenantId(tenantId);
+            policy.setCreatedAt(Instant.now());
+            aclPolicyRepository.save(policy);
+            log.info("[ACL] Seeded {} policy for collection={}, role=admin, tenant={}",
+                    action, collectionName, tenantId);
+        }
     }
 
     public List<CollectionMetaEntity> list(String tenantId) {
