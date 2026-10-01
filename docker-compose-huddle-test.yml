@@ -1,0 +1,92 @@
+# 双实例测试配置
+name: huddle-test
+
+services:
+  backend-java-1:
+    image: nocobase/backend-java:latest
+    container_name: huddle-instance-1
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      AI_SERVICE_URL: http://backend-python:8000
+      AI_PYTHON_URL: http://backend-python:8000
+      AI_ENABLED: "true"
+      RATELIMIT_LOGIN_LIMIT: ${RATELIMIT_LOGIN_LIMIT:-5}
+      CRDT_SERVICE_URL: http://crdt-service:3100
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+    networks:
+      - huddle-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  backend-java-2:
+    image: nocobase/backend-java:latest
+    container_name: huddle-instance-2
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      AI_SERVICE_URL: http://backend-python:8000
+      AI_PYTHON_URL: http://backend-python:8000
+      AI_ENABLED: "true"
+      RATELIMIT_LOGIN_LIMIT: ${RATELIMIT_LOGIN_LIMIT:-5}
+      CRDT_SERVICE_URL: http://crdt-service:3100
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+    networks:
+      - huddle-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: huddle-postgres
+    environment:
+      POSTGRES_DB: nocobase
+      POSTGRES_USER: nocobase
+      POSTGRES_PASSWORD: dev_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nocobase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - huddle-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: huddle-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - huddle-net
+
+networks:
+  huddle-net:
+    name: huddle-net

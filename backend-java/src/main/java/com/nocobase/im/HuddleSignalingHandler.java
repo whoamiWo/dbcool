@@ -1,22 +1,30 @@
 package com.nocobase.im;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.stereotype.Component;
 
 /**
  * Huddle WebRTC 信令处理。
  *
  * <p>基于原生 WebSocket 的信令中继，支持 offer/answer/candidate 交换。
- * 单进程内存路由（多实例部署需迁移到 Redis pub/sub，与 STOMP 桥一致）。
+ * 多副本部署时通过 Redis pub/sub 实现跨实例信令转发。
  *
  * <p>消息协议（JSON）：
  * <pre>
@@ -26,17 +34,28 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>媒体流不经过应用服务器（SFU/P2P 架构），此处只转发信令。
  */
+@Component
 public class HuddleSignalingHandler extends TextWebSocketHandler {
 
-    /** 房间 ID -> 参与者会话集合 */
+    private static final Logger log = LoggerFactory.getLogger(HuddleSignalingHandler.class);
+
+    public static final String REDIS_CHANNEL = "nocobase:huddle:signaling";
+
     private final Map<String, Set<WebSocketSession>> rooms = new ConcurrentHashMap<>();
-    /** 会话 -> 房间 ID */
     private final Map<WebSocketSession, String> sessionRooms = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private final SimpMessagingTemplate messagingTemplate;
+    private final StringRedisTemplate redisTemplate;
+    private final String instanceId = UUID.randomUUID().toString();
+
+    public HuddleSignalingHandler(SimpMessagingTemplate messagingTemplate, StringRedisTemplate redisTemplate) {
+        this.messagingTemplate = messagingTemplate;
+        this.redisTemplate = redisTemplate;
+    }
+
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        // 房间注册延后到收到 join 消息
     }
 
     @Override
@@ -60,7 +79,7 @@ public class HuddleSignalingHandler extends TextWebSocketHandler {
             case "join" -> handleJoin(session, roomId);
             case "leave" -> handleLeave(session, roomId);
             case "offer", "answer", "candidate", "state" -> relay(session, roomId, data);
-            default -> send(session, Map.of("type", "error", "msg", "未知类型: " + type));
+            default -> send(session, Map.of("type", "error", "msg", "未知类型：" + type));
         }
     }
 
@@ -69,7 +88,7 @@ public class HuddleSignalingHandler extends TextWebSocketHandler {
         room.add(session);
         sessionRooms.put(session, roomId);
 
-        // 通知房间内已有参与者：新 peer 加入（触发其创建 offer）
+        // 通知本机已有成员有新成员加入
         for (WebSocketSession peer : room) {
             if (peer.isOpen() && !peer.equals(session)) {
                 send(peer, Map.of("type", "peer-joined",
@@ -78,16 +97,23 @@ public class HuddleSignalingHandler extends TextWebSocketHandler {
         }
         send(session, Map.of("type", "joined", "roomId", roomId,
                 "peerCount", room.size(), "sessionId", sessionId(session)));
-    }
 
-    private void handleLeave(WebSocketSession session, String roomId) throws IOException {
-        removeFromRoom(session, roomId);
-        send(session, Map.of("type", "left", "roomId", roomId));
-        broadcastOthers(roomId, session, Map.of("type", "peer-left",
+        // 发布到 Redis，让其他实例知道有新成员加入（排除自己）
+        publishToRedis(roomId, session.getId(), Map.of("type", "peer-joined",
                 "peerId", sessionId(session)));
     }
 
-    /** 将 offer/answer/candidate/state 转发给同房间其他参与者。 */
+    private void handleLeave(WebSocketSession session, String roomId) throws IOException {
+        // 先广播 peer-left（包括 Redis），再移除
+        Set<WebSocketSession> room = rooms.get(roomId);
+        if (room != null) {
+            broadcastOthers(roomId, session, Map.of("type", "peer-left",
+                    "peerId", sessionId(session)));
+        }
+        removeFromRoom(session, roomId);
+        send(session, Map.of("type", "left", "roomId", roomId));
+    }
+
     private void relay(WebSocketSession session, String roomId, Map<String, Object> data) throws IOException {
         Set<WebSocketSession> room = rooms.get(roomId);
         if (room == null) {
@@ -109,18 +135,68 @@ public class HuddleSignalingHandler extends TextWebSocketHandler {
                 send(peer, msg);
             }
         }
+        publishToRedis(roomId, exclude.getId(), msg);
+    }
+
+    private void publishToRedis(String roomId, String fromSessionId, Map<String, Object> msg) {
+        try {
+            Map<String, Object> envelope = new HashMap<>();
+            envelope.put("instanceId", instanceId);
+            envelope.put("fromSessionId", fromSessionId);
+            envelope.put("roomId", roomId);
+            envelope.put("payload", msg);
+            String json = objectMapper.writeValueAsString(envelope);
+            redisTemplate.convertAndSend(REDIS_CHANNEL, json);
+        } catch (Exception e) {
+            log.warn("[huddle] Redis 广播失败 (roomId={}): {}", roomId, e.getMessage());
+        }
+    }
+
+    public void onRemoteMessage(String raw) {
+        if (raw == null || raw.isBlank()) return;
+        try {
+            Map<String, Object> envelope = objectMapper.readValue(raw, Map.class);
+            String senderInstanceId = (String) envelope.get("instanceId");
+            if (senderInstanceId == null || instanceId.equals(senderInstanceId)) {
+                return;
+            }
+            String fromSessionId = (String) envelope.get("fromSessionId");
+            if (fromSessionId == null) return;
+            String roomId = (String) envelope.get("roomId");
+            Map<String, Object> payload = (Map<String, Object>) envelope.get("payload");
+            if (roomId == null || payload == null) return;
+
+            Set<WebSocketSession> room = rooms.get(roomId);
+            if (room == null) return;
+
+            Map<String, Object> msg = new HashMap<>(payload);
+            msg.put("remoteInstanceId", senderInstanceId);
+
+            for (WebSocketSession peer : room) {
+                String peerSessionId = sessionId(peer);
+                if (peer.isOpen() && !peerSessionId.equals(fromSessionId)) {
+                    send(peer, msg);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[huddle] 远程消息处理失败：{}", e.getMessage());
+        }
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String roomId = sessionRooms.remove(session);
         if (roomId != null) {
-            removeFromRoom(session, roomId);
-            try {
-                broadcastOthers(roomId, session, Map.of("type", "peer-left",
-                        "peerId", sessionId(session)));
-            } catch (IOException ignored) {
+            // 先广播 peer-left（包括 Redis），再移除
+            Set<WebSocketSession> room = rooms.get(roomId);
+            if (room != null) {
+                try {
+                    broadcastOthers(roomId, session, Map.of("type", "peer-left",
+                            "peerId", sessionId(session)));
+                } catch (IOException ignored) {
+                }
             }
+            removeFromRoom(session, roomId);
         }
     }
 

@@ -75,12 +75,24 @@ public class DingTalkController {
         this.refreshTokenService = refreshTokenService;
     }
 
-    /** 生成扫码授权地址。 */
+    /** 生成扫码授权地址（支持 GET/POST）。 */
     @GetMapping("/auth-url")
-    public Map<String, Object> authUrl(
+    public Map<String, Object> authUrlGet(
             @RequestParam(required = false) String state,
             @RequestParam(required = false, defaultValue = "tenant_default") String tenantId
     ) {
+        return authUrlCommon(state, tenantId);
+    }
+
+    @PostMapping("/auth-url")
+    public Map<String, Object> authUrlPost(@RequestBody(required = false) Map<String, Object> body) {
+        String state = body == null ? null : (String) body.get("state");
+        String tenantId = body == null ? null : (String) body.get("tenantId");
+        if (tenantId == null || tenantId.isBlank()) tenantId = "tenant_default";
+        return authUrlCommon(state, tenantId);
+    }
+
+    private Map<String, Object> authUrlCommon(String state, String tenantId) {
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("url", appService.getAuthUrl(state, tenantId),
                         "configured", appService.isConfigured()));
@@ -195,7 +207,7 @@ public class DingTalkController {
      * 2. 删除 @RequestParam tenantId（租户必须由配置推导，绝不允许请求方指定）
      */
     @PostMapping("/approval-callback")
-    public Map<String, Object> approvalCallback(
+    public ResponseEntity<Map<String, Object>> approvalCallback(
             @RequestBody Map<String, Object> payload,
             @RequestHeader(value = "X-DingTalk-Timestamp", required = false) String timestamp,
             @RequestHeader(value = "X-DingTalk-Signature", required = false) String signature
@@ -203,12 +215,12 @@ public class DingTalkController {
         // 1. 签名校验（防止伪造回调）
         if (timestamp == null || signature == null) {
             log.warn("[DingTalk] 审批回调缺少签名头");
-            return Map.of("code", 401, "message", "missing signature headers");
+            return ResponseEntity.status(401).body(Map.of("code", 401, "message", "missing signature headers"));
         }
         
         if (!verifySignature(timestamp, signature, payload)) {
             log.warn("[DingTalk] 审批回调签名验证失败");
-            return Map.of("code", 401, "message", "invalid signature");
+            return ResponseEntity.status(401).body(Map.of("code", 401, "message", "invalid signature"));
         }
         
         // 2. 处理业务逻辑
@@ -218,7 +230,7 @@ public class DingTalkController {
             approvalService.handleApprovalCallback(String.valueOf(instanceId), String.valueOf(result));
             updateWorkflowTaskStatus(String.valueOf(instanceId), String.valueOf(result));
         }
-        return Map.of("code", 0, "message", "received");
+        return ResponseEntity.ok(Map.of("code", 0, "message", "received"));
     }
     
     /**

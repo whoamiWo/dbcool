@@ -60,6 +60,7 @@ public class SecurityConfig {
                         // SecurityConfig 仅负责链路可达,不做裸放行。
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/dingtalk/auth-url").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/dingtalk/auth-url").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/approval-callback").permitAll()
                         // PHASE62: 第三方 webhook 回调端点必须匿名放行 ——
                         // Slack / 飞书 / 钉钉 / 企微 / Mattermost 的回调请求**不可能**携带我方 JWT,

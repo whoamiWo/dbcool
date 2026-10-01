@@ -3,6 +3,7 @@ package com.nocobase.integration.common;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,4 +14,9 @@ public interface ExternalMessageLogRepository extends JpaRepository<ExternalMess
      * 检查是否存在已处理的外部消息。
      */
     Optional<ExternalMessageLogEntity> findBySourceAndExternalMessageId(String source, String externalMessageId);
+
+    /**
+     * 删除指定时间之前的记录，返回删除数量。
+     */
+    long deleteByProcessedAtBefore(Instant processedAtBefore);
 }

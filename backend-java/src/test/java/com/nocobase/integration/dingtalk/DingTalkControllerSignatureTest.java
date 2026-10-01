@@ -41,7 +41,7 @@ class DingTalkControllerSignatureTest {
         mockMvc.perform(post("/api/dingtalk/approval-callback")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"instance_id\":\"test\",\"result\":\"approved\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(401));
     }
 
@@ -56,7 +56,7 @@ class DingTalkControllerSignatureTest {
                         .content("{\"instance_id\":\"test\",\"result\":\"approved\"}")
                         .header("X-DingTalk-Timestamp", String.valueOf(timestamp))
                         .header("X-DingTalk-Signature", wrongSign))
-                .andExpect(status().isOk())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(401));
     }
 

@@ -74,15 +74,17 @@ class DingTalkApprovalCallbackTest {
 
     @Test
     void missingHeaders_rejected() {
-        Map<String, Object> resp = controller.approvalCallback(payload(), null, null);
-        assertThat(resp.get("code")).isEqualTo(401);
+        var resp = controller.approvalCallback(payload(), null, null);
+        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getBody().get("code")).isEqualTo(401);
     }
 
     @Test
     void invalidSignature_rejected() throws Exception {
         String ts = String.valueOf(System.currentTimeMillis());
-        Map<String, Object> resp = controller.approvalCallback(payload(), ts, "bogus_signature");
-        assertThat(resp.get("code")).isEqualTo(401);
+        var resp = controller.approvalCallback(payload(), ts, "bogus_signature");
+        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getBody().get("code")).isEqualTo(401);
     }
 
     /** 正向用例：正确签名必须放行（证明是真校验，而非被 Security 拦截的假阳性）。 */
@@ -90,8 +92,9 @@ class DingTalkApprovalCallbackTest {
     void validSignature_accepted() throws Exception {
         String ts = String.valueOf(System.currentTimeMillis());
         String sig = sign(SECRET, ts);
-        Map<String, Object> resp = controller.approvalCallback(payload(), ts, sig);
-        assertThat(resp.get("code")).isEqualTo(0);
+        var resp = controller.approvalCallback(payload(), ts, sig);
+        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getBody().get("code")).isEqualTo(0);
     }
 
     @Test
@@ -99,16 +102,18 @@ class DingTalkApprovalCallbackTest {
         // 10 分钟前的时间戳（超出 5 分钟窗口），但签名本身是合法计算的
         String ts = String.valueOf(System.currentTimeMillis() - 600_000);
         String sig = sign(SECRET, ts);
-        Map<String, Object> resp = controller.approvalCallback(payload(), ts, sig);
-        assertThat(resp.get("code")).isEqualTo(401);
+        var resp = controller.approvalCallback(payload(), ts, sig);
+        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getBody().get("code")).isEqualTo(401);
     }
 
     @Test
     void blankSecret_rejected() throws Exception {
         when(appService.getAppSecret()).thenReturn("");
         String ts = String.valueOf(System.currentTimeMillis());
-        Map<String, Object> resp = controller.approvalCallback(payload(), ts, sign(SECRET, ts));
-        assertThat(resp.get("code")).isEqualTo(401);
+        var resp = controller.approvalCallback(payload(), ts, sign(SECRET, ts));
+        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getBody().get("code")).isEqualTo(401);
     }
 
     /** 请求方无法通过 URL 参数指定租户（方法签名已不含 tenantId）。 */

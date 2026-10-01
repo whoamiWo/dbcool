@@ -15,9 +15,8 @@ metadata:
   labels:
     app: backend-java
   annotations:
-    # P0-4 临时方案：HPA + 多副本下 WebSocket 信令依赖会话粘滞（Ingress cookie affinity）
-    # TODO: 迁移到 Redis pub/sub 跨实例广播信令（参考 PresenceService 的 Redis 用法）
-    # 见：HuddleSignalingHandler.java 注释，当前内存路由在多副本下会导致同房间用户互相看不见
+    # Huddle 信令已通过 Redis pub/sub 实现跨实例广播（HuddleSignalingHandler + RedisMessageListenerContainer）
+    # 不再依赖 Ingress cookie affinity，会话粘滞可选配置
 spec:
   replicas: 3
   selector:
