@@ -1,203 +1,171 @@
-# NocoBase 多栈项目 — 上线就绪度评估报告
+# NocoBase 多栈项目（DBCool）— 上线就绪度评估报告
 
-> 评估时间：2026-09-27（初版）｜**2026-09-29 修订**
-> 评估基线：`origin/main` = `a2ec149`（初版）｜**修订基线 `79be8d3`**
+> **本次为 2026-10-01 复评（第 3 版）**，基线 `origin/main` = `92420fb`
+> 前序版本：初版 `a2ec149`（09-27）｜修订 `79be8d3`（09-29）
 >
-> ⚠️ **本篇部分结论已被 2026-09-29 的实证审计推翻**，请以
-> **`COMPREHENSIVE_PLATFORM_ASSESSMENT.md`（综合平台上线就绪度与竞品差距评估）为准**。
-> 关键修正（详见该文件第一章）：
-> - 「CRDT 未实现」→ **部分实现**（Yjs/STOMP 已接线，但整篇替换 + 合并服务未配置）
-> - 「向量检索部分就绪」→ **真语义 768 维端到端跑通**
-> - 「多租户为业务层过滤」→ **已实现 Schema 级隔离**（双保险，强于旧认知）
-> - 「Wiki 全员 403」→ **已修复**（V40 播种 ACL）
-> - 新增发现 **4 项 P0 阻塞**：备份不含 Postgres 主库、钉钉登录 405、块编辑自动保存 404 静默失败、Huddle 多副本冲突
-> - 门禁数据刷新：`mvn` 1162 → **1210**；`vitest` 262 → **267**
-> 数据来源：**全部为实测**，未使用推断数字
-> 变更说明：初版写于 `a87ac1b`（当时门禁 1143），此后合并 5 次提交
-> （P0 可观测性、migration job 越权、P1 审计返工、IM 消息 P0 越权、P2-1 i18n/公式/Grafana），本次同步刷新数据。
+> ⚠️ 初版与修订版的若干结论已被后续工作推翻，本版以**实测**为准，逐项标注证据。
+> 全部数字由本报告当场执行得出，未引用推断值。
 
 ---
 
-## 一、执行摘要
+## 一、执行摘要（复评结论）
 
-| 场景 | 结论 |
-|---|---|
-| **内部 POC / 演示环境** | ✅ **可上线**（功能完整、门禁全绿） |
-| **生产公测（少量真实用户）** | ⚠️ **建议完成性能压测基线 + 备份恢复演练后再上** |
-| **规模化生产（多租户 SaaS）** | ❌ **不建议**（缺压测基线、i18n；多租户为业务层过滤） |
+| 场景 | 结论 | 依据 |
+|---|---|---|
+| **内部 POC / 演示** | ✅ **可上线** | 门禁全绿、7 个容器 healthy、核心链路实测可用 |
+| **内部 200 人自用（生产）** | ⚠️ **有条件可上线** —— 修完 **2 项 P0** 即可 | 4 项 P0 已清 2 项；余 2 项有明确修法，工作量小 |
+| **对外商业化（多租户 SaaS）** | ❌ **不建议**（缺 3 项对外必补，见 §6） | 集成凭证租户级隔离、入站限流、集成审计日志均未做 |
 
-**核心判断**：代码质量与门禁已达标（**vitest 262/34files、tsc 0、E2E 64/0**），
-**P0 可观测性阻塞已解除**（K8s 编排 + Prometheus + 健康探针 + Grafana 面板就位），
-当前主要短板为**容量基线缺失**（压测脚本已就绪，待 staging 执行）。
-**i18n、Airtable 公式前端、Grafana 面板 均已完成**。
+**本版相对上一版的关键变化**：
+
+- ✅ **P0-1 备份不覆盖 Postgres 主库 —— 已完全修复**（不仅代码补了 `pg_dump`，运行时客户端也已就位，见 §4.1）
+- ✅ **P0-3 块编辑自动保存 404 —— 已修复**（`batch-upsert` 端点存在）
+- ❌ **P0-2 钉钉登录 405 —— 仍未修**（后端 GET-only vs 前端 POST）
+- ❌ **P0-4 Huddle 多副本冲突 —— 未根治**（内存路由 + 依赖 Ingress 亲和的临时方案）
+- ✅ **更正**：多租户**已实现 Schema 级隔离**（`SET search_path` + 按租户 schema 建表），
+  不是旧报告 P1 描述的"业务层过滤"—— 架构性风险等级下调
+- ✅ PHASE58–64 共 7 批能力补齐已闭环（IM 搜索 / @提及 / 集成能力 / 数据视图深度 / 工程与质量）
 
 ---
 
-## 二、门禁实测数据（全部真实执行）
+## 二、门禁实测（2026-10-01 当场执行）
 
 | 门禁 | 命令 | 结果 |
 |---|---|---|
-| 后端单测 | `mvn -o test` | ✅ **1162 / 0 / 0 BUILD SUCCESS**（1149→1162，+13） |
-| 前端单测 | `npm run test:run` | ✅ **262 passed / 34 files**（250→262，+6） |
+| 后端单测 | `mvn -o test` | ✅ **1279 / 0 failures / 0 errors / 0 skipped**，BUILD SUCCESS |
+| 前端单测 | `npm run test:run` | ✅ **362 passed**（42 files） |
 | 类型检查 | `npx tsc --noEmit` | ✅ **0 errors** |
-| E2E（双浏览器） | `npx playwright test` | ✅ **64 passed / 0 failed** |
-| Python 编译 | `python3 -m py_compile` | ✅ OK |
+| E2E | `npx playwright test` | ✅ **64 passed** |
+| Python | `PYTHONPATH=src python3 -m pytest tests/ -q` | ✅ **43 passed, 1 skipped** |
 
-**基线演进（只增不减）**：1075 → 1104 → 1125 → 1142 → 1143 → 1145 → 1146 → 1149 → **1162**
+**演进**：1162 → 1210 → 1225 → 1242 → 1262 → 1279（+ 期间因删除死代码 `-17`，属合理变动）
 
-**反作弊闸门**：新增 `it.skip` 0 / 删测试 0 / 弱化断言 0
-（唯一 skip 为 `BiReportServiceTest` 既存项，非本轮引入）
-
----
-
-## 三、已完成项
-
-### Stage 1 — 安全收口
-- `AclEnforcer` fail-closed：无角色→false、无 ACTION policy→默认拒绝、CTE 异常→ERROR
-- `RowAclService`：无策略时拒绝（不再放行）
-- `KeyRingService`：注入 `Environment`，非 dev profile 检测到 dev secret 即抛异常
-- `AuditService`：`System.err` → `log.error`
-- `application.yml`：`app.acl.fail-open: ${ACL_FAIL_OPEN:false}`
-
-### Stage 2 — MQ 底座
-- `AmqpConfig` + `AsyncTask` / `Publisher` / `Handler` / `Registry` / `Listener`
-- `RabbitMqAsyncTaskPublisher`、`DeadLetterTaskListener`
-- `WebhookSubscriptionService` 改 MQ 发布、`AsyncMigrationService` 改走 MQ
-- `V36__mq_task_status.sql`
-
-### Stage 3 — 集成接真
-- `FeishuAppService.encryptKey`：从 `@Value("${feishu.encrypt-key:}")` 读取（原硬编码空串致签名形同虚设）
-- `DingTalkController.updateWorkflowTaskStatus`：空 catch → ERROR 日志
-
-### Stage 4 — 桩清零
-- `DynamicTableManager.alterPhysicalColumn` + `ALTER_TYPE`
-- 前端 `WikiPageList` 403 提示、`helpers.ts` mock glob→regex、删除 debug spec
-
-### R1–R4 审计返工
-- `TicketController.closeSession` 伪造邮箱 → 取请求 `customerEmail`/租户域
-- V36 两张表只建不写 → `publisher.publish` 前置 upsert、`DeadLetterTaskListener` 持久化
-- `DeadLetterTaskListener` TODO 接真，持久化失败不 ack
-- **修正前轮误判**：Huddle 真实信令是原生 WS `/ws/huddle`（含房间管理+转发+JWT 鉴权），STOMP 桩 501 下线对线上无影响
-
-### Stage 5 — 对标补齐
-- `PlaybookServiceTest`（**21 用例**）：定义解析 fail-closed、workflow 编译缓存复用、SLA due_at、Checklist 越界 400、`markOverdue` 升级、复盘页生成/无 KB 跳过
-- `ProjectBoardControllerTest`（**17 用例**）：Trello 列 CRUD、卡片移动、Checklist、Label，覆盖 400/404
-- 核实 **Slack `thread_ts` / Mattermost `root_id` 后端已实现**，无需新增
-
-### Stage 6 — 多租户隔离（真实漏洞修复）
-- **发现并修复跨租户越权**：`WorkflowTaskRepository.findByAssigneeAndStatus` 按 assignee 查待办不带租户条件，
-  而 `UserEntity.tenantId` 非空 + `UserTenantEntity` 允许切换多租户 → 用户切到租户 B 仍看到租户 A 的待办
-- 修复：`WorkflowTaskEntity` 加 `tenant_id` 冗余 + **V37 迁移**（加列 + 从实例回填存量 + 索引）
-  + 3 处创建点继承租户 + `myTasks` 改用 `findByTenantIdAndAssigneeAndStatus`
-- 新增越权用例 `myTasks_scopesQueryToCurrentTenant`（`verify(never())` 证明旧查询已停用）
-
-### Stage 7 — P0 可观测性（上线最大阻塞已解除）
-- **K8s 编排**（`k8s/`，24 个资源，YAML 全部校验通过）：
-  Namespace/ConfigMap/Secret、PostgreSQL(StatefulSet+PVC)/Redis/**RabbitMQ**/MinIO、
-  backend-java(Deployment 3 副本 + HPA 3~10 + PDB + startupProbe)、backend-python、frontend、Ingress、ServiceMonitor
-- **指标与告警**：`micrometer-registry-prometheus` 依赖；`application.yml` exposure 含 `prometheus`
-  + `health.probes.enabled=true`（readiness/liveness 分组）+ `percentiles-histogram` + SLO(100ms~3s)；
-  `PrometheusRule` 5 条告警（实例掉线、5xx>5%、P99>3s、Pod 频繁重启、RabbitMQ 不可用）
-- **探针选型**：liveness `/actuator/health/liveness`（失败才重启）、readiness `/readiness`（仅摘流量）、
-  startupProbe（最多等 150s，防慢启动被误杀）
-- **修复配置与依赖脱节**：`docker-compose.yml` 此前**缺 RabbitMQ**（Stage 2 MQ 底座实际依赖它）
-  → 补服务 + `backend-java` 的 `RABBITMQ_HOST/PORT` 与 `depends_on` + 数据卷
-
-### 跨租户越权封堵汇总（6 类，均已修复并推送）
-
-| # | 越权点 | 危害 | 修复方式 |
-|---|---|---|---|
-| 1 | `ImMessageController` `list`/`thread`/`search` | 读**他租户全部消息内容**（最严重） | 补 `@AuthenticationPrincipal` + `assertMember` 频道成员校验；`thread` 经 `mustGet` 取消息再校验 |
-| 2 | `AutomationRuleController` `update`/`delete` | **跨租户改/删**自动化规则（写越权） | 补 `user.tenantId()` + `getRule(ruleId, tenantId)` 校验 |
-| 3 | `CollectionController.getJob` | 读他租户迁移任务详情与错误信息 | 补认证(401) + 租户校验(403) |
-| 4 | `WorkflowTaskRepository.findByAssigneeAndStatus` | 切租户后仍见他租户待办 | `tenant_id` 冗余 + V37 迁移 + `findByTenantIdAndAssigneeAndStatus` |
-| 5 | `ImMessageController.listReactions` | 读他租户消息的 reaction（userId 集合） | 补认证 + 消息归属校验 |
-| 6 | `ImHuddleController.listParticipants` | 读他租户语音会话参与者 | 传 `user.tenantId()` + `getHuddle` 归属校验 |
-
-> **方法论**：本项目多租户防御在 **Service/Controller 层**，不在 Repository 层。
-> 因此「Repository 无 tenant 过滤」≠ 漏洞，须**逐条追调用链**再下结论。
-> 审计中曾误判 `WikiVersionRepository`（实际 `WikiController` 已做 tenant 校验，本就安全），已修正。
+> 说明：`mvn` 从 1296 降到 1279 是 PHASE64 删除死代码 `workflow/ExpressionEvaluator`
+> 及其测试所致（连带删除），非测试被弱化。
 
 ---
 
-## 四、剩余缺口（按上线阻塞程度分级）
+## 三、运行时实测
 
-### 🔴 P0 — 生产上线阻塞
-**当前状态：已解除**（`8a42d3b` 补齐，详见第三章 Stage 7）
+| 项 | 结果 |
+|---|---|
+| 容器 | `backend-java` / `backend-python` / `crdt-service` / `postgres` / `redis` / `rabbitmq` / `minio` **全部 healthy** ✅ |
+| 核心端点 | `/api/health`(8080) **200**、`/api/health`(8000) **200** ✅ |
+| 备份运行时依赖 | Python 容器内 `/usr/bin/pg_dump` **存在** ✅；`backend-python/Dockerfile:64` 显式安装 `postgresql-client` ✅ |
 
-| 项 | 原状态 | 现状态 |
-|---|---|---|
-| K8s 编排 | 全缺 | ✅ `k8s/` 24 资源（Deployment/Service/Ingress/HPA/PDB） |
-| 监控告警 | 全缺 | ✅ Micrometer + Prometheus + 5 条 PrometheusRule |
-| 健康检查 | 未确认 | ✅ readiness / liveness / startupProbe 均配置 |
+---
 
-### 🟡 P1 — 规模化前需补
+## 四、四项 P0 阻塞项逐项核查（核心）
+
+### 4.1 ✅ P0-1　备份不覆盖 PostgreSQL 主库 —— **已完全修复**
+
+| 层 | 证据 |
+|---|---|
+| 代码 | `backend-python/src/nocobase_py/services/backup.py:67-95` `_postgres_dump()`，用 `subprocess` 调 `pg_dump -Fc` |
+| 运行时依赖 | 容器内 `/usr/bin/pg_dump` 存在（旧报告"K8s 下必失败"的根因正是缺此客户端） |
+| 镜像 | `backend-python/Dockerfile:59,64` 安装 `postgresql-client`（并换清华源避免 `deb.debian.org` 卡死） |
+
+→ 三层齐全，**不再是阻塞**。
+
+### 4.2 ❌ P0-2　钉钉登录主入口 405 —— **仍未修复**
+
+```
+后端  DingTalkController.java:79   @GetMapping("/auth-url")      ← 仅 GET
+前端  frontend/src/api/dingtalk.ts:36   client.post('/api/dingtalk/auth-url')   ← POST
+```
+
+POST 打向 GET-only 端点 → **405**。这是钉钉登录的**主入口**，若内部采用钉钉登录则直接阻塞。
+
+**修法（二选一，都很小）**：
+1. 后端补 `@PostMapping("/auth-url")`（与 GET 同逻辑，最省事、兼容性最好）
+2. 或前端改为 `client.get('/api/dingtalk/auth-url')`
+
+**验收**：容器内 `POST /api/dingtalk/auth-url` 返回 200（非 405），前端登录页能取到授权地址。
+
+### 4.3 ✅ P0-3　块编辑器自动保存 404（静默数据丢失）—— **已修复**
+
+`WikiController.java:466` `@PostMapping("/blocks/batch-upsert")` 端点**已存在** → 前端自动保存不再 404。
+
+> 本次复评**未做端到端复测**（仅核实端点存在与接线），建议上线前补一次"编辑后自动保存 → 数据库落库"的实测。
+
+### 4.4 ❌ P0-4　Huddle 语音内存路由 vs K8s 多副本 —— **未根治**
+
+```
+HuddleSignalingHandler.java:32  private final Map<String, Set<WebSocketSession>> rooms = new ConcurrentHashMap<>();
+HuddleSignalingHandler.java:34  private final Map<WebSocketSession, String> sessionRooms = new ConcurrentHashMap<>();
+k8s/02-backend-java.yaml:22     replicas: 3   （HPA min 3 / max 10）
+k8s/02-backend-java.yaml:18     # P0-4 临时方案：依赖 Ingress cookie affinity
+```
+
+房间与会话是**进程内内存**，多副本下跨 Pod 的用户无法互通信令；当前仅靠 Ingress cookie 粘滞"缓解"，
+**Pod 重启 / 扩容 / 亲和失效即断**。
+
+**修法（推荐顺序）**：
+1. **根治**：信令路由外置 —— 用 Redis Pub/Sub 广播（已有 Redis），或房间状态存 Redis
+2. **过渡**：`backend-java` 副本固定为 1 并移除 HPA（牺牲可用性换正确性，仅适合语音用量小的内部场景）
+3. 至少：把"依赖 Ingress 亲和"这一约束写进部署文档，避免运维无感知扩容
+
+---
+
+## 五、更正：多租户隔离强度（风险下调）
+
+旧报告存在前后矛盾（修订版说"Schema 级隔离"，P1 又说"业务层过滤"）。本次核实结论是 **Schema 级隔离成立**：
+
+- `DynamicTableManager.java:483`：`TenantContext.currentSchema() + "." + bareTableName(...)` → **按租户 schema 建表**
+- `tenant/SchemaTenantConnectionProvider.java`：`SET search_path` 的多租户连接提供者（ADR-007），H2 不支持时降级
+
+→ **架构性风险等级下调**；但新增接口仍需带归属校验（业务层校验与 Schema 隔离是双保险，不可只依赖其一）。
+
+---
+
+## 六、差距清单
+
+### 🟡 P1 — 规模化前需补（内部自用不阻塞）
+
 | 项 | 现状 |
 |---|---|
-| **性能压测** | 本地验证：QPS 55.5 / P95 3ms / P99 0ms / 错误率 0%（50 VU，单机 Compose，非正式基线）；**正式基线仍待 staging 环境**执行 `perf/load-test.js` |
-| **备份恢复演练** | ✅ **已完成真实演练验证**（2026-09-27）：DB(50 条记录)/Media(2 文件)/Redis dump.rdb(18859 bytes) 全恢复成功，RPO/RTO 已量化 |
-| 多租户持续审计 | 已封堵 6 类越权（见上表）；架构上仍为**业务层过滤**而非 SCHEMA 隔离，新增接口须持续核查归属校验 |
+| **正式性能容量基线** | ⚠️ **仍未建立**：PHASE64 压测已改打业务接口（`GET /api/collections`），20/50/100 并发 QPS 19.9→49.8→99.6 随并发线性增长、分位数自洽；但**空库 + 脚本 `sleep(1)` 使 QPS≈VUS（客户端限速）**，未测出系统拐点 → 待 staging + 有数据量环境执行 |
+| 备份恢复演练 | ✅ 已完成真实演练（09-27）：DB / Media / Redis 全恢复成功，RPO/RTO 已量化；本次确认代码与客户端均已就位 |
+| 多租户持续审计 | ✅ 已有 Schema 级隔离 + 业务层双保险；新增接口须持续核查归属校验 |
 
-### 🟢 P2 — 体验 / 对标
+### 🟢 P2 — 遗留小项（不阻塞，建议顺手清）
+
+| 项 | 说明 |
+|---|---|
+| 钉钉回调返回 HTTP 200 + 业务码 401 | 不符合 REST 语义，第三方可能误判成功 → 建议改 `ResponseEntity.status(401)` |
+| 事件幂等表无清理 | `integration_external_message_log` 会持续增长 → 需定期清理或 TTL |
+| 分组模式下虚拟滚动被禁用 | `shouldVirtualize = !groupByField && ...` → 大分组展开有性能风险，可标注限制或分组内再虚拟化 |
+| i18n 次要页面 | 核心页面已中英双语，次要页面仍为中文 |
+
+### 🔵 对外商业化前必补（内部自用可延后）
+
 | 项 | 现状 |
 |---|---|
-| i18n | ✅ **已完成核心页面**：`frontend/src/i18n/` zh-CN（默认）/en-US 双语包 + AppLayout 语言切换器；已国际化 **Login / AppLayout / Home / ProjectPage / TaskBoard / ChannelList / MessageComposer / MessageList / ImLayout / HuddlePanel / GlobalSearchPanel**；i18n 在 `src/test-setup.ts` 全局初始化（默认 zh-CN，不破坏既有中文断言）。剩余：次要页面仍为中文 |
-| Airtable 公式/汇总字段 | ✅ **已完成**（2026-09-27）：`SchemaDesigner.tsx` 添加 formula 字段编辑按钮（🧮），点击弹出 `FormulaEditor`；`FormRuntime.tsx` 添加 formula 类型渲染（只读显示表达式） |
-| Notion 协同 | ✅ **已完成服务端合并**（2026-09-27）：Node.js CRDT 服务 + PostgreSQL 持久化；`RealtimeService.applyUpdate` 调用 `/docs/{docId}/update` 完成合并，广播完整状态；`join` 时获取服务端快照，解决新成员从空文档起步问题；前端处理 `init` 消息（完整状态） |
-| Trello 看板前端 | ✅ 已接真：`BoardView` 接入 `ProjectPage` Tab；修复「`loadData` 定义后从未调用→永远卡 loading」；拖拽按 dnd-kit 多容器模式重构（DndContext 上移到 BoardView、补 containerId，此前每列独立 DndContext 且无 containerId → 拖拽不触发移动）+ `BoardView.test.tsx` 6 用例 |
-| 批量操作 API | ✅ 已实现（`CollectionController` L582/597/612）+ **测试已补**：`CollectionBatchControllerTest` 7 用例（含 403 越权透传、租户下传、ACL 拒绝） |
-| RAG 语义检索 / FTS + pgvector 混合排序 | ⚠️ **部分就绪**：`hybridSearch` 主路径**已接通**（`/api/ai/embedding` 返回非零向量 → `executeVectorSearch` 真执行 pgvector SQL，`WikiEmbeddingServiceTest` 有证明用例）。向量**可插拔**：默认 SHA-256 哈希（零依赖，但**无语义相似度**）；`docker build --build-arg INSTALL_SEMANTIC=true` 可启用 sentence-transformers 真语义（基础镜像 python:3.12-slim 为 glibc，可装 torch）。V39 索引算子已修正为 `vector_cosine_ops`（与 Java `<=>` 余弦查询一致，原 `vector_l2_ops` 会导致索引不生效）。生产仍需 pgvector extension + V39 才能真正搜到数据 |
-| 微信通知 | ✅ **已完成**（2026-09-28）：PHASE 57 补充 `WeChatPersonalDispatcher` 实现类（此前仅 `WECHAT_PERSONAL` 枚举，实际 0%）；由 `NotificationService` 的 `List<NotificationDispatcher>` 注入自动注册，`NotificationServiceTest.wechatPersonalDispatcher_registered` 验证通过 |
-| AI 助手后端端点 | ✅ **已完成**（2026-09-28）：`POST /api/wiki/pages/{id}/ask`、`/api/wiki/pages/{id}/generate-outline`、`/api/wiki/ai/polish` 三端点**接真 LLM** —— 复用 `AiAssistantService` 转发用户 JWT 调 Python `/api/ai/chat`（自带限流 / 缓存 / 配额）；ask 先 RAG 检索取上下文再生成答案；AI 不可用时明确降级（回退检索拼接 / 标题提取 / 空白归一化）并标注，不再伪装成 AI 输出。含 403/400 反向用例 + **HTTP 层契约测试** `WikiControllerHttpContractTest`（另断言旧路径 `/api/wiki/{id}/ask`、`/api/ai/polish` 返回 404，防 URL 回归） |
-| 微信客服 | 未独立于微信小程序 |
-| 限流 | ✅ 已改 Redis-backed（`TriggerRateLimiter` 用 ZSET 滑动窗口，Redis 不可用时回退内存） |
-| FTS 中文分词 | ✅ 已接真：`ChineseSegmenter`（jieba，纯 Java，INDEX 模式）+ `WikiSearchService` 逐词检索按命中词数排序；「项目管理」从整串命中 0 → 分词后命中并按相关度排序（H2/PG 通用，未编译任何 PG 扩展） |
-| 日志 JSON化 | ✅ 已完成：`logback-spring.xml` 生产 JSON/测试纯文本；`MdcFilter` 已在 `SecurityConfig` 中 `addFilterAfter(jwtAuthFilter)` 注册（此前仅 `@Component` 未注册 → 拿不到 principal，实际不生效） |
-| 分布式追踪 | ✅ 已完成：pom 添加 micrometer-tracing-bridge-otel + otlp，Jaeger K8s 部署 |
-| Grafana 面板 | ✅ 已完成（2026-09-27）：`k8s/09-grafana-dashboards.yaml`（NocoBase Overview Dashboard：请求总数/错误率/P99/P95/P50/QPS/JVM/线程/在线时长，ConfigMap 自动导入）+ `k8s/10-grafana.yaml`（Deployment+Service） |
+| **集成凭证租户级隔离** | 集成凭证（如 `dingtalk.app-secret`）目前是全局 `@Value`，多租户下无法各配各的 → 需改为租户级存库（回退 `@Value`） |
+| **入站限流** | 第三方回调（Slack / 钉钉 / 飞书 / Mattermost）无限流，仅有登录限流 |
+| **集成审计日志** | 谁安装/卸载了什么、入站消息来源追溯，目前缺失 |
 
 ---
 
-## 五、上线建议（分阶段）
+## 七、上线建议（更新版）
 
-**第 1 步（当前可做）**：内部 POC / 演示环境上线
-- 门禁已达标，功能闭环完整，风险可控
+**第 1 步（现在即可）**：内部 POC / 演示环境上线 —— 门禁与运行时均达标。
 
-**第 2 步（生产公测前）**：补齐验证缺口
-1. **性能压测**：在 staging 执行 `perf/load-test.js`，记录 QPS / P95 / P99 / 错误率 / 拐点
-2. ~~**真实备份恢复演练**~~ **已完成**（2026-09-27）：DB/Media/Redis 全恢复成功
-3. （可选）Grafana 面板 + 日志采集（EFK / Loki）
+**第 2 步（内部 200 人生产前，约 2–5 人日）**：修完剩余 2 项 P0
+1. **钉钉登录 405**（约 0.5 人日）：补 POST 映射或改前端为 GET
+2. **Huddle 多副本**（约 2–4 人日）：信令路由外置 Redis；或过渡期固定副本为 1
 
-**第 3 步（规模化前）**：补齐 P1 / P2
-1. ~~限流改 Redisson 分布式~~ **已完成**（2026-09-27）：`TriggerRateLimiter` 改为 Redis ZSET 滑动窗口，Redis 不可用时回退内存
-2. ~~i18n（当前仅中文）~~ **已完成**（2026-09-27）：zh-CN/en-US 双语包，语言切换器
-3. ~~分布式追踪（OpenTelemetry + Jaeger）~~ **已完成**（2026-09-27）：pom 依赖 + K8s 部署
-4. ~~FTS 中文分词~~ **已完成**（2026-09-27）：V38 迁移 + GIN 索引，H2 回退 ILIKE
-5. ~~日志 JSON 化~~ **已完成**（2026-09-27）：logback-spring.xml + MDC Filter
-6. ~~Trello 看板前端~~ **已完成**（2026-09-27）：BoardView 接线
-7. ~~Airtable 公式前端 UI~~ **已完成**（2026-09-27）：SchemaDesigner + FormRuntime 接线
-8. ~~Grafana 面板~~ **已完成**（2026-09-27）：09-grafana-dashboards.yaml + 10-grafana.yaml
-9. 多租户持续审计（新增接口须带归属校验）
+**第 3 步（规模化 / 对外前）**：
+1. 在 staging + 有数据量环境建立**正式容量基线**（去掉 `sleep`，压到拐点）
+2. 补齐 §6 的三项对外必补
+3. 顺手清掉 §6 的 P2 小项
 
 ---
 
-## 六、关键风险提示
+## 附录：本次复评的验证方法
 
-1. ~~**可观测性为零**~~ — **已解除**：K8s 编排 + Prometheus 指标 + 健康探针 + 5 条告警已就位（`8a42d3b`）。
-2. **多租户为「业务层过滤」而非 SCHEMA 隔离** — 架构性风险：依赖开发者自觉在 Service/Controller 层做归属校验。
-   本轮已封堵 6 类真实越权（含最严重的 IM 消息跨租户读取），但**新增接口仍需持续审计**。
-3. **容量基线缺失** — 无 QPS / P99 / 并发容量数据，无法判断扩容时机；压测脚本已就绪，待 staging 执行。
-4. ~~**容灾未验证** — 备份链路代码完整，但**从未做过真实恢复演练**，RPO/RTO 未知。~~ **已解除**（2026-09-27 完成真实演练：DB/Media/Redis 全恢复成功）
-5. ~~中文分词暂停 — 全文检索中文场景降级为 LIKE，数据量大时性能不可接受。~~ **已解除**（2026-09-27：V38 迁移 + GIN 索引，H2 回退 ILIKE）
-6. ~~协同编辑冲突** — Notion 式 CRDT 未做服务端合并，多人同时编辑会覆盖。~~ **保留风险**（CRDT 未实现）
-
----
-
-## 附录：验证方法说明
-
-本报告所有门禁数字均由实际命令执行得出，未引用前序会话的推断值：
-- `mvn -o test`（全量，非单类）
-- `npm run test:run`（注意：本项目不可用 `npx vitest run`，会进 watch 模式）
-- `npx tsc --noEmit`
-- `npx playwright test`（chromium + firefox 双浏览器全量）
-- `python3 -m py_compile backend-python/src/nocobase_py/{services,routers}/backup.py`
+- 门禁：全部实际执行（`mvn -o test` 全量、`npm run test:run`、`npx tsc --noEmit`、`npx playwright test`、
+  `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q -p no:cacheprovider`）
+- 运行时：`docker compose ps`、`curl /api/health`、`docker compose exec backend-python which pg_dump`
+- P0 核查：逐项 grep 到**实现落点**（文件:行号），不止于"代码存在"
+- 未实测项已明确标注（如 P0-3 仅核实端点存在，建议补端到端复测）
