@@ -319,50 +319,55 @@ public class DingTalkController {
      * 2. 按事件 ID 幂等（钉钉会重投）
      */
     @PostMapping("/events")
-    public Map<String, Object> eventCallback(
+    public ResponseEntity<Map<String, Object>> eventCallback(
             @RequestBody Map<String, Object> payload,
             @RequestHeader(value = "X-DingTalk-Timestamp", required = false) String timestamp,
             @RequestHeader(value = "X-DingTalk-Signature", required = false) String signature
     ) {
         // 1. 签名校验
+        // 注意：验签失败必须返回 **HTTP 401**，而不是「HTTP 200 + 业务码 401」。
+        // 后者会让第三方/网关误判为成功，也不会触发钉钉的失败重投。
         if (timestamp == null || signature == null) {
             log.warn("[DingTalk] 事件回调缺少签名头");
-            return Map.of("code", 401, "message", "missing signature headers");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", 401, "message", "missing signature headers"));
         }
-        
+
         if (!verifyEventSignature(timestamp, signature)) {
             log.warn("[DingTalk] 事件回调签名验证失败");
-            return Map.of("code", 401, "message", "invalid signature");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", 401, "message", "invalid signature"));
         }
-        
+
         // 2. 解析事件
         Object eventType = payload.get("eventType");
         Object eventId = payload.get("eventId");
         String tenantId = "tenant_default";
-        
+
         log.info("[DingTalk] 事件回调: type={}, id={}, tenant={}", eventType, eventId, tenantId);
-        
+
         // 3. 幂等检查（基于 eventId）
         if (eventId != null && !String.valueOf(eventId).isBlank()) {
             if (isDuplicateEvent(String.valueOf(eventId))) {
                 log.info("[DingTalk] 检测到重复事件，跳过: id={}", eventId);
-                return Map.of("code", 0, "message", "duplicate ignored");
+                return ResponseEntity.ok(Map.of("code", 0, "message", "duplicate ignored"));
             }
         }
-        
+
         // 4. 处理事件
         switch (String.valueOf(eventType)) {
             case "approval_status_changed" -> handleApprovalStatusChanged(payload, tenantId);
             case "contact_updated" -> handleContactUpdated(payload, tenantId);
             default -> log.warn("[DingTalk] 未知事件类型: {}", eventType);
         }
-        
+
         // 5. 记录已处理
         if (eventId != null && !String.valueOf(eventId).isBlank()) {
             markEventProcessed(String.valueOf(eventId), tenantId);
         }
-        
-        return Map.of("code", 0, "message", "success", "data", Map.of("processed", true));
+
+        return ResponseEntity.ok(
+                Map.of("code", 0, "message", "success", "data", Map.of("processed", true)));
     }
     
     /**
