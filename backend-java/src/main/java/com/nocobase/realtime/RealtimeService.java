@@ -49,9 +49,12 @@ public class RealtimeService {
     public RealtimeService(@Lazy SimpMessagingTemplate messagingTemplate,
                            @Value("${crdt.service.url:}") String crdtServiceUrl) {
         this.messagingTemplate = messagingTemplate;
-        this.crdtWebClient = (crdtServiceUrl != null && !crdtServiceUrl.isBlank())
-                ? WebClient.builder().baseUrl(crdtServiceUrl).build()
-                : null;
+        if (crdtServiceUrl == null || crdtServiceUrl.isBlank()) {
+            log.warn("[Realtime] CRDT 服务未配置 (crdt.service.url 为空),启用增量透传降级模式");
+            this.crdtWebClient = null;
+        } else {
+            this.crdtWebClient = WebClient.builder().baseUrl(crdtServiceUrl).build();
+        }
     }
 
     // ============================================================

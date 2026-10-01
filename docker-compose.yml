@@ -126,6 +126,9 @@ services:
       # 注意：不要在 application-test.properties 里全局放宽 —— GlobalRateLimitFilterE2ETest
       # 依赖默认阈值 5 来断言 429，全局放宽会让该用例失败。
       RATELIMIT_LOGIN_LIMIT: ${RATELIMIT_LOGIN_LIMIT:-5}
+      # PHASE64 T3: CRDT 服务地址（容器内用服务名，localhost 指向容器自身会连不通）。
+      # RealtimeService 的 @Value("${crdt.service.url:}") 注入此值；未配置时启用降级模式。
+      CRDT_SERVICE_URL: http://crdt-service:3100
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
@@ -183,14 +186,14 @@ services:
       # PHASE 57: 服务间调用令牌，必须与 backend-java 的 AI_INTERNAL_TOKEN 一致
       # Java 携带它调用 /api/ai/embedding；未设置时该端点仅接受用户 JWT
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
-      # PHASE 57: 模型已在构建期(INSTALL_SEMANTIC=true)下载到 /app/.cache/huggingface。
+      # PHASE 57: 模型已在构建期 (INSTALL_SEMANTIC=true) 下载到 /app/.cache/huggingface。
       # 运行时容器外网不可达，若不禁用联网，SentenceTransformer 每次启动都会尝试
       # 补全 video_preprocessor_config.json 等可选配置 → 5 次重试 × 多文件 → 启动卡死。
       # 离线模式下直接用本地缓存，缺的可选配置走默认值，启动秒起。
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
-      # PHASE 58 P0-1: 备份服务(pg_dump / redis-cli)需要连到真实 Postgres 与 Redis。
-      # 关键: 容器内 localhost 指向容器自身, 必须用 compose 服务名, 否则备份必然
+      # PHASE 58 P0-1: 备份服务 (pg_dump / redis-cli) 需要连到真实 Postgres 与 Redis。
+      # 关键：容器内 localhost 指向容器自身，必须用 compose 服务名，否则备份必然
       # Connection refused(与 AI_SERVICE_URL 硬编码 localhost 是同款问题)。
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -203,6 +206,29 @@ services:
       - "${PYTHON_PORT:-8000}:8000"
     depends_on:
       - backend-java
+    networks:
+      - nocobase-net
+    restart: unless-stopped
+
+  # ============================================================
+  #  CRDT 实时协作服务 (PHASE 64 T3)
+  # ============================================================
+  crdt-service:
+    build:
+      context: ./crdt-service
+      dockerfile: Dockerfile
+    container_name: nocobase-crdt-service
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: ${POSTGRES_DB:-nocobase}
+      PG_USER: ${POSTGRES_USER:-nocobase}
+      PG_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+    ports:
+      - "${CRDT_PORT:-3100}:3100"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - nocobase-net
     restart: unless-stopped

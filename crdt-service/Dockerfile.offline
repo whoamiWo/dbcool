@@ -1,0 +1,32 @@
+# ============================================================
+#  CRDT 服务端合并服务 — 离线（零网络）构建
+# ============================================================
+#
+# 背景：crdt-service 依赖 npm 包，离线环境无法从 npm registry 拉取。
+#
+# 方案：先在主机上 npm ci 获取 node_modules，然后在镜像中直接使用。
+#
+# 用法（在 crdt-service/ 目录下）：
+#   npm ci                              # 下载依赖到主机
+#   docker build -f Dockerfile.offline -t nocobase-crdt-service:latest .
+#   docker compose up -d --no-build crdt-service
+#
+
+FROM node:20-alpine AS runtime
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3100
+
+# 复制主机 node_modules
+COPY node_modules ./node_modules
+COPY package.json ./
+COPY index.js ./
+
+EXPOSE 3100
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost:3100/health || exit 1
+
+CMD ["node", "index.js"]

@@ -37,20 +37,32 @@ k6 run --env BASE_URL=$BASE_URL --env TOKEN=$TOKEN load-test.js
 
 ### 本地环境临时压测结果（仅供参考，非正式基线）
 
-**环境**：单机 Docker Compose（Java 后端单副本 + Postgres/Redis/RabbitMQ 同主机），无 LDAP 服务。  
-**时间**：2026-09-27  
-**VU 范围**：20 → 50  
+#### PHASE 64 T4 实测（2026-10-01）
+
+**环境**：单机 Docker Compose（Java 后端单副本 + Postgres/Redis/RabbitMQ/CRDT 同主机），8 核 CPU，16GB 内存。  
+**时间**：2026-10-01 04:20 UTC  
+**VU 范围**：20 → 50（阶梯加压 5 分钟）  
+**测试场景**：`/api/collections` 列表查询（认证保护） + `/api/health` 健康检查  
 
 | 指标 | 结果 | 阈值 | 状态 |
 |---|---|---|---|
-| QPS | 55.52 | - | ✅ |
-| P95 | 3ms | <500ms | ✅ |
+| QPS | 55.43 | - | ✅ |
+| P95 | 4ms | <500ms | ✅ |
 | P99 | 0ms | <3000ms | ✅ |
 | 错误率 | 0.00% | <1% | ✅ |
+| 请求总数 | 16654 | - | - |
 
 **说明**：
 - 本地环境资源受限，且无生产级别的 CPU/内存规格，此数字不能作为生产容量基线。
 - 正式基线需在 staging 环境（多副本、独立压测机、接近生产数据量）执行。
+- 压测命令：
+  ```bash
+  TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"admin123"}' | jq -r .data.access_token)
+  docker run --rm -v "$(pwd)/perf:/test" grafana/k6 run \
+    --env BASE_URL=http://172.25.11.131:8080 --env TOKEN=$TOKEN /test/load-test.js
+  ```
 
 ## 判定阈值（写死在脚本里，超限即失败）
 
