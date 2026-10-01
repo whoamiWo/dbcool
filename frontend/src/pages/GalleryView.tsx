@@ -30,12 +30,13 @@ export function GalleryViewPage() {
     enabled: !!collectionName,
   });
 
-  if (!viewData || !collectionData) return <p>加载中…</p>;
-
-  const fields = collectionData.fields ?? [];
+  // Move early return after all hooks
+  const view = viewData ?? { title: '', collection_name: '', config: {} };
+  const collection = collectionData ?? { name: '', fields: [] };
+  const fields = collection.fields ?? [];
   const records = recordsData ?? [];
   const fieldMap = new Map(fields.map((f) => [f.name, f]));
-  const config = (viewData.config ?? {}) as unknown as GalleryConfig;
+  const config = (view.config ?? {}) as unknown as GalleryConfig;
   
   // R2 T2: 分组配置
   const groupByField = config.groupBy;
@@ -88,7 +89,7 @@ export function GalleryViewPage() {
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
-      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{viewData.title}</h1>
+      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{viewData?.title}</h1>
       
       {groupByField && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 12 }}>

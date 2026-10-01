@@ -26,7 +26,9 @@ export function TableViewPage() {
     enabled: !!id,
   });
 
-  const collectionName = viewData?.collection_name;
+  // Move early return after all hooks
+  const view = viewData ?? { title: '', collection_name: '', config: {} };
+  const collectionName = view.collection_name;
   const { data: collectionData } = useQuery({
     queryKey: ['collection', collectionName],
     queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collectionName}`),
@@ -69,8 +71,6 @@ export function TableViewPage() {
     enabled: !!collectionName,
   });
 
-  if (!viewData) return <p>加载中…</p>;
-  const view = viewData;
   const config = (view.config ?? {}) as unknown as TableConfig;
   const fields = collectionData?.fields ?? [];
   const records = recordsData ?? [];
@@ -82,6 +82,31 @@ export function TableViewPage() {
   const nonGroupableTypes = ['formula', 'rollup', 'lookup', 'attachment', 'hasMany'];
   const groupableFields = fields.filter(f => !nonGroupableTypes.includes(f.type));
 
+  // R2-B: 使用后端聚合 API（降级到前端计算）
+  const { data: aggregatedData, error: aggError } = useQuery({
+    queryKey: ['aggregate', collectionName, groupByField, groupAggregations, filters],
+    queryFn: async () => {
+      if (!groupByField || groupAggregations.length === 0) return null;
+      
+      const result = await apiClient.post<{ code: number; data: Array<Record<string, string | number>> }>(`/collections/${collectionName}/aggregate`, {
+        groupByFields: [groupByField],
+        aggSpecs: groupAggregations.map(agg => ({
+          field: agg.field,
+          agg: agg.operator === 'avg' ? 'AVG' : agg.operator === 'min' ? 'MIN' : agg.operator === 'max' ? 'MAX' : 'SUM'
+        })),
+        filters: filters.map(f => ({ field: f.field, op: f.op, value: f.value }))
+      });
+      
+      if (result.code !== 0) throw new Error('Aggregate failed');
+      return result.data;
+    },
+    enabled: !!groupByField && groupAggregations.length > 0 && !!collectionName,
+    retry: false,
+  });
+
+  // Fallback to client-side aggregation if backend fails
+  const useBackendAggregation = aggregatedData && !aggError;
+
   // 过滤掉 visible=false 的列 (Week 15 US-206)
   type Col = { field: string; label?: string; width?: number; visible?: boolean };
   const allColumns: Col[] = config.columns ?? fields.map((f) => ({ field: f.name, label: f.label ?? f.name, width: 160, visible: true }));
@@ -91,6 +116,30 @@ export function TableViewPage() {
   const groupedData = useMemo(() => {
     if (!groupByField) return null;
     
+    // R2-B: 优先使用后端聚合结果
+    if (useBackendAggregation && aggregatedData) {
+      const result: GroupedRow[] = [];
+      for (const agg of aggregatedData) {
+        const key = String(agg[groupByField] ?? '__empty__');
+        const aggregations: Record<string, unknown> = {};
+        for (const spec of groupAggregations) {
+          const aggKey = `_sum_${spec.field}` in agg ? `_sum_${spec.field}` : 
+                        `_avg_${spec.field}` in agg ? `_avg_${spec.field}` :
+                        `_min_${spec.field}` in agg ? `_min_${spec.field}` :
+                        `_max_${spec.field}` in agg ? `_max_${spec.field}` : spec.field;
+          aggregations[spec.field] = agg[aggKey];
+        }
+        result.push({
+          _groupKey: key,
+          _count: Number(agg._count ?? 0),
+          _aggregations: aggregations,
+          _children: [], // Backend doesn't return children
+        });
+      }
+      return result;
+    }
+    
+    // Fallback to client-side aggregation
     const groups = new Map<string, RecordRow[]>();
     for (const r of records) {
       const key = String(r[groupByField] ?? '__empty__');
@@ -126,7 +175,7 @@ export function TableViewPage() {
       });
     }
     return result;
-  }, [groupByField, records, groupAggregations]);
+  }, [groupByField, records, groupAggregations, useBackendAggregation, aggregatedData]);
 
   const filtered = groupedData ? [] : records; // R2 T2: 分组模式下用分组数据
   const sorted = filtered; // Server-side sorting applied

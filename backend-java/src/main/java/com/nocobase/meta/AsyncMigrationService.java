@@ -146,16 +146,18 @@ public class AsyncMigrationService {
         }
     }
 
-    private String mapJsonbType(String type) {
+    protected String mapJsonbType(String type) {
         return switch (type) {
-            case "text", "select", "multiSelect" -> "TEXT";
-            case "number" -> "NUMERIC";
+            case "text", "select", "multiSelect", "email", "url", "phone" -> "TEXT";
+            case "number", "currency", "percent" -> "NUMERIC";
             case "boolean" -> "BOOLEAN";
-            case "date", "datetime" -> "TIMESTAMPTZ";
+            case "date", "datetime", "createdTime", "lastModifiedTime" -> "TIMESTAMPTZ";
             case "attachment" -> "TEXT";
-            case "belongsTo", "hasMany" -> "UUID";
+            case "belongsTo", "hasMany", "createdBy", "lastModifiedBy" -> "UUID";
             case "formula" -> "TEXT";
-            default -> throw new IllegalArgumentException("不支持的字段类型: " + type);
+            case "duration", "rating" -> "INTEGER";
+            case "autonumber" -> "BIGINT";
+            default -> throw new IllegalArgumentException("不支持的字段类型：" + type);
         };
     }
 

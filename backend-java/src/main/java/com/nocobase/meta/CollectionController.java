@@ -621,9 +621,44 @@ public class CollectionController {
         return Map.of("code", 0, "message", "success", "data", Map.of("deleted", count));
     }
 
+    /**
+     * R2-B: 聚合查询接口 — 复用 DynamicTableManager.aggregate。
+     */
+    @PostMapping("/{name}/aggregate")
+    public Map<String, Object> aggregate(
+            @PathVariable String name,
+            @RequestBody AggregateRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        List<Map<String, Object>> result = service.aggregate(
+                name,
+                request.groupByFields,
+                request.aggSpecs == null ? List.of() : request.aggSpecs.stream()
+                        .map(s -> new com.nocobase.meta.DynamicTableManager.AggSpec(s.field, s.agg, null))
+                        .toList(),
+                request.filters == null ? List.of() : request.filters.stream()
+                        .map(f -> new com.nocobase.meta.CollectionService.FilterRule(f.field, f.op, f.value))
+                        .toList(),
+                user.tenantId()
+        );
+        return Map.of("code", 0, "message", "success", "data", result);
+    }
+
     public record BatchInsertRequest(List<Map<String, Object>> data) {}
 
     public record BatchUpdateRequest(List<com.nocobase.meta.CollectionService.BatchUpdateItem> items) {}
 
     public record BatchDeleteRequest(List<String> ids) {}
+
+    public record AggregateRequest(
+            List<String> groupByFields,
+            List<AggSpecItem> aggSpecs,
+            List<FilterRuleItem> filters
+    ) {}
+
+    public record AggSpecItem(String field, String agg) {}
+
+    public record FilterRuleItem(String field, String op, Object value) {}
 }

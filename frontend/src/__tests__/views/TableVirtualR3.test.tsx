@@ -1,5 +1,7 @@
 /**
  * R3 T4: 表格虚拟滚动真实组件测试 — 验证虚拟化性能和交互。
+ * 
+ * 判据：如果移除 useVirtualizer / VIRTUAL_THRESHOLD 逻辑，以下测试必须失败。
  */
 import { describe, test, expect } from 'vitest';
 

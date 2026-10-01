@@ -488,4 +488,29 @@ public class DynamicTableManager {
             throw new IllegalArgumentException("非法标识符: " + name);
         }
     }
+
+    /**
+     * 获取下一个 autonumber 值（并发安全 — 使用数据库序列）。
+     *
+     * <p>策略：使用 PostgreSQL SEQUENCE 或 H2 的 IDENTITY，避免"先查 max 再 +1"的竞态。
+     * 若底层数据库不支持序列，回退到 synchronized 锁 + max 查询。
+     */
+    public Long getNextAutonumber(String collectionName, String fieldName) {
+        String physicalTable = physicalTableName(collectionName);
+        String seqName = "autonumber_" + collectionName + "_" + fieldName;
+        try {
+            // 尝试使用数据库序列
+            jdbc.execute("CREATE SEQUENCE IF NOT EXISTS " + seqName);
+            return jdbc.queryForObject("SELECT nextval('" + seqName + "')", Long.class);
+        } catch (Exception e) {
+            // 回退：synchronized + max 查询
+            synchronized (this) {
+                Long max = jdbc.queryForObject(
+                    "SELECT MAX(CAST((extra->>'" + fieldName + "') AS BIGINT)) FROM " + physicalTable,
+                    Long.class
+                );
+                return (max == null ? 0 : max) + 1;
+            }
+        }
+    }
 }

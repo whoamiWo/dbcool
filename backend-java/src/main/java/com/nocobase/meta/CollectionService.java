@@ -245,7 +245,7 @@ public class CollectionService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
         // US-003:字段约束(默认值填充 + 必填/唯一/主键校验)
-        Map<String, Object> effective = applyFieldConstraints(meta, data, null);
+        Map<String, Object> effective = applyFieldConstraints(meta, data, null, true);
         UUID id = UUID.randomUUID();
         try {
             String json = objectMapper.writeValueAsString(effective);
@@ -272,13 +272,56 @@ public class CollectionService {
     Map<String, Object> applyFieldConstraints(CollectionMetaEntity meta,
                                               Map<String, Object> data,
                                               String excludeId) {
+        return applyFieldConstraints(meta, data, excludeId, true);
+    }
+
+    /**
+     * US-003:应用字段约束 — 默认值填充、必填校验、唯一校验、主键 (=必填 + 唯一)、格式校验、自动字段维护。
+     */
+    Map<String, Object> applyFieldConstraints(CollectionMetaEntity meta,
+                                              Map<String, Object> data,
+                                              String excludeId,
+                                              boolean isInsert) {
         List<FieldDef> fields = parseFields(meta);
         Map<String, Object> out = new java.util.HashMap<>(data == null ? Map.of() : data);
+        java.time.Instant now = java.time.Instant.now();
 
         for (FieldDef f : fields) {
             if (f == null) continue;
             Object v = out.get(f.name());
             boolean blank = (v == null) || (v instanceof String s && s.isBlank());
+
+            // R1-B: 自动字段保护 — createdTime/createdBy/lastModifiedTime/lastModifiedBy/autonumber 拒绝手工写入
+            if (isAutoFieldType(f.type())) {
+                if (!blank && !isInsert) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "字段不允许手工写入：" + f.name());
+                }
+            }
+
+            // R1-B: 自动字段填充
+            if ("createdTime".equals(f.type()) && isInsert && blank) {
+                out.put(f.name(), java.sql.Timestamp.from(now));
+                v = out.get(f.name());
+                blank = false;
+            } else if ("createdBy".equals(f.type()) && isInsert && blank) {
+                out.put(f.name(), "system");
+                v = out.get(f.name());
+                blank = false;
+            } else if ("lastModifiedTime".equals(f.type()) && blank) {
+                out.put(f.name(), java.sql.Timestamp.from(now));
+                v = out.get(f.name());
+                blank = false;
+            } else if ("lastModifiedBy".equals(f.type()) && blank) {
+                out.put(f.name(), "system");
+                v = out.get(f.name());
+                blank = false;
+            } else if ("autonumber".equals(f.type()) && isInsert && blank) {
+                // R1-B: autonumber 并发安全 — 使用数据库序列
+                Long seq = tableManager.getNextAutonumber(meta.getName(), f.name());
+                out.put(f.name(), seq);
+                v = seq;
+                blank = false;
+            }
 
             // 1) 默认值填充
             if (blank && f.defaultValue() != null && !f.defaultValue().isBlank()) {
@@ -289,17 +332,47 @@ public class CollectionService {
 
             // 2) 必填 / 主键非空
             if ((f.required() || f.primaryKey()) && blank) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "字段必填: " + f.name());
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "字段必填：" + f.name());
             }
 
-            // 3) 唯一 / 主键唯一性(null 不参与)
+            // R1-B: 格式校验 — email/url/phone
+            if (!blank && v instanceof String str) {
+                if ("email".equals(f.type()) && !isValidEmail(str)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "邮箱格式无效：" + f.name());
+                } else if ("url".equals(f.type()) && !isValidUrl(str)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "URL 格式无效：" + f.name());
+                } else if ("phone".equals(f.type()) && !isValidPhone(str)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "手机号格式无效：" + f.name());
+                }
+            }
+
+            // 3) 唯一 / 主键唯一性 (null 不参与)
             if ((f.unique() || f.primaryKey()) && !blank) {
                 if (tableManager.existsByFieldValue(meta.getName(), f.name(), String.valueOf(v), excludeId)) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "字段值已存在(唯一约束): " + f.name());
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "字段值已存在 (唯一约束): " + f.name());
                 }
             }
         }
         return out;
+    }
+
+    private boolean isValidEmail(String email) {
+        return email != null && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    private boolean isAutoFieldType(String type) {
+        return switch (type) {
+            case "createdTime", "lastModifiedTime", "createdBy", "lastModifiedBy", "autonumber" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isValidUrl(String url) {
+        return url != null && url.matches("^https?://[\\w.-]+(?:/[\\w./%-]*)?$");
+    }
+
+    private boolean isValidPhone(String phone) {
+        return phone != null && phone.matches("^\\+?[0-9]{7,20}$");
     }
 
     public List<Map<String, Object>> listRecords(String collectionName, String tenantId, int limit) {
@@ -518,7 +591,7 @@ public class CollectionService {
             Map<String, Object> merged = new java.util.HashMap<>(existing);
             merged.putAll(data);
             // US-003:字段约束(排除自身 id,避免与自身唯一值冲突)
-            Map<String, Object> effective = applyFieldConstraints(meta, merged, id);
+            Map<String, Object> effective = applyFieldConstraints(meta, merged, id, false);
             String json = objectMapper.writeValueAsString(effective);
             return tableManager.updateRecord(collectionName, id, json) > 0;
         } catch (org.springframework.web.server.ResponseStatusException rse) {
@@ -632,6 +705,23 @@ public class CollectionService {
             }
         }
         return count;
+    }
+
+    /**
+     * R2-B: 聚合查询 — 委托给 DynamicTableManager.aggregate。
+     */
+    public List<Map<String, Object>> aggregate(
+            String collectionName,
+            List<String> groupByFields,
+            List<DynamicTableManager.AggSpec> aggSpecs,
+            List<FilterRule> filters,
+            String tenantId
+    ) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        return tableManager.aggregate(collectionName, groupByFields, aggSpecs, filters);
     }
 
     private boolean updateRecordInternal(String collectionName, String id, Map<String, Object> data, List<FieldDef> fields) {
