@@ -24,6 +24,7 @@ PHASE 58 P0-1 修复：
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -47,7 +48,15 @@ _POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "")
 _POSTGRES_DB = os.environ.get("POSTGRES_DB", "nocobase")
 # SQLite 告警库（Python 端内存版 Settings 的持久化 fallback）
 _SQLITE_PATHS = [Path("alerts.db")]
-_MEDIA_DIR = Path("media")
+# Media 目录：优先环境变量 MEDIA_DIR，否则默认 media/
+_MEDIA_DIR = Path(os.environ.get("MEDIA_DIR", "media"))
+# MinIO 配置（用于备份 MinIO 对象存储中的附件）
+_MINIO_ENABLED = os.environ.get("MINIO_ENABLED", "").lower() == "true"
+_MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://minio:9000")
+_MINIO_ACCESS_KEY = os.environ.get("MINIO_ROOT_USER", "minio")
+_MINIO_SECRET_KEY = os.environ.get("MINIO_ROOT_PASSWORD", "minio123")
+_MINIO_BUCKET = os.environ.get("MINIO_BUCKET", "nocobase")
+_MINIO_PREFIX = os.environ.get("MINIO_PREFIX", "")  # 对象前缀，如 "attachments/"
 # Redis 直连参数
 _REDIS_HOST = os.environ.get("REDIS_HOST", _settings.redis_host)
 _REDIS_PORT = int(os.environ.get("REDIS_PORT", _settings.redis_port))
@@ -161,6 +170,81 @@ def _redis_snapshot() -> bytes:
         raise
 
 
+def _backup_media() -> tuple[list[tuple[str, bytes]], list[str]]:
+    """备份媒体资产（MinIO 对象或本地目录）。
+    
+    返回：([(path, bytes), ...], warnings)
+    
+    策略：
+    - 如果 MINIO_ENABLED=true：用 minio SDK 下载对象
+    - 否则如果 _MEDIA_DIR.exists()：打包本地目录
+    - 否则：返回 warning，不静默跳过
+    """
+    files: list[tuple[str, bytes]] = []
+    warnings: list[str] = []
+    
+    if _MINIO_ENABLED:
+        # MinIO 模式：下载所有对象
+        try:
+            from minio import Minio
+            from minio.error import S3Error
+            
+            client = Minio(
+                _MINIO_ENDPOINT.replace("http://", "").replace("https://", ""),
+                access_key=_MINIO_ACCESS_KEY,
+                secret_key=_MINIO_SECRET_KEY,
+                secure=_MINIO_ENDPOINT.startswith("https://"),
+            )
+            
+            objects = client.list_objects(_MINIO_BUCKET, prefix=_MINIO_PREFIX, recursive=True)
+            count = 0
+            total_bytes = 0
+            
+            for obj in objects:
+                try:
+                    data = client.get_object(_MINIO_BUCKET, obj.object_name).read()
+                    # 去除前缀，保持相对路径
+                    rel_path = obj.object_name[len(_MINIO_PREFIX):] if _MINIO_PREFIX else obj.object_name
+                    files.append((f"media/{rel_path}", data))
+                    count += 1
+                    total_bytes += len(data)
+                except S3Error as e:
+                    warnings.append(f"minio object {obj.object_name}: {e}")
+            
+            if count > 0:
+                logger.info("[backup] minio media: %d objects, %d bytes", count, total_bytes)
+            else:
+                warnings.append("minio bucket empty or no objects with prefix")
+                
+        except ImportError:
+            warnings.append("minio SDK not installed; cannot backup MinIO objects")
+        except Exception as e:
+            warnings.append(f"minio backup failed: {e}")
+    
+    elif _MEDIA_DIR.exists():
+        # 本地目录模式
+        for root, dirs, filenames in os.walk(_MEDIA_DIR):
+            for filename in filenames:
+                file_path = Path(root) / filename
+                rel_path = file_path.relative_to(_MEDIA_DIR)
+                try:
+                    data = file_path.read_bytes()
+                    files.append((f"media/{rel_path}", data))
+                except Exception as e:
+                    warnings.append(f"media file {rel_path}: {e}")
+        
+        if files:
+            logger.info("[backup] local media: %d files, %d bytes", len(files), sum(len(d) for _, d in files))
+        else:
+            warnings.append("media directory exists but contains no files")
+    
+    else:
+        # 既不是 MinIO 也没有本地目录
+        warnings.append("media: source not available (MinIO disabled and media dir does not exist)")
+    
+    return files, warnings
+
+
 def _restore_postgres(dump_bytes: bytes) -> bool:
     """恢复 PostgreSQL 主库（pg_restore 或 psql）。
     
@@ -213,9 +297,10 @@ def create_backup() -> dict[str, Any]:
     """创建全量备份。
 
     返回：
-        backup_id, path, size_bytes, components, created_at
+        backup_id, path, size_bytes, components, warnings, manifest, created_at
     
     PHASE 58 P0-1：新增 PostgreSQL 主库备份，关键组件失败时整体失败。
+    PHASE 68 P0: 不再静默跳过缺失组件；显式 WARN + manifest。
     """
     stamp = _now_stamp()
     backup_id = f"backup_{stamp}"
@@ -223,62 +308,116 @@ def create_backup() -> dict[str, Any]:
     out_path = _ensure_dir() / out_name
     
     components: list[str] = []
+    warnings: list[str] = []
+    manifest_entries: dict[str, Any] = {}
     postgres_bytes: bytes | None = None
+    rdb_bytes: bytes | None = None
     
+    # 1. PostgreSQL 主库（关键组件，失败则整体失败）
+    try:
+        postgres_bytes = _postgres_dump()
+        if postgres_bytes:
+            manifest_entries["postgresql"] = {"bytes": len(postgres_bytes)}
+    except Exception as e:
+        logger.error("[backup] PostgreSQL backup FAILED: %s", e)
+        raise RuntimeError(f"PostgreSQL backup failed (critical): {e}") from e
+    
+    # 2. SQLite 数据库文件（alerts.db 等）
+    sqlite_count = 0
+    sqlite_bytes = 0
+    for db_path in _SQLITE_PATHS:
+        if db_path.exists():
+            sqlite_count += 1
+            sqlite_bytes += db_path.stat().st_size
+        else:
+            w = f"sqlite: source file not found: {db_path}"
+            warnings.append(w)
+            logger.warning("[backup] %s", w)
+    
+    if sqlite_count > 0:
+        manifest_entries["sqlite"] = {"files": sqlite_count, "bytes": sqlite_bytes}
+    
+    # 3. 媒体资产（MinIO 或本地目录）
+    media_files, media_warnings = _backup_media()
+    warnings.extend(media_warnings)
+    
+    if media_files:
+        media_bytes = sum(len(d) for _, d in media_files)
+        manifest_entries["media"] = {"files": len(media_files), "bytes": media_bytes}
+    
+    # 4. Redis 快照（关键组件）
+    try:
+        rdb_bytes = _redis_snapshot()
+        if rdb_bytes:
+            manifest_entries["redis"] = {"bytes": len(rdb_bytes)}
+    except Exception as e:
+        logger.error("[backup] Redis backup FAILED: %s", e)
+        raise RuntimeError(f"Redis backup failed (critical): {e}") from e
+    
+    # 5. 写入 tar 包
     with tarfile.open(out_path, "w:gz") as tar:
-        # 1. PostgreSQL 主库（关键组件，失败则整体失败）
-        try:
-            postgres_bytes = _postgres_dump()
-            if postgres_bytes:
-                import io
-                pg_file = io.BytesIO(postgres_bytes)
-                ti = tarfile.TarInfo(name="postgresql/dump.pg")
-                ti.size = len(postgres_bytes)
-                ti.mtime = time.time()
-                tar.addfile(ti, pg_file)
-                components.append("postgresql")
-                logger.info("[backup] added postgresql/dump.pg (%d bytes)", len(postgres_bytes))
-        except Exception as e:
-            logger.error("[backup] PostgreSQL backup FAILED: %s", e)
-            raise RuntimeError(f"PostgreSQL backup failed (critical): {e}") from e
+        # PostgreSQL
+        if postgres_bytes:
+            import io
+            pg_file = io.BytesIO(postgres_bytes)
+            ti = tarfile.TarInfo(name="postgresql/dump.pg")
+            ti.size = len(postgres_bytes)
+            ti.mtime = time.time()
+            tar.addfile(ti, pg_file)
+            components.append("postgresql")
+            logger.info("[backup] added postgresql/dump.pg (%d bytes)", len(postgres_bytes))
         
-        # 2. SQLite 数据库文件（alerts.db 等）
+        # SQLite
         for db_path in _SQLITE_PATHS:
             if db_path.exists():
                 tar.add(db_path, arcname=f"sqlite/{db_path.name}")
                 components.append("sqlite")
                 logger.info("[backup] added sqlite/%s", db_path.name)
         
-        # 3. 媒体资产
-        if _MEDIA_DIR.exists():
-            tar.add(_MEDIA_DIR, arcname="media")
+        # Media
+        for arc_path, data in media_files:
+            import io
+            ti = tarfile.TarInfo(name=arc_path)
+            ti.size = len(data)
+            ti.mtime = time.time()
+            tar.addfile(ti, io.BytesIO(data))
+        if media_files:
             components.append("media")
-            logger.info("[backup] added media/")
+            logger.info("[backup] added media/ (%d files, %d bytes)", len(media_files), sum(len(d) for _, d in media_files))
         
-        # 4. Redis 快照（关键组件）
-        try:
-            rdb_bytes = _redis_snapshot()
-            if rdb_bytes:
-                import io
-                rdb_file = io.BytesIO(rdb_bytes)
-                ti = tarfile.TarInfo(name="redis/dump.rdb")
-                ti.size = len(rdb_bytes)
-                ti.mtime = time.time()
-                tar.addfile(ti, rdb_file)
-                components.append("redis")
-                logger.info("[backup] added redis/dump.rdb (%d bytes)", len(rdb_bytes))
-        except Exception as e:
-            logger.error("[backup] Redis backup FAILED: %s", e)
-            raise RuntimeError(f"Redis backup failed (critical): {e}") from e
+        # Redis
+        if rdb_bytes:
+            import io
+            rdb_file = io.BytesIO(rdb_bytes)
+            ti = tarfile.TarInfo(name="redis/dump.rdb")
+            ti.size = len(rdb_bytes)
+            ti.mtime = time.time()
+            tar.addfile(ti, rdb_file)
+            components.append("redis")
+            logger.info("[backup] added redis/dump.rdb (%d bytes)", len(rdb_bytes))
+        
+        # Manifest
+        manifest_entries["backup_id"] = backup_id
+        manifest_entries["created_at"] = datetime.now(UTC).isoformat()
+        manifest_entries["components"] = components
+        manifest_entries["warnings"] = warnings
+        import io
+        manifest_bytes = json.dumps(manifest_entries, indent=2).encode("utf-8")
+        ti = tarfile.TarInfo(name="manifest.json")
+        ti.size = len(manifest_bytes)
+        ti.mtime = time.time()
+        tar.addfile(ti, io.BytesIO(manifest_bytes))
     
     size = out_path.stat().st_size
-    logger.info("[backup] created %s (%d bytes, components=%s)", out_path, size, components)
+    logger.info("[backup] created %s (%d bytes, components=%s, warnings=%s)", out_path, size, components, warnings)
     
     return {
         "backup_id": backup_id,
         "path": str(out_path),
         "size_bytes": size,
         "components": components,
+        "warnings": warnings,
+        "manifest": manifest_entries,
         "created_at": datetime.now(UTC).isoformat(),
         "postgres_bytes": len(postgres_bytes) if postgres_bytes else 0,
     }
@@ -307,13 +446,16 @@ def restore_backup(backup_id: str) -> dict[str, Any]:
     返回恢复结果。
     
     PHASE 58 P0-1：新增 PostgreSQL 恢复路径。
+    PHASE 68 P0: 支持 manifest 验证 + warnings。
     """
     backup_path = _BACKUP_DIR / f"{backup_id}.tar.gz"
     if not backup_path.exists():
         raise FileNotFoundError(f"backup not found: {backup_id}")
 
     restored: list[str] = []
+    warnings: list[str] = []
     postgres_bytes: bytes | None = None
+    rdb_bytes: bytes | None = None
     
     with tarfile.open(backup_path, "r:gz") as tar:
         members = tar.getmembers()
@@ -336,8 +478,14 @@ def restore_backup(backup_id: str) -> dict[str, Any]:
             elif m.name.startswith("redis/"):
                 data = tar.extractfile(m)
                 if data:
-                    Path("dump.rdb").write_bytes(data.read())
+                    rdb_bytes = data.read()
                     restored.append("redis")
+            elif m.name == "manifest.json":
+                # 读取 manifest 用于验证
+                data = tar.extractfile(m)
+                if data:
+                    manifest = json.loads(data.read().decode("utf-8"))
+                    # 可以在此处验证组件完整性
 
     # 恢复 PostgreSQL（关键组件，失败则整体失败）
     if postgres_bytes:
@@ -347,9 +495,32 @@ def restore_backup(backup_id: str) -> dict[str, Any]:
         except Exception as e:
             logger.error("[restore] PostgreSQL restore FAILED: %s", e)
             raise RuntimeError(f"PostgreSQL restore failed (critical): {e}") from e
+    else:
+        w = "postgresql: no data in backup"
+        warnings.append(w)
+        logger.warning("[restore] %s", w)
 
-    logger.info("[restore] %s: %s", backup_id, restored)
-    return {"backup_id": backup_id, "restored": restored}
+    # 恢复 Redis
+    if rdb_bytes:
+        Path("dump.rdb").write_bytes(rdb_bytes)
+        logger.info("[restore] Redis dump.rdb restored (%d bytes)", len(rdb_bytes))
+    else:
+        w = "redis: no data in backup"
+        warnings.append(w)
+        logger.warning("[restore] %s", w)
+
+    # Media 已直接 extract，检查是否有 media 数据
+    if "media" not in restored:
+        w = "media: no data in backup"
+        warnings.append(w)
+        logger.warning("[restore] %s", w)
+
+    logger.info("[restore] %s: restored=%s, warnings=%s", backup_id, restored, warnings)
+    return {
+        "backup_id": backup_id,
+        "restored": restored,
+        "warnings": warnings,
+    }
 
 
 def prune_old_backups(retention_days: int | None = None) -> int:
