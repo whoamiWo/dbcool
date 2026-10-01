@@ -4,10 +4,9 @@
 //  用法（固定并发单档，供明细表）：k6 run --env VUS=20 --env DURATION=2m ...
 //
 //  说明：
-//  - 默认打 /api/health（公开端点）——登录接口有速率限制（实测 429），
-//    认证接口 (/api/collections) 无法在压测中持续获取 Token；
-//  - 因此本基线仅反映"框架开销 + 健康检查链路"，不代表业务接口吞吐；
-//  - 空库 + 公开端点的 QPS 只能作为回归对照基线，不能作为生产容量依据。
+//  - 目标接口：GET /api/collections（业务接口，走 DB + ACL）
+//  - 数据量：空库（仅 6 个用户，无业务记录）
+//  - 登录限流：压测前临时调高 RATELIMIT_LOGIN_LIMIT=1000，压测后必须恢复默认 5
 // ============================================================
 
 import http from 'k6/http';
@@ -15,6 +14,7 @@ import { check, sleep } from 'k6';
 
 const VUS = Number(__ENV.VUS || 0);
 const DURATION = __ENV.DURATION || '';
+const TOKEN = __ENV.TOKEN || '';
 
 export const options = VUS > 0
   ? {
@@ -43,12 +43,19 @@ export const options = VUS > 0
     };
 
 const BASE = __ENV.BASE_URL || 'http://localhost:8080';
+const params = {
+  headers: {
+    Authorization: `Bearer ${TOKEN}`,
+    'Content-Type': 'application/json',
+  },
+};
 
 export default function () {
-  const health = http.get(`${BASE}/api/health`);
-  check(health, {
-    'health status 200': (r) => r.status === 200,
-    'health < 500ms': (r) => r.timings.duration < 500,
+  // 业务接口：GET /api/collections（走 DB + ACL，有查询成本）
+  const collections = http.get(`${BASE}/api/collections?limit=10`, params);
+  check(collections, {
+    'collections status 200': (r) => r.status === 200,
+    'collections < 500ms': (r) => r.timings.duration < 500,
   });
 
   sleep(1);
