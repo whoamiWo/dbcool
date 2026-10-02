@@ -13,11 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -27,9 +27,9 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>已实现端点:
  * <ul>
  *   <li>POST /api/attachments/metadata — 创建附件元数据(需提供 storageKey)</li>
- *   <li>GET  /api/attachments/{storageKey} — 获取附件元数据(501,待扩展)</li>
+ *   <li>GET  /api/attachments?storageKey=... — 获取附件元数据(需 query param)</li>
  *   <li>POST /api/attachments/upload — multipart 上传 → MinIO → 返回 metadata</li>
- *   <li>GET  /api/attachments/{key}/download — 302 重定向到预签名 URL</li>
+ *   <li>GET  /api/attachments/download?storageKey=... — 302 重定向到预签名 URL</li>
  * </ul>
  */
 @RestController
@@ -85,12 +85,27 @@ public class AttachmentController {
     }
 
     /**
-     * 获取附件 metadata(Week 41 暂未实现实际存储,返 501)。
+     * 获取附件 metadata。
+     *
+     * <p>PHASE69 T3: 使用 query param 避免路径编码问题。
      */
-    @GetMapping("/{storageKey}")
-    public ResponseEntity<Map<String, Object>> getMetadata(@PathVariable String storageKey) {
-        throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
-                "附件实际存储 Week 42+ D1.4 实现 (MinIO SDK + 预签名 URL)");
+    @GetMapping(params = "storageKey")
+    public ResponseEntity<Map<String, Object>> getMetadata(@RequestParam String storageKey) {
+        if (!storage.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
+                    "对象存储未启用");
+        }
+        String tenantId = TenantContext.currentTenantId();
+        if (!storageKey.startsWith(tenantId + "/")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "无权访问该附件");
+        }
+        String url = storage.presignedDownloadUrl(storageKey);
+        return ResponseEntity.ok(Map.of(
+                "storageKey", storageKey,
+                "downloadUrl", url,
+                "tenantId", tenantId
+        ));
     }
 
     /**
@@ -127,6 +142,8 @@ public class AttachmentController {
                             "tenantId", tenantId
                     )
             );
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "文件上传失败: " + e.getMessage());
@@ -135,12 +152,22 @@ public class AttachmentController {
 
     /**
      * 下载文件:302 重定向到 MinIO 预签名 URL(Week 41 复核 D1.4 新增)。
+     *
+     * <p>PHASE69 T3: 使用 query param 避免路径编码问题。
      */
-    @GetMapping("/{storageKey}/download")
-    public ResponseEntity<Void> download(@PathVariable String storageKey) {
+    @GetMapping("/download")
+    public ResponseEntity<Void> download(@RequestParam String storageKey) {
         if (!storage.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
-                    "对象存储未启用 — 配置 app.storage.minio.enabled=true 后可用(D1.4)");
+                    "对象存储未启用 — 配置 app.storage.minio.enabled=true 后可用 (D1.4)");
+        }
+        // R2: 租户归属校验 + 路径穿越防护
+        String tenantId = TenantContext.currentTenantId();
+        if (storageKey == null || storageKey.contains("..") || storageKey.startsWith("/") || storageKey.contains("\\")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "无效的存储键");
+        }
+        if (!storageKey.startsWith(tenantId + "/")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该对象");
         }
         String url = storage.presignedDownloadUrl(storageKey);
         return ResponseEntity.status(HttpStatus.FOUND)

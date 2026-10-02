@@ -63,10 +63,11 @@ services:
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - nocobase-net
     restart: unless-stopped
@@ -145,6 +146,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_at_least_32_characters_long_for_hs256}
       JAVA_PORT: 8080
       NOCOBASE_ALERTS_PATH: /tmp/alerts.db
+      # PHASE69: 附件存储 MinIO 配置（容器内用服务名，外部用 localhost）
+      MINIO_ENABLED: ${MINIO_ENABLED:-true}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_EXTERNAL_URL: ${MINIO_EXTERNAL_URL:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
       # PHASE62 R2: 集成端到端实测配置（勿提交真实密钥，值放 .env）
       # 注意 Spring Boot relaxed binding：dingtalk.app-secret → DINGTALK_APP_SECRET，
       # 写成 APP_DINGTALK_APP_SECRET 不会生效（后端读到的仍是空 → 验签必然 401）。
@@ -160,6 +168,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - nocobase-net
@@ -202,6 +212,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # PHASE69 R3: MinIO 备份配置
+      MINIO_ENABLED: "true"
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
     ports:
       - "${PYTHON_PORT:-8000}:8000"
     depends_on:

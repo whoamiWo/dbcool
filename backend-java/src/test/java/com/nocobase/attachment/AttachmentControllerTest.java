@@ -2,7 +2,9 @@ package com.nocobase.attachment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import java.util.LinkedHashMap;
@@ -19,25 +21,24 @@ import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * AttachmentController 单元测试(Week 41 D1.2).
- *
- * <p>覆盖 metadata 注册 + Week 41 暂未实现的 get endpoint。
+ * AttachmentController 单元测试 (Week 41 D1.2 + PHASE69 R2).
  */
 class AttachmentControllerTest {
 
     private AttachmentController controller;
+    private MinioStorageService storage;
     private AuthenticatedUser user;
 
     @BeforeEach
     void setUp() {
-        // Week 41 复核 D1.4:Controller 现在依赖存储服务。
-        // mock 的 isEnabled() 默认 false → upload / download 仍返 501,行为与改造前一致。
-        controller = new AttachmentController(mock(MinioStorageService.class));
+        storage = mock(MinioStorageService.class);
+        when(storage.isEnabled()).thenReturn(true);
+        when(storage.presignedDownloadUrl(anyString())).thenReturn("http://minio/pre-signed-url");
+        controller = new AttachmentController(storage);
         user = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");
         SecurityContextHolder.setContext(new SecurityContextImpl(
                 new UsernamePasswordAuthenticationToken(user, "n/a",
                         java.util.List.of(new SimpleGrantedAuthority("ROLE_USER")))));
-        // 设置 TenantContext(模拟 JWT 过滤器已跑)
         com.nocobase.tenant.TenantContext.set("tenant_default");
     }
 
@@ -80,11 +81,55 @@ class AttachmentControllerTest {
                 .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.BAD_REQUEST);
     }
 
+    // PHASE69 R2: getMetadata with tenant validation
     @Test
-    void getMetadata_week41NotImplemented_returns501() {
-        // Week 42+ D1.4 MinIO 集成后才实现
-        assertThatThrownBy(() -> controller.getMetadata("some-key"))
+    void getMetadata_validStorageKey_returnsOk() {
+        var resp = controller.getMetadata("tenant_default/file.txt");
+        
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.getBody();
+        assertThat(data).containsKey("downloadUrl");
+    }
+
+    // PHASE69 R2: 租户校验测试
+    @Test
+    void download_sameTenant_returns302() {
+        String storageKey = "tenant_default/file.txt";
+        
+        var resp = controller.download(storageKey);
+        
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        assertThat(resp.getHeaders().getLocation()).isNotNull();
+    }
+
+    @Test
+    void download_otherTenant_returns403() {
+        String storageKey = "other_tenant/file.txt";
+        
+        assertThatThrownBy(() -> controller.download(storageKey))
                 .isInstanceOf(ResponseStatusException.class)
-                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.NOT_IMPLEMENTED);
+                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void download_pathTraversal_returns400() {
+        assertThatThrownBy(() -> controller.download("../etc/passwd"))
+                .isInstanceOf(ResponseStatusException.class)
+                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void download_backslash_returns400() {
+        assertThatThrownBy(() -> controller.download("tenant_default\\..\\etc\\passwd"))
+                .isInstanceOf(ResponseStatusException.class)
+                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void download_absolutePath_returns400() {
+        assertThatThrownBy(() -> controller.download("/etc/passwd"))
+                .isInstanceOf(ResponseStatusException.class)
+                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.BAD_REQUEST);
     }
 }

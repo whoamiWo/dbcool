@@ -1,8 +1,10 @@
 package com.nocobase;
 
+import com.nocobase.attachment.MinioStorageProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 /**
  * NocoBase 核心引擎入口.
@@ -14,9 +16,12 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  */
 @SpringBootApplication
 @ConfigurationPropertiesScan
+@EnableConfigurationProperties(MinioStorageProperties.class)
 public class NocoBaseApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(NocoBaseApplication.class, args);
-    }
 }
+
+}
+

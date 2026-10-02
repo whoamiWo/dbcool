@@ -45,6 +45,7 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    validate-on-migrate: true
 
   data:
     redis:
@@ -82,15 +83,6 @@ app:
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
   cors:
     allowed-origins: http://localhost:5173,http://localhost:3000
-  # Week 41 复核 D1.4:附件对象存储(MinIO / S3 兼容)
-  # 默认关闭 —— 未启用时附件端点返 501,与改造前一致,不会因缺少 MinIO 而启动失败
-  storage:
-    minio:
-      enabled: ${MINIO_ENABLED:false}
-      endpoint: ${MINIO_ENDPOINT:}
-      access-key: ${MINIO_ACCESS_KEY:}
-      secret-key: ${MINIO_SECRET_KEY:}
-      bucket: ${MINIO_BUCKET:nocobase}
 
 # Actuator(健康检查 + 可观测性)—— PHASE 55 P0
 management:
@@ -194,3 +186,16 @@ ratelimit:
   file-upload:
     limit: 10
     window-seconds: 60
+
+# PHASE69: MinIO 配置 (app.storage.minio prefix for @ConfigurationProperties)
+app:
+  storage:
+    minio:
+      enabled: ${MINIO_ENABLED:false}
+      endpoint: ${MINIO_ENDPOINT:}
+      external-url: ${MINIO_EXTERNAL_URL:}
+      access-key: ${MINIO_ACCESS_KEY:}
+      secret-key: ${MINIO_SECRET_KEY:}
+      bucket: ${MINIO_BUCKET:nocobase}
+      max-file-size: ${MINIO_MAX_FILE_SIZE_MB:100}
+      allowed-content-types: ${MINIO_ALLOWED_CONTENT_TYPES:image/png,image/jpeg,image/gif,application/pdf,text/plain}
