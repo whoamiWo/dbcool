@@ -139,6 +139,56 @@ black --check .          # ✅ 代码格式化
 
 ---
 
-**最后更新**: 2026-09-18  
+## 七、性能容量基线（PHASE70 T2，实测）
+
+> 环境：**单副本**（本机 docker compose，非 K8s）；数据量：空库 + 少量种子数据；
+> 工具：k6（`grafana/k6` 离线镜像）；脚本：`perf/load-test.js`。
+> 场景：`GET /api/collections`（只读）+ `POST /api/im/messages`（IM 写入，含广播）
+> + `POST /api/attachments/upload`（附件上传 → MinIO）。
+
+### 7.1 复现命令
+
+```bash
+# 默认（限流开启，即生产配置）
+docker run --rm -v $PWD/perf:/scripts --network host \
+  -e BASE_URL=http://localhost:8080 -e USERNAME=admin -e PASSWORD=admin123 \
+  grafana/k6 run /scripts/load-test.js
+
+# 测"系统本身容量"时临时放宽限流（测完必须重启恢复默认 30/60s）
+RATELIMIT_IM_LIMIT=100000 RATELIMIT_FILEUPLOAD_LIMIT=100000 \
+RATELIMIT_LOGIN_LIMIT=20000 docker compose up -d --no-build backend-java
+```
+
+### 7.2 实测数字（阶梯 20 → 50 → 100 VU，共 3m30s）
+
+| 指标 | 限流开启（生产配置） | 限流放宽（系统容量） |
+|---|---|---|
+| 总请求数 | 24,907 | 24,769 |
+| 吞吐 | 137.8 req/s | **137.3 req/s** |
+| `http_req_duration` avg | 3.86 ms | 5.75 ms |
+| p(50) | 1.81 ms | 6.15 ms |
+| **p(95)** | 10.18 ms | **11.45 ms** |
+| **p(99)** | 14.2 ms | **14.66 ms** |
+| max | 67.76 ms | 78.78 ms |
+| `http_req_failed` | **32.96%**（8,211 个 429） | **0.00%** |
+| checks 通过率 | — | **100%**（24,765/24,765） |
+
+### 7.3 结论与拐点
+
+- **系统本身（限流放宽）**：100 VU 下 p95 仅 11.45 ms、p99 14.66 ms、**零错误**，
+  在本次压测量级下**未出现拐点** —— 单机容量上限高于 137 req/s，需更大压力
+  （≥300 VU 或延长阶梯）才能测得拐点。
+- **限流开启时**：失败率 32.96% 全部为 **429**，集中在 IM 写入
+  （默认 `ratelimit.im.limit=30 / 60s`）。即**生产环境的写入吞吐实际受限于限流配额，
+  而非系统容量** —— 这是预期行为（防刷），但意味着：
+  - 若业务侧确有高频发消息需求（如机器人/集成入站），需**单独放宽或豁免**该限流键；
+  - 压测任何写入接口前必须先确认目标接口的限流阈值，否则测到的是限流而非容量。
+- **未覆盖**：Wiki 块保存、工作流触发 —— 当前环境无 wiki page / workflow 数据，
+  脚本 `setup()` 抓不到 ID 会自动跳过（日志 `page=N/A workflow=N/A`）。
+  补上种子数据后可直接复用同一脚本。
+
+---
+
+**最后更新**: 2026-10-02（PHASE70 追加第七节）  
 **维护者**: 三栈开发团队  
-**版本**: 1.0.0
+**版本**: 1.0.1

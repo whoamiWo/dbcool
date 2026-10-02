@@ -162,3 +162,21 @@ export function disconnectStomp(): void {
     stompClient = null;
   }
 }
+
+/** 发送 awareness 更新 (光标位置/选区)。*/
+export function sendCollabAwareness(
+  docId: string,
+  cursorPosition?: number,
+  selectionStart?: number,
+  selectionEnd?: number
+): void {
+  getStompClient().publish({
+    destination: '/app/collab/awareness',
+    body: JSON.stringify({ 
+      docId, 
+      cursorPosition, 
+      selectionStart, 
+      selectionEnd 
+    }),
+  });
+}

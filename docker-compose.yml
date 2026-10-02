@@ -158,6 +158,11 @@ services:
       # 写成 APP_DINGTALK_APP_SECRET 不会生效（后端读到的仍是空 → 验签必然 401）。
       DINGTALK_APP_SECRET: ${DINGTALK_APP_SECRET:-}
       SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      # PHASE70 T2: 压测时可用 shell 变量临时调高(默认保持生产值，勿改默认)。
+      #   RATELIMIT_IM_LIMIT=100000 docker compose up -d backend-java
+      # 压完 unset 后重启即恢复默认 30/60s。
+      RATELIMIT_IM_LIMIT: ${RATELIMIT_IM_LIMIT:-30}
+      RATELIMIT_FILEUPLOAD_LIMIT: ${RATELIMIT_FILEUPLOAD_LIMIT:-10}
       # 入站消息默认落到的频道（InboundMessageService#resolveTargetChannel）
       INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID: ${INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID:-}
     ports:
