@@ -119,7 +119,12 @@ public class DynamicTableManager {
     public List<String> listRecords(String collectionName, int limit,
                                     String sortExpr,
                                     List<com.nocobase.meta.FieldDef> fields) {
-        StringBuilder sql = new StringBuilder("SELECT extra::text FROM ")
+        // PHASE71: id 是独立列(extra 里没有),必须注入返回 JSON,
+        // 否则前端拿不到 id(无法编辑/删除/建立关联),rollup 也无法定位关联记录。
+        // 注意路径只能是 '{id}' —— PostgreSQL 的 jsonb_set 只能创建**最后一级**缺失键,
+        // 用 '{data,id}' 不会创建中间的 data 对象(实测返回原值不变)。
+        StringBuilder sql = new StringBuilder(
+                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM ")
                 .append(physicalTableName(collectionName));
         String orderBy = buildOrderBy(sortExpr, fields);
         if (orderBy != null) {
@@ -343,9 +348,11 @@ public class DynamicTableManager {
      * 按 ID 取单条记录的 extra JSON(Week 14.5 P3-3 补完).
      */
     public java.util.Optional<String> getRecord(String collectionName, String id) {
+        // PHASE71: 同 listRecords —— 注入 id 到返回 JSON（路径只能是 '{id}'，见 listRecords 注释）
         var list = jdbc.queryForList(
-                "SELECT extra::text FROM " + physicalTableName(collectionName) +
-                " WHERE id = ?::uuid",
+                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
+                        + physicalTableName(collectionName) +
+                        " WHERE id = ?::uuid",
                 String.class,
                 id
         );

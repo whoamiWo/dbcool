@@ -573,7 +573,8 @@ public class CollectionService {
                     String agg = String.valueOf(f.options().getOrDefault("agg", "SUM"));
                     Object relatedRaw = record.get(relationField);
                     if (relatedRaw == null) continue;
-                    List<Map<String, Object>> related = resolveRelatedRecords(relationField, relatedRaw, tenantId);
+                    List<Map<String, Object>> related =
+                            resolveRelatedRecords(resolveTargetCollection(fields, relationField), relatedRaw, tenantId);
                     if (related.isEmpty()) continue;
                     record.put(f.name(), RollupEngine.aggregate(related, agg, targetField));
                 } catch (Exception e) {
@@ -585,7 +586,8 @@ public class CollectionService {
                     String targetField = String.valueOf(f.options().get("targetField"));
                     Object relatedRaw = record.get(relationField);
                     if (relatedRaw == null) continue;
-                    List<Map<String, Object>> related = resolveRelatedRecords(relationField, relatedRaw, tenantId);
+                    List<Map<String, Object>> related =
+                            resolveRelatedRecords(resolveTargetCollection(fields, relationField), relatedRaw, tenantId);
                     if (related.isEmpty()) continue;
                     record.put(f.name(), RollupEngine.lookup(related, targetField));
                 } catch (Exception e) {
@@ -595,24 +597,101 @@ public class CollectionService {
         }
     }
 
+    /**
+     * 解析关联记录 —— **必须返回完整字段**，否则 rollup / lookup 只能看到 id 与 title。
+     *
+     * <p>历史缺陷（PHASE71 审计发现）：本方法此前只把关联记录裁剪成
+     * {@code {id, title}} 两项，导致：
+     * <ul>
+     *   <li>{@code rollup} 的 SUM / AVG / MIN / MAX 恒为 0（{@code RollupEngine.sum}
+     *       取不到 Number 就跳过）</li>
+     *   <li>{@code lookup} 取非 title 字段恒为 null</li>
+     *   <li>只有 COUNT 可用（不依赖字段值）</li>
+     * </ul>
+     * 该缺陷长期未被发现，是因为前端此前无法创建 rollup/lookup 字段
+     * （PHASE71 才把它们暴露出来）。
+     *
+     * <p>修复：先从关联字段的 options 定位目标集合（{@code _inverseSource} 或
+     * {@code targetCollection}），再按 id 从物理表加载完整记录。
+     * 这里刻意使用 {@code tableManager.getRecord} 而非本类的 {@code getRecord} ——
+     * 后者会再次触发 {@code applyRollupAndLookup}，自引用关系下有递归风险。
+     */
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> resolveRelatedRecords(String relationField, Object relatedRaw, String tenantId) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        if (relatedRaw instanceof Map map) {
+    private List<Map<String, Object>> resolveRelatedRecords(String targetCollection, Object relatedRaw, String tenantId) {
+        // 1) 收集关联 id（hasMany 存 ID 数组；belongsTo 存单个对象/ID）
+        List<String> ids = new ArrayList<>();
+        if (relatedRaw instanceof Map<?, ?> map) {
             String id = String.valueOf(map.get("id"));
-            if (id != null && !id.isBlank()) {
-                result.add(Map.of("id", id, "title", map.getOrDefault("title", id)));
-            }
-        } else if (relatedRaw instanceof Collection list) {
+            if (id != null && !id.isBlank() && !"null".equals(id)) ids.add(id);
+        } else if (relatedRaw instanceof Collection<?> list) {
             for (Object o : list) {
-                if (o instanceof Map m) {
-                    result.add(Map.of("id", String.valueOf(m.get("id")), "title", m.getOrDefault("title", "")));
-                } else {
-                    result.add(Map.of("id", String.valueOf(o), "title", String.valueOf(o)));
+                if (o instanceof Map<?, ?> m) {
+                    String id = String.valueOf(m.get("id"));
+                    if (id != null && !id.isBlank() && !"null".equals(id)) ids.add(id);
+                } else if (o != null) {
+                    ids.add(String.valueOf(o));
                 }
             }
         }
+        if (ids.isEmpty()) return List.of();
+
+        // 2) 定位不到目标集合 → 退化为 id/title（保持旧行为，至少 COUNT 可用）
+        if (targetCollection == null || targetCollection.isBlank()) {
+            List<Map<String, Object>> fallback = new ArrayList<>();
+            for (String id : ids) {
+                Map<String, Object> m = new java.util.HashMap<>();
+                m.put("id", id);
+                m.put("title", id);
+                fallback.add(m);
+            }
+            return fallback;
+        }
+
+        // 3) 按 id 加载完整记录
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (String id : ids) {
+            try {
+                String json = tableManager.getRecord(targetCollection, id).orElse(null);
+                if (json == null) {
+                    result.add(Map.of("id", id));
+                    continue;
+                }
+                Map<String, Object> wrapper = objectMapper.readValue(json, new TypeReference<>() {});
+                Object inner = wrapper.get("data");
+                Map<String, Object> rec = (inner instanceof Map<?, ?> m)
+                        ? (Map<String, Object>) m
+                        : wrapper;
+                if (rec.get("id") == null) rec.put("id", id);
+                result.add(rec);
+            } catch (Exception e) {
+                log.warn("[relation] 加载关联记录失败 collection={} id={}: {}",
+                        targetCollection, id, e.getMessage());
+                result.add(Map.of("id", id));
+            }
+        }
         return result;
+    }
+
+    /**
+     * 从字段定义里解析关联字段指向的目标集合名。
+     *
+     * <p>两种来源：
+     * <ul>
+     *   <li>{@code _inverseSource} —— belongsTo 自动生成的反向 hasMany
+     *       （见 {@link InverseRelationManager#KEY_INVERSE_SOURCE}）</li>
+     *   <li>{@code targetCollection} —— 手工定义 hasMany 时显式指定</li>
+     * </ul>
+     */
+    private String resolveTargetCollection(List<FieldDef> fields, String relationField) {
+        if (fields == null || relationField == null) return null;
+        for (FieldDef f : fields) {
+            if (f == null || !relationField.equals(f.name()) || f.options() == null) continue;
+            Object src = f.options().get(InverseRelationManager.KEY_INVERSE_SOURCE);
+            if (src != null && !String.valueOf(src).isBlank()) return String.valueOf(src);
+            Object tc = f.options().get("targetCollection");
+            if (tc != null && !String.valueOf(tc).isBlank()) return String.valueOf(tc);
+        }
+        return null;
     }
 
     // ============================================================
