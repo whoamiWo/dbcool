@@ -347,6 +347,23 @@ public class CollectionService {
                                               Map<String, Object> data,
                                               String excludeId,
                                               boolean isInsert) {
+        return applyFieldConstraints(meta, data, excludeId, isInsert, null);
+    }
+
+    /**
+     * @param userProvided 用户**实际提交**的字段名集合（更新场景用于区分
+     *                     "用户手工写入"与"从现有记录 merge 过来的旧值"）。
+     *                     为 null 时表示不做区分（兼容既有调用）。
+     *
+     *                     <p>PHASE71: 缺这个参数时，updateRecord 把 existing merge 进
+     *                     data 后调用本方法，自动字段带着旧值被判定为"手工写入" →
+     *                     **任何含 createdTime/createdBy 的记录都无法更新（400）**。
+     */
+    Map<String, Object> applyFieldConstraints(CollectionMetaEntity meta,
+                                              Map<String, Object> data,
+                                              String excludeId,
+                                              boolean isInsert,
+                                              java.util.Set<String> userProvided) {
         List<FieldDef> fields = parseFields(meta);
         Map<String, Object> out = new java.util.HashMap<>(data == null ? Map.of() : data);
         java.time.Instant now = java.time.Instant.now();
@@ -358,7 +375,8 @@ public class CollectionService {
 
             // R1-B: 自动字段保护 — createdTime/createdBy/lastModifiedTime/lastModifiedBy/autonumber 拒绝手工写入
             if (isAutoFieldType(f.type())) {
-                if (!blank && !isInsert) {
+                boolean providedByUser = userProvided == null || userProvided.contains(f.name());
+                if (!blank && !isInsert && providedByUser) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "字段不允许手工写入：" + f.name());
                 }
             }
@@ -369,15 +387,18 @@ public class CollectionService {
                 v = out.get(f.name());
                 blank = false;
             } else if ("createdBy".equals(f.type()) && isInsert && blank) {
-                out.put(f.name(), "system");
+                // PHASE71: 原先硬编码 "system"，审计追踪完全失效 —— 改为真实用户
+                out.put(f.name(), currentUserIdOrSystem());
                 v = out.get(f.name());
                 blank = false;
-            } else if ("lastModifiedTime".equals(f.type()) && blank) {
+            } else if ("lastModifiedTime".equals(f.type())) {
+                // PHASE71: 去掉 `&& blank` —— 否则更新时旧值非空就永不刷新
                 out.put(f.name(), java.sql.Timestamp.from(now));
                 v = out.get(f.name());
                 blank = false;
-            } else if ("lastModifiedBy".equals(f.type()) && blank) {
-                out.put(f.name(), "system");
+            } else if ("lastModifiedBy".equals(f.type())) {
+                // 同上：每次写入都要刷新为本次操作者
+                out.put(f.name(), currentUserIdOrSystem());
                 v = out.get(f.name());
                 blank = false;
             } else if ("autonumber".equals(f.type()) && isInsert && blank) {
@@ -423,6 +444,30 @@ public class CollectionService {
 
     private boolean isValidEmail(String email) {
         return email != null && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    /**
+     * 当前操作者 id —— 供 createdBy / lastModifiedBy 自动字段使用。
+     *
+     * <p>PHASE71: 这两个字段此前硬编码为 {@code "system"}，导致审计追踪完全失效
+     * （看不出是谁创建/改的）。这里从 SecurityContext 取真实用户；
+     * 非 web 上下文（单测、定时任务、API Key 之外的内部调用）回退 {@code "system"}。
+     */
+    private String currentUserIdOrSystem() {
+        try {
+            var ctx = org.springframework.security.core.context.SecurityContextHolder.getContext();
+            var auth = ctx == null ? null : ctx.getAuthentication();
+            if (auth == null || !auth.isAuthenticated()) return "system";
+            Object p = auth.getPrincipal();
+            if (p instanceof com.nocobase.auth.JwtAuthFilter.AuthenticatedUser u && u.userId() != null) {
+                return u.userId().toString();
+            }
+            String name = auth.getName();
+            if (name == null || name.isBlank() || "anonymousUser".equals(name)) return "system";
+            return name;
+        } catch (Exception e) {
+            return "system";
+        }
     }
 
     private boolean isAutoFieldType(String type) {
@@ -735,7 +780,10 @@ public class CollectionService {
             Map<String, Object> merged = new java.util.HashMap<>(existing);
             merged.putAll(data);
             // US-003:字段约束(排除自身 id,避免与自身唯一值冲突)
-            Map<String, Object> effective = applyFieldConstraints(meta, merged, id, false);
+            // PHASE71: 传入用户实际提交的 keySet —— 否则自动字段的旧值(由 merged 带过来)
+            // 会被误判为"手工写入"而 400，导致含 createdTime/createdBy 的记录无法更新。
+            Map<String, Object> effective = applyFieldConstraints(
+                    meta, merged, id, false, data == null ? java.util.Set.of() : data.keySet());
             String json = objectMapper.writeValueAsString(effective);
             return tableManager.updateRecord(collectionName, id, json) > 0;
         } catch (org.springframework.web.server.ResponseStatusException rse) {
