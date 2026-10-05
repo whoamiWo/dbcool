@@ -4,6 +4,10 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import Drawer from '@mui/material/Drawer';
+import IconButton from '@mui/material/IconButton';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   getJoinedChannels,
   getChannelMessages,
@@ -41,6 +45,7 @@ export function ImChatPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [channelDrawerOpen, setChannelDrawerOpen] = useState(false);
   const { roomId: huddleRoomId, joinHuddle, leaveHuddle, peers } = useHuddle();
 
   const { data: channelsData, refetch: refetchChannels } = useQuery({
@@ -111,7 +116,8 @@ export function ImChatPage() {
     setCurrentChannel(channel);
     setThreadMessage(null);
     navigate(`/im/${channel.id}`);
-  }, [navigate]);
+    if (isMobile) setChannelDrawerOpen(false);
+  }, [navigate, isMobile]);
 
   const handleMessageClick = useCallback((message: ImMessage) => {
     if (message.parentId) return;
@@ -202,17 +208,57 @@ export function ImChatPage() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: isMobile ? 'auto' : 'calc(100vh - 64px)', minHeight: 0 }}>
-      <div className="im-layout" style={isMobile ? { flexDirection: 'column', height: 'auto', minHeight: 0, margin: 0, borderRadius: 0 } : {}}>
-        <ChannelList
-          channels={channels}
-          selectedChannel={currentChannel}
-          onSelect={handleChannelSelect}
-          onRefresh={refetchChannels}
-          onCreateChannel={() => setShowCreateDialog(true)}
-          currentUser={user}
-          getUnreadCount={getUnreadCount}
-        />
+    <div style={{ display: 'flex', flexDirection: 'column', height: isMobile ? '100vh' : 'calc(100vh - 64px)', minHeight: 0 }}>
+      <div className="im-layout" style={isMobile ? { flexDirection: 'column', height: '100vh', margin: 0, borderRadius: 0 } : {}}>
+        {/* Mobile: Hamburger menu button */}
+        {isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
+            <IconButton onClick={() => setChannelDrawerOpen(true)} size="small">
+              <MenuIcon />
+            </IconButton>
+            <span style={{ marginLeft: 8, fontWeight: 600 }}>{currentChannel?.name || t('im.channels')}</span>
+          </div>
+        )}
+
+        {/* Channel List - Desktop inline, Mobile drawer */}
+        {!isMobile ? (
+          <ChannelList
+            channels={channels}
+            selectedChannel={currentChannel}
+            onSelect={handleChannelSelect}
+            onRefresh={refetchChannels}
+            onCreateChannel={() => setShowCreateDialog(true)}
+            currentUser={user}
+            getUnreadCount={getUnreadCount}
+          />
+        ) : (
+          <Drawer
+            anchor="left"
+            open={channelDrawerOpen}
+            onClose={() => setChannelDrawerOpen(false)}
+            slotProps={{
+              paper: {
+                style: { width: 280, background: 'var(--color-bg-secondary)' },
+              },
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid var(--color-border)' }}>
+              <span style={{ fontWeight: 600 }}>{t('im.channels')}</span>
+              <IconButton onClick={() => setChannelDrawerOpen(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </div>
+            <ChannelList
+              channels={channels}
+              selectedChannel={currentChannel}
+              onSelect={handleChannelSelect}
+              onRefresh={refetchChannels}
+              onCreateChannel={() => { setShowCreateDialog(true); setChannelDrawerOpen(false); }}
+              currentUser={user}
+              getUnreadCount={getUnreadCount}
+            />
+          </Drawer>
+        )}
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }} className="im-main">
           <div className="im-header">

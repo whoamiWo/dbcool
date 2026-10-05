@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   addReaction,
   removeReaction,
@@ -33,6 +34,7 @@ export function MessageList({
   onBurnExpired,
 }: MessageListProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [pickerFor, setPickerFor] = useState<string | null>(null);
@@ -247,15 +249,15 @@ export function MessageList({
               {showAvatar && (
                 <div
                   style={{
-                    width: 32,
-                    height: 32,
+                    width: isMobile ? 28 : 32,
+                    height: isMobile ? 28 : 32,
                     borderRadius: "50%",
                     background: isSelf ? 'var(--color-primary-500)' : 'var(--color-bg-tertiary)',
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "white",
-                    fontSize: 12,
+                    fontSize: isMobile ? 11 : 12,
                     fontWeight: 600,
                     flexShrink: 0,
                     boxShadow: 'var(--shadow-sm)',
@@ -265,17 +267,18 @@ export function MessageList({
                 </div>
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
-                {!showAvatar && <div style={{ height: 20 }} />}
+                {!showAvatar && <div style={{ height: isMobile ? 16 : 20 }} />}
                 <div
                   onClick={() => onMessageClick?.(msg)}
                   className={`message-bubble ${isSelf ? 'message-bubble-self' : ''} ${isReply ? 'message-bubble-replied' : ''}`}
                   style={{
-                    maxWidth: "fit-content",
+                    maxWidth: isMobile ? "90%" : "fit-content",
                     marginLeft: isSelf ? "auto" : 0,
+                    padding: isMobile ? "6px 10px" : undefined,
                   }}
                 >
                   <div
-                    style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}
+                    style={{ fontSize: isMobile ? 10 : 11, color: 'var(--color-text-muted)', marginBottom: 2 }}
                   >
                     {t("im.userPrefix")} {msg.senderId.substring(0, 8)}
                     {isReply && (

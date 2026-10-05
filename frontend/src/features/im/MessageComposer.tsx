@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { sendMessage, uploadAttachment, listSlashCommands, type SlashCommand } from './api';
 
 interface MessageComposerProps {
@@ -91,6 +92,7 @@ const SlashPanel = ({
 
 export function MessageComposer({ channelId, onSent, disabled, onAttachment }: MessageComposerProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const [content, setContent] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
@@ -194,19 +196,23 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         style={{
-          padding: 12,
+          padding: isMobile ? 8 : 12,
           borderTop: '1px solid var(--color-border-light)',
           background: 'rgba(15, 23, 42, 0.5)',
           backdropFilter: 'blur(10px)',
-          minHeight: 80,
+          minHeight: isMobile ? 56 : 80,
+          // 移动端：输入区固定在底部，避开 Home Indicator
+          position: isMobile ? 'sticky' : undefined,
+          bottom: 0,
+          paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : 12,
         }}
       >
         <div
           style={{
             display: 'flex',
-            gap: 8,
+            gap: isMobile ? 6 : 8,
             alignItems: 'flex-end',
-            padding: 12,
+            padding: isMobile ? 6 : 12,
             background: 'rgba(30, 41, 59, 0.6)',
             backdropFilter: 'blur(10px)',
             borderRadius: 'var(--radius-lg)',
@@ -217,8 +223,15 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="拖拽或点击上传文件（≤50MB）"
+            aria-label="上传附件"
             className="glass-button"
-            style={{ padding: '8px 12px', fontSize: 13 }}
+            // 触控区 ≥44px（移动端可点性下限）
+            style={{
+              padding: isMobile ? '10px 12px' : '8px 12px',
+              minWidth: isMobile ? 44 : undefined,
+              minHeight: isMobile ? 44 : undefined,
+              fontSize: isMobile ? 16 : 13,
+            }}
             disabled={disabled}
           >
             📎
@@ -248,17 +261,28 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             onKeyDown={handleKeyDown}
             placeholder={disabled ? t('im.selectChannelPlaceholder') : t('im.inputPlaceholder')}
             disabled={disabled}
+            aria-label="输入消息"
             className="textarea-glass"
+            style={{
+              fontSize: isMobile ? 16 : 13, // iOS 16px 避免自动缩放
+              minHeight: isMobile ? 36 : undefined,
+              maxHeight: isMobile ? 120 : undefined,
+              padding: isMobile ? '6px 8px' : undefined,
+            }}
           />
           <button
             onClick={handleSend}
             disabled={!content.trim() || isSending || disabled}
+            aria-label="发送消息"
             className="glass-button-primary"
+            // 触控区 ≥44px
             style={{
-              padding: '8px 16px',
+              padding: isMobile ? '10px 16px' : '8px 16px',
+              minWidth: isMobile ? 44 : undefined,
+              minHeight: isMobile ? 44 : undefined,
               opacity: !content.trim() || isSending || disabled ? 0.5 : 1,
               cursor: !content.trim() || isSending || disabled ? 'not-allowed' : 'pointer',
-              fontSize: 13,
+              fontSize: isMobile ? 16 : 13,
               fontWeight: 500,
             }}
           >
