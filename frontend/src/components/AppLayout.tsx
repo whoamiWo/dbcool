@@ -194,20 +194,24 @@ export function AppLayout() {
 
       {/* 移动端底部导航 (768px 以下) */}
       {isMobile && (
-        <nav className="app-footer">
+        <nav className="app-footer" style={{ display: 'flex', borderTop: '1px solid var(--color-border)' }}>
           {MOBILE_BOTTOM_NAV.map((item) => {
             const active = location.pathname.startsWith(item.path);
             return (
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
+                aria-label={t(item.labelKey)}
+                aria-current={active ? 'page' : undefined}
+                // 触控区 ≥44px（WCAG 2.5.8 AA）
                 style={{
                   flex: 1,
                   background: 'none',
                   border: 'none',
                   color: active ? 'var(--color-primary-400)' : 'var(--color-text-muted)',
                   cursor: 'pointer',
-                  padding: '4px 0',
+                  padding: '8px 4px',
+                  minHeight: 44,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',

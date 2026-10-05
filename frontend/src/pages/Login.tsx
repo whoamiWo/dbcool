@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
 
   const {
     register,
@@ -99,11 +101,13 @@ export function LoginPage() {
       <form
         onSubmit={handleSubmit(onSubmit)}
         style={{
-          padding: 32,
+          padding: isMobile ? 20 : 32,
           background: 'var(--color-bg-secondary)',
           borderRadius: 8,
           boxShadow: 'var(--shadow-md)',
-          width: 360,
+          // 移动端：占满宽度（375px 视口下 360px 固定宽会溢出）
+          width: isMobile ? '100%' : 360,
+          maxWidth: '100%',
           border: '1px solid var(--color-border-light)',
         }}
       >
@@ -146,7 +150,7 @@ export function LoginPage() {
           <input
             {...register('username')}
             autoComplete="username"
-            style={{ width: '100%', padding: 8, fontSize: 14, background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-primary)' }}
+            style={{ width: '100%', padding: isMobile ? 12 : 8, minHeight: isMobile ? 44 : undefined, fontSize: isMobile ? 16 : 14, background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-primary)' }}
           />
           {errors.username && (
             <span style={{ color: 'var(--color-error)', fontSize: 12 }}>{errors.username.message}</span>
@@ -159,7 +163,7 @@ export function LoginPage() {
             {...register('password')}
             type="password"
             autoComplete="current-password"
-            style={{ width: '100%', padding: 8, fontSize: 14, background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-primary)' }}
+            style={{ width: '100%', padding: isMobile ? 12 : 8, minHeight: isMobile ? 44 : undefined, fontSize: isMobile ? 16 : 14, background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-light)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text-primary)' }}
           />
           {errors.password && (
             <span style={{ color: 'var(--color-error)', fontSize: 12 }}>{errors.password.message}</span>
