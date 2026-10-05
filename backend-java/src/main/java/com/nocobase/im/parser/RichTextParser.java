@@ -17,10 +17,7 @@ import org.springframework.stereotype.Component;
  *   <li>代码块：```code```</li>
  * </ul>
  *
- * <p>PHASE 57 备注：该类暂不接入生产代码（@提及链路将在后续迭代），
- * 但保留方法供后续使用。MessageSearchService 中已删除对 formatMention 的死引用调用。
- * 
- * <p>PHASE 61: Now activated for @mention parsing pipeline.
+ * <p>PHASE 61: 已接入 IM @提及链路。MessageSearchService 中 formatMention 调用已删除。
  */
 @Component
 public class RichTextParser {

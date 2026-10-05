@@ -577,51 +577,6 @@ public class CollectionController {
     ) {}
 
     /**
-     * W3: 批量插入记录.
-     */
-    @PostMapping("/{name}/batch-insert")
-    public Map<String, Object> batchInsert(
-            @PathVariable String name,
-            @RequestBody BatchInsertRequest request,
-            @AuthenticationPrincipal AuthenticatedUser user
-    ) {
-        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
-                com.nocobase.auth.AclPolicyEntity.Action.CREATE);
-        int count = service.batchInsert(name, request.data(), user.tenantId());
-        return Map.of("code", 0, "message", "success", "data", Map.of("inserted", count));
-    }
-
-    /**
-     * W3: 批量更新记录.
-     */
-    @PostMapping("/{name}/batch-update")
-    public Map<String, Object> batchUpdate(
-            @PathVariable String name,
-            @RequestBody BatchUpdateRequest request,
-            @AuthenticationPrincipal AuthenticatedUser user
-    ) {
-        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
-                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
-        List<String> updatedIds = service.batchUpdate(name, request.items(), user.tenantId());
-        return Map.of("code", 0, "message", "success", "data", Map.of("updated_ids", updatedIds));
-    }
-
-    /**
-     * W3: 批量删除记录.
-     */
-    @PostMapping("/{name}/batch-delete")
-    public Map<String, Object> batchDelete(
-            @PathVariable String name,
-            @RequestBody BatchDeleteRequest request,
-            @AuthenticationPrincipal AuthenticatedUser user
-    ) {
-        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
-                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
-        int count = service.batchDelete(name, request.ids(), user.tenantId());
-        return Map.of("code", 0, "message", "success", "data", Map.of("deleted", count));
-    }
-
-    /**
      * R2-B: 聚合查询接口 — 复用 DynamicTableManager.aggregate。
      */
     @PostMapping("/{name}/aggregate")
