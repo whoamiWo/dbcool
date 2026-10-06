@@ -123,7 +123,7 @@ public class AutomationRuleController {
     public ResponseEntity<Map<String, Object>> get(
             @PathVariable UUID ruleId,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        AutomationRuleEntity rule = automationService.getRule(ruleId);
+        AutomationRuleEntity rule = automationService.getRule(ruleId, user.tenantId());
         
         return ResponseEntity.ok(Map.of(
                 "code", 0,

@@ -283,7 +283,7 @@ class UserAdminServiceTest {
         when(roleRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
         when(roleRepository.findById(editor.getId())).thenReturn(Optional.of(editor));
 
-        Map<String, Object> perms = service.getEffectivePermissions(userId);
+        Map<String, Object> perms = service.getEffectivePermissions(userId, "tenant");
 
         assertEquals(userId.toString(), perms.get("user_id"));
         @SuppressWarnings("unchecked")

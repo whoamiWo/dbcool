@@ -108,6 +108,9 @@ public class ProjectBoardController {
     ) {
         BoardListEntity list = boardListRepository.findById(listId)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "List not found"));
+        if (!list.getTenantId().equals(user.tenantId())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         if (body.get("title") != null) list.setTitle((String) body.get("title"));
         if (body.get("type") != null) list.setType((String) body.get("type"));
         if (body.get("sortOrder") instanceof Number n) list.setSortOrder(n.intValue());
@@ -371,6 +374,9 @@ public class ProjectBoardController {
     ) {
         CardLabelEntity label = labelRepository.findById(labelId)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Label not found"));
+        if (!label.getTenantId().equals(user.tenantId())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         if (body.get("name") != null) label.setName((String) body.get("name"));
         if (body.get("color") != null) label.setColor((String) body.get("color"));
         labelRepository.save(label);

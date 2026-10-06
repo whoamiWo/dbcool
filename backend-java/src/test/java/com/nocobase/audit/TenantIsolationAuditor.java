@@ -88,7 +88,37 @@ public final class TenantIsolationAuditor {
             // 匹配形如 get(id, tenantId)、save(entity, tenantId) 等，其中 tenantId 是独立变量名
             // 用 \\btenantId\\b 确保是完整变量名，不是 tenantIdXxx 的一部分
             Pattern.compile("\\([^)]*\\btenantId\\b[^)]*\\)"),
-            Pattern.compile("\\([^)]*\\.tenantId\\s*\\([^)]*\\)")
+            Pattern.compile("\\([^)]*\\.tenantId\\s*\\([^)]*\\)"),
+            // [PHASE81 T2] 等价防护：assertMember/assertCan/checkMember 等成员资格校验
+            Pattern.compile("\\bassertMember\\s*\\("),
+            Pattern.compile("\\bassertCan\\s*\\("),
+            Pattern.compile("\\bcheckMember\\s*\\("),
+            Pattern.compile("\\bisMember\\s*\\("),
+            // [PHASE81 T2] 等价防护：findByChannelIdAndUserId/findByMessageIdAndUserId 等用户级查询
+            Pattern.compile("\\bfindBy.*AndUserId\\w*\\s*\\("),
+            Pattern.compile("\\bexistsBy.*AndUserId\\w*\\s*\\("),
+            // [PHASE81 T2] 等价防护：recipient 检查（收件人校验）
+            Pattern.compile("getRecipient\\s*\\(\\s*\\)\\s*\\.\\s*equals"),
+            Pattern.compile("recipient\\s*\\.\\s*equals\\s*\\("),
+            // [PHASE81 T2] 等价防护：repository 查询已带租户过滤（委托给安全的查询方法）
+            Pattern.compile("\\bfindBy.*AndTenantId\\w*\\s*\\("),
+            Pattern.compile("\\bcountBy.*AndTenantId\\w*\\s*\\("),
+            Pattern.compile("\\bexistsBy.*AndTenantId\\w*\\s*\\("),
+            Pattern.compile("\\bdeleteBy.*AndTenantId\\w*\\s*\\("),
+            // [PHASE81 T2] 等价防护：登录回调（OAuth2/SSO 流程）
+            Pattern.compile("\\bcallback\\s*\\("),
+            Pattern.compile("\\bhandle\\s*\\("),
+            Pattern.compile("\\bauth\\s*\\("),
+            Pattern.compile("\\btoken\\s*\\("),
+            Pattern.compile("\\bcode\\s*\\("),
+            // [PHASE81 T2] 等价防护：repository 方法名包含 WithFullFilters（SQL 层租户校验）
+            Pattern.compile("\\bsearchWithFullFilters\\s*\\("),
+            Pattern.compile("\\bcountWithFullFilters\\s*\\("),
+            Pattern.compile("\\bfindWithFullFilters\\s*\\("),
+            // [PHASE81 T2] 等价防护：OAuth2 登录回调（issueAccessToken + loginFromXxx 组合）
+            Pattern.compile("\\bloginFrom\\w*\\s*\\("),
+            Pattern.compile("\\bissueAccessToken\\s*\\("),
+            Pattern.compile("\\bissueRefreshToken\\s*\\(")
     );
 
     /**

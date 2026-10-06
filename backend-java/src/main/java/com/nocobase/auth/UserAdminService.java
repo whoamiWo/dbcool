@@ -111,9 +111,10 @@ public class UserAdminService {
     /**
      * 用户的有效权限(US-307 权限预览) — 简化为角色列表 + ACL 列表.
      */
-    public Map<String, Object> getEffectivePermissions(UUID userId) {
+    public Map<String, Object> getEffectivePermissions(UUID userId, String tenantId) {
         Map<String, Object> result = new HashMap<>();
         result.put("user_id", userId.toString());
+        result.put("tenant_id", tenantId);
         result.put("roles", getUserRoles(userId).stream().map(this::toRoleDto).toList());
         // ACL policies from user's roles
         // 简化:列出所有 role 的所有 policy

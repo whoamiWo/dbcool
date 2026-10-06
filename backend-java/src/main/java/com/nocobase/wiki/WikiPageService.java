@@ -267,14 +267,6 @@ public class WikiPageService {
         return pageRepository.listBacklinks("%[[" + slug + "]]%", tenantId);
     }
 
-    /** 标记页面为模板。 */
-    @Transactional
-    public WikiPageEntity markTemplate(UUID id, boolean isTemplate) {
-        WikiPageEntity e = get(id);
-        e.setIsTemplate(isTemplate);
-        return pageRepository.save(e);
-    }
-
     /** 标记页面为模板（带租户校验）。 */
     @Transactional
     public WikiPageEntity markTemplate(UUID id, boolean isTemplate, String tenantId) {
@@ -284,6 +276,13 @@ public class WikiPageService {
         }
         e.setIsTemplate(isTemplate);
         return pageRepository.save(e);
+    }
+
+    /** 标记页面为模板（已过弃用，请使用带 tenantId 参数的重载）。 */
+    @Deprecated
+    @Transactional
+    public WikiPageEntity markTemplate(UUID id, boolean isTemplate) {
+        return markTemplate(id, isTemplate, null);
     }
 
     /** 列出所有模板页面。 */

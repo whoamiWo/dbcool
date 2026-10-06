@@ -1,8 +1,10 @@
 package com.nocobase.notification;
 
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -35,7 +37,8 @@ public class WeChatWorkController {
      * 若 channel 未配置 webhook_url,recipient 可作备用地址。
      */
     @PostMapping("/send")
-    public ResponseEntity<Map<String, Object>> send(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Map<String, Object>> send(@RequestBody Map<String, Object> body,
+                                                    @AuthenticationPrincipal AuthenticatedUser user) {
         if (body == null || body.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
                     "code", 400, "message", "请求体不能为空"));
@@ -49,7 +52,7 @@ public class WeChatWorkController {
 
         if (channelId.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "code", 400, "message", "channelId 必填(通知渠道配置了 webhook_url)"));
+                    "code", 400, "message", "channelId 必填 (通知渠道配置了 webhook_url)"));
         }
 
         Map<String, Object> payload = Map.of(
@@ -61,7 +64,8 @@ public class WeChatWorkController {
         NotificationDispatcher.SendResult result = notificationService.testSend(
                 channelId.isBlank() ? null : UUID.fromString(channelId),
                 recipient.isBlank() ? null : recipient,
-                payload
+                payload,
+                user.tenantId()
         );
 
         if (result.success()) {

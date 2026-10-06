@@ -97,9 +97,10 @@ public class UserAdminController {
     }
 
     @GetMapping("/{id}/effective-permissions")
-    public Map<String, Object> effectivePermissions(@PathVariable UUID id) {
+    public Map<String, Object> effectivePermissions(@PathVariable UUID id,
+                                                    @AuthenticationPrincipal AuthenticatedUser user) {
         return Map.of("code", 0, "message", "success",
-                "data", userService.getEffectivePermissions(id));
+                "data", userService.getEffectivePermissions(id, user.tenantId()));
     }
 
     private Map<String, Object> toDto(UserEntity u) {

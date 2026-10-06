@@ -1,5 +1,7 @@
 package com.nocobase.notification;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -64,9 +66,12 @@ public class NotificationService {
 
     /** 测试单 channel 发送 — admin UI "测试" 按钮. */
     public NotificationDispatcher.SendResult testSend(UUID channelId, String recipient,
-                                                       Map<String, Object> payload) {
+                                                       Map<String, Object> payload, String tenantId) {
         NotificationChannelEntity ch = repository.findById(channelId)
                 .orElseThrow(() -> new IllegalArgumentException("channel not found: " + channelId));
+        if (!ch.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         NotificationDispatcher d = dispatchers.get(ch.getType());
         if (d == null) return NotificationDispatcher.SendResult.error("no dispatcher: " + ch.getType());
         return d.send(ch, recipient, payload);

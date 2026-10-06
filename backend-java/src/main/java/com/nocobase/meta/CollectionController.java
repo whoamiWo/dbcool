@@ -116,8 +116,9 @@ public class CollectionController {
     }
 
     @GetMapping("/{name}")
-    public Map<String, Object> get(@PathVariable String name) {
-        CollectionMetaEntity meta = service.get(name);
+    public Map<String, Object> get(@PathVariable String name,
+                                   @AuthenticationPrincipal AuthenticatedUser user) {
+        CollectionMetaEntity meta = service.get(name, user.tenantId());
         Map<String, Object> dto = toDto(meta);
         dto.put("fields", service.parseFields(meta));
         return Map.of("code", 0, "message", "success", "data", dto);
@@ -419,7 +420,7 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
-        CollectionMetaEntity meta = service.get(name);
+        CollectionMetaEntity meta = service.get(name, user.tenantId());
         List<Map<String, Object>> records = service.listRecords(name, user.tenantId(), limit);
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))

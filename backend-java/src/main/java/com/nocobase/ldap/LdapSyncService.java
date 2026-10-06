@@ -85,8 +85,8 @@ public class LdapSyncService {
      * 启用/禁用 LDAP 同步。
      */
     @Transactional
-    public LdapConfigEntity toggleConfig(UUID configId, boolean enabled) {
-        LdapConfigEntity config = getConfig(configId);
+    public LdapConfigEntity toggleConfig(UUID configId, boolean enabled, String tenantId) {
+        LdapConfigEntity config = getConfig(configId, tenantId);
         config.setEnabled(enabled);
         config.setUpdatedAt(Instant.now());
         return ldapConfigRepository.save(config);
@@ -97,7 +97,7 @@ public class LdapSyncService {
      */
     @Transactional
     public Map<String, Object> syncUsers(UUID configId, String tenantId) {
-        LdapConfigEntity config = getConfig(configId);
+        LdapConfigEntity config = getConfig(configId, tenantId);
         
         if (!config.getEnabled()) {
             throw new RuntimeException("LDAP 配置未启用");
@@ -234,8 +234,8 @@ public class LdapSyncService {
     /**
      * 获取同步状态。
      */
-    public LdapConfigEntity getSyncStatus(UUID configId) {
-        return getConfig(configId);
+    public LdapConfigEntity getSyncStatus(UUID configId, String tenantId) {
+        return getConfig(configId, tenantId);
     }
 
     /**
@@ -256,9 +256,9 @@ public class LdapSyncService {
     //  内部方法
     // ============================================================
 
-    private LdapConfigEntity getConfig(UUID configId) {
-        return ldapConfigRepository.findById(configId)
-                .orElseThrow(() -> new RuntimeException("LDAP 配置不存在: " + configId));
+    private LdapConfigEntity getConfig(UUID configId, String tenantId) {
+        return ldapConfigRepository.findByIdAndTenantId(configId, tenantId)
+                .orElseThrow(() -> new RuntimeException("LDAP 配置不存在或无权访问：" + configId));
     }
 
     private String toJson(Map<?, ?> map) {

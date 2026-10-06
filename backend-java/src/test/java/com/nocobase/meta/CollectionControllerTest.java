@@ -148,11 +148,11 @@ class CollectionControllerTest {
     @Test
     void get_includesParsedFields() {
         CollectionMetaEntity meta = makeMeta("posts");
-        when(service.get("posts")).thenReturn(meta);
+        when(service.get("posts", "tenant_default")).thenReturn(meta);
         when(service.parseFields(meta)).thenReturn(List.of(
                 new FieldDef("x", "text", false, "X", null)));
 
-        Map<String, Object> resp = controller.get("posts");
+        Map<String, Object> resp = controller.get("posts", testUser);
 
         assertEquals(0, resp.get("code"));
         @SuppressWarnings("unchecked")
@@ -186,7 +186,7 @@ class CollectionControllerTest {
 
     @Test
     void delete_sameTenant_succeeds() {
-        when(service.get("posts")).thenReturn(makeMeta("posts"));
+        when(service.get("posts", "tenant_default")).thenReturn(makeMeta("posts"));
         // Week 41 B3:deleteMeta 需要 mock 返回成功
         when(service.deleteMeta(eq("posts"), eq(testUser.tenantId()))).thenReturn(true);
 
@@ -486,7 +486,7 @@ class CollectionControllerTest {
     void exportCsv_returnsCsvBody() {
         CollectionMetaEntity meta = makeMeta("posts");
         meta.setFieldsJson("[{\"name\":\"title\"}]");
-        when(service.get("posts")).thenReturn(meta);
+        when(service.get("posts", "tenant_default")).thenReturn(meta);
         when(service.listRecords("posts", "tenant_default", 1000))
                 .thenReturn(List.of(Map.of("title", "Hello, World")));
 

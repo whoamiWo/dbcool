@@ -139,7 +139,7 @@ class NotificationServiceTest {
     void testSend_channelNotFound_throwsIAE() {
         UUID id = UUID.randomUUID();
         when(repo.findById(id)).thenReturn(java.util.Optional.empty());
-        assertThatThrownBy(() -> service.testSend(id, "u@e.com", Map.of()))
+        assertThatThrownBy(() -> service.testSend(id, "u@e.com", Map.of(), "tenant"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("channel not found");
     }
@@ -147,9 +147,16 @@ class NotificationServiceTest {
     @Test
     void testSend_existingChannel_delegates() {
         UUID id = UUID.randomUUID();
-        var ch = makeChannel(NotificationChannelEntity.Type.EMAIL, "test_ch", true);
+        NotificationDispatcher emailDispatcher = mock(NotificationDispatcher.class);
+        when(emailDispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
+        when(emailDispatcher.send(any(), any(), any()))
+                .thenReturn(NotificationDispatcher.SendResult.ok("mocked"));
+        NotificationService svcWithDisp = new NotificationService(repo, List.of(emailDispatcher));
+        var ch = makeChannel(NotificationChannelEntity.Type.EMAIL, "all", true);
+        ch.setId(id);
+        ch.setTenantId(TENANT);
         when(repo.findById(id)).thenReturn(java.util.Optional.of(ch));
-        var r = service.testSend(id, "u@e.com", Map.of("title", "Hi"));
+        var r = svcWithDisp.testSend(id, "u@e.com", Map.of("title", "Hi"), TENANT);
         assertThat(r.success()).isTrue();
         assertThat(r.detail()).isEqualTo("mocked");
     }
@@ -158,8 +165,10 @@ class NotificationServiceTest {
     void testSend_noDispatcherForType_returnsError() {
         UUID id = UUID.randomUUID();
         var ch = makeChannel(NotificationChannelEntity.Type.DINGTALK, "no_disp", true);
+        ch.setId(id);
+        ch.setTenantId(TENANT);
         when(repo.findById(id)).thenReturn(java.util.Optional.of(ch));
-        var r = service.testSend(id, "u@e.com", Map.of());
+        var r = service.testSend(id, "u@e.com", Map.of(), TENANT);
         assertThat(r.success()).isFalse();
         assertThat(r.detail()).contains("no dispatcher");
     }

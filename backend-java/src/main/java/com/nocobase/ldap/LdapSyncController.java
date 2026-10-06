@@ -62,7 +62,7 @@ public class LdapSyncController {
             @AuthenticationPrincipal AuthenticatedUser user) {
         
         boolean enabled = body.getOrDefault("enabled", true) instanceof Boolean b && b;
-        LdapConfigEntity config = ldapSyncService.toggleConfig(configId, enabled);
+        LdapConfigEntity config = ldapSyncService.toggleConfig(configId, enabled, user.tenantId());
         
         return ResponseEntity.ok(Map.of(
                 "code", 0,

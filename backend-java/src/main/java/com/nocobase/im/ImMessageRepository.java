@@ -69,7 +69,9 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
      * @param startTime 开始时间（可选）
      * @param endTime 结束时间（可选）
      */
-    @Query(value = "select m from ImMessageEntity m where m.channelId = :channelId "
+     @Query(value = "select m from ImMessageEntity m left join ImChannelEntity ch on ch.id = :channelId "
+            + "where m.channelId = :channelId "
+            + "and (ch.tenantId is null or m.tenantId = ch.tenantId) "
             + "and m.deletedAt is null "
             + "and (:senderId is null or m.senderId = :senderId) "
             + "and (:keyword is null or :keyword = '' or m.content is not null and lower(m.content) like lower(concat('%', :keyword, '%'))) "
@@ -88,7 +90,9 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
     /**
      * 高级搜索计数（与 searchWithFullFilters 的过滤条件一致）。
      */
-    @Query("select count(m) from ImMessageEntity m where m.channelId = :channelId "
+    @Query("select count(m) from ImMessageEntity m left join ImChannelEntity ch on ch.id = :channelId "
+            + "where m.channelId = :channelId "
+            + "and (ch.tenantId is null or m.tenantId = ch.tenantId) "
             + "and m.deletedAt is null "
             + "and (:senderId is null or m.senderId = :senderId) "
             + "and (:keyword is null or :keyword = '' or m.content is not null and lower(m.content) like lower(concat('%', :keyword, '%'))) "

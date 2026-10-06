@@ -119,6 +119,7 @@ class ProjectBoardControllerTest {
         BoardListEntity l = new BoardListEntity();
         l.setId(listId);
         l.setTitle("旧");
+        l.setTenantId(TENANT);
         when(boardListRepository.findById(listId)).thenReturn(Optional.of(l));
 
         Map<String, Object> resp = controller.updateBoardList(listId, Map.of("title", "新"), USER);
@@ -248,6 +249,7 @@ class ProjectBoardControllerTest {
         CardLabelEntity label = new CardLabelEntity();
         label.setId(id);
         label.setName("旧");
+        label.setTenantId(TENANT);
         when(labelRepository.findById(id)).thenReturn(Optional.of(label));
 
         controller.updateLabel(id, Map.of("name", "新"), USER);

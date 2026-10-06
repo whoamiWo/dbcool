@@ -52,7 +52,7 @@ class CollectionServiceB3Test {
         existing.setTitle("订单");
         existing.setTenantId("tenant_default");
         existing.setCreatedAt(Instant.now());
-        when(repository.findByName("orders")).thenReturn(java.util.Optional.of(existing));
+        when(repository.findByNameAndTenantId("orders", "tenant_default")).thenReturn(java.util.Optional.of(existing));
     }
 
     // ============ deleteMeta 主流程 ============
@@ -97,10 +97,10 @@ class CollectionServiceB3Test {
 
     @Test
     void deleteMeta_crossTenantForbidden() {
-        // tenantId 不匹配 → 拒绝
+        // tenantId 不匹配 → 拒绝 (NOT_FOUND for security - doesn't leak existence)
         assertThatThrownBy(() -> service.deleteMeta("orders", "other_tenant"))
                 .isInstanceOf(ResponseStatusException.class)
-                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.FORBIDDEN);
+                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.NOT_FOUND);
 
         verify(repository, never()).deleteByName(anyString());
         verify(tableManager, never()).dropTable(anyString());

@@ -8,6 +8,7 @@ import com.nocobase.auth.RoleRepository;
 import com.nocobase.common.ExpressionEvaluator;
 import com.nocobase.meta.formula.FormulaEngine;
 import com.nocobase.meta.rollup.RollupEngine;
+import com.nocobase.tenant.TenantContext;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -164,10 +165,15 @@ public class CollectionService {
         return repository.findByTenantId(tenantId);
     }
 
-    public CollectionMetaEntity get(String name) {
-        return repository.findByName(name)
+    public CollectionMetaEntity get(String name, String tenantId) {
+        return repository.findByNameAndTenantId(name, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Collection 不存在: " + name));
+                        HttpStatus.NOT_FOUND, "Collection 不存在或无权访问：" + name));
+    }
+
+    /** 内部方法：使用 TenantContext 获取（仅限内部调用）。 */
+    public CollectionMetaEntity get(String name) {
+        return get(name, TenantContext.currentTenantId());
     }
 
     public List<FieldDef> parseFields(CollectionMetaEntity meta) {
@@ -815,10 +821,7 @@ public class CollectionService {
      */
     @Transactional
     public boolean deleteMeta(String collectionName, String tenantId) {
-        CollectionMetaEntity meta = get(collectionName);
-        if (!meta.getTenantId().equals(tenantId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除该 collection");
-        }
+        CollectionMetaEntity meta = get(collectionName, tenantId);
         // 1. 删元数据(主流程)
         long deleted = repository.deleteByName(collectionName);
         if (deleted == 0) {

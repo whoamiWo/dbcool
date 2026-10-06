@@ -180,7 +180,7 @@ class NotificationChannelControllerTest {
         login();
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.of(makeChannel(id, TENANT)));
-        when(service.testSend(any(), any(), any()))
+        when(service.testSend(any(), any(), any(), any()))
                 .thenReturn(NotificationDispatcher.SendResult.ok("sent"));
 
         mockMvc.perform(post("/api/admin/notification-channels/" + id + "/test")

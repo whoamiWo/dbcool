@@ -90,7 +90,7 @@ public class NotificationChannelController {
         payload.put("body", String.valueOf(body.getOrDefault("body",
                 "这是一条测试通知,来自 NocoBase admin 后台")));
         String recipient = (String) body.getOrDefault("recipient", "");
-        NotificationDispatcher.SendResult r = service.testSend(id, recipient, payload);
+        NotificationDispatcher.SendResult r = service.testSend(id, recipient, payload, user.tenantId());
         return ResponseEntity.ok(Map.of(
                 "code", r.success() ? 0 : 1,
                 "message", r.success() ? "success" : "send failed",

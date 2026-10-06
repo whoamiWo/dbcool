@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
@@ -311,15 +313,23 @@ class UserAdminControllerTest {
     @Test
     void effectivePermissions_returnsData() throws Exception {
         UUID uid = UUID.randomUUID();
-        when(userService.getEffectivePermissions(uid)).thenReturn(Map.of(
+        AuthenticatedUser currentUser = new AuthenticatedUser(uid, "admin", "tenant_admin");
+        when(userService.getEffectivePermissions(uid, "tenant_admin")).thenReturn(Map.of(
                 "permissions", List.of("read", "write"),
                 "source", Map.of("role", "admin")
         ));
 
-        mockMvc.perform(get("/api/admin/users/{id}/effective-permissions", uid))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.permissions[0]").value("read"))
-                .andExpect(jsonPath("$.data.source.role").value("admin"));
+        SecurityContextHolder.setContext(new SecurityContextImpl(
+                new UsernamePasswordAuthenticationToken(currentUser, null)));
+        
+        try {
+            mockMvc.perform(get("/api/admin/users/{id}/effective-permissions", uid))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(0))
+                    .andExpect(jsonPath("$.data.permissions[0]").value("read"))
+                    .andExpect(jsonPath("$.data.source.role").value("admin"));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.nocobase.tenant;
 
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -7,6 +8,8 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -35,10 +38,20 @@ public class UserTenantController {
 
     @GetMapping("/users/{userId}/tenants")
     @PreAuthorize("hasRole('ADMIN')")
-    public Map<String, Object> listByUser(@PathVariable String userId) {
+    public Map<String, Object> listByUser(@PathVariable String userId,
+                                          @AuthenticationPrincipal AuthenticatedUser user) {
+        // 校验：目标用户必须属于当前租户
         List<UserTenantEntity> list = userTenantRepo.findByUserId(userId);
-        // 关联实体信息,便于前端展示
-        List<Map<String, Object>> data = list.stream().map(ute -> {
+        // 过滤出当前租户的记录
+        List<UserTenantEntity> filtered = list.stream()
+                .filter(ute -> ute.getTenantId().equals(user.tenantId()))
+                .toList();
+        // 如果没有任何记录，说明用户不属于当前租户
+        if (filtered.isEmpty() && !list.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "用户不属于当前租户");
+        }
+        // 关联实体信息，便于前端展示
+        List<Map<String, Object>> data = filtered.stream().map(ute -> {
             var t = tenantRepo.findById(ute.getTenantId());
             return Map.<String, Object>of(
                     "user_id", ute.getUserId(),
