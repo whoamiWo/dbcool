@@ -1,11 +1,10 @@
-AuthController#login
-AuthController#refresh
 AutomationRuleController#get
 CollectionController#get
 ImMessageController#listReactions
 ImMessageController#thread
 LdapSyncController#toggle
 LdapSyncService#toggleConfig
+MessageController#markRead
 MessageSearchService#searchMessages
 MessageService#markRead
 NotificationService#testSend
@@ -13,10 +12,6 @@ ProjectBoardController#updateBoardList
 ProjectBoardController#updateLabel
 ReactionService#remove
 UserAdminService#getEffectivePermissions
-WeComController#callback
-MessageController#markRead
 UserTenantController#listByUser
-WebhookSubscriptionController#delete
-WebhookSubscriptionController#setEnabled
+WeComController#callback
 WikiPageService#markTemplate
-WorkflowController#get
