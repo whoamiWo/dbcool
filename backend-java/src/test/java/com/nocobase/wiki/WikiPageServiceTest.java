@@ -118,4 +118,62 @@ class WikiPageServiceTest {
         assertEquals(2, drafts.size());
         assertEquals(1, published.size());
     }
+
+    @Test
+    void softDelete_tenantMismatch_403() {
+        String otherTenant = "other-tenant";
+        UUID userId2 = UUID.randomUUID();
+        WikiPageEntity page = pageService.create(kbId, null, "Other Tenant Page", "otp", "Content", userId2, otherTenant);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pageService.softDelete(page.getId(), tenantId),
+                "租户 A 无法软删除租户 B 的页面");
+    }
+
+    @Test
+    void restore_tenantMismatch_403() {
+        String otherTenant = "other-tenant";
+        UUID userId2 = UUID.randomUUID();
+        WikiPageEntity page = pageService.create(kbId, null, "Other Tenant Page", "otp", "Content", userId2, otherTenant);
+        // 先由其他租户软删
+        pageService.softDelete(page.getId(), otherTenant);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pageService.restore(page.getId(), tenantId),
+                "租户 A 无法恢复租户 B 的页面");
+    }
+
+    @Test
+    void share_tenantMismatch_403() {
+        String otherTenant = "other-tenant";
+        UUID userId2 = UUID.randomUUID();
+        WikiPageEntity page = pageService.create(kbId, null, "Other Tenant Page", "otp", "Content", userId2, otherTenant);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pageService.share(page.getId(), false, tenantId),
+                "租户 A 无法分享租户 B 的页面");
+    }
+
+    @Test
+    void unshare_tenantMismatch_403() {
+        String otherTenant = "other-tenant";
+        UUID userId2 = UUID.randomUUID();
+        WikiPageEntity page = pageService.create(kbId, null, "Other Tenant Page", "otp", "Content", userId2, otherTenant);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pageService.unshare(page.getId(), tenantId),
+                "租户 A 无法取消分享租户 B 的页面");
+    }
+
+    @Test
+    void createFromTemplate_tenantMismatch_403() {
+        String otherTenant = "other-tenant";
+        UUID userId2 = UUID.randomUUID();
+        WikiPageEntity template = pageService.create(kbId, null, "Template", "tpl", "Template Content", userId2, otherTenant);
+        pageService.markTemplate(template.getId(), true, otherTenant);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pageService.createFromTemplate(template.getId(), kbId, null, "New Page", "new-page", userId, tenantId),
+                "租户 A 无法从租户 B 的模板创建页面");
+    }
 }

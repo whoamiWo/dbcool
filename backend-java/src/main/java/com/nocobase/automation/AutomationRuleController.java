@@ -140,7 +140,7 @@ public class AutomationRuleController {
             @AuthenticationPrincipal AuthenticatedUser user) {
         
         Map<String, Object> triggerData = (Map<String, Object>) body.get("triggerData");
-        var execution = automationService.executeRule(ruleId, triggerData, user.userId());
+        var execution = automationService.executeRule(ruleId, triggerData, user.userId(), user.tenantId());
         
         return ResponseEntity.ok(Map.of(
                 "code", 0,

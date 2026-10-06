@@ -296,13 +296,23 @@ public class WikiPageService {
     public WikiPageEntity createFromTemplate(UUID templateId, UUID kbId, UUID parentId,
                                              String title, String slug, UUID createdBy, String tenantId) {
         WikiPageEntity tpl = get(templateId);
+        // 模板归属校验
+        if (!tpl.getTenantId().equals(tenantId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Template not owned by tenant");
+        }
+        // 将模板内容复制到新页面
         return create(kbId, parentId, title, slug, tpl.getContent(), createdBy, tenantId);
     }
 
     /** 软删除（进入回收站，30 天可恢复）。 */
     @Transactional
-    public WikiPageEntity softDelete(UUID id) {
+    public WikiPageEntity softDelete(UUID id, String tenantId) {
         WikiPageEntity e = get(id);
+        if (!e.getTenantId().equals(tenantId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         e.setDeletedAt(Instant.now());
         e.setStatus("TRASH");
         return pageRepository.save(e);
@@ -310,8 +320,12 @@ public class WikiPageService {
 
     /** 恢复软删除的页面。 */
     @Transactional
-    public WikiPageEntity restore(UUID id) {
+    public WikiPageEntity restore(UUID id, String tenantId) {
         WikiPageEntity e = get(id);
+        if (!e.getTenantId().equals(tenantId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         e.setDeletedAt(null);
         e.setStatus("DRAFT");
         return pageRepository.save(e);
@@ -324,8 +338,12 @@ public class WikiPageService {
 
     /** 生成分享链接 token（免登录只读访问）。 */
     @Transactional
-    public WikiPageEntity share(UUID id, boolean regenerate) {
+    public WikiPageEntity share(UUID id, boolean regenerate, String tenantId) {
         WikiPageEntity e = get(id);
+        if (!e.getTenantId().equals(tenantId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         if (regenerate || e.getShareToken() == null) {
             e.setShareToken(UUID.randomUUID().toString().substring(0, 32));
         }
@@ -334,8 +352,12 @@ public class WikiPageService {
 
     /** 撤销分享链接。 */
     @Transactional
-    public WikiPageEntity unshare(UUID id) {
+    public WikiPageEntity unshare(UUID id, String tenantId) {
         WikiPageEntity e = get(id);
+        if (!e.getTenantId().equals(tenantId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         e.setShareToken(null);
         return pageRepository.save(e);
     }

@@ -7,7 +7,6 @@ AutomationRuleController#list
 AutomationRuleController#toggle
 AutomationRuleController#update
 AutomationRuleService#deleteRule
-AutomationRuleService#executeRule
 AutomationRuleService#toggleRule
 AutomationRuleService#updateRule
 ChannelService#archive
@@ -120,9 +119,5 @@ WikiController#updatePage
 WikiEmbeddingService#hybridSearch
 WikiPageService#createFromTemplate
 WikiPageService#markTemplate
-WikiPageService#restore
-WikiPageService#share
-WikiPageService#softDelete
-WikiPageService#unshare
 WikiSearchService#search
 WorkflowController#get

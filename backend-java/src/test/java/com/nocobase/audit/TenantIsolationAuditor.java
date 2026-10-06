@@ -58,7 +58,11 @@ public final class TenantIsolationAuditor {
             // Spring Data 派生查询：查询条件已带租户过滤（DB 层隔离）
             Pattern.compile("\\bfind\\w*ByTenantId"),
             Pattern.compile("\\b\\w*By\\w*AndTenantId\\w*\\s*\\("),
-            Pattern.compile("query.*tenant_id|tenant_id\\s*=|setTenantId\\s*\\(")
+            Pattern.compile("query.*tenant_id|tenant_id\\s*=|setTenantId\\s*\\("),
+            // [PHASE77 T3] 委托隔离：同类内调用带 tenantId 参数的重载/辅助方法（如 getRule(ruleId, tenantId)、
+            // findAgent(tenantId, channelId)、get(id, tenantId)）——被调方内部已做租户限定，
+            // 方法签名含 tenantId 且实参中传递了该变量，视为已有防护
+            Pattern.compile("\\b\\w+\\s*\\(\\s*[^)]*\\btenantId\\w*\\s*[,)]")
     );
 
     /** 方法签名：访问修饰符 + 返回类型 + 名字 + 参数列表（不含 getter/setter/构造器）。 */

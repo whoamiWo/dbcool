@@ -171,8 +171,8 @@ public class AutomationRuleService {
      * 手动触发规则执行。
      */
     @Transactional
-    public AutomationExecutionEntity executeRule(UUID ruleId, Map<String, Object> triggerData, UUID triggeredBy) {
-        AutomationRuleEntity rule = getRule(ruleId);  // 内部调用不传 tenantId，仅用于手动触发
+    public AutomationExecutionEntity executeRule(UUID ruleId, Map<String, Object> triggerData, UUID triggeredBy, String tenantId) {
+        AutomationRuleEntity rule = getRule(ruleId, tenantId);  // 使用租户限定版本
         
         if (!rule.getEnabled()) {
             throw new RuntimeException("规则已禁用");

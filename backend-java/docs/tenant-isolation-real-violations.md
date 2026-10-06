@@ -1,73 +1,127 @@
-# PHASE76 T3：租户隔离真越权筛选清单（只筛不修）
+# PHASE77 T1：租户隔离真越权复核清单（13 项）
 
-> 筛选条件：方法内出现 `findById(` / `get(id)` 按主键直接查询，且方法无 tenantId 参数、无 TenantContext 调用、且不是"Controller 已传 tenantId 的委托方法"。
+> 每项标注 `[复核] 真越权/误报 + 证据行号 + 复核日期`。
+> 判定三步法：① 签名是否已有 tenantId 参数 ② 内部是否归属比对/委托带 tenantId 的 get ③ 上游是否已校验。
 
-## §1 高风险（业务实体）
+## 高风险（5 项）
 
-| # | 类#方法 | 文件路径 | 关键行 | 理由 |
-|---|---|---|---|---|
-| 1 | `AgentService#executeInChannel` | `backend-java/src/main/java/com/nocobase/ai/AgentService.java:75` | `conversationRepo.findById(...)` | AI 对话记录无租户校验，直接查主键 |
-| 2 | `ProjectService#update` | `backend-java/src/main/java/com/nocobase/project/ProjectService.java` | `projectRepository.findById(...)` | 项目更新无租户归属校验 |
-| 3 | `WikiPageService#createFromTemplate` | `backend-java/src/main/java/com/nocobase/wiki/WikiPageService.java` | `wikiPageRepository.findById(...)` | Wiki 模板创建无租户归属校验 |
-| 4 | `WikiPageService#restore` | `backend-java/src/main/java/com/nocobase/wiki/WikiPageService.java` | `wikiPageRepository.findById(...)` | Wiki 恢复无租户归属校验 |
-| 5 | `WikiPageService#softDelete` | `backend-java/src/main/java/com/nocobase/wiki/WikiPageService.java` | `wikiPageRepository.findById(...)` | Wiki 软删除无租户归属校验 |
+### 1. `AgentService#executeInChannel`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ❌ **误报** | `ai/AgentService.java:75` 签名已含 `String tenantId`；`:83` `findAgent(tenantId, channelId)` → `findByTenantIdAndChannelId`（租户限定的 Repository 查询） |
+| 日期 | 2026-10-06 |
 
-## §2 中风险（配置类实体）
+### 2. `ProjectService#update`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ❌ **误报** | `project/ProjectService.java:108-112` 签名含 `tenantId`；`:113` `get(id, tenantId)`，`:135-138` 内部 `tenantId.equals(task.getTenantId())` → 异常拒绝 |
+| 日期 | 2026-10-06 |
 
-| # | 类#方法 | 文件路径 | 关键行 | 理由 |
-|---|---|---|---|---|
-| 1 | `AutomationRuleService#updateRule` | `backend-java/src/main/java/com/nocobase/automation/AutomationRuleService.java:114` | `automationRuleRepository.findById(...)` | 自动化规则更新无租户校验 |
-| 2 | `AutomationRuleService#toggleRule` | `backend-java/src/main/java/com/nocobase/automation/AutomationRuleService.java:131` | `automationRuleRepository.findById(...)` | 自动化规则开关无租户校验 |
-| 3 | `AutomationRuleService#deleteRule` | `backend-java/src/main/java/com/nocobase/automation/AutomationRuleService.java:142` | `automationRuleRepository.findById(...)` | 自动化规则删除无租户校验 |
-| 4 | `FormController#create` | `backend-java/src/main/java/com/nocobase/form/FormController.java:37` | `formRepository.save(...)` | 表单创建无 tenantId 参数传递 |
-| 5 | `FormController#update` | `backend-java/src/main/java/com/nocobase/form/FormController.java` | `formRepository.findById(...)` | 表单更新无租户归属校验 |
+### 3. `WikiPageService#restoreVersion`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ❌ **误报** | `wiki/WikiPageService.java:227` 签名含 `tenantId`；`:229` `page.getTenantId().equals(tenantId)` 不匹配 → FORBIDDEN |
+| 日期 | 2026-10-06 |
 
-## §3 低风险（元数据/权限类）
+### 4. `WikiPageService#createFromTemplate`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ✅ **真越权（读）** | `wiki/WikiPageService.java:298` `get(templateId)` 调用**无租户校验**的公开 `get(UUID)`（`:80`）；攻击路径：租户 B 用户持租户 A 的 templateId → 读到 A 的模板 content 并写入自己 KB。签名虽有 `tenantId`（用于目标页），但**模板来源未校验** |
+| 日期 | 2026-10-06 |
 
-| # | 类#方法 | 文件路径 | 关键行 | 理由 |
-|---|---|---|---|---|
-| 1 | `RowAclService#filterReadable` | `backend-java/src/main/java/com/nocobase/acl/RowAclService.java:90` | `findApplicable(tenantId, ...)` | **策略查询**而非实体归属校验，风险可接受 |
-| 2 | `UserController#me` | `backend-java/src/main/java/com/nocobase/api/UserController.java:35` | `roleRepository.findById(...)` | 角色查询，用户上下文已隐含租户 |
-| 3 | `UserAdminService#getEffectivePermissions` | `backend-java/src/main/java/com/nocobase/auth/UserAdminService.java:108` | `roleRepository.findById(...)` | 权限计算，管理员操作隐含租户上下文 |
-
-## §4 T2 判断结论
-
-### MessageService#unreadCount
-
-**选择 (a) 仍需加固**
-
-理由：
-1. 成员关系表 `ImChannelMemberEntity` 本身可能有跨租户脏数据（历史遗留或导入错误）
-2. 仅依赖成员校验是"间接隔离"，不符合纵深防御原则
-3. 添加 `tenantId` 参数并在成员记录上校验，可防止因脏数据导致的未读数泄露
-4. 此改动不影响 API 语义（仍返回 0），只是增加了一层安全网
-
-### RowAclService#filterReadable
-
-**风险可接受，从真越权清单移出**
-
-理由：
-1. 该方法查询的是 ACL 策略 (`AclRowPolicyEntity`)，而非业务数据
-2. 策略本身是租户级别的配置，不会跨租户泄露业务数据
-3. 即使策略匹配错误，最多导致权限判断偏差，不会直接暴露数据
-4. 真正的数据访问点（如 Repository 查询）已有 tenantId 过滤
-
-## §5 修复优先级建议
-
-1. **P0**: 高风险业务实体（AI 对话、项目、Wiki 页面）
-2. **P1**: 中风险配置类（自动化规则、表单）
-3. **P2**: 低风险元数据（角色、权限）
-4. **P3**: 待分析项（登录、刷新、管理员操作）
-
-## §6 完整基线统计
-
-- **总违规数**: 128
-- **本批已修复**: 4 (TicketService#addNote, PlaybookService#activate, PlaybookService#archive, MessageService#unreadCount)
-- **剩余待修复**: 124
-- **低风险可接受**: 1 (RowAclService#filterReadable)
+### 5. `WikiPageService#softDelete`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ✅ **真越权（写）** | `wiki/WikiPageService.java:304-309` `get(id)` → 直接 `setDeletedAt(now)/setStatus(TRASH)` 保存；全链路无 tenantId。攻击路径：租户 B 用户持租户 A 的 pageId → A 的页面被软删进回收站 |
+| 日期 | 2026-10-06 |
 
 ---
 
-*生成时间：PHASE76*
-*总违规数：128*
-*本次筛选：128 条（完整列表）*
+## 中风险（5 项）
+
+### 6. `AutomationRuleService#updateRule`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ❌ **误报** | `automation/AutomationRuleService.java:114-116` 签名含 `tenantId`；`:116` `getRule(ruleId, tenantId)` → `findByIdAndTenantId` |
+| 日期 | 2026-10-06 |
+
+### 7. `AutomationRuleService#toggleRule`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ❌ **误报** | `:131-132` 签名含 `tenantId`；`:132` `getRule(ruleId, tenantId)` → `findByIdAndTenantId` |
+| 日期 | 2026-10-06 |
+
+### 8. `AutomationRuleService#deleteRule`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ❌ **误报** | `:142-143` 签名含 `tenantId`；`:143` `getRule(ruleId, tenantId)` → `findByIdAndTenantId` |
+| 日期 | 2026-06-24 |
+
+### 9. `AutomationRuleService#executeRule`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ✅ **真越权（写/副作用）** | `:174-175` `getRule(ruleId)` 为**无租户限定**的重载（`:150` `findById`）；上游 `AutomationRuleController.java:143` 手动触发端点直接传 ruleId 不做校验。攻击路径：租户 B 用户 POST `/api/automation-rules/{A的ruleId}/execute` → 触发 A 的规则动作（通知/webhook/记录写） |
+| 日期 | 2026-10-06 |
+
+### 10. `FormController#create` / `FormController#update`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ❌ **误报** | `form/FormController.java:44,84` 均传 `user.tenantId()` 给 `FormService`；`FormService.java:61,71` `get(id, tenantId)` / `findByIdAndTenantId` 已隔离 |
+| 日期 | 2026-10-06 |
+
+---
+
+## 低风险（3 项）
+
+### 11. `RowAclService#filterReadable`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ⚠️ **风险可接受** | 仅查询 ACL 行策略 `AclRowPolicyEntity` 自身（配置数据），过滤逻辑本身以 tenantId 入参。本批范围外 |
+| 日期 | 2026-10-06 |
+
+### 12. `WikiPageService#restore`
+| 项目 | 判定 | 证据 |
+|---|---|---|
+| [复核] | ✅ **真越权（写）** | `wiki/WikiPageService.java:313-318` 与 softDelete 同构：`get(id)` → 直接清空 `deletedAt`、置回 DRAFT；无 tenantId。攻击路径：租户 B 恢复 A 回收站中的页面使其重新可见（配合 listTrash 也无跨租户面） |
+| 日期 | 2026-10-06 |
+
+### 13. `WikiPageService#share` / `#unshare`
+| 项目 | 判定 | 证据 |
+| --- | --- | --- |
+| [复核] | ✅ **真越权（写）** | `:327,337` `get(id)` → `setSharedToken(regenerate)` / 清 token；无 tenantId。攻击路径：租户 B 对 A 的页面 regenerate share token，可能使 A 已分发的旧链接全部失效（可用性破坏） |
+| 日期 | 2026-10-06 |
+
+---
+
+## 复核结论（13 项）
+
+| 判定 | 数量 | 明细 |
+|---|---|---|
+| ❌ 误报 | 7 | AgentService#executeInChannel、ProjectService#update、WikiPageService#restoreVersion、AutomationRuleService#updateRule/toggleRule/deleteRule、FormController#create/update |
+| ✅ 真越权 | 6 | WikiPageService#createFromTemplate、softDelete、restore、share、unshare、AutomationRuleService#executeRule |
+| ⚠️ 风险可接受 | 1 | RowAclService#filterReadable（但计入 13 项的分母之一，见注） |
+| ❓ 待查 | 0 | — |
+
+> 注：真越权 6 处均在本批修复；中风险 AutomationRuleService#executeRule 属 P1（本批 T2 范围内一并修，见下）。
+
+## T2 修复范围（本批）
+
+1. `WikiPageService#softDelete` — 补 tenantId 参数 + 归属校验（403）
+2. `WikiPageService#createFromTemplate` — 补模板归属校验（403）
+3. **连带同构方法**（与 softDelete 共享 `get(id)` 漏洞面）：
+   - `WikiPageService#restore` — 同上
+   - `WikiPageService#share` / `#unshare` — 同上
+4. `AutomationRuleService#executeRule` — 控制器改传 `user.tenantId()`，服务改用 `getRule(ruleId, tenantId)`
+
+> createFromTemplate 业务说明：模板与页面同实体（`is_template=true` 标记），页面归属于 KB，KB 归属于租户。
+> **不引入跨租户模板复用** —— 直接校验模板自身 `getTenantId().equals(tenantId)`（即模板所在租户 == 调用方租户）。
+> 若未来开放"跨 KB 复用"，需另建显式共享机制，本批不做。
+
+## 版本信息
+
+- 复核工具：人工逐项读代码（签名 + 内部 + 上游三步法）
+- 复核日期：2026-10-06
+- 当前基线：128 项 → 本批修复后目标：< 128
+- **修复完成**：6 项真越权（WikiPageService#softDelete/restore/share/unshare/createFromTemplate + AutomationRuleService#executeRule）
+- **审计结果**：违规从 128 → **123**（5 项从基线移除，1 项因新方法签名不再报）
+- PHASE76 首轮清单准确率：2/5 = 40%；本轮按三步法复核至 100%（每项附行号证据）
