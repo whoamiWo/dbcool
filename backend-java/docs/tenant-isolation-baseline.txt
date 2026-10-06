@@ -56,12 +56,9 @@ MessageSearchService#searchMessages
 MessageService#delete
 MessageService#edit
 MessageService#markRead
-MessageService#unreadCount
 NotificationService#testSend
 PlaybookController#create
 PlaybookController#update
-PlaybookService#activate
-PlaybookService#archive
 PlaybookService#finishRun
 PlaybookService#markOverdue
 PlaybookService#update
@@ -83,7 +80,6 @@ ReactionService#remove
 RowAclService#filterReadable
 TicketController#closeSession
 TicketController#listTickets
-TicketService#addNote
 TicketService#updateStatus
 UserAdminController#create
 UserAdminController#update

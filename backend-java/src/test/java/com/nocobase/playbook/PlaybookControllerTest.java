@@ -108,12 +108,12 @@ class PlaybookControllerTest {
 
     @Test
     void activate_and_archive() {
-        when(service.activate(playbookId)).thenReturn(playbook());
-        when(service.archive(playbookId)).thenReturn(playbook());
-        assertThat(controller.activate(playbookId).get("code")).isEqualTo(0);
-        assertThat(controller.archive(playbookId).get("code")).isEqualTo(0);
-        verify(service).activate(playbookId);
-        verify(service).archive(playbookId);
+        when(service.activate(eq(playbookId), eq("tenant_default"))).thenReturn(playbook());
+        when(service.archive(eq(playbookId), eq("tenant_default"))).thenReturn(playbook());
+        assertThat(controller.activate(playbookId, user).get("code")).isEqualTo(0);
+        assertThat(controller.archive(playbookId, user).get("code")).isEqualTo(0);
+        verify(service).activate(playbookId, "tenant_default");
+        verify(service).archive(playbookId, "tenant_default");
     }
 
     @Test

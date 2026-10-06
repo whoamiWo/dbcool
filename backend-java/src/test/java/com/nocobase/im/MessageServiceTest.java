@@ -112,7 +112,7 @@ class MessageServiceTest {
     @Test
     void unreadCount_nonMemberIsZero() {
         when(memberRepo.findByChannelIdAndUserId(channelId, senderId)).thenReturn(Optional.empty());
-        assertThat(service.unreadCount(channelId, senderId)).isZero();
+        assertThat(service.unreadCount(channelId, senderId, "tenant_default")).isZero();
     }
 
     @Test
@@ -120,12 +120,25 @@ class MessageServiceTest {
         ImChannelMemberEntity m = new ImChannelMemberEntity();
         m.setChannelId(channelId);
         m.setUserId(senderId);
+        m.setTenantId("tenant_default");
         m.setLastReadMessageId(null); // 从未读过
         when(memberRepo.findByChannelIdAndUserId(channelId, senderId)).thenReturn(Optional.of(m));
         when(messageRepo.countByChannelIdAndParentIdIsNullAndCreatedAtAfterAndDeletedAtIsNull(
                 any(), any())).thenReturn(7L);
 
-        assertThat(service.unreadCount(channelId, senderId)).isEqualTo(7L);
+        assertThat(service.unreadCount(channelId, senderId, "tenant_default")).isEqualTo(7L);
+    }
+
+    @Test
+    void unreadCount_crossTenantMemberReturnsZero() {
+        // 纵深防御:即使存在跨租户成员记录,租户 A 也读不到租户 B 的未读数
+        ImChannelMemberEntity m = new ImChannelMemberEntity();
+        m.setChannelId(channelId);
+        m.setUserId(senderId);
+        m.setTenantId("tenant_B");
+        when(memberRepo.findByChannelIdAndUserId(channelId, senderId)).thenReturn(Optional.of(m));
+
+        assertThat(service.unreadCount(channelId, senderId, "tenant_A")).isZero();
     }
 
     @Test

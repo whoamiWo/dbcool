@@ -72,4 +72,22 @@ public class TicketController {
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("tickets", tickets));
     }
+
+    /** 添加工单备注（客服操作）。 */
+    @PostMapping("/tickets/{id}/notes")
+    public Map<String, Object> addNote(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        String notes = (String) body.get("notes");
+        // 额外校验：防止直接调用 service.addNote 时越权
+        TicketEntity existing = ticketService.findTicketById(id);
+        if (!existing.getTenantId().equals(user.tenantId())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
+        TicketEntity ticket = ticketService.addNote(id, notes, user.tenantId());
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("ticketId", ticket.getId().toString()));
+    }
 }

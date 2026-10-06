@@ -284,14 +284,14 @@ public class ImMessageController {
         return Map.of("code", 0, "message", "success", "data", Map.of("messages", hits));
     }
 
-    @GetMapping("/unread")
+@GetMapping("/unread")
     public Map<String, Object> unread(
             @RequestParam UUID channelId,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         return Map.of("code", 0, "message", "success", "data", Map.of(
                 "channelId", channelId.toString(),
-                "unread_count", messageService.unreadCount(channelId, user.userId())
+                "unread_count", messageService.unreadCount(channelId, user.userId(), user.tenantId())
         ));
     }
 

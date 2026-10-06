@@ -142,8 +142,9 @@ class PlaybookServiceTest {
     void activate_setsActiveStatus() {
         PlaybookEntity existing = new PlaybookEntity();
         existing.setId(UUID.randomUUID());
+        existing.setTenantId(TENANT);
         when(playbookRepo.findById(existing.getId())).thenReturn(Optional.of(existing));
-        service.activate(existing.getId());
+        service.activate(existing.getId(), TENANT);
         assertThat(existing.getStatus()).isEqualTo(PlaybookEntity.Status.ACTIVE);
     }
 
@@ -151,9 +152,34 @@ class PlaybookServiceTest {
     void archive_setsArchivedStatus() {
         PlaybookEntity existing = new PlaybookEntity();
         existing.setId(UUID.randomUUID());
+        existing.setTenantId(TENANT);
         when(playbookRepo.findById(existing.getId())).thenReturn(Optional.of(existing));
-        service.archive(existing.getId());
+        service.archive(existing.getId(), TENANT);
         assertThat(existing.getStatus()).isEqualTo(PlaybookEntity.Status.ARCHIVED);
+    }
+
+    @Test
+    void activate_tenantMismatch_throws403() {
+        PlaybookEntity existing = new PlaybookEntity();
+        existing.setId(UUID.randomUUID());
+        existing.setTenantId("tenant_A");
+        when(playbookRepo.findById(existing.getId())).thenReturn(Optional.of(existing));
+        assertThatThrownBy(() -> service.activate(existing.getId(), "tenant_B"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void archive_tenantMismatch_throws403() {
+        PlaybookEntity existing = new PlaybookEntity();
+        existing.setId(UUID.randomUUID());
+        existing.setTenantId("tenant_A");
+        when(playbookRepo.findById(existing.getId())).thenReturn(Optional.of(existing));
+        assertThatThrownBy(() -> service.archive(existing.getId(), "tenant_B"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test

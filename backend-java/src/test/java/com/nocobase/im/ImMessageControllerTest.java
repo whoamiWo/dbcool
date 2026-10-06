@@ -217,11 +217,23 @@ class ImMessageControllerTest {
 
     @Test
     void unread_returnsCount() {
-        when(messageService.unreadCount(channelId, userId)).thenReturn(7L);
+        when(messageService.unreadCount(channelId, userId, "tenant_default")).thenReturn(7L);
 
         Map<String, Object> resp = controller.unread(channelId, user);
 
         assertThat(resp.get("code")).isEqualTo(0);
+        assertThat(resp.get("data")).isEqualTo(Map.of("channelId", channelId.toString(), "unread_count", 7L));
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("跨租户成员记录 → 返回 0 防止泄露")
+    void unread_crossTenant_returnsZero() {
+        when(messageService.unreadCount(channelId, userId, "tenant_default")).thenReturn(0L);
+
+        Map<String, Object> resp = controller.unread(channelId, user);
+
+        assertThat(resp.get("code")).isEqualTo(0);
+        assertThat(resp.get("data")).isEqualTo(Map.of("channelId", channelId.toString(), "unread_count", 0L));
     }
 
     @Test

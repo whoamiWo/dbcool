@@ -1,7 +1,10 @@
 package com.nocobase.ticket;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -70,10 +73,19 @@ public class TicketService {
 
     /** 添加工单备注。 */
     @Transactional
-    public TicketEntity addNote(UUID id, String notes) {
+    public TicketEntity addNote(UUID id, String notes, String tenantId) {
         TicketEntity ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket not found: " + id));
+        if (!ticket.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         ticket.setAgentNotes(notes);
         return ticketRepository.save(ticket);
+    }
+
+    /** 查找工单（供控制器做租户校验）。 */
+    public TicketEntity findTicketById(UUID id) {
+        return ticketRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Ticket not found: " + id));
     }
 }

@@ -198,10 +198,11 @@ public class MessageService {
     }
 
     /** 未读主消息数:以成员的 lastReadMessageId 对应时间为游标。 */
-    public long unreadCount(UUID channelId, UUID userId) {
+    public long unreadCount(UUID channelId, UUID userId, String tenantId) {
         Optional<ImChannelMemberEntity> m =
                 memberRepository.findByChannelIdAndUserId(channelId, userId);
-        if (m.isEmpty()) return 0L;
+        // 成员记录必须属于调用方租户(纵深防御:防止跨租户成员记录泄露未读数)
+        if (m.isEmpty() || !m.get().getTenantId().equals(tenantId)) return 0L;
         Instant cursor = lastReadCursor(m.get());
         return cursor == null
                 ? messageRepository.countByChannelIdAndParentIdIsNullAndCreatedAtAfterAndDeletedAtIsNull(

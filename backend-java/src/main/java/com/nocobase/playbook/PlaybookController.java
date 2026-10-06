@@ -75,17 +75,19 @@ public class PlaybookController {
                 body.get("yamlSource") == null ? null : String.valueOf(body.get("yamlSource")));
         return Map.of("code", 0, "message", "success", "data", p);
     }
-
-    @PostMapping("/{id}/activate")
-    public Map<String, Object> activate(@PathVariable UUID id) {
-        return Map.of("code", 0, "message", "success", "data", playbookService.activate(id));
+@PostMapping("/{id}/activate")
+    public Map<String, Object> activate(@PathVariable UUID id,
+                                       @AuthenticationPrincipal AuthenticatedUser user) {
+        return Map.of("code", 0, "message", "success",
+                "data", playbookService.activate(id, user.tenantId()));
     }
 
     @PostMapping("/{id}/archive")
-    public Map<String, Object> archive(@PathVariable UUID id) {
-        return Map.of("code", 0, "message", "success", "data", playbookService.archive(id));
+    public Map<String, Object> archive(@PathVariable UUID id,
+                                       @AuthenticationPrincipal AuthenticatedUser user) {
+        return Map.of("code", 0, "message", "success",
+                "data", playbookService.archive(id, user.tenantId()));
     }
-
     /** 运行一次(body 可带 slaHours,缺省 24h)。 */
     @PostMapping("/{id}/run")
     public Map<String, Object> run(

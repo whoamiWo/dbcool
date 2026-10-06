@@ -101,15 +101,21 @@ public class PlaybookService {
     }
 
     @Transactional
-    public PlaybookEntity activate(UUID id) {
+    public PlaybookEntity activate(UUID id, String tenantId) {
         PlaybookEntity p = get(id);
+        if (!p.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         p.setStatus(PlaybookEntity.Status.ACTIVE);
         return playbookRepo.save(p);
     }
 
     @Transactional
-    public PlaybookEntity archive(UUID id) {
+    public PlaybookEntity archive(UUID id, String tenantId) {
         PlaybookEntity p = get(id);
+        if (!p.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         p.setStatus(PlaybookEntity.Status.ARCHIVED);
         return playbookRepo.save(p);
     }
