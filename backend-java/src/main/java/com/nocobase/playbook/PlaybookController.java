@@ -68,8 +68,9 @@ public class PlaybookController {
 
     @PutMapping("/{id}")
     public Map<String, Object> update(@PathVariable UUID id,
-                                      @RequestBody Map<String, Object> body) {
-        PlaybookEntity p = playbookService.update(id,
+                                      @RequestBody Map<String, Object> body,
+                                      @AuthenticationPrincipal AuthenticatedUser user) {
+        PlaybookEntity p = playbookService.update(id, user.tenantId(),
                 body.get("name") == null ? null : String.valueOf(body.get("name")),
                 body.get("description") == null ? null : String.valueOf(body.get("description")),
                 body.get("yamlSource") == null ? null : String.valueOf(body.get("yamlSource")));
@@ -124,21 +125,22 @@ public class PlaybookController {
     @PutMapping("/runs/{runId}/checklist")
     public Map<String, Object> updateChecklist(
             @PathVariable UUID runId,
-            @RequestBody Map<String, Object> body
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
         if (!(body.get("index") instanceof Number idx)) {
             return Map.of("code", 1, "message", "index 必填");
         }
         boolean done = Boolean.parseBoolean(String.valueOf(body.get("done")));
         return Map.of("code", 0, "message", "success",
-                "data", playbookService.updateChecklist(runId, idx.intValue(), done));
+                "data", playbookService.updateChecklist(runId, idx.intValue(), done, user.tenantId()));
     }
 
     @PostMapping("/runs/{runId}/finish")
     public Map<String, Object> finish(@PathVariable UUID runId,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
         return Map.of("code", 0, "message", "success",
-                "data", playbookService.finishRun(runId, user.userId()));
+                "data", playbookService.finishRun(runId, user.userId(), user.tenantId()));
     }
 
     private static UUID parseUuid(Object o) {

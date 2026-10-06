@@ -59,4 +59,27 @@ class TicketServiceTest {
                 .matches(e -> ((org.springframework.web.server.ResponseStatusException) e).getStatusCode() == FORBIDDEN);
         assertThat(t.getAgentNotes()).isNull(); // 未被修改
     }
+
+    @Test
+    void updateStatus_sameTenant_updatesStatus() {
+        TicketEntity t = ticketOf("tenant_A");
+        when(ticketRepository.findById(t.getId())).thenReturn(Optional.of(t));
+
+        TicketEntity out = service.updateStatus(t.getId(), TicketEntity.Status.RESOLVED, "tenant_A");
+
+        assertThat(out.getStatus()).isEqualTo(TicketEntity.Status.RESOLVED);
+        assertThat(out.getResolvedAt()).isNotNull();
+    }
+
+    @Test
+    void updateStatus_tenantMismatch_403() {
+        TicketEntity t = ticketOf("tenant_A");
+        when(ticketRepository.findById(t.getId())).thenReturn(Optional.of(t));
+
+        assertThatThrownBy(() -> service.updateStatus(t.getId(), TicketEntity.Status.CLOSED, "tenant_B"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .matches(e -> ((org.springframework.web.server.ResponseStatusException) e).getStatusCode() == FORBIDDEN);
+        // Status should remain unchanged (default OPEN)
+        assertThat(t.getStatus()).isEqualTo(TicketEntity.Status.OPEN);
+    }
 }

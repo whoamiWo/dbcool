@@ -9,17 +9,12 @@ LdapSyncService#toggleConfig
 MessageSearchService#searchMessages
 MessageService#markRead
 NotificationService#testSend
-PlaybookController#update
-PlaybookService#finishRun
-PlaybookService#update
-PlaybookService#updateChecklist
 ProjectBoardController#updateBoardList
 ProjectBoardController#updateLabel
 ReactionService#remove
 UserAdminService#getEffectivePermissions
 WeComController#callback
 MessageController#markRead
-TicketService#updateStatus
 UserTenantController#listByUser
 WebhookSubscriptionController#delete
 WebhookSubscriptionController#setEnabled

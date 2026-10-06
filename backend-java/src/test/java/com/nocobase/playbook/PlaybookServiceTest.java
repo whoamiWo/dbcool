@@ -128,11 +128,12 @@ class PlaybookServiceTest {
     void update_newDefinition_invalidatesWorkflowCache() {
         PlaybookEntity existing = new PlaybookEntity();
         existing.setId(UUID.randomUUID());
+        existing.setTenantId(TENANT);
         existing.setYamlSource("[{\"id\":\"n1\"}]");
         existing.setWorkflowId(UUID.randomUUID()); // 已有编译缓存
         when(playbookRepo.findById(existing.getId())).thenReturn(Optional.of(existing));
 
-        service.update(existing.getId(), "new name", null, "[{\"id\":\"n2\"}]");
+        service.update(existing.getId(), TENANT, "new name", null, "[{\"id\":\"n2\"}]");
 
         assertThat(existing.getWorkflowId()).isNull(); // 缓存失效
         assertThat(existing.getName()).isEqualTo("new name");
@@ -258,14 +259,14 @@ class PlaybookServiceTest {
     @Test
     void updateChecklist_validIndex_marksDone() {
         PlaybookRunEntity run = runWithChecklist("[{\"title\":\"a\",\"done\":false},{\"title\":\"b\",\"done\":false}]");
-        service.updateChecklist(run.getId(), 1, true);
+        service.updateChecklist(run.getId(), 1, true, TENANT);
         assertThat(run.getChecklistJson()).contains("\"done\":true");
     }
 
     @Test
     void updateChecklist_outOfRange_throws400() {
         PlaybookRunEntity run = runWithChecklist("[{\"title\":\"a\",\"done\":false}]");
-        assertThatThrownBy(() -> service.updateChecklist(run.getId(), 5, true))
+        assertThatThrownBy(() -> service.updateChecklist(run.getId(), 5, true, TENANT))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
@@ -274,10 +275,21 @@ class PlaybookServiceTest {
     @Test
     void updateChecklist_negativeIndex_throws400() {
         PlaybookRunEntity run = runWithChecklist("[{\"title\":\"a\",\"done\":false}]");
-        assertThatThrownBy(() -> service.updateChecklist(run.getId(), -1, true))
+        assertThatThrownBy(() -> service.updateChecklist(run.getId(), -1, true, TENANT))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void updateChecklist_tenantMismatch_throws403() {
+        PlaybookRunEntity run = runWithChecklist("[{\"title\":\"a\",\"done\":false}]");
+        run.setTenantId("tenant_A");
+        when(runRepo.findById(run.getId())).thenReturn(Optional.of(run));
+        assertThatThrownBy(() -> service.updateChecklist(run.getId(), 0, true, "tenant_B"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     // ==================== SLA 超时升级 ====================
@@ -314,7 +326,7 @@ class PlaybookServiceTest {
         when(wikiPageService.create(any(), any(), anyString(), anyString(), anyString(),
                 any(), anyString())).thenReturn(page);
 
-        PlaybookRunEntity out = service.finishRun(run.getId(), USER);
+        PlaybookRunEntity out = service.finishRun(run.getId(), USER, TENANT);
 
         assertThat(out.getStatus()).isEqualTo(PlaybookRunEntity.FINISHED);
         assertThat(out.getRetrospectivePageId()).isEqualTo(page.getId());
@@ -328,7 +340,7 @@ class PlaybookServiceTest {
         run.setTenantId(TENANT);
         when(knowledgeBaseService.list(TENANT)).thenReturn(List.of());
 
-        PlaybookRunEntity out = service.finishRun(run.getId(), USER);
+        PlaybookRunEntity out = service.finishRun(run.getId(), USER, TENANT);
 
         assertThat(out.getStatus()).isEqualTo(PlaybookRunEntity.FINISHED);
         assertThat(out.getRetrospectivePageId()).isNull();
@@ -339,9 +351,20 @@ class PlaybookServiceTest {
     void finishRun_alreadyFinished_isIdempotent() {
         PlaybookRunEntity run = runWithChecklist("[]");
         run.setStatus(PlaybookRunEntity.FINISHED);
-        PlaybookRunEntity out = service.finishRun(run.getId(), USER);
+        PlaybookRunEntity out = service.finishRun(run.getId(), USER, TENANT);
         assertThat(out.getStatus()).isEqualTo(PlaybookRunEntity.FINISHED);
         verify(knowledgeBaseService, never()).list(anyString());
+    }
+
+    @Test
+    void finishRun_tenantMismatch_throws403() {
+        PlaybookRunEntity run = runWithChecklist("[]");
+        run.setTenantId("tenant_A");
+        when(runRepo.findById(run.getId())).thenReturn(Optional.of(run));
+        assertThatThrownBy(() -> service.finishRun(run.getId(), USER, "tenant_B"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     // ==================== helpers ====================

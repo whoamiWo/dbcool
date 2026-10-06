@@ -61,9 +61,12 @@ public class TicketService {
 
     /** 更新工单状态。 */
     @Transactional
-    public TicketEntity updateStatus(UUID id, TicketEntity.Status status) {
+    public TicketEntity updateStatus(UUID id, TicketEntity.Status status, String tenantId) {
         TicketEntity ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Ticket not found: " + id));
+        if (!ticket.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         ticket.setStatus(status);
         if (status == TicketEntity.Status.RESOLVED || status == TicketEntity.Status.CLOSED) {
             ticket.setResolvedAt(Instant.now());

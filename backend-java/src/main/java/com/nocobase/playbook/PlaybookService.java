@@ -88,12 +88,15 @@ public class PlaybookService {
     }
 
     @Transactional
-    public PlaybookEntity update(UUID id, String name, String description, String yamlSource) {
+    public PlaybookEntity update(UUID id, String tenantId, String name, String description, String yamlSource) {
         PlaybookEntity p = get(id);
+        if (!p.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         if (yamlSource != null) {
             parseDefinition(yamlSource);
             p.setYamlSource(yamlSource);
-            p.setWorkflowId(null); // 定义变更,编译缓存失效
+            p.setWorkflowId(null);
         }
         if (name != null) p.setName(name);
         if (description != null) p.setDescription(description);
@@ -197,8 +200,11 @@ public class PlaybookService {
 
     /** 勾选 / 取消勾选 Checklist 项。 */
     @Transactional
-    public PlaybookRunEntity updateChecklist(UUID runId, int index, boolean done) {
+    public PlaybookRunEntity updateChecklist(UUID runId, int index, boolean done, String tenantId) {
         PlaybookRunEntity run = getRun(runId);
+        if (!run.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         List<Map<String, Object>> items = readJson(run.getChecklistJson());
         if (index < 0 || index >= items.size()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Checklist 下标越界: " + index);
@@ -211,8 +217,11 @@ public class PlaybookService {
 
     /** 完成:标记 FINISHED + 生成 Wiki 复盘页(存在知识库时)+ 频道同步。 */
     @Transactional
-    public PlaybookRunEntity finishRun(UUID runId, UUID userId) {
+    public PlaybookRunEntity finishRun(UUID runId, UUID userId, String tenantId) {
         PlaybookRunEntity run = getRun(runId);
+        if (!run.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         if (PlaybookRunEntity.FINISHED.equals(run.getStatus())) return run;
         run.setStatus(PlaybookRunEntity.FINISHED);
         run.setFinishedAt(Instant.now());

@@ -102,8 +102,8 @@ class PlaybookControllerTest {
 
     @Test
     void update() {
-        when(service.update(eq(playbookId), isNull(), isNull(), eq("[]"))).thenReturn(playbook());
-        assertThat(controller.update(playbookId, Map.of("yamlSource", "[]")).get("code")).isEqualTo(0);
+        when(service.update(eq(playbookId), eq("tenant_default"), isNull(), isNull(), eq("[]"))).thenReturn(playbook());
+        assertThat(controller.update(playbookId, Map.of("yamlSource", "[]"), user).get("code")).isEqualTo(0);
     }
 
     @Test
@@ -145,25 +145,25 @@ class PlaybookControllerTest {
     @Test
     void checklist_update() {
         PlaybookRunEntity r = run();
-        when(service.updateChecklist(r.getId(), 0, true)).thenReturn(r);
+        when(service.updateChecklist(r.getId(), 0, true, "tenant_default")).thenReturn(r);
         Map<String, Object> resp = controller.updateChecklist(r.getId(),
-                Map.of("index", 0, "done", true));
+                Map.of("index", 0, "done", true), user);
         assertThat(resp.get("code")).isEqualTo(0);
-        verify(service).updateChecklist(r.getId(), 0, true);
+        verify(service).updateChecklist(r.getId(), 0, true, "tenant_default");
     }
 
     @Test
     void checklist_missingIndexRejected() {
-        Map<String, Object> resp = controller.updateChecklist(UUID.randomUUID(), Map.of("done", true));
+        Map<String, Object> resp = controller.updateChecklist(UUID.randomUUID(), Map.of("done", true), user);
         assertThat(resp.get("code")).isEqualTo(1);
     }
 
     @Test
     void finish() {
         PlaybookRunEntity r = run();
-        when(service.finishRun(r.getId(), userId)).thenReturn(r);
+        when(service.finishRun(r.getId(), userId, "tenant_default")).thenReturn(r);
         assertThat(controller.finish(r.getId(), user).get("code")).isEqualTo(0);
-        verify(service).finishRun(r.getId(), userId);
+        verify(service).finishRun(r.getId(), userId, "tenant_default");
     }
 
     @Test
