@@ -12,10 +12,24 @@ import {
   Add,
   MoreHoriz,
   DragIndicator,
+  CheckCircleOutlined,
+  CalendarToday,
 } from '@mui/icons-material';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+interface ChecklistItem {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+interface Checklist {
+  id: string;
+  title: string;
+  items: ChecklistItem[];
+}
 
 interface CardItem {
   id: string;
@@ -26,6 +40,7 @@ interface CardItem {
   progress: number;
   dueDate?: string;
   labels?: string[];
+  checklists?: Checklist[];
 }
 
 interface BoardColumnProps {
@@ -36,6 +51,22 @@ interface BoardColumnProps {
   onAddCard: (columnId: string) => void;
 }
 
+function formatDueDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+function isOverdue(dateStr?: string): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
+}
+
 function SortableCard({ card, columnId }: { card: CardItem; columnId: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -43,6 +74,9 @@ function SortableCard({ card, columnId }: { card: CardItem; columnId: string }) 
     data: { sortable: { containerId: columnId } },
   });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  const totalItems = card.checklists?.reduce((sum, c) => sum + c.items.length, 0) ?? 0;
+  const doneItems = card.checklists?.reduce((sum, c) => sum + c.items.filter(i => i.done).length, 0) ?? 0;
 
   return (
     <Paper
@@ -67,10 +101,52 @@ function SortableCard({ card, columnId }: { card: CardItem; columnId: string }) 
               <Chip key={label} label={label} size="small" sx={{ height: 18, fontSize: '0.7rem' }} />
             ))}
           </Box>
+          {card.checklists && card.checklists.length > 0 && (
+            <Box sx={{ mb: 0.5, p: 0.5, bgcolor: 'rgba(0,0,0,0.04)', borderRadius: 0.5 }}>
+              {card.checklists.map(cl => (
+                <Box key={cl.id} sx={{ mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                    {cl.title}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {cl.items.slice(0, 3).map(item => (
+                      <Chip
+                        key={item.id}
+                        icon={item.done ? <CheckCircleOutlined /> : undefined}
+                        label={item.title}
+                        size="small"
+                        variant={item.done ? 'filled' : 'outlined'}
+                        sx={{ height: 18, fontSize: '0.65rem' }}
+                      />
+                    ))}
+                    {cl.items.length > 3 && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        +{cl.items.length - 3}项
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              ))}
+              {totalItems > 0 && (
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {doneItems}/{totalItems} 已完成
+                </Typography>
+              )}
+            </Box>
+          )}
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', fontSize: '0.75rem', color: 'text.secondary' }}>
             <Chip label={card.priority} size="small" color={card.priority === 'HIGH' ? 'error' : card.priority === 'MEDIUM' ? 'warning' : 'default'} />
             <Typography variant="caption">{card.assignee || '未分配'}</Typography>
             <Typography variant="caption">{card.progress}%</Typography>
+            {card.dueDate && (
+              <Chip
+                icon={<CalendarToday fontSize="small" />}
+                label={formatDueDate(card.dueDate)}
+                size="small"
+                color={isOverdue(card.dueDate) ? 'error' : 'default'}
+                sx={{ height: 18, fontSize: '0.65rem' }}
+              />
+            )}
           </Box>
         </Box>
         <IconButton size="small" sx={{ p: 0.25 }}>

@@ -52,6 +52,9 @@ public final class TenantIsolationAuditor {
             // 反向比对：something.equals(tenantId) —— 实体或请求参数与 tenantId 比较
             Pattern.compile("\\.\\s*equals\\s*\\(\\s*tenantId\\w*\\s*\\)"),
             Pattern.compile("\\.\\s*equals\\s*\\(\\s*currentTenantId"),
+            // user.tenantId().equals(entity.getTenantId()) 及其反向 —— 认证用户与实体比对
+            Pattern.compile("user\\.tenantId\\s*\\(\\s*\\)\\s*\\.\\s*equals\\s*\\("),
+            Pattern.compile("tenantId\\s*\\(\\s*\\)\\s*\\.\\s*equals\\s*\\(\\s*[a-z]\\w*\\.getTenantId"),
             // Spring Data 派生查询：查询条件已带租户过滤（DB 层隔离）
             Pattern.compile("\\bfind\\w*ByTenantId"),
             Pattern.compile("\\b\\w*By\\w*AndTenantId\\w*\\s*\\("),

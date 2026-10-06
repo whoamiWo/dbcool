@@ -208,6 +208,9 @@ public class ProjectBoardController {
     ) {
         CardChecklistEntity c = checklistRepository.findById(checklistId)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Checklist not found"));
+        if (!user.tenantId().equals(c.getTenantId())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         if (body.get("title") != null) c.setTitle((String) body.get("title"));
         checklistRepository.save(c);
         return Map.of("code", 0, "message", "updated", "data", Map.of("id", c.getId().toString()));
@@ -219,8 +222,11 @@ public class ProjectBoardController {
             @PathVariable UUID checklistId,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        checklistRepository.findById(checklistId).orElseThrow(
-                () -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Checklist not found"));
+        CardChecklistEntity c = checklistRepository.findById(checklistId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Checklist not found"));
+        if (!user.tenantId().equals(c.getTenantId())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         checklistRepository.deleteById(checklistId);
         return Map.of("code", 0, "message", "deleted", "data", Map.of("id", checklistId.toString()));
     }
@@ -284,6 +290,9 @@ public class ProjectBoardController {
     ) {
         CardChecklistItemEntity item = checklistItemRepository.findById(itemId)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Item not found"));
+        if (!user.tenantId().equals(item.getTenantId())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         Boolean done = body.get("done") instanceof Boolean b ? b : false;
         item.setDone(done);
         checklistItemRepository.save(item);
@@ -296,8 +305,11 @@ public class ProjectBoardController {
             @PathVariable UUID itemId,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        checklistItemRepository.findById(itemId).orElseThrow(
-                () -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Item not found"));
+        CardChecklistItemEntity item = checklistItemRepository.findById(itemId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Item not found"));
+        if (!user.tenantId().equals(item.getTenantId())) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         checklistItemRepository.deleteById(itemId);
         return Map.of("code", 0, "message", "deleted", "data", Map.of("id", itemId.toString()));
     }

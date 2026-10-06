@@ -56,6 +56,8 @@ class ProjectBoardControllerTest {
                 .thenAnswer(inv -> inv.getArgument(0));
         when(checklistRepository.save(any(CardChecklistEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+        when(checklistItemRepository.save(any(CardChecklistItemEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
         when(labelRepository.save(any(CardLabelEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -251,5 +253,138 @@ class ProjectBoardControllerTest {
         controller.updateLabel(id, Map.of("name", "新"), USER);
 
         assertThat(label.getName()).isEqualTo("新");
+    }
+
+    // ==================== Checklist Item ====================
+
+    @Test
+    void createChecklistItem_missingIds_throws400() {
+        assertThatThrownBy(() -> controller.createChecklistItem(Map.of(), USER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void createChecklistItem_valid_returns201() {
+        UUID checklistId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        ResponseEntity<Map<String, Object>> resp = controller.createChecklistItem(
+                Map.of("checklistId", checklistId.toString(), "taskId", taskId.toString(), "title", "Item"), USER);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void listChecklistItems_returnsTotal() {
+        UUID checklistId = UUID.randomUUID();
+        CardChecklistItemEntity item = new CardChecklistItemEntity();
+        item.setId(UUID.randomUUID());
+        item.setTitle("Item");
+        item.setDone(false);
+        when(checklistItemRepository.findByTenantIdAndChecklistIdOrderBySortOrderAsc(TENANT, checklistId))
+                .thenReturn(List.of(item));
+
+        Map<String, Object> resp = controller.listChecklistItems(checklistId, USER);
+
+        assertThat(resp.get("total")).isEqualTo(1);
+    }
+
+    @Test
+    void updateChecklistItem_notFound_throws404() {
+        UUID id = UUID.randomUUID();
+        when(checklistItemRepository.findById(id)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> controller.updateChecklistItem(id, Map.of("done", true), USER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void updateChecklistItem_valid_updatesDone() {
+        UUID id = UUID.randomUUID();
+        CardChecklistItemEntity item = new CardChecklistItemEntity();
+        item.setId(id);
+        item.setDone(false);
+        item.setTenantId(TENANT);
+        when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
+
+        controller.updateChecklistItem(id, Map.of("done", true), USER);
+
+        assertThat(item.getDone()).isTrue();
+    }
+
+    @Test
+    void deleteChecklistItem_notFound_throws404() {
+        UUID id = UUID.randomUUID();
+        when(checklistItemRepository.findById(id)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> controller.deleteChecklistItem(id, USER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void deleteChecklistItem_valid_deletes() {
+        UUID id = UUID.randomUUID();
+        CardChecklistItemEntity item = new CardChecklistItemEntity();
+        item.setId(id);
+        item.setTenantId(TENANT);
+        when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
+        controller.deleteChecklistItem(id, USER);
+        verify(checklistItemRepository).deleteById(id);
+    }
+
+    // ==================== Tenant Isolation ====================
+
+    @Test
+    void updateChecklistItem_wrongTenant_throws403() {
+        UUID id = UUID.randomUUID();
+        CardChecklistItemEntity item = new CardChecklistItemEntity();
+        item.setId(id);
+        item.setTenantId("other_tenant");
+        when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
+        assertThatThrownBy(() -> controller.updateChecklistItem(id, Map.of("done", true), USER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void deleteChecklistItem_wrongTenant_throws403() {
+        UUID id = UUID.randomUUID();
+        CardChecklistItemEntity item = new CardChecklistItemEntity();
+        item.setId(id);
+        item.setTenantId("other_tenant");
+        when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
+        assertThatThrownBy(() -> controller.deleteChecklistItem(id, USER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void updateChecklist_wrongTenant_throws403() {
+        UUID id = UUID.randomUUID();
+        CardChecklistEntity c = new CardChecklistEntity();
+        c.setId(id);
+        c.setTenantId("other_tenant");
+        when(checklistRepository.findById(id)).thenReturn(Optional.of(c));
+        assertThatThrownBy(() -> controller.updateChecklist(id, Map.of("title", "x"), USER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void deleteChecklist_wrongTenant_throws403() {
+        UUID id = UUID.randomUUID();
+        CardChecklistEntity c = new CardChecklistEntity();
+        c.setId(id);
+        c.setTenantId("other_tenant");
+        when(checklistRepository.findById(id)).thenReturn(Optional.of(c));
+        assertThatThrownBy(() -> controller.deleteChecklist(id, USER))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

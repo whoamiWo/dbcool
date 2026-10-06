@@ -95,4 +95,31 @@ export const projectApi = {
   deleteTask: async (id: string): Promise<void> => {
     await apiClient.delete(`/projects/tasks/${id}`);
   },
+
+  listChecklists: async (taskId: string): Promise<CardChecklist[]> => {
+    const r = await apiClient.get<Envelope<CardChecklist[]>>(`/projects/boards/checklists/by-task/${taskId}`);
+    return unwrap<CardChecklist[]>(r);
+  },
+
+  listChecklistItems: async (checklistId: string): Promise<CardChecklistItem[]> => {
+    const r = await apiClient.get<Envelope<CardChecklistItem[]>>(`/projects/boards/checklist-items/by-checklist/${checklistId}`);
+    return unwrap<CardChecklistItem[]>(r);
+  },
+
+  updateChecklistItem: async (itemId: string, body: Record<string, unknown>): Promise<void> => {
+    await apiClient.put(`/projects/boards/checklist-items/${itemId}`, body);
+  },
 };
+
+export interface CardChecklist {
+  id: string;
+  title: string;
+  sortOrder: number;
+}
+
+export interface CardChecklistItem {
+  id: string;
+  title: string;
+  done: boolean;
+  sortOrder: number;
+}
