@@ -71,5 +71,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     /**
      * 已认证用户(写入 SecurityContext 的 principal).
      */
-    public record AuthenticatedUser(UUID userId, String username, String tenantId) {}
+    public record AuthenticatedUser(UUID userId, String username, String tenantId)
+            implements java.security.Principal {
+        @Override
+        public String getName() {
+            return username;
+        }
+    }
 }

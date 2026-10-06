@@ -80,11 +80,7 @@ RowAclService#filterReadable
 TicketController#closeSession
 TicketController#listTickets
 TicketService#updateStatus
-UserAdminController#create
-UserAdminController#update
 UserAdminService#getEffectivePermissions
-UserAdminService#resetPassword
-UserAdminService#update
 UserController#me
 UserMappingService#getMappings
 UserTenantController#listByUser

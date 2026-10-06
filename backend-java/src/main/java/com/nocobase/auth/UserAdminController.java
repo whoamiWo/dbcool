@@ -49,28 +49,38 @@ public class UserAdminController {
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> create(@RequestBody @Valid CreateUserRequest req) {
-        UserEntity u = userService.create(req.username(), req.password(), req.displayName());
+    public ResponseEntity<Map<String, Object>> create(
+            @RequestBody @Valid CreateUserRequest req,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        UserEntity u = userService.create(req.username(), req.password(), req.displayName(), user.tenantId());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("code", 0, "message", "success", "data", toDto(u)));
     }
 
     @PatchMapping("/{id}")
-    public Map<String, Object> update(@PathVariable UUID id, @RequestBody UpdateUserRequest req) {
-        UserEntity u = userService.update(id, req.displayName(), req.enabled());
+    public Map<String, Object> update(
+            @PathVariable UUID id,
+            @RequestBody UpdateUserRequest req,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        UserEntity u = userService.update(id, req.displayName(), req.enabled(), user.tenantId());
         return Map.of("code", 0, "message", "success", "data", toDto(u));
     }
 
     @PostMapping("/{id}/password")
-    public Map<String, Object> resetPassword(@PathVariable UUID id, @RequestBody Map<String, String> body) {
-        userService.resetPassword(id, body.get("password"));
+    public Map<String, Object> resetPassword(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        userService.resetPassword(id, body.get("password"), user.tenantId());
         return Map.of("code", 0, "message", "password reset");
     }
 
     @DeleteMapping("/{id}")
-    public Map<String, Object> delete(@PathVariable UUID id) {
+    public Map<String, Object> delete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        userService.delete(id, user.tenantId());
         userRoleRepository.deleteByIdUserId(id);
-        userService.delete(id);
         return Map.of("code", 0, "message", "deleted");
     }
 

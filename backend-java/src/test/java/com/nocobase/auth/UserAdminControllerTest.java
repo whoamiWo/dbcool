@@ -3,6 +3,7 @@ package com.nocobase.auth;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +24,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -100,17 +106,47 @@ class UserAdminControllerTest {
     @Test
     void create_validRequest_returns201() throws Exception {
         UUID uid = UUID.randomUUID();
-        when(userService.create(eq("alice"), eq("pw"), any())).thenReturn(user(uid, "alice"));
+        when(userService.create(eq("alice"), eq("pw"), any(), eq("tenant_admin"))).thenReturn(user(uid, "alice"));
 
         String body = """
                 {"username":"alice","password":"pw","displayName":"Alice"}
                 """;
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         mockMvc.perform(post("/api/admin/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.username").value("alice"));
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void create_validRequest_createsInCallingTenant() throws Exception {
+        UUID uid = UUID.randomUUID();
+        UserEntity createdUser = user(uid, "alice");
+        createdUser.setTenantId("tenant_admin");
+        when(userService.create(eq("alice"), eq("pw"), any(), eq("tenant_admin"))).thenReturn(createdUser);
+
+        String body = """
+                {"username":"alice","password":"pw","displayName":"Alice"}
+                """;
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        mockMvc.perform(post("/api/admin/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.tenant_id").value("tenant_admin"));
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -127,46 +163,125 @@ class UserAdminControllerTest {
     @Test
     void update_partialFields_returnsUpdatedUser() throws Exception {
         UUID uid = UUID.randomUUID();
-        when(userService.update(eq(uid), eq("New Name"), eq(false)))
+        when(userService.update(eq(uid), eq("New Name"), eq(false), eq("tenant_admin")))
                 .thenReturn(user(uid, "alice"));
 
         String body = """
                 {"displayName":"New Name","enabled":false}
                 """;
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         mockMvc.perform(patch("/api/admin/users/{id}", uid)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.username").value("alice"));
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void update_wrongTenant_returns404() throws Exception {
+        UUID uid = UUID.randomUUID();
+        when(userService.update(eq(uid), any(), any(), eq("tenant_other")))
+                .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "User 不存在"));
+
+        String body = """
+                {"displayName":"X"}
+                """;
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_other"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        mockMvc.perform(patch("/api/admin/users/{id}", uid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNotFound());
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void resetPassword_returnsSuccess() throws Exception {
         UUID uid = UUID.randomUUID();
-        doNothing().when(userService).resetPassword(eq(uid), eq("newpw"));
+        doNothing().when(userService).resetPassword(eq(uid), eq("newpw"), eq("tenant_admin"));
 
         String body = """
                 {"password":"newpw"}
                 """;
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         mockMvc.perform(post("/api/admin/users/{id}/password", uid)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.message").value("password reset"));
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void resetPassword_wrongTenant_returns404() throws Exception {
+        UUID uid = UUID.randomUUID();
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND, "User 不存在"))
+                .when(userService).resetPassword(eq(uid), eq("newpw"), eq("tenant_other"));
+
+        String body = """
+                {"password":"newpw"}
+                """;
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_other"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        mockMvc.perform(post("/api/admin/users/{id}/password", uid)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNotFound());
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void delete_removesUserAndRoles() throws Exception {
         UUID uid = UUID.randomUUID();
-        doNothing().when(userService).delete(uid);
+        doNothing().when(userService).delete(eq(uid), eq("tenant_admin"));
         doNothing().when(userRoleRepository).deleteByIdUserId(uid);
+
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
 
         mockMvc.perform(delete("/api/admin/users/{id}", uid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.message").value("deleted"));
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void delete_wrongTenant_returns404_andUserExists() throws Exception {
+        UUID uid = UUID.randomUUID();
+        doThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND, "User 不存在"))
+                .when(userService).delete(eq(uid), eq("tenant_other"));
+
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_other"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
+        mockMvc.perform(delete("/api/admin/users/{id}", uid))
+                .andExpect(status().isNotFound());
+        SecurityContextHolder.clearContext();
     }
 
     @Test

@@ -59,10 +59,15 @@ public final class TenantIsolationAuditor {
             Pattern.compile("\\bfind\\w*ByTenantId"),
             Pattern.compile("\\b\\w*By\\w*AndTenantId\\w*\\s*\\("),
             Pattern.compile("query.*tenant_id|tenant_id\\s*=|setTenantId\\s*\\("),
+            // [PHASE78 R1] TenantContext 模式：通过 ThreadLocal 获取当前租户（JWT 过滤器写入）
+            Pattern.compile("TenantContext\\.currentTenantId\\s*\\(\\s*\\)"),
+            // [PHASE78 R1] Principal 提取租户：AuthenticatedUser.tenantId() 被调用（Controller 层委托给 Service）
+            Pattern.compile("\\w+\\.tenantId\\s*\\(\\s*\\)"),
             // [PHASE77 T3] 委托隔离：同类内调用带 tenantId 参数的重载/辅助方法（如 getRule(ruleId, tenantId)、
             // findAgent(tenantId, channelId)、get(id, tenantId)）——被调方内部已做租户限定，
             // 方法签名含 tenantId 且实参中传递了该变量，视为已有防护
-            Pattern.compile("\\b\\w+\\s*\\(\\s*[^)]*\\btenantId\\w*\\s*[,)]")
+            // [PHASE78 R1] 扩展：也匹配 user.tenantId() 等 Principal 提取形式（Controller→Service 委托）
+            Pattern.compile("\\b\\w+\\s*\\(\\s*[^)]*\\b(?:tenantId\\w*|\\w+\\.tenantId\\s*\\(\\s*\\))\\s*[,)]")
     );
 
     /** 方法签名：访问修饰符 + 返回类型 + 名字 + 参数列表（不含 getter/setter/构造器）。 */

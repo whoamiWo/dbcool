@@ -44,8 +44,13 @@ public class UserAdminService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User 不存在"));
     }
 
+    public UserEntity get(UUID id, String tenantId) {
+        return userRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User 不存在"));
+    }
+
     @Transactional
-    public UserEntity create(String username, String password, String displayName) {
+    public UserEntity create(String username, String password, String displayName, String tenantId) {
         if (userRepository.findByUsername(username).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
         }
@@ -54,8 +59,8 @@ public class UserAdminService {
         u.setUsername(username);
         u.setPasswordHash(passwordEncoder.encode(password));
         // Week 41 复核:改用 TenantContext,不再硬编码。
-        // 保持 3 参签名不变(改签名会破坏 UserAdminServiceTest / UserAdminControllerTest)
-        u.setTenantId(TenantContext.currentTenantId());
+        // [PHASE78 R1] 显式传 tenantId,与 update/resetPassword/delete 对齐(不依赖 ThreadLocal)
+        u.setTenantId(tenantId != null ? tenantId : TenantContext.currentTenantId());
         u.setDisplayName(displayName != null ? displayName : username);
         u.setEnabled(true);
         u.setCreatedAt(Instant.now());
@@ -63,18 +68,24 @@ public class UserAdminService {
     }
 
     @Transactional
-    public UserEntity update(UUID id, String displayName, Boolean enabled) {
-        UserEntity u = get(id);
+    public UserEntity update(UUID id, String displayName, Boolean enabled, String tenantId) {
+        UserEntity u = get(id, tenantId);
         if (displayName != null) u.setDisplayName(displayName);
         if (enabled != null) u.setEnabled(enabled);
         return userRepository.save(u);
     }
 
     @Transactional
-    public void resetPassword(UUID id, String newPassword) {
-        UserEntity u = get(id);
+    public void resetPassword(UUID id, String newPassword, String tenantId) {
+        UserEntity u = get(id, tenantId);
         u.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(u);
+    }
+
+    @Transactional
+    public void delete(UUID id, String tenantId) {
+        UserEntity u = get(id, tenantId);
+        userRepository.delete(u);
     }
 
     @Transactional

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -102,7 +103,7 @@ class UserAdminServiceTest {
     @Test
     void create_newUser_succeeds() {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
-        UserEntity u = service.create("alice", "pass123", "Alice Display");
+        UserEntity u = service.create("alice", "pass123", "Alice Display", "tenant_default");
         assertEquals("alice", u.getUsername());
         assertEquals("Alice Display", u.getDisplayName());
         assertTrue(u.isEnabled());
@@ -113,7 +114,7 @@ class UserAdminServiceTest {
     @Test
     void create_nullDisplayName_fallsBackToUsername() {
         when(userRepository.findByUsername("bob")).thenReturn(Optional.empty());
-        UserEntity u = service.create("bob", "pass", null);
+        UserEntity u = service.create("bob", "pass", null, "tenant_default");
         assertEquals("bob", u.getDisplayName());
     }
 
@@ -121,68 +122,73 @@ class UserAdminServiceTest {
     void create_duplicateUsername_throws409() {
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(makeUser()));
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.create("alice", "p", "d"));
+                () -> service.create("alice", "p", "d", "tenant_default"));
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
     }
 
-    // ============ update ============
+    // ============ update with tenantId ============
 
     @Test
-    void update_displayName_applies() {
+    void update_withTenantId_applies() {
         UserEntity u = makeUser();
-        when(userRepository.findById(u.getId())).thenReturn(Optional.of(u));
-        UserEntity updated = service.update(u.getId(), "New Name", null);
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+        UserEntity updated = service.update(u.getId(), "New Name", null, "tenant_default");
         assertEquals("New Name", updated.getDisplayName());
-        assertTrue(updated.isEnabled());  // 不变
+        assertTrue(updated.isEnabled());
     }
 
     @Test
-    void update_enabled_false_applies() {
+    void update_wrongTenant_throws404() {
         UserEntity u = makeUser();
-        when(userRepository.findById(u.getId())).thenReturn(Optional.of(u));
-        UserEntity updated = service.update(u.getId(), null, false);
-        assertFalse(updated.isEnabled());
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_wrong")).thenReturn(Optional.empty());
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.update(u.getId(), "New Name", null, "tenant_wrong"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
+    // ============ resetPassword with tenantId ============
+
     @Test
-    void update_both_applies() {
+    void resetPassword_withTenantId_encodesNewPassword() {
         UserEntity u = makeUser();
-        when(userRepository.findById(u.getId())).thenReturn(Optional.of(u));
-        UserEntity updated = service.update(u.getId(), "New", false);
-        assertEquals("New", updated.getDisplayName());
-        assertFalse(updated.isEnabled());
-    }
-
-    @Test
-    void update_notFound_throws404() {
-        UUID id = UUID.randomUUID();
-        when(userRepository.findById(id)).thenReturn(Optional.empty());
-        assertThrows(ResponseStatusException.class, () -> service.update(id, "x", null));
-    }
-
-    // ============ resetPassword ============
-
-    @Test
-    void resetPassword_encodesNewPassword() {
-        UserEntity u = makeUser();
-        when(userRepository.findById(u.getId())).thenReturn(Optional.of(u));
-        service.resetPassword(u.getId(), "newpass");
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+        service.resetPassword(u.getId(), "newpass", "tenant_default");
         verify(passwordEncoder).encode("newpass");
         assertEquals("hashed-password", u.getPasswordHash());
         verify(userRepository).save(u);
     }
 
     @Test
-    void resetPassword_userNotFound_throws404() {
-        UUID id = UUID.randomUUID();
-        when(userRepository.findById(id)).thenReturn(Optional.empty());
-        assertThrows(ResponseStatusException.class, () -> service.resetPassword(id, "x"));
+    void resetPassword_wrongTenant_throws404() {
+        UserEntity u = makeUser();
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_wrong")).thenReturn(Optional.empty());
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.resetPassword(u.getId(), "newpass", "tenant_wrong"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
     // ============ delete ============
 
     @Test
-    void delete_callsDeleteById() {
+    void delete_withTenantId_checksOwnership_thenDeletes() {
+        UserEntity u = makeUser();
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+        doNothing().when(userRepository).delete(u);
+        service.delete(u.getId(), "tenant_default");
+        verify(userRepository).delete(u);
+    }
+
+    @Test
+    void delete_wrongTenant_throws404() {
+        UserEntity u = makeUser();
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_wrong")).thenReturn(Optional.empty());
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.delete(u.getId(), "tenant_wrong"));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+    }
+
+    @Test
+    void delete_oldSignature_deletesWithoutCheck() {
         UUID id = UUID.randomUUID();
         service.delete(id);
         verify(userRepository).deleteById(id);
