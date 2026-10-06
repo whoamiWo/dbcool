@@ -104,4 +104,71 @@ class TenantIsolationAuditorTest {
         assertTrue(violations.isEmpty(),
                 "Spring Data 派生查询已带租户过滤，不应误报：" + violations);
     }
+
+    @Test
+    void T3_newAntiExample_noTenantIdDirectReturn() {
+        // T3 reverse validation: simulate PHASE76 fixed TicketService#addNote original form
+        // Get entity and return directly without tenantId check
+        String badMethod = """
+                public TicketEntity getTicket(java.util.UUID ticketId) {
+                    TicketEntity ticket = ticketRepository.findById(ticketId).orElse(null);
+                    return ticket;
+                }
+                """;
+        TenantIsolationAuditor.SourceFile fixture = new SourceFile("bad/TicketService.java", badMethod);
+
+        Set<String> entities = Set.of("TicketEntity");
+        TenantIsolationAuditor auditor = new TenantIsolationAuditor(entities);
+
+        List<TenantIsolationAuditor.Violation> violations = auditor.audit(List.of(fixture));
+
+        assertTrue(violations.size() > 0,
+                "T3 反向验证失败：审计器没有报出'无 tenantId 直返实体'漏洞！");
+        assertEquals(1, violations.size(), "应只报一处违规");
+
+        var v = violations.get(0);
+        assertTrue(v.methodName().contains("getTicket"),
+                "Should report getTicket() method missing ownership check");
+    }
+
+    @Test
+    void T3_aclCheckShouldBeProtection() {
+        // T2 new rule validation: ACL check should be considered protection
+        String method = """
+                public Map<String, Object> archivePage(java.util.UUID id, AuthenticatedUser user) {
+                    aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page", Action.UPDATE);
+                    WikiPageEntity entity = pageService.archive(id, user.userId(), user.tenantId());
+                    return Map.of("code", 0);
+                }
+                """;
+        TenantIsolationAuditor.SourceFile fixture = new SourceFile("test/WikiController.java", method);
+
+        Set<String> entities = Set.of("WikiPageEntity");
+        TenantIsolationAuditor auditor = new TenantIsolationAuditor(entities);
+
+        List<TenantIsolationAuditor.Violation> violations = auditor.audit(List.of(fixture));
+
+        assertTrue(violations.isEmpty(),
+                "ACL check should be considered protection, false positive: " + violations);
+    }
+
+    @Test
+    void T3_delegationWithParentheses() {
+        // T2 fix: delegate pattern now supports user.tenantId() with parentheses
+        String method = """
+                public Map<String, Object> createPage(Map<String, Object> body, AuthenticatedUser user) {
+                    WikiPageEntity entity = pageService.create(body, user.tenantId(), user.userId());
+                    return Map.of("code", 0);
+                }
+                """;
+        TenantIsolationAuditor.SourceFile fixture = new SourceFile("test/WikiController.java", method);
+
+        Set<String> entities = Set.of("WikiPageEntity");
+        TenantIsolationAuditor auditor = new TenantIsolationAuditor(entities);
+
+        List<TenantIsolationAuditor.Violation> violations = auditor.audit(List.of(fixture));
+
+        assertTrue(violations.isEmpty(),
+                "Passing user.tenantId() on delegation should be protection: " + violations);
+    }
 }

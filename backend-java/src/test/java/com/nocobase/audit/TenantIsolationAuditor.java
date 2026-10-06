@@ -63,11 +63,13 @@ public final class TenantIsolationAuditor {
             Pattern.compile("TenantContext\\.currentTenantId\\s*\\(\\s*\\)"),
             // [PHASE78 R1] Principal 提取租户：AuthenticatedUser.tenantId() 被调用（Controller 层委托给 Service）
             Pattern.compile("\\w+\\.tenantId\\s*\\(\\s*\\)"),
-            // [PHASE77 T3] 委托隔离：同类内调用带 tenantId 参数的重载/辅助方法（如 getRule(ruleId, tenantId)、
-            // findAgent(tenantId, channelId)、get(id, tenantId)）——被调方内部已做租户限定，
-            // 方法签名含 tenantId 且实参中传递了该变量，视为已有防护
-            // [PHASE78 R1] 扩展：也匹配 user.tenantId() 等 Principal 提取形式（Controller→Service 委托）
-            Pattern.compile("\\b\\w+\\s*\\(\\s*[^)]*\\b(?:tenantId\\w*|\\w+\\.tenantId\\s*\\(\\s*\\))\\s*[,)]")
+            // [PHASE79 T2] ACL 校验即防护：aclEnforcer.assertCan/checkCan 等显式权限校验带 tenantId
+            Pattern.compile("aclEnforcer\\s*\\.\\s*(assertCan|checkCan|hasPermission)\\s*\\("),
+            // [PHASE79 T2] 委托隔离（增强版）：方法调用中包含 tenantId 作为实参
+            // 匹配形如 get(id, tenantId)、save(entity, tenantId) 等，其中 tenantId 是独立变量名
+            // 用 \\btenantId\\b 确保是完整变量名，不是 tenantIdXxx 的一部分
+            Pattern.compile("\\([^)]*\\btenantId\\b[^)]*\\)"),
+            Pattern.compile("\\([^)]*\\.tenantId\\s*\\([^)]*\\)")
     );
 
     /** 方法签名：访问修饰符 + 返回类型 + 名字 + 参数列表（不含 getter/setter/构造器）。 */

@@ -188,10 +188,14 @@ class UserAdminServiceTest {
     }
 
     @Test
-    void delete_oldSignature_deletesWithoutCheck() {
+    void delete_delegatesToTenantScopedGet() {
         UUID id = UUID.randomUUID();
-        service.delete(id);
-        verify(userRepository).deleteById(id);
+        UserEntity u = makeUser();
+        when(userRepository.findByIdAndTenantId(id, "tenant_default")).thenReturn(Optional.of(u));
+        doNothing().when(userRepository).delete(u);
+
+        service.delete(id, "tenant_default");
+        verify(userRepository).delete(u);
     }
 
     // ============ getUserRoles ============

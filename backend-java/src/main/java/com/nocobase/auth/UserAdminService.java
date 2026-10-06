@@ -88,11 +88,6 @@ public class UserAdminService {
         userRepository.delete(u);
     }
 
-    @Transactional
-    public void delete(UUID id) {
-        userRepository.deleteById(id);
-    }
-
     public List<RoleEntity> getUserRoles(UUID userId) {
         return userRoleRepository.findByIdUserId(userId).stream()
                 .map(ur -> roleRepository.findById(ur.getId().getRoleId()).orElse(null))
