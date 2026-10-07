@@ -1,13 +1,15 @@
 package com.nocobase.auth;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.keystore.KeyRingService;
+import com.nocobase.tenant.TenantContext;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 /**
  * JWT 密钥轮换管理端点(Week 42 R10).
@@ -27,12 +29,13 @@ import org.springframework.http.HttpStatus;
 public class JwtKeyRotationController {
 
     private final KeyRingService keyRing;
+    private final AuditService auditService;
 
-    public JwtKeyRotationController(KeyRingService keyRing) {
+    public JwtKeyRotationController(KeyRingService keyRing, AuditService auditService) {
         this.keyRing = keyRing;
+        this.auditService = auditService;
     }
 
-    /** 列出当前 keyring(secret 脱敏)。 */
     @GetMapping
     public Map<String, Object> snapshot() {
         return Map.of(
@@ -44,11 +47,13 @@ public class JwtKeyRotationController {
         );
     }
 
-    /** 触发轮换 — 生成新 ACTIVE key,旧 ACTIVE → RETIRED。 */
     @PostMapping("/rotate")
     public Map<String, Object> rotate() {
         try {
             String newKid = keyRing.rotate();
+            auditService.log(TenantContext.currentTenantId(), "system", "system",
+                    "jwt_key.rotate", "jwt_key", newKid,
+                    Map.of("newKid", newKid));
             return Map.of(
                     "code", 0, "message", "rotated",
                     "data", Map.of(

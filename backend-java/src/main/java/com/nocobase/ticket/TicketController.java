@@ -1,5 +1,6 @@
 package com.nocobase.ticket;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,15 +18,19 @@ import java.util.UUID;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final AuditService auditService;
 
-    public TicketController(TicketService ticketService) {
+    public TicketController(TicketService ticketService, AuditService auditService) {
         this.ticketService = ticketService;
+        this.auditService = auditService;
     }
 
-    /** 创建会话（前端初始化时调用）。 */
     @PostMapping("/session")
     public Map<String, Object> createSession(@AuthenticationPrincipal AuthenticatedUser user) {
         String sessionId = UUID.randomUUID().toString();
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "ticket.session.create", "ticket_session", sessionId,
+                Map.of("sessionId", sessionId));
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("sessionId", sessionId));
     }
@@ -46,19 +51,23 @@ public class TicketController {
     }
 
     /** 结束会话并创建工单。 */
-    @PostMapping("/close")
+@PostMapping("/close")
     public Map<String, Object> closeSession(
             @RequestBody Map<String, Object> body,
             @AuthenticationPrincipal AuthenticatedUser user) {
         String sessionId = (String) body.get("sessionId");
         String customerName = user.username();
-        // PHASE 55 Stage 4: 禁伪造邮箱(@nocobase.local)；取请求传入，回退为租户域
         String customerEmail = (String) body.getOrDefault("customerEmail",
                 user.username() + "@" + user.tenantId() + ".local");
         String message = (String) body.get("message");
 
         TicketEntity ticket = ticketService.createTicket(
                 user.tenantId(), sessionId, customerName, customerEmail, message);
+
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "ticket.close", "ticket", ticket.getId().toString(),
+                Map.of("sessionId", sessionId, "ticketId", ticket.getId().toString(),
+                        "customerEmail", customerEmail));
 
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("ticketId", ticket.getId().toString()));

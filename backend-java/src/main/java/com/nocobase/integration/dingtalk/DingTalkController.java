@@ -1,5 +1,6 @@
 package com.nocobase.integration.dingtalk;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtService;
 import com.nocobase.auth.RefreshTokenService;
 import com.nocobase.integration.common.ExternalMessageLogEntity;
@@ -7,6 +8,7 @@ import com.nocobase.integration.common.ExternalMessageLogRepository;
 import com.nocobase.integration.dingtalk.DingTalkApprovalService;
 import com.nocobase.integration.dingtalk.DingTalkOrgSyncService;
 import com.nocobase.integration.dingtalk.UserMappingService;
+import com.nocobase.tenant.TenantContext;
 import com.nocobase.workflow.WorkflowInstanceRepository;
 import com.nocobase.workflow.WorkflowTaskRepository;
 import com.nocobase.workflow.WorkflowTaskEntity;
@@ -47,6 +49,7 @@ public class DingTalkController {
 
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final AuditService auditService;
 
     /**
      * 事件幂等记录（复用入站消息那张带 UNIQUE 约束的表）。
@@ -63,7 +66,8 @@ public class DingTalkController {
                               WorkflowInstanceRepository instanceRepository,
                               WorkflowTaskRepository taskRepository,
                               JwtService jwtService,
-                              RefreshTokenService refreshTokenService) {
+                              RefreshTokenService refreshTokenService,
+                              AuditService auditService) {
         this.adapter = adapter;
         this.appService = appService;
         this.approvalService = approvalService;
@@ -73,6 +77,7 @@ public class DingTalkController {
         this.taskRepository = taskRepository;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.auditService = auditService;
     }
 
     /** 生成扫码授权地址（支持 GET/POST）。 */
@@ -112,6 +117,9 @@ public class DingTalkController {
         Map<String, Object> result = adapter.ssoLogin(code, tenantId);
         Integer rc = (Integer) result.get("code");
         if (rc == null || rc != 0) {
+            auditService.log(tenantId, "anonymous", "anonymous",
+                    "dingtalk.login.failed", "dingtalk_auth", "code_" + code,
+                    Map.of("tenantId", tenantId, "reason", rc != null && rc == 500 ? "server_error" : "auth_failed"));
             return ResponseEntity.status(rc != null && rc == 500 ? 500 : 401).body(result);
         }
 
@@ -123,6 +131,10 @@ public class DingTalkController {
         String accessToken = jwtService.issueAccessToken(
                 UUID.fromString(userId), username, tenantId);
         String refreshToken = refreshTokenService.issue(UUID.fromString(userId));
+
+        auditService.log(tenantId, userId, username,
+                "dingtalk.login.success", "dingtalk_auth", userId,
+                Map.of("userId", userId, "username", username, "tenantId", tenantId));
 
         return ResponseEntity.ok(Map.of(
                 "code", 0,
@@ -168,7 +180,22 @@ public class DingTalkController {
      * 钉钉退出登录。
      */
     @PostMapping("/logout")
-    public Map<String, Object> logout() {
+    public Map<String, Object> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String userId = "anonymous";
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            try {
+                var claims = jwtService.parseAccessToken(token);
+                if (claims != null) {
+                    userId = claims.getSubject();
+                }
+            } catch (Exception e) {
+                userId = "anonymous";
+            }
+        }
+        auditService.log("unknown", userId, "anonymous",
+                "dingtalk.logout", "dingtalk_auth", userId,
+                Map.of("userId", userId));
         return Map.of("code", 0, "message", "success", "data", Map.of("loggedOut", true));
     }
 
@@ -193,9 +220,15 @@ public class DingTalkController {
         Map<String, Object> formValues = (Map<String, Object>) body.get("formValues");
         String instanceId = approvalService.createApproval(processCode, title, formValues);
         if (instanceId != null) {
+            auditService.log(TenantContext.currentTenantId(), "system", "system",
+                    "dingtalk.approval.create", "dingtalk_approval", instanceId,
+                    Map.of("processCode", processCode, "title", title, "instanceId", instanceId));
             return Map.of("code", 0, "message", "success",
                     "data", Map.of("instanceId", instanceId));
         }
+        auditService.log(TenantContext.currentTenantId(), "system", "system",
+                "dingtalk.approval.failed", "dingtalk_approval", "unknown",
+                Map.of("processCode", processCode, "title", title, "reason", "creation_failed"));
         return Map.of("code", 502, "message", "创建审批实例失败", "data", Map.of());
     }
 

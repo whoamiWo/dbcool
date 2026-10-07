@@ -1,5 +1,6 @@
 package com.nocobase.im;
 
+import com.nocobase.audit.AuditService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 import java.util.UUID;
@@ -25,9 +26,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 public class ImSlashController {
 
     private final SlashCommandRegistry registry;
+    private final AuditService auditService;
 
-    public ImSlashController(SlashCommandRegistry registry) {
+    public ImSlashController(SlashCommandRegistry registry, AuditService auditService) {
         this.registry = registry;
+        this.auditService = auditService;
     }
 
     /** 列出可用 Slash 命令。 */
@@ -56,6 +59,9 @@ public class ImSlashController {
         ctx.put("channelId", channelId);
 
         registry.get(command.toLowerCase()).accept(content, ctx);
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "im.slash.execute", "im_slash_command", channelId.toString(),
+                Map.of("command", command, "content", content, "channelId", channelId.toString()));
         return ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", ctx));
     }
 

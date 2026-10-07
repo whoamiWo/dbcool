@@ -1,5 +1,7 @@
 package com.nocobase.auth;
 
+import com.nocobase.audit.AuditService;
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
@@ -7,7 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final AuditService auditService;
 
     public AuthController(
             UserRepository userRepository,
@@ -41,14 +44,15 @@ public class AuthController {
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            RefreshTokenService refreshTokenService
-    ) {
+            RefreshTokenService refreshTokenService,
+            AuditService auditService) {
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.auditService = auditService;
     }
 
     /**
@@ -58,16 +62,30 @@ public class AuthController {
     @Transactional
     public ResponseEntity<Map<String, Object>> login(@RequestBody @Valid LoginRequest request) {
         UserEntity user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "账号或密码错误"));
+                .orElse(null);
+
+        if (user == null) {
+            auditService.log("unknown", "anonymous", request.username(),
+                    "auth.login.failed", "auth", "username_" + request.username(),
+                    Map.of("username", request.username(), "reason", "user_not_found"));
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "账号或密码错误");
+        }
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
+                    "auth.login.failed", "auth", user.getId().toString(),
+                    Map.of("username", user.getUsername(), "reason", "bad_password"));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "账号或密码错误");
         }
 
         String accessToken = jwtService.issueAccessToken(
                 user.getId(), user.getUsername(), user.getTenantId());
         String refreshToken = refreshTokenService.issue(user.getId());
+
+        auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
+                "auth.login.success", "auth", user.getId().toString(),
+                Map.of("username", user.getUsername(), "userId", user.getId().toString(),
+                        "tenantId", user.getTenantId()));
 
         return ResponseEntity.ok(Map.of(
                 "code", 0,
@@ -96,16 +114,29 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> refresh(@RequestBody @Valid RefreshRequest request) {
         UUID userId = refreshTokenService.consume(request.refreshToken());
         if (userId == null) {
+            auditService.log("unknown", "anonymous", "anonymous",
+                    "auth.refresh.failed", "auth", "unknown",
+                    Map.of("reason", "invalid_refresh_token"));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refresh token 无效或已过期");
         }
 
         UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "用户不存在"));
+                .orElse(null);
+        
+        if (user == null) {
+            auditService.log("unknown", userId.toString(), "anonymous",
+                    "auth.refresh.failed", "auth", userId.toString(),
+                    Map.of("userId", userId.toString(), "reason", "user_not_found"));
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户不存在");
+        }
 
         String newAccessToken = jwtService.issueAccessToken(
                 user.getId(), user.getUsername(), user.getTenantId());
         String newRefreshToken = refreshTokenService.issue(user.getId());
+
+        auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
+                "auth.refresh.success", "auth", user.getId().toString(),
+                Map.of("username", user.getUsername(), "tenantId", user.getTenantId()));
 
         return ResponseEntity.ok(Map.of(
                 "code", 0,

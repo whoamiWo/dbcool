@@ -3,6 +3,7 @@ package com.nocobase.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.keystore.KeyRingService;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -16,6 +17,7 @@ class JwtKeyRotationControllerTest {
 
     private KeyRingService keyRing;
     private JwtKeyRotationController controller;
+    private final AuditService auditService = mock(AuditService.class);
 
     private static org.springframework.core.env.Environment mockEnv() {
         org.springframework.core.env.Environment env = mock(org.springframework.core.env.Environment.class);
@@ -27,7 +29,7 @@ class JwtKeyRotationControllerTest {
     void setUp() {
         keyRing = new KeyRingService(
                 "this-is-a-32-byte-secret-key-for-hmac-sha256!!", "", mockEnv());
-        controller = new JwtKeyRotationController(keyRing);
+        controller = new JwtKeyRotationController(keyRing, auditService);
     }
 
     @Test

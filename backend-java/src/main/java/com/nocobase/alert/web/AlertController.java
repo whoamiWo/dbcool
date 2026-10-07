@@ -1,11 +1,14 @@
 package com.nocobase.alert.web;
 
+import com.nocobase.audit.AuditService;
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,11 +39,13 @@ public class AlertController {
 
     private final AlertCollector collector;
     private final AlertStore store;
+    private final AuditService auditService;
 
     @Autowired
-    public AlertController(AlertCollector collector, AlertStore store) {
+    public AlertController(AlertCollector collector, AlertStore store, AuditService auditService) {
         this.collector = collector;
         this.store = store;
+        this.auditService = auditService;
     }
 
     @GetMapping("/recent")
@@ -67,35 +72,51 @@ public class AlertController {
     }
 
     @PostMapping("/{eventId}/ack")
-    public ResponseEntity<Map<String, Object>> ack(
-            @PathVariable String eventId,
-            @RequestBody(required = false) Map<String, String> body
-    ) {
+    public ResponseEntity<Map<String, Object>> ack(@PathVariable String eventId,
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
         String by = body != null ? body.get("by") : null;
         boolean ok = collector.ack(eventId, by);
         if (ok) {
             store.updateAlert(eventId, true, by, System.currentTimeMillis() / 1000.0, null, null);
         }
+        String tenantId = principal != null ? principal.tenantId() : "unknown";
+        Object userId = principal != null ? principal.userId() : "system";
+        String username = principal != null ? principal.username() : "system";
+        auditService.log(tenantId, userId, username,
+                "alert.ack", "alert", eventId,
+                Map.of("alertId", eventId, "ackedBy", by != null ? by : username));
         return ResponseEntity.ok(Map.of("ok", ok, "event_id", eventId));
     }
 
     @PostMapping("/{eventId}/resolve")
-    public ResponseEntity<Map<String, Object>> resolve(@PathVariable String eventId) {
+    public ResponseEntity<Map<String, Object>> resolve(@PathVariable String eventId, @AuthenticationPrincipal AuthenticatedUser principal) {
         boolean ok = collector.resolve(eventId);
         if (ok) {
             store.updateAlert(eventId, null, null, null, true, System.currentTimeMillis() / 1000.0);
         }
+        String tenantId = principal != null ? principal.tenantId() : "unknown";
+        Object userId = principal != null ? principal.userId() : "system";
+        String username = principal != null ? principal.username() : "system";
+        auditService.log(tenantId, userId, username,
+                "alert.resolve", "alert", eventId,
+                Map.of("alertId", eventId));
         return ResponseEntity.ok(Map.of("ok", ok, "event_id", eventId));
     }
 
     @PostMapping("/subscriptions")
-    public Map<String, Object> subscribe(@RequestBody Map<String, String> body) {
+    public Map<String, Object> subscribe(@RequestBody Map<String, String> body,
+                                         @AuthenticationPrincipal AuthenticatedUser principal) {
         String userId = body.get("user_id");
         String kind = body.get("kind");
         if (userId == null || kind == null) {
             return Map.of("ok", false, "error", "user_id 和 kind 必填");
         }
         boolean created = store.subscribe(userId, kind);
+        String tenantId = principal != null ? principal.tenantId() : "unknown";
+        auditService.log(tenantId, userId, userId,
+                "alert.subscribe", "alert_subscription", userId + "_" + kind,
+                Map.of("userId", userId, "kind", kind));
         return Map.of("ok", true, "created", created, "user_id", userId, "kind", kind);
     }
 

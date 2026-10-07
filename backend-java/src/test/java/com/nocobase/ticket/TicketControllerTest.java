@@ -1,6 +1,8 @@
 package com.nocobase.ticket;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,7 @@ class TicketControllerTest {
 
     private TicketService ticketService;
     private TicketController controller;
+    private final AuditService auditService = new AuditService(null, new ObjectMapper());
 
     private final UUID ticketId = UUID.randomUUID();
     private final AuthenticatedUser alice = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_A");
@@ -33,7 +36,7 @@ class TicketControllerTest {
     @BeforeEach
     void setUp() {
         ticketService = mock(TicketService.class);
-        controller = new TicketController(ticketService);
+        controller = new TicketController(ticketService, auditService);
     }
 
     @Test

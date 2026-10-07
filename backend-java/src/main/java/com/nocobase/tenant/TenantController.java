@@ -1,11 +1,14 @@
 package com.nocobase.tenant;
 
+import com.nocobase.audit.AuditService;
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,9 +36,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TenantController {
 
     private final TenantService service;
+    private final AuditService auditService;
 
-    public TenantController(TenantService service) {
+    public TenantController(TenantService service, AuditService auditService) {
         this.service = service;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -54,16 +59,24 @@ public class TenantController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> create(@RequestBody CreateTenantRequest req) {
+    public ResponseEntity<Map<String, Object>> create(@RequestBody CreateTenantRequest req,
+                                                      @AuthenticationPrincipal AuthenticatedUser user) {
         TenantEntity t = service.create(req.id(), req.name(), req.slug());
+        auditService.log(req.id(), user.userId(), user.username(),
+                "tenant.create", "tenant", req.id(),
+                Map.of("id", req.id(), "name", req.name(), "slug", req.slug()));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("code", 0, "message", "success", "data", t));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Map<String, Object> disable(@PathVariable String id) {
+    public Map<String, Object> disable(@PathVariable String id,
+                                       @AuthenticationPrincipal AuthenticatedUser user) {
         TenantEntity t = service.disable(id);
+        auditService.log(id, user.userId(), user.username(),
+                "tenant.disable", "tenant", id,
+                Map.of("before", Map.of("enabled", true), "after", Map.of("enabled", false)));
         return Map.of("code", 0, "message", "disabled", "data", t);
     }
 

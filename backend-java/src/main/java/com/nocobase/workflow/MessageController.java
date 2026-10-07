@@ -1,5 +1,6 @@
 package com.nocobase.workflow;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import java.time.Instant;
 import java.util.HashMap;
@@ -25,9 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class MessageController {
 
     private final MessageRepository messageRepository;
+    private final AuditService auditService;
 
-    public MessageController(MessageRepository messageRepository) {
+    public MessageController(MessageRepository messageRepository, AuditService auditService) {
         this.messageRepository = messageRepository;
+        this.auditService = auditService;
     }
 
     /**
@@ -89,6 +92,9 @@ public class MessageController {
         }
         m.setRead(true);
         messageRepository.save(m);
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "message.mark_read", "message", id.toString(),
+                Map.of("messageId", id.toString()));
         return Map.of("code", 0, "message", "marked read");
     }
 

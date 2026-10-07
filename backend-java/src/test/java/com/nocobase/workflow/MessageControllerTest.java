@@ -9,7 +9,9 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,11 +37,12 @@ class MessageControllerTest {
     private MessageRepository repo;
     private MessageController controller;
     private AuthenticatedUser testUser;
+    private final AuditService auditService = new AuditService(null, new ObjectMapper());
 
     @BeforeEach
     void setUp() {
         repo = mock(MessageRepository.class);
-        controller = new MessageController(repo);
+        controller = new MessageController(repo, auditService);
         when(repo.save(any(MessageEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         testUser = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");

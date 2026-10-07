@@ -1,5 +1,6 @@
 package com.nocobase.tenant;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import java.time.Instant;
 import java.util.List;
@@ -30,10 +31,13 @@ public class UserTenantController {
 
     private final UserTenantRepository userTenantRepo;
     private final TenantRepository tenantRepo;
+    private final AuditService auditService;
 
-    public UserTenantController(UserTenantRepository userTenantRepo, TenantRepository tenantRepo) {
+    public UserTenantController(UserTenantRepository userTenantRepo, TenantRepository tenantRepo,
+                                AuditService auditService) {
         this.userTenantRepo = userTenantRepo;
         this.tenantRepo = tenantRepo;
+        this.auditService = auditService;
     }
 
     @GetMapping("/users/{userId}/tenants")
@@ -80,8 +84,12 @@ public class UserTenantController {
 
     @DeleteMapping("/users/{userId}/tenants/{tenantId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Map<String, Object> unlink(@PathVariable String userId, @PathVariable String tenantId) {
+    public Map<String, Object> unlink(@PathVariable String userId, @PathVariable String tenantId,
+                                      @AuthenticationPrincipal AuthenticatedUser user) {
         userTenantRepo.deleteByUserIdAndTenantId(userId, tenantId);
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "user_tenant.unlink", "user_tenant", userId + "_" + tenantId,
+                Map.of("userId", userId, "tenantId", tenantId));
         return Map.of("code", 0, "message", "deleted");
     }
 

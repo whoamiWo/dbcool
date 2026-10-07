@@ -58,7 +58,8 @@ class DingTalkApprovalCallbackTest {
                 mock(WorkflowInstanceRepository.class),
                 taskRepository,
                 mock(JwtService.class),
-                mock(RefreshTokenService.class));
+                mock(RefreshTokenService.class),
+                mock(com.nocobase.audit.AuditService.class));
     }
 
     private Map<String, Object> payload() {

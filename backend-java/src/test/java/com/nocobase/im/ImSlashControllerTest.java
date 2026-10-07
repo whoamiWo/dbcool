@@ -2,21 +2,20 @@ package com.nocobase.im;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nocobase.audit.AuditService;
+import com.nocobase.audit.AuditLogRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Slash 命令端点契约测试（断链修复）。
- *
- * <p>前端 {@code GET /api/im/slash/commands} 此前无后端端点；
- * 此处断言端点返回真实注册表内容（而非硬编码列表），防止与注册表漂移。
- */
 class ImSlashControllerTest {
 
+    private final AuditService auditService = new AuditService(
+            org.mockito.Mockito.mock(AuditLogRepository.class), new ObjectMapper());
     private final ImSlashController controller =
-            new ImSlashController(SlashCommandRegistry.defaultRegistry());
+            new ImSlashController(SlashCommandRegistry.defaultRegistry(), auditService);
 
     @Test
     void commands_returnsRegistryContents() {
@@ -40,7 +39,7 @@ class ImSlashControllerTest {
     void commands_reflectsCustomRegistration() {
         SlashCommandRegistry reg = new SlashCommandRegistry();
         reg.register("standup", "发起站会", (content, ctx) -> { });
-        var c = new ImSlashController(reg);
+        var c = new ImSlashController(reg, auditService);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) c.commands().get("data");
@@ -57,7 +56,7 @@ class ImSlashControllerTest {
         SlashCommandRegistry reg = new SlashCommandRegistry();
         reg.register("test", "测试命令",
                 (content, ctx) -> ctx.put("echo", "ran:" + content));
-        ImSlashController c = new ImSlashController(reg);
+        ImSlashController c = new ImSlashController(reg, auditService);
 
         // 模拟已登录用户
         com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user =

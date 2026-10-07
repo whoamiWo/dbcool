@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.config.SecurityConfig;
 import java.time.Duration;
@@ -54,6 +55,7 @@ class AuthControllerTest {
     @MockBean private PasswordEncoder passwordEncoder;
     @MockBean private JwtService jwtService;
     @MockBean private RefreshTokenService refreshTokenService;
+    @MockBean private AuditService auditService;
 
     @AfterEach
     void clearSecurity() { SecurityContextHolder.clearContext(); }
