@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,30 @@ class CollectionServiceB3Test {
         existing.setTenantId("tenant_default");
         existing.setCreatedAt(Instant.now());
         when(repository.findByNameAndTenantId("orders", "tenant_default")).thenReturn(java.util.Optional.of(existing));
+    }
+
+    /**
+     * PHASE87：记录写入必须带租户，**缺失即 403**，不得静默回退默认租户。
+     *
+     * <p>这是本批整改的核心 —— 危险不在"报错"，而在**静默读写错误租户的数据**
+     *（生产上表现为"偶尔看到别人数据"，日志无痕）。
+     */
+    /**
+     * 断言**消息**而不只是状态码：此处若只判 403，则删掉"租户上下文缺失"这道校验后，
+     * 第二道 `meta.getTenantId().equals(null)` 同样抛 403，测试仍绿 —— 守卫就失效了。
+     * （这是我在反向验证时实测发现的，不要改回只判状态码。）
+     */
+    @Test
+    void insertRecord_nullOrBlankTenantId_throws403() {
+        assertThatThrownBy(() -> service.insertRecord("orders", Map.of("qty", 1), null))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("租户上下文缺失")
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> service.insertRecord("orders", Map.of("qty", 1), "   "))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("租户上下文缺失");
     }
 
     // ============ deleteMeta 主流程 ============

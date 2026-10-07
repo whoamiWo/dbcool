@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * NotificationService 单元测试(Week 22 抬红线).
@@ -42,6 +44,25 @@ class NotificationServiceTest {
         when(repo.findEnabledByTenantId(TENANT)).thenReturn(List.of());
         var results = service.fire(TENANT, "workflow.approve", "u@e.com", Map.of("title", "Hi"));
         assertThat(results).isEmpty();
+    }
+
+    /**
+     * PHASE87：无租户上下文必须**拒绝**，不得静默回退到默认租户发通知。
+     *
+     * <p>背景：异步链路（如自动化规则 {@code @Async}）不继承 ThreadLocal，
+     * 若此处放行就会把通知发到错误的租户。
+     */
+    @Test
+    void fire_nullOrBlankTenantId_throws403() {
+        assertThatThrownBy(() -> service.fire(null, "record.create", "u@e.com", Map.of()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> service.fire("   ", "record.create", "u@e.com", Map.of()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test
