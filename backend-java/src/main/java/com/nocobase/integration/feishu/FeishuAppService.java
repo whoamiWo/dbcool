@@ -111,10 +111,14 @@ public class FeishuAppService {
      */
     public boolean verifySignature(String timestamp, String nonce, String signature, String body) {
         if (timestamp == null || nonce == null || signature == null) {
+            log.warn("[Feishu] 签名校验：缺少必填参数(timestamp/nonce/signature)");
             return false;
         }
-        // 飞书签名算法：SHA256(timestamp + nonce + encrypt_key + body)
-        String signingString = timestamp + nonce + (encryptKey != null ? encryptKey : "") + body;
+        if (encryptKey == null || encryptKey.isBlank()) {
+            log.warn("[Feishu] 签名校验：encrypt-key 未配置，拒绝请求");
+            return false;
+        }
+        String signingString = timestamp + nonce + encryptKey + body;
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(signingString.getBytes(StandardCharsets.UTF_8));

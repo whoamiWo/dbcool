@@ -1,5 +1,6 @@
 package com.nocobase.integration.feishu;
 
+import com.nocobase.audit.AuditService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,10 +29,12 @@ import java.util.Map;
 public class FeishuController {
 
     private final FeishuAppService feishuAppService;
+    private final AuditService auditService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public FeishuController(FeishuAppService feishuAppService) {
+    public FeishuController(FeishuAppService feishuAppService, AuditService auditService) {
         this.feishuAppService = feishuAppService;
+        this.auditService = auditService;
     }
 
     /** 获取飞书 OAuth2 授权地址 */
@@ -77,21 +80,28 @@ public class FeishuController {
             JsonNode json = objectMapper.readTree(body);
             String type = json.path("type").asText();
             
-            // Challenge 验证
             if ("url_verification".equals(type)) {
                 String challenge = json.path("challenge").asText();
                 if (challenge.isBlank()) {
                     return ResponseEntity.badRequest().body("{\"error\":\"missing challenge\"}");
                 }
+                auditService.log("tenant_default", "system", "system",
+                        "feishu.events.challenge", "feishu_event", challenge,
+                        Map.of("eventType", "url_verification", "challenge", challenge));
                 return ResponseEntity.ok(challenge);
             }
 
-            // 签名验证：飞书服务端用 SHA256(timestamp+nonce+encrypt_key+body) 算签名
             if (!feishuAppService.verifySignature(timestamp, nonce, signature, body)) {
+                auditService.log("tenant_default", "unknown", "unknown",
+                        "feishu.events.rejected", "feishu_event", "unknown",
+                        Map.of("timestamp", timestamp, "nonce", nonce, "reason", "signature_invalid"));
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"error\":\"invalid signature\"}");
             }
 
-            // 事件处理（异步）
+            auditService.log("tenant_default", "system", "system",
+                    "feishu.events.received", "feishu_event", json.path("event_id").asText("unknown"),
+                    Map.of("type", type, "bodyPreview", body.length() > 100 ? body.substring(0, 100) : body));
+
             feishuAppService.handleEvent(json);
             
             return ResponseEntity.ok("{\"code\":0}");
