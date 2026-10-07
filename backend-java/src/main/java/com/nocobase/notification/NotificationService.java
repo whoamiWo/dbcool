@@ -37,10 +37,13 @@ public class NotificationService {
      * 触发一个事件 — 发送到所有匹配 channels.
      * @param eventName 如 "workflow.approve" / "workflow.trigger" / "record.create"(可为 null 表示全部)
      */
-    public List<NotificationDispatcher.SendResult> fire(String tenantId,
-                                                         String eventName,
-                                                         String recipient,
-                                                         Map<String, Object> payload) {
+public List<NotificationDispatcher.SendResult> fire(String tenantId,
+                                                          String eventName,
+                                                          String recipient,
+                                                          Map<String, Object> payload) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝通知");
+        }
         List<NotificationChannelEntity> channels = repository.findEnabledByTenantId(tenantId);
         List<NotificationDispatcher.SendResult> results = new ArrayList<>();
         for (NotificationChannelEntity ch : channels) {

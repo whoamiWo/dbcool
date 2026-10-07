@@ -61,7 +61,7 @@ public class AutomationTriggerListener {
                     continue;
                 }
                 // 执行动作
-                automationRuleService.executeRule(rule, event.getData(), event.getRecordId(), userId);
+                automationRuleService.executeRule(rule, event.getData(), event.getRecordId(), userId, tenantId);
                 log.info("[AUTOMATION TRIGGER] ruleId={} triggered by {} on {}",
                         rule.getId(), changeType, collectionName);
             } catch (Exception e) {

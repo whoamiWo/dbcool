@@ -185,7 +185,7 @@ public class AutomationRuleService {
         }
         
         // 执行动作
-        AutomationExecutionEntity execution = executeActions(rule, triggerData);
+        AutomationExecutionEntity execution = executeActions(rule, triggerData, tenantId);
         
         // 更新统计
         rule.setExecutionCount(rule.getExecutionCount() + 1);
@@ -240,7 +240,7 @@ public class AutomationRuleService {
     /**
      * 执行动作列表。
      */
-    private AutomationExecutionEntity executeActions(AutomationRuleEntity rule, Map<String, Object> data) {
+    private AutomationExecutionEntity executeActions(AutomationRuleEntity rule, Map<String, Object> data, String tenantId) {
         List<Map<String, Object>> actions = rule.getActions();
         if (actions == null || actions.isEmpty()) return null;
         
@@ -258,7 +258,7 @@ public class AutomationRuleService {
         for (Map<String, Object> action : actions) {
             String actionType = (String) action.get("type");
             try {
-                executeAction(action, data, rule);
+                executeAction(tenantId, action, data, rule);
             } catch (Exception e) {
                 errorMsg.append(actionType).append(": ").append(e.getMessage()).append("; ");
                 execution.setStatus("FAILED");
@@ -278,13 +278,13 @@ public class AutomationRuleService {
     /**
      * 执行单个动作。
      */
-    private void executeAction(Map<String, Object> action, Map<String, Object> data, AutomationRuleEntity rule) {
+    private void executeAction(String tenantId, Map<String, Object> action, Map<String, Object> data, AutomationRuleEntity rule) {
         String actionType = (String) action.get("type");
         
         switch (actionType) {
-            case "NOTIFY" -> executeNotify(action, data);
-            case "UPDATE_RECORD" -> executeUpdateRecord(action, data, rule);
-            case "CREATE_RECORD" -> executeCreateRecord(action, data, rule);
+            case "NOTIFY" -> executeNotify(tenantId, action, data);
+            case "UPDATE_RECORD" -> executeUpdateRecord(tenantId, action, data, rule);
+            case "CREATE_RECORD" -> executeCreateRecord(tenantId, action, data, rule);
             case "WEBHOOK" -> executeWebhook(action, data);
             default -> throw new IllegalArgumentException("未知动作类型: " + actionType);
         }
@@ -295,7 +295,7 @@ public class AutomationRuleService {
      */
     @Transactional
     public void executeRule(AutomationRuleEntity rule, Map<String, Object> data,
-                            String recordId, UUID userId) {
+                            String recordId, UUID userId, String tenantId) {
         long startTime = System.currentTimeMillis();
         AutomationExecutionEntity execution = new AutomationExecutionEntity();
         execution.setId(UUID.randomUUID());
@@ -311,7 +311,7 @@ public class AutomationRuleService {
             List<Map<String, Object>> actions = (List<Map<String, Object>>) rule.getActions();
             if (actions != null) {
                 for (Map<String, Object> action : actions) {
-                    executeAction(action, data, rule);
+                    executeAction(tenantId, action, data, rule);
                 }
             }
             execution.setStatus("SUCCESS");
@@ -325,7 +325,7 @@ public class AutomationRuleService {
         executionRepository.save(execution);
     }
 
-    private void executeNotify(Map<String, Object> action, Map<String, Object> data) {
+    private void executeNotify(String tenantId, Map<String, Object> action, Map<String, Object> data) {
         String message = (String) action.get("message");
         String recipient = (String) action.get("recipient");
         Map<String, Object> payload = new HashMap<>();
@@ -333,7 +333,7 @@ public class AutomationRuleService {
         payload.put("source", "automation");
         payload.put("data", data);
         try {
-            notificationService.fire(TenantContext.currentTenantId(), "automation.notify",
+            notificationService.fire(tenantId, "automation.notify",
                     recipient != null ? recipient : "all", payload);
             log.info("[AUTOMATION NOTIFY] sent to={}", recipient);
         } catch (Exception e) {
@@ -341,13 +341,13 @@ public class AutomationRuleService {
         }
     }
 
-    private void executeUpdateRecord(Map<String, Object> action, Map<String, Object> data, AutomationRuleEntity rule) {
+    private void executeUpdateRecord(String tenantId, Map<String, Object> action, Map<String, Object> data, AutomationRuleEntity rule) {
         String recordId = (String) data.get("recordId");
         Map<String, Object> updates = (Map<String, Object>) action.get("updates");
         if (recordId != null && updates != null) {
             try {
                 collectionService.updateRecord(rule.getCollectionName(), recordId, updates,
-                        TenantContext.currentTenantId());
+                        tenantId);
                 log.info("[AUTOMATION UPDATE_RECORD] recordId={}", recordId);
             } catch (Exception e) {
                 log.warn("[AUTOMATION UPDATE_RECORD] failed: {}", e.getMessage());
@@ -355,13 +355,13 @@ public class AutomationRuleService {
         }
     }
 
-    private void executeCreateRecord(Map<String, Object> action, Map<String, Object> data, AutomationRuleEntity rule) {
+    private void executeCreateRecord(String tenantId, Map<String, Object> action, Map<String, Object> data, AutomationRuleEntity rule) {
         String collectionName = (String) action.get("collection");
         Map<String, Object> fields = (Map<String, Object>) action.get("fields");
         if (collectionName != null && fields != null) {
             try {
                 UUID newId = collectionService.insertRecord(collectionName, fields,
-                        TenantContext.currentTenantId());
+                        tenantId);
                 log.info("[AUTOMATION CREATE_RECORD] collection={}, newId={}", collectionName, newId);
             } catch (Exception e) {
                 log.warn("[AUTOMATION CREATE_RECORD] failed: {}", e.getMessage());

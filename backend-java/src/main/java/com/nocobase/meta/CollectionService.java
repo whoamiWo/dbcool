@@ -311,6 +311,9 @@ public class CollectionService {
     // ============================================================
 
     public UUID insertRecord(String collectionName, Map<String, Object> data, String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
@@ -750,6 +753,9 @@ public class CollectionService {
     // ============================================================
 
     public Map<String, Object> getRecord(String collectionName, String id, String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒否访问");
+        }
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
@@ -774,8 +780,11 @@ public class CollectionService {
         }
     }
 
-    public boolean updateRecord(String collectionName, String id,
-                                 Map<String, Object> data, String tenantId) {
+public boolean updateRecord(String collectionName, String id,
+                                  Map<String, Object> data, String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
@@ -800,6 +809,9 @@ public class CollectionService {
     }
 
     public boolean deleteRecord(String collectionName, String id, String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
