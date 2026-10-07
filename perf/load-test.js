@@ -1,5 +1,5 @@
 // ============================================================
-//  NocoBase 性能压测脚本（k6）—— 请在 staging 环境执行
+//  NocoBase 性能压测脚本（k6） —— PHASE70 T2 / PHASE88
 //
 //  用法（阶梯全程）：
 //    docker run --rm -v $PWD/perf:/scripts --network host \
@@ -8,18 +8,15 @@
 //  用法（单档固定并发，供明细表）：
 //    ... -e VUS=20 -e DURATION=2m grafana/k6 run /scripts/load-test.js
 //
-//  PHASE70 T2：从"只压 1 个只读接口"扩展到真实写入路径：
-//    - 只读：GET  /api/collections
+//  写入场景（T1 补齐覆盖）：
 //    - 写入1：POST /api/im/messages            （IM 发消息，含广播）
 //    - 写入2：POST /api/wiki/blocks/batch-upsert（Wiki 块保存）
-//    - 写入3：POST /api/attachments/upload      （附件上传，multipart → MinIO）
+//    - 写入3：POST /api/attachments/upload      （附件上传 → MinIO）
 //    - 写入4：POST /api/workflows/{id}/trigger  （工作流触发）
 //
-//  setup() 会先登录并抓取真实的 channelId / pageId / workflowId，
-//  避免压测打在不存在资源上产生满屏 404。
-//
-//  注意：限流默认开启（登录 5/300s、全局 30/60s）。本脚本**不关闭限流**，
-//  因此部分场景的拐点反映的是限流配置而非纯系统容量 —— 报告中已标注。
+//  T1：setup() 中创建 Wiki 页面和工作流，确保压测全覆盖
+//  T2：阶梯式加压到拐点
+//  注意：限流默认开启时看到 429 错误，这是限流配置导致，非系统容量问题
 // ============================================================
 
 import http from 'k6/http';
@@ -58,7 +55,13 @@ const BASE = __ENV.BASE_URL || 'http://localhost:8080';
 const USERNAME = __ENV.USERNAME || 'admin';
 const PASSWORD = __ENV.PASSWORD || 'admin123';
 
-/** 登录并抓取压测需要的真实资源 ID。 */
+let createdKbId = '';
+let createdPageId = '';
+let createdWorkflowId = '';
+
+/** 登录并抓取压测需要的真实资源 ID。
+ *  T1：若 Wiki/Workflow 不存在，先创建种子数据
+ */
 export function setup() {
   const login = http.post(
     `${BASE}/api/auth/login`,
@@ -74,29 +77,94 @@ export function setup() {
 
   const auth = { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
 
+  // —— IM 频道 ——
   let channelId = '';
   const ch = http.get(`${BASE}/api/im/channels`, auth);
   try {
     const data = ch.json('data');
     const list = Array.isArray(data) ? data : data && data.content;
     if (list && list.length) channelId = String(list[0].id);
-  } catch (e) { /* 忽略：无频道则跳过 IM 场景 */ }
+  } catch (e) {}
 
+  // —— T1：Wiki 知识库 & 页面（若无则创建）——
   let pageId = '';
-  const pg = http.get(`${BASE}/api/wiki/pages?limit=1`, auth);
+  const pgList = http.get(`${BASE}/api/wiki/pages?limit=1`, auth);
   try {
-    const data = pg.json('data');
+    const data = pgList.json('data');
     const list = Array.isArray(data) ? data : data && data.content;
-    if (list && list.length) pageId = String(list[0].id);
-  } catch (e) { /* 忽略 */ }
+    if (list && list.length) {
+      pageId = String(list[0].id);
+    } else if (createdPageId) {
+      pageId = createdPageId;
+    }
+  } catch (e) {}
 
+  if (!pageId) {
+    // 创建知识库
+    const kbResp = http.post(
+      `${BASE}/api/wiki/kbs`,
+      JSON.stringify({ name: '压测知识库', description: 'Load test KB' }),
+      auth,
+    );
+    try {
+      const kbData = kbResp.json('data');
+      createdKbId = kbData?.id || '';
+      if (kbData?.id) {
+        // 创建页面
+        const pageResp = http.post(
+          `${BASE}/api/wiki/pages`,
+          JSON.stringify({
+            knowledge_base_id: createdKbId,
+            slug: 'perf-page-' + Date.now(),
+            title: '压测页面',
+            content: 'Load test page content',
+          }),
+          auth,
+        );
+        try {
+          const pageData = pageResp.json('data');
+          createdPageId = pageData?.id || pageId;
+          pageId = createdPageId;
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  // —— T1：工作流（若无则创建）——
   let workflowId = '';
-  const wf = http.get(`${BASE}/api/workflows?limit=1`, auth);
+  const wfList = http.get(`${BASE}/api/workflows?limit=1`, auth);
   try {
-    const data = wf.json('data');
+    const data = wfList.json('data');
     const list = Array.isArray(data) ? data : data && data.content;
     if (list && list.length) workflowId = String(list[0].id);
-  } catch (e) { /* 忽略 */ }
+  } catch (e) {}
+
+  if (!workflowId) {
+    // 创建一个最简工作流（手动触发）
+    const wfResp = http.post(
+      `${BASE}/api/workflows`,
+      JSON.stringify({
+        name: '压测工作流',
+        description: 'Load test workflow',
+        enabled: true,
+        formSchema: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        },
+        triggerType: 'MANUAL',
+        // 最简流程：只有开始节点
+        nodes: [{ id: 'start', type: 'start', position: { x: 0, y: 0 } }],
+        edges: [],
+      }),
+      auth,
+    );
+    try {
+      const wfData = wfResp.json('data');
+      createdWorkflowId = wfData?.id || '';
+      workflowId = createdWorkflowId;
+    } catch (e) {}
+  }
 
   console.log(`setup: channel=${channelId || 'N/A'} page=${pageId || 'N/A'} workflow=${workflowId || 'N/A'}`);
   return { token, channelId, pageId, workflowId };
@@ -123,8 +191,6 @@ export default function (data) {
       auth,
       { tags: { scenario: 'im_message' } },
     );
-    // 注：发送成功返回 201，被限流返回 429 —— 两者都属"正常处理"，
-    // 只有 4xx/5xx（如 403 越权）才算异常。
     check(msg, { 'im message accepted': (r) => (r.status >= 200 && r.status < 300) || r.status === 429 });
   }
 
