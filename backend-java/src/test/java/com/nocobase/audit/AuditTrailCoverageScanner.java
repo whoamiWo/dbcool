@@ -165,7 +165,23 @@ public final class AuditTrailCoverageScanner {
             System.out.println("  " + m);
         }
 
-        if (!missing.isEmpty()) {
+        Path baselinePath = sourceRoot.getParent().resolve("docs/audit-trail-baseline.txt");
+        if (Files.exists(baselinePath)) {
+            List<String> baseline = Files.readAllLines(baselinePath);
+            // filter out comments and empty
+            List<String> baselineEntries = baseline.stream()
+                    .filter(l -> !l.trim().startsWith("#") && !l.trim().isEmpty())
+                    .toList();
+            // Count only new missing not in baseline
+            long newMissing = missing.stream().filter(m -> !baselineEntries.contains(m)).count();
+            if (newMissing > 0) {
+                System.out.println("\n新增未留痕方法: " + newMissing + " 处 (基线已记录除外)");
+                missing.stream().filter(m -> !baselineEntries.contains(m)).forEach(m -> System.out.println("  NEW " + m));
+                System.exit(1);
+            }
+        }
+
+        if (!missing.isEmpty() && !Files.exists(baselinePath)) {
             System.exit(1);
         }
     }

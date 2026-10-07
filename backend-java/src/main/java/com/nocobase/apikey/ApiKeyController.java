@@ -1,5 +1,6 @@
 package com.nocobase.apikey;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.tenant.TenantContext;
 import java.time.Instant;
@@ -25,11 +26,12 @@ import org.springframework.web.server.ResponseStatusException;
 @io.swagger.v3.oas.annotations.tags.Tag(name = "API Keys", description = "API Key 管理")
 @RequestMapping("/api/admin/api-keys")
 public class ApiKeyController {
-
     private final ApiKeyService service;
+    private final AuditService auditService;
 
-    public ApiKeyController(ApiKeyService service) {
+    public ApiKeyController(ApiKeyService service, AuditService auditService) {
         this.service = service;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -58,7 +60,9 @@ public class ApiKeyController {
         ApiKeyService.CreatedKey created = service.create(
                 req.name(), req.scopes(), expiresAt,
                 TenantContext.currentTenantId(), user.userId());
-
+        auditService.log(TenantContext.currentTenantId(), user.userId(), user.username(),
+                "apikey.create", "apikey", created.entity().getId().toString(),
+                Map.of("name", req.name(), "scopes", req.scopes(), "expiresInDays", req.expiresInDays()));
         Map<String, Object> body = Map.of(
                 "code", 0, "message", "success",
                 "data", Map.of(
@@ -76,11 +80,13 @@ public class ApiKeyController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Map<String, Object> revoke(@PathVariable UUID id) {
+    public Map<String, Object> revoke(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser user) {
         boolean ok = service.revoke(id, TenantContext.currentTenantId());
         if (!ok) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "key 不存在或不属于当前租户");
         }
+        auditService.log(TenantContext.currentTenantId(), user.userId(), user.username(),
+                "apikey.revoke", "apikey", id.toString(), Map.of("revoked", true));
         return Map.of("code", 0, "message", "revoked", "data", Map.of("id", id.toString()));
     }
 

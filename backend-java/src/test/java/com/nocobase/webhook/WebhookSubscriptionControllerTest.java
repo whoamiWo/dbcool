@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.tenant.TenantContext;
 import java.time.Instant;
 import java.util.List;
@@ -26,12 +27,14 @@ import org.springframework.web.server.ResponseStatusException;
 class WebhookSubscriptionControllerTest {
 
     private WebhookSubscriptionRepository repository;
+    private AuditService auditService;
     private WebhookSubscriptionController controller;
 
     @BeforeEach
     void setUp() {
         repository = mock(WebhookSubscriptionRepository.class);
-        controller = new WebhookSubscriptionController(repository);
+        auditService = mock(AuditService.class);
+        controller = new WebhookSubscriptionController(repository, auditService);
         TenantContext.set("tenant_default");
     }
 

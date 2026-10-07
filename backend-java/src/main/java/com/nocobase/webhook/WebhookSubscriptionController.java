@@ -1,5 +1,6 @@
 package com.nocobase.webhook;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
@@ -33,9 +34,11 @@ public class WebhookSubscriptionController {
             Set.of("on_create", "on_update", "on_delete");
 
     private final WebhookSubscriptionRepository repository;
+    private final AuditService auditService;
 
-    public WebhookSubscriptionController(WebhookSubscriptionRepository repository) {
+    public WebhookSubscriptionController(WebhookSubscriptionRepository repository, AuditService auditService) {
         this.repository = repository;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -76,6 +79,9 @@ public class WebhookSubscriptionController {
         e.setCreatedAt(Instant.now());
 
         WebhookSubscriptionEntity saved = repository.save(e);
+        auditService.log(TenantContext.currentTenantId(), null, "system",
+                "webhook.create", "webhook_subscription", saved.getId().toString(),
+                Map.of("collection", collection, "event", event, "url", url));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("code", 0, "message", "success", "data", toDto(saved)));
     }
@@ -83,15 +89,25 @@ public class WebhookSubscriptionController {
     /** 启停订阅(避免删除后重建)。 */
     @PutMapping("/{id}/enabled")
     public Map<String, Object> setEnabled(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
+        String tenant = TenantContext.currentTenantId();
         WebhookSubscriptionEntity e = mustGet(id);
+        boolean oldEnabled = e.isEnabled();
         e.setEnabled(Boolean.parseBoolean(String.valueOf(body.get("enabled"))));
-        return Map.of("code", 0, "message", "success", "data", toDto(repository.save(e)));
+        WebhookSubscriptionEntity saved = repository.save(e);
+        auditService.log(tenant, null, "system",
+                "webhook.update", "webhook_subscription", id.toString(),
+                Map.of("before_enabled", oldEnabled, "after_enabled", e.isEnabled()));
+        return Map.of("code", 0, "message", "success", "data", toDto(saved));
     }
 
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id) {
+        String tenant = TenantContext.currentTenantId();
         WebhookSubscriptionEntity e = mustGet(id);
         repository.delete(e);
+        auditService.log(tenant, null, "system",
+                "webhook.delete", "webhook_subscription", id.toString(),
+                Map.of("collection", e.getCollectionName(), "event", e.getEvent()));
         return Map.of("code", 0, "message", "deleted", "data", Map.of("id", id.toString()));
     }
 
