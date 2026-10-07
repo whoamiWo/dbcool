@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.config.SecurityConfig;
 import java.time.Instant;
@@ -55,6 +56,12 @@ class UserAdminControllerTest {
     @MockBean private JwtAuthFilter jwtAuthFilter;
     @MockBean private UserAdminService userService;
     @MockBean private UserRoleRepository userRoleRepository;
+    @MockBean private AuditService auditService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        doNothing().when(auditService).log(any(), any(), any(), any(), any(), any(), any());
+    }
 
     private UserEntity user(UUID id, String username) {
         UserEntity u = new UserEntity();
@@ -165,6 +172,7 @@ class UserAdminControllerTest {
     @Test
     void update_partialFields_returnsUpdatedUser() throws Exception {
         UUID uid = UUID.randomUUID();
+        when(userService.get(uid)).thenReturn(user(uid, "alice"));
         when(userService.update(eq(uid), eq("New Name"), eq(false), eq("tenant_admin")))
                 .thenReturn(user(uid, "alice"));
 
@@ -254,6 +262,7 @@ class UserAdminControllerTest {
     @Test
     void delete_removesUserAndRoles() throws Exception {
         UUID uid = UUID.randomUUID();
+        when(userService.get(uid)).thenReturn(user(uid, "alice"));
         doNothing().when(userService).delete(eq(uid), eq("tenant_admin"));
         doNothing().when(userRoleRepository).deleteByIdUserId(uid);
 
@@ -292,10 +301,16 @@ class UserAdminControllerTest {
         UUID rid = UUID.randomUUID();
         doNothing().when(userService).assignRole(uid, rid);
 
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         mockMvc.perform(post("/api/admin/users/{id}/roles/{roleId}", uid, rid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.message").value("assigned"));
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -304,10 +319,16 @@ class UserAdminControllerTest {
         UUID rid = UUID.randomUUID();
         doNothing().when(userService).removeRole(uid, rid);
 
+        var auth = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         mockMvc.perform(delete("/api/admin/users/{id}/roles/{roleId}", uid, rid))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.message").value("removed"));
+        SecurityContextHolder.clearContext();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.nocobase.im;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.im.entity.ImChannelEntity;
 import com.nocobase.im.entity.ImChannelMemberEntity;
@@ -26,10 +27,12 @@ public class ImChannelController {
 
     private final ChannelService channelService;
     private final PresenceService presenceService;
+    private final AuditService auditService;
 
-    public ImChannelController(ChannelService channelService, PresenceService presenceService) {
+    public ImChannelController(ChannelService channelService, PresenceService presenceService, AuditService auditService) {
         this.channelService = channelService;
         this.presenceService = presenceService;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -99,8 +102,13 @@ public class ImChannelController {
         UUID target = body == null || body.get("userId") == null
                 ? user.userId()
                 : UUID.fromString(String.valueOf(body.get("userId")));
-        channelService.join(user.tenantId(), id, target,
-                body == null ? null : str(body.get("role")));
+        String role = body == null ? null : str(body.get("role"));
+        channelService.join(user.tenantId(), id, target, role);
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("channel_id", id.toString());
+        if (role != null) payload.put("role", role);
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "im.channel.member.add", "im_channel_member", target.toString(), payload);
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("channelId", id.toString(), "userId", target.toString()));
     }
@@ -111,6 +119,9 @@ public class ImChannelController {
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         channelService.leave(id, user.userId());
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "im.channel.member.remove", "im_channel_member", user.userId().toString(),
+                Map.of("channel_id", id.toString()));
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("channelId", id.toString()));
     }
@@ -119,6 +130,8 @@ public class ImChannelController {
     @PostMapping("/presence/heartbeat")
     public Map<String, Object> heartbeat(@AuthenticationPrincipal AuthenticatedUser user) {
         presenceService.heartbeat(user.tenantId(), user.userId());
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "im.presence.heartbeat", "im_presence", user.userId().toString(), Map.of());
         return Map.of("code", 0, "message", "success", "data", Map.of());
     }
 

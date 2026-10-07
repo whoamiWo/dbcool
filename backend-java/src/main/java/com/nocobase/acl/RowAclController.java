@@ -2,7 +2,9 @@ package com.nocobase.acl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -18,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/** ROW-level ACL 管理接口(Week 14.5). */
 @RestController
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Roles & ACL", description = "角色 + ACL 策略")
 @RequestMapping("/api/admin/row-acl")
@@ -26,10 +27,12 @@ public class RowAclController {
 
     private final AclRowPolicyRepository repository;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
-    public RowAclController(AclRowPolicyRepository repository, ObjectMapper objectMapper) {
+    public RowAclController(AclRowPolicyRepository repository, ObjectMapper objectMapper, AuditService auditService) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -65,6 +68,11 @@ public class RowAclController {
             p.setEnabled(req.enabled() == null || req.enabled());
             p.setDescription(req.description());
             repository.save(p);
+            auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                    "row_acl.policy.create", "row_acl", p.getId().toString(),
+                    auditPayload("collection", req.collection(), "principal_type", req.principalType(),
+                            "principal_id", req.principalId(), "action", req.action(),
+                            "priority", req.priority(), "enabled", req.enabled()));
             return Map.of("code", 0, "data", toDto(p));
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -82,6 +90,7 @@ public class RowAclController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         try {
+            AclRowPolicyEntity before = clone(p);
             p.setCollection(req.collection());
             p.setPrincipalType(req.principalType());
             p.setPrincipalId(req.principalId());
@@ -91,6 +100,9 @@ public class RowAclController {
             if (req.enabled() != null) p.setEnabled(req.enabled());
             p.setDescription(req.description());
             repository.save(p);
+            auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                    "row_acl.policy.update", "row_acl", p.getId().toString(),
+                    auditPayload("before", toDto(before), "after", toDto(p)));
             return Map.of("code", 0, "data", toDto(p));
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -106,12 +118,41 @@ public class RowAclController {
         if (!p.getTenantId().equals(user.tenantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        Map<String, Object> dto = toDto(p);
         repository.delete(p);
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "row_acl.policy.delete", "row_acl", id.toString(),
+                auditPayload("collection", p.getCollection(), "principal_id", p.getPrincipalId()));
         return Map.of("code", 0, "data", Map.of("id", id));
     }
 
+    private Map<String, Object> auditPayload(Object... kv) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        for (int i = 0; i < kv.length; i += 2) {
+            m.put((String) kv[i], kv[i + 1]);
+        }
+        return m;
+    }
+
+    private AclRowPolicyEntity clone(AclRowPolicyEntity src) {
+        AclRowPolicyEntity copy = new AclRowPolicyEntity();
+        copy.setId(src.getId());
+        copy.setTenantId(src.getTenantId());
+        copy.setCollection(src.getCollection());
+        copy.setPrincipalType(src.getPrincipalType());
+        copy.setPrincipalId(src.getPrincipalId());
+        copy.setAction(src.getAction());
+        copy.setExpression(src.getExpression());
+        copy.setPriority(src.getPriority());
+        copy.setEnabled(src.isEnabled());
+        copy.setDescription(src.getDescription());
+        copy.setCreatedAt(src.getCreatedAt());
+        copy.setUpdatedAt(src.getUpdatedAt());
+        return copy;
+    }
+
     private Map<String, Object> toDto(AclRowPolicyEntity p) {
-        java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<>();
+        LinkedHashMap<String, Object> m = new LinkedHashMap<>();
         m.put("id", p.getId().toString());
         m.put("collection", p.getCollection());
         m.put("principal_type", p.getPrincipalType());

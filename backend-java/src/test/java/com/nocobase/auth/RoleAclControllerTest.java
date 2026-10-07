@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.config.SecurityConfig;
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +37,12 @@ class RoleAclControllerTest {
     @MockBean private JwtAuthFilter jwtAuthFilter;
     @MockBean private RoleRepository roleRepository;
     @MockBean private AclPolicyRepository aclRepository;
+    @MockBean private AuditService auditService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        org.mockito.Mockito.doNothing().when(auditService).log(any(), any(), any(), any(), any(), any(), any());
+    }
 
     private RoleEntity role(UUID id, String name, UUID parentId) {
         RoleEntity r = new RoleEntity();
@@ -180,7 +187,9 @@ class RoleAclControllerTest {
     @Test
     void deleteRole_clearsChildrenAndAcls_thenDeletes() throws Exception {
         UUID rid = UUID.randomUUID();
+        RoleEntity role = role(rid, "admin", null);
         UUID childId = UUID.randomUUID();
+        when(roleRepository.findByIdAndTenantId(rid, "tenant_default")).thenReturn(Optional.of(role));
         when(roleRepository.findByParentRoleId(rid))
                 .thenReturn(List.of(role(childId, "viewer", rid)));
         when(roleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -328,6 +337,15 @@ class RoleAclControllerTest {
     @Test
     void deleteAcl_returnsSuccess() throws Exception {
         UUID pid = UUID.randomUUID();
+        AclPolicyEntity acl = new AclPolicyEntity();
+        acl.setId(pid);
+        acl.setRoleId(UUID.randomUUID());
+        acl.setType(AclPolicyEntity.Type.FIELD);
+        acl.setAction(AclPolicyEntity.Action.READ);
+        acl.setSubject("*");
+        acl.setTenantId("tenant_default");
+        acl.setCreatedAt(Instant.now());
+        when(aclRepository.findByIdAndTenantId(pid, "tenant_default")).thenReturn(Optional.of(acl));
 
         mockMvc.perform(delete("/api/admin/acl/{id}", pid))
                 .andExpect(status().isOk())

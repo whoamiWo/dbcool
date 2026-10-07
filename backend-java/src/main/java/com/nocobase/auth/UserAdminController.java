@@ -1,9 +1,11 @@
 package com.nocobase.auth;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,10 +31,12 @@ public class UserAdminController {
 
     private final UserAdminService userService;
     private final UserRoleRepository userRoleRepository;
+    private final AuditService auditService;
 
-    public UserAdminController(UserAdminService userService, UserRoleRepository userRoleRepository) {
+    public UserAdminController(UserAdminService userService, UserRoleRepository userRoleRepository, AuditService auditService) {
         this.userService = userService;
         this.userRoleRepository = userRoleRepository;
+        this.auditService = auditService;
     }
 
     @GetMapping
@@ -53,6 +57,9 @@ public class UserAdminController {
             @RequestBody @Valid CreateUserRequest req,
             @AuthenticationPrincipal AuthenticatedUser user) {
         UserEntity u = userService.create(req.username(), req.password(), req.displayName(), user.tenantId());
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "user.create", "user", u.getId().toString(),
+                Map.of("username", req.username(), "display_name", req.displayName()));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("code", 0, "message", "success", "data", toDto(u)));
     }
@@ -62,7 +69,11 @@ public class UserAdminController {
             @PathVariable UUID id,
             @RequestBody UpdateUserRequest req,
             @AuthenticationPrincipal AuthenticatedUser user) {
+        UserEntity before = userService.get(id);
         UserEntity u = userService.update(id, req.displayName(), req.enabled(), user.tenantId());
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "user.update", "user", id.toString(),
+                Map.of("before", toDto(before), "after", toDto(u)));
         return Map.of("code", 0, "message", "success", "data", toDto(u));
     }
 
@@ -72,6 +83,9 @@ public class UserAdminController {
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal AuthenticatedUser user) {
         userService.resetPassword(id, body.get("password"), user.tenantId());
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "user.password.reset", "user", id.toString(),
+                Map.of());
         return Map.of("code", 0, "message", "password reset");
     }
 
@@ -79,26 +93,45 @@ public class UserAdminController {
     public Map<String, Object> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser user) {
+        UserEntity before = userService.get(id);
         userService.delete(id, user.tenantId());
         userRoleRepository.deleteByIdUserId(id);
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "user.delete", "user", id.toString(),
+                Map.of("username", before.getUsername(), "display_name", before.getDisplayName()));
         return Map.of("code", 0, "message", "deleted");
     }
 
     @PostMapping("/{id}/roles/{roleId}")
-    public Map<String, Object> assignRole(@PathVariable UUID id, @PathVariable UUID roleId) {
+    public Map<String, Object> assignRole(
+            @PathVariable UUID id,
+            @PathVariable UUID roleId,
+            @AuthenticationPrincipal AuthenticatedUser user) {
         userService.assignRole(id, roleId);
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "user.role.assign", "user", id.toString(),
+                Map.of("role_id", roleId.toString()));
         return Map.of("code", 0, "message", "assigned");
     }
 
     @DeleteMapping("/{id}/roles/{roleId}")
-    public Map<String, Object> removeRole(@PathVariable UUID id, @PathVariable UUID roleId) {
+    public Map<String, Object> removeRole(
+            @PathVariable UUID id,
+            @PathVariable UUID roleId,
+            @AuthenticationPrincipal AuthenticatedUser user) {
         userService.removeRole(id, roleId);
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "user.role.revoke", "user", id.toString(),
+                Map.of("role_id", roleId.toString()));
         return Map.of("code", 0, "message", "removed");
     }
 
     @GetMapping("/{id}/effective-permissions")
     public Map<String, Object> effectivePermissions(@PathVariable UUID id,
                                                     @AuthenticationPrincipal AuthenticatedUser user) {
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "user.permissions.view", "user", id.toString(),
+                Map.of());
         return Map.of("code", 0, "message", "success",
                 "data", userService.getEffectivePermissions(id, user.tenantId()));
     }

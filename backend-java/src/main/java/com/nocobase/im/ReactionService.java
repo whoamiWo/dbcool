@@ -1,7 +1,9 @@
 package com.nocobase.im;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.im.entity.ImMessageReactionEntity;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -13,9 +15,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class ReactionService {
 
     private final ImReactionRepository reactionRepository;
+    private final AuditService auditService;
 
-    public ReactionService(ImReactionRepository reactionRepository) {
+    public ReactionService(ImReactionRepository reactionRepository, AuditService auditService) {
         this.reactionRepository = reactionRepository;
+        this.auditService = auditService;
     }
 
     /** 添加回应;已存在则原样返回(幂等)。 */
@@ -31,7 +35,11 @@ public class ReactionService {
                     r.setUserId(userId);
                     r.setEmoji(emoji);
                     r.setTenantId(tenantId);
-                    return reactionRepository.save(r);
+                    ImMessageReactionEntity saved = reactionRepository.save(r);
+                    auditService.log(tenantId, userId.toString(), null,
+                            "im.reaction.add", "im_message_reaction", saved.getId().toString(),
+                            Map.of("message_id", messageId.toString(), "emoji", emoji));
+                    return saved;
                 });
     }
 
@@ -42,10 +50,12 @@ public class ReactionService {
         ImMessageReactionEntity r = reactionRepository
                 .findByMessageIdAndUserIdAndEmoji(messageId, userId, emoji)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "回应不存在"));
-        // PHASE82: 三元组命中只说明"这条回应存在"，仍需校验它属于当前租户
         if (!tenantId.equals(r.getTenantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
         }
+        auditService.log(tenantId, userId.toString(), null,
+                "im.reaction.remove", "im_message_reaction", r.getId().toString(),
+                Map.of("message_id", messageId.toString(), "emoji", emoji));
         reactionRepository.delete(r);
     }
 

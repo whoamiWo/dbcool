@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.im.entity.ImMessageReactionEntity;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +27,7 @@ class ReactionServiceTest {
 
     private ImReactionRepository repo;
     private ReactionService service;
+    private AuditService auditService;
 
     private final UUID messageId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
@@ -33,7 +35,8 @@ class ReactionServiceTest {
     @BeforeEach
     void setUp() {
         repo = mock(ImReactionRepository.class);
-        service = new ReactionService(repo);
+        auditService = mock(AuditService.class);
+        service = new ReactionService(repo, auditService);
     }
 
     private ImMessageReactionEntity reaction(String tenantId) {

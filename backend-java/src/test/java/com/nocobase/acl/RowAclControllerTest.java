@@ -1,6 +1,7 @@
 package com.nocobase.acl;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.config.SecurityConfig;
@@ -46,7 +48,7 @@ class RowAclControllerTest {
     @MockBean private SecurityConfig securityConfig;
     @MockBean private JwtAuthFilter jwtAuthFilter;
     @MockBean private AclRowPolicyRepository repository;
-    // ObjectMapper 由 Spring 注入(不要 @MockBean,否则 .reader() 返回 null)
+    @MockBean private AuditService auditService;
 
     @AfterEach
     void clearSecurity() { SecurityContextHolder.clearContext(); }

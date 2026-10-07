@@ -1,5 +1,6 @@
 package com.nocobase.im;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.event.RecordChangeEvent;
 import com.nocobase.im.dto.ImMessageDto;
@@ -38,15 +39,17 @@ public class ImMessageController {
     private final PinService pinService;
     private final MessageSearchService messageSearchService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditService auditService;
 
     public ImMessageController(MessageService messageService, ReactionService reactionService,
                                PinService pinService, MessageSearchService messageSearchService,
-                               ApplicationEventPublisher eventPublisher) {
+                               ApplicationEventPublisher eventPublisher, AuditService auditService) {
         this.messageService = messageService;
         this.reactionService = reactionService;
         this.pinService = pinService;
         this.messageSearchService = messageSearchService;
         this.eventPublisher = eventPublisher;
+        this.auditService = auditService;
     }
 
     /** 置顶消息列表(按置顶时间倒序)。 */
@@ -131,6 +134,10 @@ public class ImMessageController {
                 RecordChangeEvent.ChangeType.CREATE, "im_message", m.getId().toString(), null,
                 user.tenantId(), user.userId()));
 
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "im.message.create", "im_message", m.getId().toString(),
+                Map.of("channel_id", channelId.toString(), "content_length", str(body.get("content")).length()));
+
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 Map.of("code", 0, "message", "success", "data", ImMessageDto.from(m)));
     }
@@ -160,6 +167,8 @@ public class ImMessageController {
         eventPublisher.publishEvent(new RecordChangeEvent(
                 RecordChangeEvent.ChangeType.DELETE, "im_message", id.toString(), null,
                 user.tenantId(), user.userId()));
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "im.message.delete", "im_message", id.toString(), Map.of());
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("id", id.toString()));
     }

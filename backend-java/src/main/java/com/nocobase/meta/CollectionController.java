@@ -448,6 +448,11 @@ public class CollectionController {
             csv.append(String.join(",", row)).append("\n");
         }
         String filename = name + "_" + java.time.LocalDate.now() + ".csv";
+        String filterInfo = "limit=" + limit;
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "collection.export_csv", "collection", name,
+                Map.of("collection_name", name, "exported_rows", records.size(),
+                        "filter", filterInfo));
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
                 .body(csv.toString());

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.im.entity.ImMessageEntity;
 import com.nocobase.im.entity.ImMessageReactionEntity;
@@ -36,6 +37,7 @@ class ImMessageControllerTest {
     private PinService pinService;
     private MessageSearchService messageSearchService;
     private ApplicationEventPublisher eventPublisher;
+    private AuditService auditService;
     private ImMessageController controller;
 
     private final UUID userId = UUID.randomUUID();
@@ -49,7 +51,8 @@ class ImMessageControllerTest {
         pinService = mock(PinService.class);
         messageSearchService = mock(MessageSearchService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
-        controller = new ImMessageController(messageService, reactionService, pinService, messageSearchService, eventPublisher);
+        auditService = mock(AuditService.class);
+        controller = new ImMessageController(messageService, reactionService, pinService, messageSearchService, eventPublisher, auditService);
     }
 
     @Test

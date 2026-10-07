@@ -1,6 +1,7 @@
 package com.nocobase.auth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nocobase.audit.AuditService;
 import com.nocobase.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -23,10 +24,12 @@ public class RoleAclController {
 
     private final RoleRepository roleRepository;
     private final AclPolicyRepository aclRepository;
+    private final AuditService auditService;
 
-    public RoleAclController(RoleRepository roleRepository, AclPolicyRepository aclRepository) {
+    public RoleAclController(RoleRepository roleRepository, AclPolicyRepository aclRepository, AuditService auditService) {
         this.roleRepository = roleRepository;
         this.aclRepository = aclRepository;
+        this.auditService = auditService;
     }
 
     // ============================================================
@@ -55,33 +58,50 @@ public class RoleAclController {
         if (req.parentRoleId() != null) {
             assertNoCycle(r.getId(), req.parentRoleId());
         }
+        RoleEntity saved = roleRepository.save(r);
+        auditService.log(TenantContext.currentTenantId(), null, "system",
+                "role.create", "role", saved.getId().toString(),
+                auditPayload("name", req.name(), "description", req.description(),
+                        "parent_role_id", req.parentRoleId()));
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("code", 0, "message", "success", "data", roleDto(roleRepository.save(r))));
+                .body(Map.of("code", 0, "message", "success", "data", roleDto(saved)));
     }
 
     @PutMapping("/roles/{id}")
     public Map<String, Object> updateRole(@PathVariable UUID id, @RequestBody UpdateRoleRequest req) {
         RoleEntity r = roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role 不存在"));
+        Map<String, Object> before = roleDto(r);
         if (req.name() != null) r.setName(req.name());
         if (req.description() != null) r.setDescription(req.description());
         if (req.parentRoleId() != null) {
             assertNoCycle(r.getId(), req.parentRoleId());
             r.setParentRoleId(req.parentRoleId());
         }
-        return Map.of("code", 0, "message", "success", "data", roleDto(roleRepository.save(r)));
+        RoleEntity saved = roleRepository.save(r);
+        auditService.log(TenantContext.currentTenantId(), null, "system",
+                "role.update", "role", id.toString(),
+                Map.of("before", before, "after", roleDto(saved)));
+        return Map.of("code", 0, "message", "success", "data", roleDto(saved));
     }
 
     @DeleteMapping("/roles/{id}")
     public Map<String, Object> deleteRole(@PathVariable UUID id) {
+        Map<String, Object> before = roleDto(roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role 不存在")));
         // 清空子角色引用此 role 的 parent_role_id(避免 FK 失败)
         for (RoleEntity child : roleRepository.findByParentRoleId(id)) {
             child.setParentRoleId(null);
             roleRepository.save(child);
         }
+        List<Map<String, Object>> deletedAcls = aclRepository.findByRoleIdAndTenantId(id, TenantContext.currentTenantId())
+                .stream().map(this::aclDto).toList();
         aclRepository.findByRoleIdAndTenantId(id, TenantContext.currentTenantId())
                 .forEach(p -> aclRepository.deleteById(p.getId()));
         roleRepository.deleteById(id);
+        auditService.log(TenantContext.currentTenantId(), null, "system",
+                "role.delete", "role", id.toString(),
+                Map.of("before", before, "deleted_acls", deletedAcls));
         return Map.of("code", 0, "message", "deleted");
     }
 
@@ -145,28 +165,53 @@ public class RoleAclController {
         p.setConfigJson(req.config() != null ? req.config() : "{}");
         p.setTenantId(TenantContext.currentTenantId());
         p.setCreatedAt(Instant.now());
+        AclPolicyEntity saved = aclRepository.save(p);
+        auditService.log(TenantContext.currentTenantId(), null, "system",
+                "acl.policy.create", "acl.policy", saved.getId().toString(),
+                Map.of("role_id", req.roleId(), "type", p.getType(), "subject", req.subject(),
+                        "action", p.getAction(), "config", req.config()));
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("code", 0, "message", "success", "data", aclDto(aclRepository.save(p))));
+                .body(Map.of("code", 0, "message", "success", "data", aclDto(saved)));
     }
 
     @PutMapping("/acl/{id}")
     public Map<String, Object> updateAcl(@PathVariable UUID id, @RequestBody UpdateAclRequest req) {
         AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ACL 不存在"));
+        Map<String, Object> before = aclDto(p);
         if (req.config() != null) p.setConfigJson(req.config());
         if (req.action() != null) p.setAction(AclPolicyEntity.Action.valueOf(req.action().toUpperCase()));
-        return Map.of("code", 0, "message", "success", "data", aclDto(aclRepository.save(p)));
+        AclPolicyEntity saved = aclRepository.save(p);
+        auditService.log(TenantContext.currentTenantId(), null, "system",
+                "acl.policy.update", "acl.policy", id.toString(),
+                Map.of("before", before, "after", aclDto(saved)));
+        return Map.of("code", 0, "message", "success", "data", aclDto(saved));
     }
 
     @DeleteMapping("/acl/{id}")
     public Map<String, Object> deleteAcl(@PathVariable UUID id) {
+        AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ACL 不存在"));
+        Map<String, Object> before = aclDto(p);
         aclRepository.deleteById(id);
+        auditService.log(TenantContext.currentTenantId(), null, "system",
+                "acl.policy.delete", "acl.policy", id.toString(),
+                Map.of("before", before));
         return Map.of("code", 0, "message", "deleted");
     }
 
     // ============================================================
     //  helpers
     // ============================================================
+
+    /** 构建允许 null 值的审计 payload（Map.of 不允许 null）。 */
+    private static Map<String, Object> auditPayload(Object... kv) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        for (int i = 0; i < kv.length; i += 2) {
+            m.put((String) kv[i], kv[i + 1]);
+        }
+        return m;
+    }
 
     private Map<String, Object> roleDto(RoleEntity r) {
         Map<String, Object> dto = new LinkedHashMap<>();

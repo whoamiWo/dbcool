@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.im.entity.ImChannelEntity;
 import com.nocobase.im.entity.ImChannelMemberEntity;
@@ -23,6 +24,7 @@ class ImChannelControllerTest {
 
     private ChannelService channelService;
     private PresenceService presenceService;
+    private AuditService auditService;
     private ImChannelController controller;
 
     private final UUID userId = UUID.randomUUID();
@@ -33,7 +35,8 @@ class ImChannelControllerTest {
     void setUp() {
         channelService = mock(ChannelService.class);
         presenceService = mock(PresenceService.class);
-        controller = new ImChannelController(channelService, presenceService);
+        auditService = mock(AuditService.class);
+        controller = new ImChannelController(channelService, presenceService, auditService);
     }
 
     @Test

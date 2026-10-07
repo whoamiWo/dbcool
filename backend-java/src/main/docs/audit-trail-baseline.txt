@@ -1,0 +1,26 @@
+# Audit Trail Coverage Baseline
+# Generated: 2026-10-07T03:01:39.620998595Z
+#
+# 以下方法在 Controller 中有写操作，但未调用 auditService.log():
+# 格式: file:行号 -> 方法名
+#
+
+src/main/java/com/nocobase/apikey/ApiKeyController.java:77 -> revoke (missing audit)
+src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java:49 -> create (missing audit)
+src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java:84 -> setEnabled (missing audit)
+src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java:91 -> delete (missing audit)
+src/main/java/com/nocobase/ticket/TicketController.java:26 -> createSession (missing audit)
+src/main/java/com/nocobase/workflow/MessageController.java:83 -> markRead (missing audit)
+src/main/java/com/nocobase/tenant/TenantController.java:55 -> create (missing audit)
+src/main/java/com/nocobase/tenant/TenantController.java:63 -> disable (missing audit)
+src/main/java/com/nocobase/tenant/UserTenantController.java:81 -> unlink (missing audit)
+src/main/java/com/nocobase/auth/JwtKeyRotationController.java:48 -> rotate (missing audit)
+src/main/java/com/nocobase/auth/AuthController.java:57 -> login (missing audit)
+src/main/java/com/nocobase/auth/AuthController.java:95 -> refresh (missing audit)
+src/main/java/com/nocobase/alert/web/AlertController.java:82 -> resolve (missing audit)
+src/main/java/com/nocobase/alert/web/AlertController.java:91 -> subscribe (missing audit)
+src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java:106 -> login (missing audit)
+src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java:170 -> logout (missing audit)
+src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java:188 -> createApproval (missing audit)
+src/main/java/com/nocobase/im/ImChannelController.java:130 -> heartbeat (missing audit)
+src/main/java/com/nocobase/im/ImSlashController.java:41 -> execute (missing audit)
