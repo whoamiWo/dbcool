@@ -17,6 +17,7 @@ import com.nocobase.config.SecurityConfig;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -117,6 +118,11 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnauthorized());
+
+        // 失败登录必须留痕（否则撞库在审计上完全不可见），且 payload 不得含密码
+        verify(auditService).log(eq("unknown"), eq("anonymous"), eq("ghost"),
+                eq("auth.login.failed"), eq("auth"), anyString(),
+                eq(Map.of("username", "ghost", "reason", "user_not_found")));
     }
 
     @Test
@@ -132,6 +138,11 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnauthorized());
+
+        // 密码错误也要留痕，且 payload 不含密码原文
+        verify(auditService).log(eq("tenant_default"), eq(uid.toString()), eq("alice"),
+                eq("auth.login.failed"), eq("auth"), eq(uid.toString()),
+                eq(Map.of("username", "alice", "reason", "bad_password")));
     }
 
     @Test
