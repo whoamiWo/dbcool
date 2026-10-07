@@ -163,12 +163,20 @@ public class ImMessageController {
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        messageService.delete(user.tenantId(), id, user.userId());
+        ImMessageEntity deleted = messageService.delete(user.tenantId(), id, user.userId());
         eventPublisher.publishEvent(new RecordChangeEvent(
                 RecordChangeEvent.ChangeType.DELETE, "im_message", id.toString(), null,
                 user.tenantId(), user.userId()));
+        // 删除不可逆：payload 至少要能回答"删的是哪条、在哪个频道"，
+        // 空 payload 事后无从举证（只记正文长度，不记正文）。
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
-                "im.message.delete", "im_message", id.toString(), Map.of());
+                "im.message.delete", "im_message", id.toString(),
+                deleted == null
+                        ? Map.of("message_id", id.toString())
+                        : Map.of("message_id", id.toString(),
+                                 "channel_id", String.valueOf(deleted.getChannelId()),
+                                 "content_length", deleted.getContent() == null
+                                         ? 0 : deleted.getContent().length()));
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("id", id.toString()));
     }

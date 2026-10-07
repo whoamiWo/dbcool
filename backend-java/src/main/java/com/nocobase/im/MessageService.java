@@ -148,7 +148,8 @@ public class MessageService {
      * 父消息被删时,子回复仍应可见并提示"回复了已删除消息"。
      */
     @Transactional
-    public void delete(String tenantId, UUID messageId, UUID userId) {
+    /** @return 被软删的消息（供调用方记审计留痕；沿用返回值可忽略，不影响既有调用） */
+    public ImMessageEntity delete(String tenantId, UUID messageId, UUID userId) {
         ImMessageEntity m = mustGet(messageId);
         assertOwner(m, userId);
         m.setDeletedAt(Instant.now());
@@ -156,6 +157,7 @@ public class MessageService {
         // 防御性:save 返回 null 时回退到入参实体,避免广播时 NPE
         bridge.broadcast(StompDestinations.channelTopic(tenantId, m.getChannelId()),
                 ImMessageDto.from(saved != null ? saved : m));
+        return saved != null ? saved : m;
     }
 
     public List<ImMessageEntity> search(UUID channelId, String keyword, int limit) {

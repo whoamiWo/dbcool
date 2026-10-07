@@ -1,0 +1,21 @@
+# Audit Trail Coverage Baseline
+# Generated: 2026-10-07T05:57:00.451985722Z
+#
+# 以下方法在 Controller 中有写操作，但未调用 auditService.log():
+# 格式: file:行号 -> 方法名
+#
+
+com/nocobase/ticket/TicketController.java:26 -> createSession (missing audit)
+com/nocobase/workflow/MessageController.java:83 -> markRead (missing audit)
+com/nocobase/tenant/TenantController.java:55 -> create (missing audit)
+com/nocobase/tenant/TenantController.java:63 -> disable (missing audit)
+com/nocobase/tenant/UserTenantController.java:81 -> unlink (missing audit)
+com/nocobase/auth/JwtKeyRotationController.java:48 -> rotate (missing audit)
+com/nocobase/auth/AuthController.java:57 -> login (missing audit)
+com/nocobase/auth/AuthController.java:95 -> refresh (missing audit)
+com/nocobase/alert/web/AlertController.java:82 -> resolve (missing audit)
+com/nocobase/alert/web/AlertController.java:91 -> subscribe (missing audit)
+com/nocobase/integration/dingtalk/DingTalkController.java:106 -> login (missing audit)
+com/nocobase/integration/dingtalk/DingTalkController.java:170 -> logout (missing audit)
+com/nocobase/integration/dingtalk/DingTalkController.java:188 -> createApproval (missing audit)
+com/nocobase/im/ImSlashController.java:41 -> execute (missing audit)

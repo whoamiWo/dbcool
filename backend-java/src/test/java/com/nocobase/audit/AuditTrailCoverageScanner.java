@@ -48,7 +48,10 @@ public final class AuditTrailCoverageScanner {
             for (MethodRange method : methods) {
                 String methodBody = content.substring(method.start, method.end);
                 if (!AUDIT_CALL.matcher(methodBody).find()) {
-                    String entry = file.toString() + ":" + method.line + " -> " + method.name + " (missing audit)";
+                    // 用**相对路径**：基线要能跨机器/跨 checkout 稳定比对，
+                    // 绝对路径会让所有条目在每次运行时都算"新增"，门禁直接失效。
+                    String rel = sourceRoot.relativize(file).toString().replace('\\', '/');
+                    String entry = rel + ":" + method.line + " -> " + method.name + " (missing audit)";
                     missing.add(entry);
                 }
             }
@@ -123,8 +126,14 @@ public final class AuditTrailCoverageScanner {
         return -1;
     }
 
+    /** 基线写到 {@code backend-java/docs/}（标准文档目录，不会被打进 jar）。 */
+    public Path baselinePath() {
+        // sourceRoot = <backend-java>/src/main/java → 上三级即 backend-java
+        return sourceRoot.resolve("../../../docs/audit-trail-baseline.txt").normalize();
+    }
+
     public void writeBaseline(List<String> missing) throws IOException {
-        Path baseline = sourceRoot.getParent().resolve("docs/audit-trail-baseline.txt");
+        Path baseline = baselinePath();
         Files.createDirectories(baseline.getParent());
         StringBuilder sb = new StringBuilder();
         sb.append("# Audit Trail Coverage Baseline\n");
@@ -152,37 +161,8 @@ public final class AuditTrailCoverageScanner {
         }
     }
 
-    public static void main(String[] args) throws IOException {
-        Path sourceRoot = Path.of(args.length > 0 ? args[0] : "backend-java/src/main/java");
-        AuditTrailCoverageScanner scanner = new AuditTrailCoverageScanner(sourceRoot);
-        List<String> missing = scanner.scan();
-        scanner.writeBaseline(missing);
-
-        System.out.println("=== Audit Trail Coverage Scan ===");
-        System.out.println("扫描目录: " + sourceRoot);
-        System.out.println("未留痕方法: " + missing.size() + " 处");
-        for (String m : missing) {
-            System.out.println("  " + m);
-        }
-
-        Path baselinePath = sourceRoot.getParent().resolve("docs/audit-trail-baseline.txt");
-        if (Files.exists(baselinePath)) {
-            List<String> baseline = Files.readAllLines(baselinePath);
-            // filter out comments and empty
-            List<String> baselineEntries = baseline.stream()
-                    .filter(l -> !l.trim().startsWith("#") && !l.trim().isEmpty())
-                    .toList();
-            // Count only new missing not in baseline
-            long newMissing = missing.stream().filter(m -> !baselineEntries.contains(m)).count();
-            if (newMissing > 0) {
-                System.out.println("\n新增未留痕方法: " + newMissing + " 处 (基线已记录除外)");
-                missing.stream().filter(m -> !baselineEntries.contains(m)).forEach(m -> System.out.println("  NEW " + m));
-                System.exit(1);
-            }
-        }
-
-        if (!missing.isEmpty() && !Files.exists(baselinePath)) {
-            System.exit(1);
-        }
-    }
+    // 注：此处原有一个 main()，用 System.exit(1) 表达"有新増未留痕" ——
+    // 它**不会被 mvn test 执行**（surefire 只跑 @Test），门禁等于没接；
+    // 且 System.exit 一旦在测试里被调用会直接杀掉 JVM。
+    // 已由 AuditTrailCoverageIntegrationTest（真 @Test + 断言）取代。
 }
