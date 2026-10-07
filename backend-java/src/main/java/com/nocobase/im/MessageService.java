@@ -213,9 +213,14 @@ public class MessageService {
 
     /** 标记已读到某条消息(推进未读游标)。 */
     @Transactional
-    public void markRead(UUID channelId, UUID userId, UUID lastMessageId) {
+    public void markRead(UUID channelId, UUID userId, UUID lastMessageId, String tenantId) {
         ImChannelMemberEntity m = memberRepository.findByChannelIdAndUserId(channelId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "不是频道成员"));
+        // PHASE82: 成员记录本身也要校验租户 —— 只凭 (channelId,userId) 查到成员，
+        // 不足以证明该成员属于当前租户。
+        if (!tenantId.equals(m.getTenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         m.setLastReadMessageId(lastMessageId);
         m.setLastReadAt(Instant.now());
         memberRepository.save(m);

@@ -37,11 +37,15 @@ public class ReactionService {
 
     /** 取消回应(只能取消自己的)。 */
     @Transactional
-    public void remove(UUID messageId, UUID userId, String emoji) {
+    public void remove(UUID messageId, UUID userId, String emoji, String tenantId) {
         validateEmoji(emoji);
         ImMessageReactionEntity r = reactionRepository
                 .findByMessageIdAndUserIdAndEmoji(messageId, userId, emoji)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "回应不存在"));
+        // PHASE82: 三元组命中只说明"这条回应存在"，仍需校验它属于当前租户
+        if (!tenantId.equals(r.getTenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant mismatch");
+        }
         reactionRepository.delete(r);
     }
 

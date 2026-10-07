@@ -313,6 +313,72 @@ class TenantIsolationAuditorTest {
         assertTrue(vs.get(0).methodName().contains("updateStatus"));
     }
 
+    // ---------- PHASE82：把"不得再用宽泛规则掩盖越权"固化成测试 ----------
+
+    @Test
+    void PHASE82_裸读加通用名调用仍须报出() {
+        // 曾有人在审计器里加 \bcallback\s*\( / \btoken\s*\( 这类宽泛模式（本想识别登录回调），
+        // 结果方法体里只要出现同名调用就判为"有防护" —— 探针实测：
+        // 纯裸读能被报出，而"裸读 + callback(id)"不被报出，审计器当场失明。
+        String src = """
+                public class ProbeService {
+                    public TicketEntity load(java.util.UUID id) {
+                        callback(id);
+                        token(id);
+                        TicketEntity t = ticketRepository.findById(id).orElseThrow();
+                        return t;
+                    }
+                    private void callback(java.util.UUID id) {}
+                    private void token(java.util.UUID id) {}
+                }
+                """;
+        var fixture = new SourceFile("test/ProbeService.java", src);
+        var auditor = new TenantIsolationAuditor(Set.of("TicketEntity"));
+
+        assertEquals(1, auditor.audit(List.of(fixture)).size(),
+                "通用方法名调用(callback/token/handle/auth/code)不得视为防护 —— "
+                        + "名字越通用掩盖面越大，此类规则不得再加回");
+    }
+
+    @Test
+    void PHASE82_userId来自参数的派生查询仍须报出() {
+        // 曾加 \bfindBy.*AndUserId\s*\( 豁免所有"按 userId 查询"的方法。
+        // 但 userId 是**方法参数**时，它来自 user.userId() 还是请求参数，静态不可判 ——
+        // 放过去等于放过"传他人 userId 查他人数据"。
+        String method = """
+                public ImChannelMemberEntity findMember(java.util.UUID channelId, java.util.UUID userId) {
+                    ImChannelMemberEntity m = memberRepository
+                            .findByChannelIdAndUserId(channelId, userId)
+                            .orElseThrow();
+                    return m;
+                }
+                """;
+        var fixture = new SourceFile("test/MemberService.java", method);
+        var auditor = new TenantIsolationAuditor(Set.of("ImChannelMemberEntity"));
+
+        assertEquals(1, auditor.audit(List.of(fixture)).size(),
+                "findBy*AndUserId 不得豁免：userId 来源静态不可判，据此放行会放过越权");
+    }
+
+    @Test
+    void PHASE82_成员断言视为防护_保持有效() {
+        // 正面：assertMember 是"失败即抛异常"的成员资格断言，不依赖任何参数来源 → 认可
+        String src = """
+                public class WikiController {
+                    public Map<String, Object> get(java.util.UUID id, AuthenticatedUser user) {
+                        aclService.assertMember(id, user.userId());
+                        WikiPageEntity e = pageService.get(id);
+                        return Map.of("code", 0);
+                    }
+                }
+                """;
+        var fixture = new SourceFile("test/WikiController.java", src);
+        var auditor = new TenantIsolationAuditor(Set.of("WikiPageEntity"));
+
+        assertTrue(auditor.audit(List.of(fixture)).isEmpty(),
+                "assertMember 语义明确（非成员即拒绝），应视为防护：" + auditor.audit(List.of(fixture)));
+    }
+
     @Test
     void T3_delegationWithParentheses() {
         // T2 fix: delegate pattern now supports user.tenantId() with parentheses

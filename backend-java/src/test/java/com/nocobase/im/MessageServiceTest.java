@@ -146,14 +146,37 @@ class MessageServiceTest {
         ImChannelMemberEntity m = new ImChannelMemberEntity();
         m.setChannelId(channelId);
         m.setUserId(senderId);
+        m.setTenantId("tenant_default");
         when(memberRepo.findByChannelIdAndUserId(channelId, senderId)).thenReturn(Optional.of(m));
 
         UUID lastId = UUID.randomUUID();
-        service.markRead(channelId, senderId, lastId);
+        service.markRead(channelId, senderId, lastId, "tenant_default");
 
         assertThat(m.getLastReadMessageId()).isEqualTo(lastId);
         assertThat(m.getLastReadAt()).isNotNull();
         verify(memberRepo).save(m);
+    }
+
+    /**
+     * PHASE82：查到成员记录 ≠ 该成员属于当前租户。
+     * 此前 {@code markRead} 只用 (channelId, userId) 命中成员即推进游标，
+     * 未比对成员自身的租户。
+     */
+    @Test
+    void markRead_tenantMismatch_throws403() {
+        ImChannelMemberEntity m = new ImChannelMemberEntity();
+        m.setChannelId(channelId);
+        m.setUserId(senderId);
+        m.setTenantId("tenant_other"); // 属于别的租户
+        when(memberRepo.findByChannelIdAndUserId(channelId, senderId)).thenReturn(Optional.of(m));
+
+        UUID lastId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.markRead(channelId, senderId, lastId, "tenant_default"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.FORBIDDEN));
+
+        assertThat(m.getLastReadMessageId()).isNull(); // 游标不得被推进
     }
 
     private ImMessageEntity message(UUID owner) {

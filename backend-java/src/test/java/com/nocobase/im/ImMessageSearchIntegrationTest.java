@@ -68,8 +68,8 @@ class ImMessageSearchIntegrationTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                ch, "keyword", null, null, null, null, pageable);
-        long total = repo.countWithFullFilters(ch, "keyword", null, null, null, null);
+                ch, tenantId, "keyword", null, null, null, null, pageable);
+        long total = repo.countWithFullFilters(ch, tenantId, "keyword", null, null, null, null);
 
         assertThat(total).isEqualTo(1L);
         assertThat(results).hasSize(1);
@@ -83,12 +83,12 @@ class ImMessageSearchIntegrationTest {
             repo.save(msg(ch, "budget report " + i));
         }
 
-        long total = repo.countWithFullFilters(ch, "budget", null, null, null, null);
+        long total = repo.countWithFullFilters(ch, tenantId, "budget", null, null, null, null);
         assertThat(total).isEqualTo(5L);
 
         Pageable pageable = PageRequest.of(0, 2);
         List<ImMessageEntity> page = repo.searchWithFullFilters(
-                ch, "budget", null, null, null, null, pageable);
+                ch, tenantId, "budget", null, null, null, null, pageable);
         assertThat(page).hasSize(2);
         assertThat(total).isEqualTo(5L);
     }
@@ -101,7 +101,7 @@ class ImMessageSearchIntegrationTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                ch, "hello", null, null, null, null, pageable);
+                ch, tenantId, "hello", null, null, null, null, pageable);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getContent()).isEqualTo("hello world");
@@ -114,10 +114,10 @@ class ImMessageSearchIntegrationTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                ch, "xyz123", null, null, null, null, pageable);
+                ch, tenantId, "xyz123", null, null, null, null, pageable);
 
         assertThat(results).isEmpty();
-        assertThat(repo.countWithFullFilters(ch, "xyz123", null, null, null, null)).isZero();
+        assertThat(repo.countWithFullFilters(ch, tenantId, "xyz123", null, null, null, null)).isZero();
     }
 
     @Test
@@ -139,7 +139,7 @@ class ImMessageSearchIntegrationTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                ch, null, null, null, t1, t2, pageable);
+                ch, tenantId, null, null, null, t1, t2, pageable);
 
         assertThat(results).hasSize(2);
     }
@@ -155,7 +155,7 @@ class ImMessageSearchIntegrationTest {
         String userIdStr = mentionedUser.toString();
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                ch, null, userIdStr, null, null, null, pageable);
+                ch, tenantId, null, userIdStr, null, null, null, pageable);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getContent()).isEqualTo("hello @{" + mentionedUser + "}");
@@ -170,7 +170,7 @@ class ImMessageSearchIntegrationTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                otherChannel, "hello", null, null, null, null, pageable);
+                otherChannel, tenantId, "hello", null, null, null, null, pageable);
 
         // Filter applies on channelId directly — this tests channel-scoping.
         // The caller must assert membership before calling; the repo filters by channel.
@@ -186,7 +186,7 @@ class ImMessageSearchIntegrationTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                ch, null, null, null, null, null, pageable);
+                ch, tenantId, null, null, null, null, null, pageable);
 
         assertThat(results).hasSize(2);
     }
@@ -201,7 +201,7 @@ class ImMessageSearchIntegrationTest {
 
         Pageable pageable = PageRequest.of(0, 10);
         List<ImMessageEntity> results = repo.searchWithFullFilters(
-                ch, "content", null, null, null, null, pageable);
+                ch, tenantId, "content", null, null, null, null, pageable);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).getContent()).isEqualTo("active content");

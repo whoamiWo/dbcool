@@ -52,6 +52,7 @@ public class MessageSearchService {
      */
     public Page<ImMessageEntity> searchMessages(
             UUID channelId,
+            String tenantId,
             String keyword,
             UUID mentionedByUserId,
             UUID senderId,
@@ -63,11 +64,14 @@ public class MessageSearchService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         String mentionedByStr = mentionedByUserId != null ? mentionedByUserId.toString() : null;
 
+        // 租户过滤下推到 SQL：只返回 m.tenantId = 当前租户 的消息。
+        // （此前版本用 "m.tenantId = ch.tenantId" 与传入频道的租户自比，
+        //   攻击者传他人 channelId 时两边恒等 → 过滤形同虚设。）
         List<ImMessageEntity> results = repository.searchWithFullFilters(
-                channelId, keyword, mentionedByStr, senderId, startTime, endTime, pageable);
+                channelId, tenantId, keyword, mentionedByStr, senderId, startTime, endTime, pageable);
 
         long total = repository.countWithFullFilters(
-                channelId, keyword, mentionedByStr, senderId, startTime, endTime);
+                channelId, tenantId, keyword, mentionedByStr, senderId, startTime, endTime);
 
         return new PageImpl<>(results, pageable, total);
     }

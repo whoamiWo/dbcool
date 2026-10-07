@@ -214,7 +214,7 @@ public class ImMessageController {
         Instant start = startTime != null ? Instant.parse(startTime) : null;
         Instant end = endTime != null ? Instant.parse(endTime) : null;
         Page<ImMessageEntity> result = messageSearchService.searchMessages(
-                channelId, keyword, mentionedBy, senderId, start, end, page, size);
+                channelId, user.tenantId(), keyword, mentionedBy, senderId, start, end, page, size);
         List<Map<String, Object>> messages = result.getContent().stream()
                 .map(m -> {
                     Map<String, Object> data = new HashMap<>();
@@ -304,7 +304,7 @@ public class ImMessageController {
         UUID channelId = UUID.fromString(String.valueOf(body.get("channelId")));
         UUID lastId = body.get("lastMessageId") == null
                 ? null : UUID.fromString(String.valueOf(body.get("lastMessageId")));
-        messageService.markRead(channelId, user.userId(), lastId);
+        messageService.markRead(channelId, user.userId(), lastId, user.tenantId());
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("channelId", channelId.toString()));
     }
@@ -331,7 +331,7 @@ public class ImMessageController {
             @RequestParam String emoji,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        reactionService.remove(id, user.userId(), emoji);
+        reactionService.remove(id, user.userId(), emoji, user.tenantId());
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("messageId", id.toString()));
     }

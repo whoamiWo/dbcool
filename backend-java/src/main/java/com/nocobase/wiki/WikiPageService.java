@@ -278,13 +278,6 @@ public class WikiPageService {
         return pageRepository.save(e);
     }
 
-    /** 标记页面为模板（已过弃用，请使用带 tenantId 参数的重载）。 */
-    @Deprecated
-    @Transactional
-    public WikiPageEntity markTemplate(UUID id, boolean isTemplate) {
-        return markTemplate(id, isTemplate, null);
-    }
-
     /** 列出所有模板页面。 */
     public List<WikiPageEntity> listTemplates(String tenantId) {
         return pageRepository.findByIsTemplateTrueAndTenantId(tenantId);

@@ -245,7 +245,7 @@ class ImMessageControllerTest {
                 "lastMessageId", lastId.toString()), user);
 
         assertThat(resp.get("code")).isEqualTo(0);
-        verify(messageService).markRead(channelId, userId, lastId);
+        verify(messageService).markRead(eq(channelId), eq(userId), eq(lastId), any());
     }
 
     @Test
@@ -266,7 +266,7 @@ class ImMessageControllerTest {
         Map<String, Object> resp = controller.removeReaction(UUID.randomUUID(), "+1", user);
 
         assertThat(resp.get("code")).isEqualTo(0);
-        verify(reactionService).remove(any(), eq(userId), eq("+1"));
+        verify(reactionService).remove(any(), eq(userId), eq("+1"), any());
     }
 
     @Test
@@ -301,7 +301,7 @@ class ImMessageControllerTest {
 
     @Test
     void advancedSearch_returnsHits() {
-        when(messageSearchService.searchMessages(eq(channelId), eq("kw"), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(messageSearchService.searchMessages(eq(channelId), any(), eq("kw"), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(message())));
 
         Map<String, Object> resp = controller.advancedSearch(channelId, "kw", null, null, null, null, 0, 20, user);
@@ -315,7 +315,7 @@ class ImMessageControllerTest {
 
     @Test
     void advancedSearch_crossChannelReturnsHits() {
-        when(messageSearchService.searchMessages(eq(null), eq("budget"), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(messageSearchService.searchMessages(eq(null), any(), eq("budget"), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(message())));
 
         Map<String, Object> resp = controller.advancedSearch(null, "budget", null, null, null, null, 0, 20, user);
@@ -329,26 +329,26 @@ class ImMessageControllerTest {
     @Test
     void advancedSearch_mentionedByFilter() {
         UUID mentionedBy = UUID.randomUUID();
-        when(messageSearchService.searchMessages(eq(channelId), any(), eq(mentionedBy), any(), any(), any(), anyInt(), anyInt()))
+        when(messageSearchService.searchMessages(eq(channelId), any(), any(), eq(mentionedBy), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(message())));
 
         Map<String, Object> resp = controller.advancedSearch(channelId, null, mentionedBy, null, null, null, 0, 20, user);
 
         assertThat(resp.get("code")).isEqualTo(0);
-        verify(messageSearchService).searchMessages(eq(channelId), any(), eq(mentionedBy), any(), any(), any(), anyInt(), anyInt());
+        verify(messageSearchService).searchMessages(eq(channelId), any(), any(), eq(mentionedBy), any(), any(), any(), anyInt(), anyInt());
     }
 
     @Test
     void advancedSearch_timeRangeFilter() {
         Instant start = Instant.now().minusSeconds(3600);
         Instant end = Instant.now();
-        when(messageSearchService.searchMessages(eq(channelId), any(), any(), any(), eq(start), eq(end), anyInt(), anyInt()))
+        when(messageSearchService.searchMessages(eq(channelId), any(), any(), any(), any(), eq(start), eq(end), anyInt(), anyInt()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
         Map<String, Object> resp = controller.advancedSearch(channelId, null, null, null, start.toString(), end.toString(), 0, 20, user);
 
         assertThat(resp.get("code")).isEqualTo(0);
-        verify(messageSearchService).searchMessages(eq(channelId), any(), any(), any(), eq(start), eq(end), anyInt(), anyInt());
+        verify(messageSearchService).searchMessages(eq(channelId), any(), any(), any(), any(), eq(start), eq(end), anyInt(), anyInt());
     }
 
     @Test
@@ -356,7 +356,7 @@ class ImMessageControllerTest {
         List<ImMessageEntity> mockResults = List.of(message(), message(), message());
         Page<ImMessageEntity> page = new PageImpl<>(mockResults,
                 org.springframework.data.domain.PageRequest.of(0, 10), 47L);
-        when(messageSearchService.searchMessages(eq(channelId), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(messageSearchService.searchMessages(eq(channelId), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(page);
 
         Map<String, Object> resp = controller.advancedSearch(channelId, "test", null, null, null, null, 0, 10, user);
@@ -381,7 +381,7 @@ class ImMessageControllerTest {
 
     @Test
     void advancedSearch_emptyKeyword_returnsEmpty() {
-        when(messageSearchService.searchMessages(eq(channelId), eq(""), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(messageSearchService.searchMessages(eq(channelId), any(), eq(""), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(),
                         org.springframework.data.domain.PageRequest.of(0, 20), 0L));
 
@@ -418,7 +418,7 @@ class ImMessageControllerTest {
                 createMessage("no match 10"),
                 createMessage("unique keyword match")  // 第 11 条，唯一匹配项
         );
-        when(messageSearchService.searchMessages(eq(channelId), eq("keyword"), any(), any(), any(), any(), eq(0), eq(10)))
+        when(messageSearchService.searchMessages(eq(channelId), any(), eq("keyword"), any(), any(), any(), any(), eq(0), eq(10)))
                 .thenReturn(new PageImpl<>(
                         List.of(allMessages.get(10)),
                         org.springframework.data.domain.PageRequest.of(0, 10),
