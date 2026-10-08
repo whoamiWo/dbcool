@@ -197,6 +197,83 @@ test.describe('Mobile Responsive Tests', () => {
     expect(scrollWidth).toBeGreaterThan(0);
   });
 
+  test('GalleryView page - responsive grid, single column on mobile', async ({ page }) => {
+    await page.route('**/api/views/gallery-test*', async (route, request) => {
+      if (request.url().includes('/records') || request.url().includes('/run')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0,
+            data: [
+              { id: 'r1', title: '卡片一' },
+              { id: 'r2', title: '卡片二' },
+            ],
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0,
+            data: {
+              id: 'gallery-test',
+              type: 'gallery',
+              fields: [{ name: 'title', type: 'text' }],
+            },
+          }),
+        });
+      }
+    });
+
+    await page.goto('/views/gallery-test/gallery');
+    await page.waitForLoadState('networkidle');
+
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+  });
+
+  test('TableView page - table wrapped in scrollable container', async ({ page }) => {
+    await page.route('**/api/views/table-test*', async (route, request) => {
+      if (request.url().includes('/records') || request.url().includes('/run')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0,
+            data: [{ id: 'r1', title: '记录一' }, { id: 'r2', title: '记录二' }],
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0,
+            data: {
+              id: 'table-test',
+              type: 'table',
+              fields: [
+                { name: 'title', label: '标题', type: 'text' },
+                { name: 'status', label: '状态', type: 'select' },
+                { name: 'created_at', label: '创建时间', type: 'date' },
+              ],
+            },
+          }),
+        });
+      }
+    });
+
+    await page.goto('/views/table-test/run');
+    await page.waitForLoadState('networkidle');
+
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
+  });
+
   test('Wiki page - sidebar collapses on mobile', async ({ page }) => {
     await page.route('**/api/wiki/kb*', async (route, request) => {
       const url = request.url();

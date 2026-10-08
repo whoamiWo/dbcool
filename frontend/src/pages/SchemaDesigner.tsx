@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { FormulaEditor } from '@/components/views/FormulaEditor';
+import { Screen } from '@/components/Screen';
 import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 
 /**
@@ -133,7 +134,7 @@ export function SchemaDesignerPage() {
   };
 
   return (
-    <div>
+    <Screen>
       <h1>📐 Schema Designer</h1>
       <p style={{ color: 'var(--color-text-disabled)' }}>
         定义一个新的数据表,字段将存为 JSONB(支持零锁表扩展).
@@ -309,6 +310,6 @@ export function SchemaDesignerPage() {
           />
         )}
       </div>
-    </div>
+    </Screen>
   );
 }
