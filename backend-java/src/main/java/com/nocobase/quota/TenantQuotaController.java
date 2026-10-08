@@ -67,13 +67,14 @@ public class TenantQuotaController {
         if (req.seatsLimit() != null) tenant.setSeatsLimit(req.seatsLimit());
 
         TenantEntity saved = tenantRepository.save(tenant);
+        // 注意：Map.of() **不接受 null**，而请求体允许只传部分字段（其余为 null）。
+        // 原实现因此抛 NPE → 接口 500（PHASE92 端到端验证时实测踩到）。
+        Map<String, Object> payload = new java.util.HashMap<>();
+        if (req.apiCallLimit() != null) payload.put("apiCallLimit", req.apiCallLimit());
+        if (req.storageLimit() != null) payload.put("storageLimit", req.storageLimit());
+        if (req.seatsLimit() != null) payload.put("seatsLimit", req.seatsLimit());
         auditService.log(id, user.userId(), user.username(),
-            "quota.update", "tenant_quota", id,
-            Map.of(
-                "apiCallLimit", req.apiCallLimit(),
-                "storageLimit", req.storageLimit(),
-                "seatsLimit", req.seatsLimit()
-            ));
+            "quota.update", "tenant_quota", id, payload);
         return ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", saved));
     }
 

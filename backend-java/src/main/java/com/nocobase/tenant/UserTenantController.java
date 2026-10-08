@@ -32,12 +32,15 @@ public class UserTenantController {
     private final UserTenantRepository userTenantRepo;
     private final TenantRepository tenantRepo;
     private final AuditService auditService;
+    private final com.nocobase.quota.TenantQuotaService quotaService;
 
     public UserTenantController(UserTenantRepository userTenantRepo, TenantRepository tenantRepo,
-                                AuditService auditService) {
+                                AuditService auditService,
+                                com.nocobase.quota.TenantQuotaService quotaService) {
         this.userTenantRepo = userTenantRepo;
         this.tenantRepo = tenantRepo;
         this.auditService = auditService;
+        this.quotaService = quotaService;
     }
 
     @GetMapping("/users/{userId}/tenants")
@@ -75,6 +78,9 @@ public class UserTenantController {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("code", 1, "message", "用户已关联该租户"));
         }
+        // PHASE92 收尾：席位配额此前**只有定义、零调用**（等价于死代码）。
+        // 超限由 checkSeatsQuota 抛 403，并自动 seats_used + 1。
+        quotaService.checkSeatsQuota(req.tenantId());
         var entity = new UserTenantEntity(UUID.randomUUID().toString(), userId, req.tenantId());
         userTenantRepo.save(entity);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -87,6 +93,8 @@ public class UserTenantController {
     public Map<String, Object> unlink(@PathVariable String userId, @PathVariable String tenantId,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
         userTenantRepo.deleteByUserIdAndTenantId(userId, tenantId);
+        // 解绑后释放席位，否则 seats_used 只增不减，租户会永久占满
+        quotaService.releaseSeatsQuota(tenantId);
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "user_tenant.unlink", "user_tenant", userId + "_" + tenantId,
                 Map.of("userId", userId, "tenantId", tenantId));
