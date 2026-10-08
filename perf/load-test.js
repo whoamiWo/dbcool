@@ -38,10 +38,12 @@ export const options = VUS > 0
       summaryTrendStats: trendStats,
     }
   : {
+      // PHASE88：分层测容量时必须**稳定在目标 VU**（爬坡式阶梯把不同压力混在一起，
+      // 聚合出来的 p95/吞吐无法代表任何单一层级）。用环境变量指定峰值：
+      //   PEAK_VU=150 HOLD=2m docker run ... k6 run /scripts/load-test.js
       stages: [
-        { duration: '30s', target: 20 },
-        { duration: '1m', target: 50 },
-        { duration: '1m', target: 100 },
+        { duration: '30s', target: Number(__ENV.PEAK_VU || 100) },
+        { duration: __ENV.HOLD || '1m', target: Number(__ENV.PEAK_VU || 100) },
         { duration: '30s', target: 0 },
       ],
       thresholds: {
