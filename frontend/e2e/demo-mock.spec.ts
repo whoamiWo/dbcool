@@ -1,19 +1,18 @@
 /**
- * E2E 演示路径冒烟测试(R13 — 演示前最后一道关卡).
+ * E2E 演示路径测试（MOCK 版，供前端单元测试 CI 使用）.
  *
- * <p>完整跑通"demo 必演示"3 个核心流程:
- * <ol>
- *   <li>登录 → 创建 collection → 加字段 → 创建记录</li>
- *   <li>查看列表(关联字段展开 {id, title})</li>
- *   <li>触发工作流实例(RUNNING → COMPLETED)</li>
- * </ol>
+ * ⚠️ 此文件 **全部 mock API 响应**，不做真实后端端到端测试。
+ *   - 目的：快速跑通前端 UI 流程，验证页面渲染与交互。
+ *   - 方法：page.route() 拦截所有 /api/* 请求，返回固定 JSON。
  *
- * <p>失败时 E2E 报告就是演示现场排查清单 — 哪个组件挂了直接定位。
+ * 真正的端到端冒烟测试请参考 scripts/smoke.py（PHASE89）。
+ *
+ * R13 — 演示前最后一道关卡
  */
 import { test, expect } from '@playwright/test';
 import { mockLoginSuccess, ADMIN_USER } from './helpers';
 
-test.describe('Demo full path smoke', () => {
+test.describe('Demo path (mock, not real e2e)', () => {
     test.beforeEach(async ({ page }) => {
         await mockLoginSuccess(page, ADMIN_USER);
     });

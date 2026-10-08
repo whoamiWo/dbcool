@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                         .requestMatchers("/api/health").permitAll()
+                        .requestMatchers("/api/health/**").permitAll()
                         // 钉钉嵌入:扫码登录与服务端回调无法携带 JWT,必须匿名放行。
                         // Stage 1 安全收口:审批回调的 HMAC-SHA256 签名校验(含 5 分钟时间窗 + 常量时间比较)
                         // 在 DingTalkController.approvalCallback 内完成,签名无效返 401(见 L187-256)。

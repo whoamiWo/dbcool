@@ -59,6 +59,10 @@ frontend: ## React 本地起
 #  测试
 # ============================================================
 
+smoke: ## 跨模块端到端冒烟（需后端运行：docker compose up -d）
+	@echo "$(CYAN)▶ 冒烟测试: ./scripts/smoke.py$(RESET)"
+	python3 scripts/smoke.py
+
 test: ## 三栈全部测试
 	@echo "$(CYAN)▶ Java$(RESET)"
 	cd backend-java && mvn test -q
