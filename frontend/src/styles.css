@@ -398,10 +398,11 @@ button {
 }
 
 /* ============================================
-   Responsive Adjustments
-   ============================================ */
+    Responsive Adjustments
+    ============================================ */
 
 @media (max-width: 768px) {
+  /* IM Layout */
   .im-layout {
     margin: 0;
     border-radius: 0;
@@ -437,6 +438,7 @@ button {
     border-top: var(--glass-border);
   }
 
+  /* Wiki */
   .wiki-page-list {
     flex-direction: column;
     gap: 8px;
@@ -455,6 +457,7 @@ button {
     font-size: 1.25rem;
   }
 
+  /* Table View */
   .table-view-container {
     flex-direction: column;
     padding: 8px;
@@ -474,6 +477,7 @@ button {
     white-space: nowrap;
   }
 
+  /* Kanban - horizontal scroll */
   .kanban-view-container {
     grid-auto-columns: 260px;
     padding: 8px;
@@ -483,6 +487,7 @@ button {
     font-size: 1.25rem;
   }
 
+  /* App Header */
   .app-header {
     flex-wrap: wrap;
     gap: 4px;
@@ -502,8 +507,95 @@ button {
     padding: 2px 4px;
   }
 
+  /* App Main */
   .app-main {
     padding: 12px;
     padding-bottom: 72px;
+  }
+
+  /* Login Page */
+  form {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 20px !important;
+  }
+
+  input, textarea, select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Cards single column */
+  .summary-card-grid,
+  .panel-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Grid layouts */
+  div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Forms */
+  [class*="form-container"],
+  [class*="form-wrapper"] {
+    padding: 12px !important;
+  }
+
+  /* Messages */
+  [class*="message-list"] {
+    max-height: 60vh;
+  }
+
+  [class*="thread-panel"] {
+    width: 100% !important;
+    border-left: none !important;
+    border-top: 1px solid var(--color-border-light);
+  }
+
+  /* Calendar */
+  [class*="calendar-cell"] {
+    min-width: 40px;
+    min-height: 40px;
+    font-size: 10px;
+  }
+
+  /* Calendar - mobile compact */
+  [class*="calendar-view"],
+  [class*="CalendarView"] {
+    padding: 8px !important;
+    margin: 0 !important;
+  }
+
+  [class*="calendar-view"] table,
+  [class*="calendar-view"] .grid {
+    display: block !important;
+    overflow-x: auto !important;
+  }
+
+  /* MyTasks - card layout on mobile */
+  [class*="tasks"],
+  [class*="Task"]:not([class*="TaskTable"]) {
+    display: block !important;
+  }
+
+  .task-table,
+  table[style*="width: 100%"] {
+    display: block !important;
+    overflow-x: auto !important;
+  }
+
+  /* Ensure no layout shift */
+  .task-table thead,
+  .task-table tbody,
+  .task-table tr,
+  .task-table td,
+  .task-table th {
+    display: table-row !important;
   }
 }
