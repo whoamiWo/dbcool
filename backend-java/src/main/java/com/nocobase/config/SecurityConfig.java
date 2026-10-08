@@ -31,11 +31,15 @@ public class SecurityConfig {
     private final ApiKeyFilter apiKeyFilter;
     /** PHASE 60 R1: 全局限流过滤器，早于认证返回 401。 */
     private final GlobalRateLimitFilter globalRateLimitFilter;
+    private final com.nocobase.quota.TenantQuotaFilter tenantQuotaFilter;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter, GlobalRateLimitFilter globalRateLimitFilter) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter,
+                          GlobalRateLimitFilter globalRateLimitFilter,
+                          com.nocobase.quota.TenantQuotaFilter tenantQuotaFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.apiKeyFilter = apiKeyFilter;
         this.globalRateLimitFilter = globalRateLimitFilter;
+        this.tenantQuotaFilter = tenantQuotaFilter;
     }
 
     @Bean
@@ -115,6 +119,13 @@ public class SecurityConfig {
                 // Week 42 D5.2: API Key filter 先于 JWT — 外部系统用 X-Api-Key
                 .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // PHASE92：租户配额必须在**认证之后**才能拿到 tenantId
+                // （放在 JwtAuthFilter 之前会因 SecurityContext 为空而整段跳过，
+                //  表现为"配额写了但从不生效"）。
+                // 注意：addFilterAfter 必须写在 addFilterBefore(jwtAuthFilter, …)
+                // **之后** —— 否则 JwtAuthFilter 尚未注册 order，启动直接失败：
+                // "The Filter class …JwtAuthFilter does not have a registered order"。
+                .addFilterAfter(tenantQuotaFilter, JwtAuthFilter.class)
                 // PHASE 56 P1-1: MDC 必须在 JWT 鉴权之后,才能从 SecurityContext
                 // 读到 AuthenticatedUser 并注入 tenantId/userId 到日志 MDC。
                 .addFilterAfter(new MdcFilter(), JwtAuthFilter.class);

@@ -52,6 +52,11 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc(addFilters = false)
 class WikiControllerHttpContractTest {
 
+    // PHASE92：SecurityConfig 依赖 TenantQuotaFilter → 进而依赖 TenantQuotaService。
+    // 本测试是 @WebMvcTest（切片，不加载 @Service），需显式 mock 才能启动上下文。
+    @MockBean
+    private com.nocobase.quota.TenantQuotaService tenantQuotaService;
+
     @Autowired
     private MockMvc mockMvc;
 

@@ -35,30 +35,54 @@ public class TenantQuotaService {
      * @return true: 有配额并成功消耗；false: 超限
      * @throws ResponseStatusException 429 超限时抛出
      */
+    // @Modifying 的 UPDATE **必须在事务中执行**，否则 Spring Data 抛
+    // InvalidDataAccessApiUsageException（实测踩到：未加事务时 UPDATE 从未执行，
+    // 又因下面的 catch 放行而表现为"配额完全不生效"）。
+    @org.springframework.transaction.annotation.Transactional
     public boolean checkAndConsumeApiQuota(String tenantId) {
-        TenantEntity tenant = tenantRepository.findById(tenantId)
-            .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
-
-        synchronized (tenant) {
-            long usage = tenant.getApiCallUsage();
-            long limit = tenant.getApiCallLimit();
-
-            if (usage >= limit) {
-                log.warn("[quota] API 调用超限 tenant={} usage={} limit={}", tenantId, usage, limit);
-                auditService.log(tenantId, null, "system", "QUOTA_EXCEEDED", "API_CALL", tenantId,
-                    String.format("API 调用次数达到上限 %d/%d", usage, limit));
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "API 调用次数已达上限，请稍后重试");
-            }
-
-            tenant.setApiCallUsage(usage + 1);
-            tenantRepository.save(tenant);
+        // 原子 UPDATE：affected=1 消耗成功，0 表示已达上限
+        int affected;
+        try {
+            affected = tenantRepository.consumeApiQuota(tenantId);
+        } catch (Exception e) {
+            // 配额服务异常不得阻塞业务（与 AuditService 同样的容错取向）。
+            // 用 ERROR 级别：这类异常意味着配额整体失效，必须能在日志里被看见。
+            log.error("[quota] 配额消耗异常，放行 tenant={} err={}", tenantId, e.toString());
             return true;
         }
+
+        if (affected == 0) {
+            // 注意：可能是"已达上限"，也可能是租户不存在 —— 单独确认一次避免误判
+            TenantEntity t = tenantRepository.findById(tenantId).orElse(null);
+            if (t == null) {
+                throw new IllegalArgumentException("Tenant not found: " + tenantId);
+            }
+            log.warn("[quota] API 调用超限 tenant={} usage={} limit={}",
+                    tenantId, t.getApiCallUsage(), t.getApiCallLimit());
+            auditService.log(tenantId, null, "system", "QUOTA_EXCEEDED", "API_CALL", tenantId,
+                String.format("API 调用次数达到上限 %d/%d",
+                        t.getApiCallUsage(), t.getApiCallLimit()));
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                "API 调用次数已达上限，请稍后重试");
+        }
+        return true;
     }
 
     /**
-     * 重置 API 调用计数（每分钟一次，由定时任务触发）
+     * 每分钟重置所有租户的 API 用量 —— 配额是**按分钟**计的，必须滚动清零。
+     *
+     * <p>此前这个方法**没有任何定时调用**，导致配额用满后租户被永久封禁
+     * （实测：压测后 usage 停在 3600，之后所有请求都 429）。
+     */
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
+    @org.springframework.transaction.annotation.Transactional
+    public void resetAllApiUsagePeriodically() {
+        int n = tenantRepository.resetAllApiUsage();
+        log.debug("[quota] 每分钟重置 API 用量，影响 {} 个租户", n);
+    }
+
+    /**
+     * 重置单个租户的 API 调用计数（手动/管理用）
      */
     public void resetApiUsage(String tenantId) {
         TenantEntity tenant = tenantRepository.findById(tenantId).orElse(null);

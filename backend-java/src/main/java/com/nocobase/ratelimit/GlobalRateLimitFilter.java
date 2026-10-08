@@ -58,20 +58,11 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
             path = request.getRequestURI();
         }
 
-        // PHASE92: 先检查租户 API 配额
-        String tenantId = extractTenantId(request);
-        if (tenantId != null) {
-            try {
-                tenantQuotaService.checkAndConsumeApiQuota(tenantId);
-            } catch (org.springframework.web.server.ResponseStatusException e) {
-                log.warn("[quota] 租户 API 配额超限 tenant={} path={}", tenantId, path);
-                response.setStatus(e.getStatusCode().value());
-                response.setContentType("application/json");
-                String message = e.getMessage();
-                response.getWriter().write("{\"code\":" + e.getStatusCode().value() + ",\"message\":\"" + message + "\",\"data\":null}");
-                return;
-            }
-        }
+        // 注：租户 API 配额**不在这里检查**。
+        // 本过滤器注册在 JwtAuthFilter 之前，此刻 SecurityContext 为空，
+        // extractTenantId() 恒返回 null —— 放在这里等于永不执行（PHASE92 实测：
+        // 压测 109301 个请求，配额拦截数为 0）。
+        // 已移到 TenantQuotaFilter（注册在 JwtAuthFilter 之后）执行。
 
         String key = buildKey(request, path);
         int limit;
@@ -84,20 +75,8 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
             limit = properties.getIm().getLimit();
             windowSeconds = properties.getIm().getWindowSeconds();
         } else if (UPLOAD_PATTERN.matcher(path).matches() && "POST".equals(request.getMethod())) {
-            // PHASE92: 检查存储配额
-            String contentLength = request.getHeader("Content-Length");
-            long fileSize = contentLength != null ? Long.parseLong(contentLength) : 0;
-            if (tenantId != null) {
-                try {
-                    tenantQuotaService.checkStorageQuota(tenantId, fileSize);
-                } catch (org.springframework.web.server.ResponseStatusException e) {
-                    log.warn("[quota] 租户存储配额超限 tenant={} size={}", tenantId, fileSize);
-                    response.setStatus(e.getStatusCode().value());
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"code\":" + e.getStatusCode().value() + ",\"message\":\"" + e.getMessage() + "\",\"data\":null}");
-                    return;
-                }
-            }
+            // 存储配额同样不在这里检查（原因同 API 配额：此刻拿不到 tenantId），
+            // 已移到 TenantQuotaFilter。
             limit = properties.getFileUpload().getLimit();
             windowSeconds = properties.getFileUpload().getWindowSeconds();
         } else {

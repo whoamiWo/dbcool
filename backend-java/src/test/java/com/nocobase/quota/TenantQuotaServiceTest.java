@@ -44,30 +44,37 @@ class TenantQuotaServiceTest {
 
     // === API 配额 ===
 
+    /**
+     * 配额消耗已改为**数据库原子 UPDATE**（{@code consumeApiQuota} 返回影响行数），
+     * 不再依赖内存对象自增 —— 见 TenantQuotaService 的注释。
+     * 因此这里按原子语义 mock：返回 1 = 消耗成功，0 = 已达上限。
+     */
     @Test
     void apiQuota_allows_when_under_limit() {
+        when(tenantRepository.consumeApiQuota(TENANT_ID)).thenReturn(1);
+
         for (int i = 0; i < 5; i++) {
-            service.checkAndConsumeApiQuota(TENANT_ID);
+            assertThat(service.checkAndConsumeApiQuota(TENANT_ID)).isTrue();
         }
-        assertThat(tenant.getApiCallUsage()).isEqualTo(5L);
+        verify(tenantRepository, times(5)).consumeApiQuota(TENANT_ID);
     }
 
     @Test
     void apiQuota_throws_429_when_over_limit() {
-        for (int i = 0; i < 5; i++) {
-            service.checkAndConsumeApiQuota(TENANT_ID);
-        }
+        // affected=0 → 已达上限
+        when(tenantRepository.consumeApiQuota(TENANT_ID)).thenReturn(0);
+
         assertThatThrownBy(() -> service.checkAndConsumeApiQuota(TENANT_ID))
             .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
     void apiQuota_resets_usage() {
-        service.checkAndConsumeApiQuota(TENANT_ID);
-        service.checkAndConsumeApiQuota(TENANT_ID);
-        assertThat(tenant.getApiCallUsage()).isEqualTo(2L);
         service.resetApiUsage(TENANT_ID);
         assertThat(tenant.getApiCallUsage()).isEqualTo(0L);
+
+        service.resetAllApiUsagePeriodically();
+        verify(tenantRepository).resetAllApiUsage();
     }
 
     // === 存储配额 ===
