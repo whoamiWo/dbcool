@@ -1,5 +1,7 @@
 package com.nocobase.ratelimit;
 
+import com.nocobase.quota.TenantQuotaService;
+import com.nocobase.tenant.TenantRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,14 +23,31 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
 
     private final GlobalRateLimiter rateLimiter;
     private final GlobalRateLimitProperties properties;
+    private final TenantQuotaService tenantQuotaService;
+    private final TenantRepository tenantRepository;
 
     private static final Pattern LOGIN_PATTERN = Pattern.compile("^/api/auth/login$");
     private static final Pattern IM_SEND_PATTERN = Pattern.compile("^/api/im/messages$");
     private static final Pattern UPLOAD_PATTERN = Pattern.compile("^/api/upload$");
 
-    public GlobalRateLimitFilter(GlobalRateLimiter rateLimiter, GlobalRateLimitProperties properties) {
+    public GlobalRateLimitFilter(GlobalRateLimiter rateLimiter, GlobalRateLimitProperties properties,
+                                  TenantQuotaService tenantQuotaService, TenantRepository tenantRepository) {
         this.rateLimiter = rateLimiter;
         this.properties = properties;
+        this.tenantQuotaService = tenantQuotaService;
+        this.tenantRepository = tenantRepository;
+    }
+
+    private String extractTenantId(HttpServletRequest request) {
+        Object principal = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication() != null
+                ? org.springframework.security.core.context.SecurityContextHolder
+                        .getContext().getAuthentication().getPrincipal()
+                : null;
+        if (principal instanceof com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user) {
+            return user.tenantId();
+        }
+        return null;
     }
 
     @Override
@@ -37,6 +56,21 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
         String path = (String) request.getAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE);
         if (path == null) {
             path = request.getRequestURI();
+        }
+
+        // PHASE92: 先检查租户 API 配额
+        String tenantId = extractTenantId(request);
+        if (tenantId != null) {
+            try {
+                tenantQuotaService.checkAndConsumeApiQuota(tenantId);
+            } catch (org.springframework.web.server.ResponseStatusException e) {
+                log.warn("[quota] 租户 API 配额超限 tenant={} path={}", tenantId, path);
+                response.setStatus(e.getStatusCode().value());
+                response.setContentType("application/json");
+                String message = e.getMessage();
+                response.getWriter().write("{\"code\":" + e.getStatusCode().value() + ",\"message\":\"" + message + "\",\"data\":null}");
+                return;
+            }
         }
 
         String key = buildKey(request, path);
@@ -50,6 +84,20 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
             limit = properties.getIm().getLimit();
             windowSeconds = properties.getIm().getWindowSeconds();
         } else if (UPLOAD_PATTERN.matcher(path).matches() && "POST".equals(request.getMethod())) {
+            // PHASE92: 检查存储配额
+            String contentLength = request.getHeader("Content-Length");
+            long fileSize = contentLength != null ? Long.parseLong(contentLength) : 0;
+            if (tenantId != null) {
+                try {
+                    tenantQuotaService.checkStorageQuota(tenantId, fileSize);
+                } catch (org.springframework.web.server.ResponseStatusException e) {
+                    log.warn("[quota] 租户存储配额超限 tenant={} size={}", tenantId, fileSize);
+                    response.setStatus(e.getStatusCode().value());
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"code\":" + e.getStatusCode().value() + ",\"message\":\"" + e.getMessage() + "\",\"data\":null}");
+                    return;
+                }
+            }
             limit = properties.getFileUpload().getLimit();
             windowSeconds = properties.getFileUpload().getWindowSeconds();
         } else {

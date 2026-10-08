@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GlobalRateLimiter {
     private static final Logger log = LoggerFactory.getLogger(GlobalRateLimiter.class);
     private static final String REDIS_KEY_PREFIX = "ratelimit:";
+    // PHASE92: 租户配额使用独立前缀，避免与接口限流键冲突
+    private static final String TENANT_QUOTA_PREFIX = "quota:";
 
     private final StringRedisTemplate redisTemplate;
     private final MemoryRateLimiter memoryLimiter;
