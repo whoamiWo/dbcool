@@ -30,9 +30,16 @@ export function MyTasksPage() {
   const { user } = useAuthStore();
   const qc = useQueryClient();
 
+  // 注意：apiClient **不解包**响应体，后端统一返回 { code, data } 信封。
+  // 此前这里写成 get<Task[]>()，tasks 实际拿到的是整个信封对象，
+  // 于是 (tasks ?? []).filter 抛 "…is not a function"，页面直接崩溃
+  // （移动端 E2E 在 375px 视口下暴露出来；桌面端同样会崩）。
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['my-tasks', user?.id],
-    queryFn: () => apiClient.get<Task[]>('/workflows/tasks/my'),
+    queryFn: async () => {
+      const res = await apiClient.get<{ code: number; data: Task[] }>('/workflows/tasks/my');
+      return res?.data ?? [];
+    },
   });
 
   const act = useMutation({
@@ -70,6 +77,9 @@ function TaskTable({ tasks, showActions, act }: {
   act: ReturnType<typeof useMutation<unknown, unknown, { id: string; op: 'approve' | 'reject'; comment?: string }>>;
 }) {
   return (
+    // 表格包一层可横向滚动的容器：移动端下表格保持可读宽度并在容器内滚动，
+    // 而不是把整个页面撑出横向滚动条（红线：页面级不得横向滚动）。
+    <div className="table-scroll">
     <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8 }}>
       <thead>
         <tr style={{ background: 'var(--color-bg-secondary)' }}>
@@ -126,6 +136,7 @@ function TaskTable({ tasks, showActions, act }: {
         })}
       </tbody>
     </table>
+    </div>
   );
 }
 

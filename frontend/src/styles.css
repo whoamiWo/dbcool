@@ -599,3 +599,20 @@ button {
     display: table-row !important;
   }
 }
+
+/* ---------------------------------------------------------------
+   数据密集型表格：允许**表格容器**横向滚动，页面本身不得横向滚动。
+   （PHASE90 收尾：MyTasks 的表格此前直接撑破页面，被一个恒真断言掩盖。）
+   --------------------------------------------------------------- */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  /* 移动端给表格一个可读的下限宽度，超出部分由容器滚动承担 */
+  .table-scroll > table {
+    min-width: 560px;
+  }
+}

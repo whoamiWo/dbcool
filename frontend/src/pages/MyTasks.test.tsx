@@ -58,7 +58,7 @@ describe('MyTasksPage', () => {
   });
 
   it('加载成功:渲染待办列表(只显示 PENDING)', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue(sampleTasks as any);
+    vi.mocked(apiClient.get).mockResolvedValue({ code: 0, data: sampleTasks } as any);
 
     wrap();
 
@@ -73,7 +73,7 @@ describe('MyTasksPage', () => {
   });
 
   it('空待办:显示"🎉 当前没有待办任务"', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue([] as any);
+    vi.mocked(apiClient.get).mockResolvedValue({ code: 0, data: [] } as any);
 
     wrap();
 
@@ -82,7 +82,7 @@ describe('MyTasksPage', () => {
   });
 
   it('点击"通过":调 POST approve', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue(sampleTasks as any);
+    vi.mocked(apiClient.get).mockResolvedValue({ code: 0, data: sampleTasks } as any);
     vi.mocked(apiClient.post).mockResolvedValue({} as any);
 
     wrap();
@@ -98,7 +98,7 @@ describe('MyTasksPage', () => {
   });
 
   it('点击"拒绝":调 POST reject', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue(sampleTasks as any);
+    vi.mocked(apiClient.get).mockResolvedValue({ code: 0, data: sampleTasks } as any);
     vi.mocked(apiClient.post).mockResolvedValue({} as any);
 
     wrap();
@@ -119,7 +119,7 @@ describe('MyTasksPage', () => {
       { ...sampleTasks[0], id: 't2', status: 'PENDING' },
       { ...sampleTasks[0], id: 't3', status: 'APPROVED' },
     ];
-    vi.mocked(apiClient.get).mockResolvedValue(mixedTasks as any);
+    vi.mocked(apiClient.get).mockResolvedValue({ code: 0, data: mixedTasks } as any);
 
     wrap();
 

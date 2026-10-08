@@ -270,11 +270,27 @@ test.describe('Mobile Responsive Tests', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 
-    // 表格页允许横向滚动（数据密集型页面），但主容器宽度不应溢出
-    const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
-    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-    // 表格容器允许 scrollX，但总宽度控制在合理范围内
-    expect(bodyWidth).toBeGreaterThanOrEqual(clientWidth);
+    // 数据密集型表格允许**表格容器自身**横向滚动，但**页面不得横向滚动**。
+    //
+    // 注：原断言为 `bodyWidth >= clientWidth` —— 该式恒真，等于没断言（见审计记录）。
+    // 正确做法是断言文档级别无横向滚动；表格若需横滚，应由其容器 overflow-x 承担。
+    const docScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const docClientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(docScrollWidth).toBeLessThanOrEqual(docClientWidth + 1);
+
+    // 表格若存在，应包裹在可横向滚动的容器内（局部滚动，不撑破页面）
+    const tableInScrollableContainer = await page.evaluate(() => {
+      const table = document.querySelector('table');
+      if (!table) return true; // 已改为卡片布局，无表格
+      let el = table.parentElement;
+      while (el && el !== document.body) {
+        const overflowX = getComputedStyle(el).overflowX;
+        if (overflowX === 'auto' || overflowX === 'scroll') return true;
+        el = el.parentElement;
+      }
+      return false;
+    });
+    expect(tableInScrollableContainer).toBe(true);
   });
 
   test('Calendar view - compact on mobile', async ({ page }) => {

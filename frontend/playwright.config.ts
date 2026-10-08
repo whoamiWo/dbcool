@@ -23,6 +23,11 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    // 用 iPhone 13 的视口，但**强制 chromium 引擎**：
+    // devices['iPhone 13'] 默认走 WebKit，本机未安装 WebKit 会导致该项目的
+    // 用例全部以 "browserType.launch: Executable doesn't exist" 失败
+    // （看起来像适配没做，实际是浏览器没装）。
+    { name: 'mobile-chromium', use: { ...devices['iPhone 13'], browserName: 'chromium' } },
   ],
   webServer: {
     command: 'VITE_E2E=true pnpm build && VITE_E2E=true pnpm preview --port 4173',
