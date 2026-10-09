@@ -84,3 +84,6 @@ frontend/test_thread_click.cjs
 # 假验证脚本(从未跑通,详见文件头横幅),仅本地留痕
 /im_e2e_test.mjs
 # 保留真实回归脚本:frontend/im_full_smoke.mjs、im_headless_verify.mjs
+
+# 备份产物(含数据库 dump / 生产数据),严禁入库
+backend-python/backups/

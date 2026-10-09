@@ -42,6 +42,10 @@ PG_IMAGE = "pgvector/pgvector:pg16"
 RESTORE_CONTAINER = "postgres-restore-test"
 PITR_SRC = "pitr-demo-src"
 PITR_RESTORED = "pitr-demo-restored"
+# T3 演练一律用 docker 命名卷，不用宿主机目录：宿主机目录属主是宿主机用户
+# （uid 1000），容器内 postgres 是 uid 999，archive_command 会 Permission denied。
+PITR_VOL_ARCHIVE = "phase94-pitr-archive"
+PITR_VOL_BASE = "phase94-pitr-base"
 
 results = []
 
@@ -76,6 +80,10 @@ def wait_pg(container, user=POSTGRES_USER, db="nocobase", tries=40):
 
 def rm_container(name):
     run(["docker", "rm", "-f", name], check=False)
+
+
+def rm_volume(name):
+    run(["docker", "volume", "rm", "-f", name], check=False)
 
 
 # ---------------- T1 ----------------
@@ -188,8 +196,14 @@ def test_t3_pitr():
     为什么不在生产库上做：PITR 需要 base backup + WAL 回放，操作生产库风险高。
     独立容器同样能证明这套能力，而且这才是演练的正确姿势（与恢复演练同理）。
 
-    流程：起源库(开归档) → 插入数据 → 记时间 T → 删除数据 → pg_basebackup
+    流程（顺序不能变）：起源库(开归档) → 建表 + 基线数据 → **pg_basebackup**
+          → 插入数据 → 等 WAL 归档 → 记时间 T → 删除数据 → 等 WAL 归档
           → 新实例配置 recovery_target_time=T 启动 → 断言"被删的数据回来了"
+
+    为什么备份必须在插入/删除**之前**：PITR 只能前滚，不能回滚。备份是时点 T0 的
+    快照，若备份发生在删除之后，快照里本来就没有那行，再要求恢复到更早的 T
+    属于还原未来 —— 实测必然报 "recovery ended before configured recovery target
+    was reached"（这一版之前就是这么错的）。
     """
     print("\n=== T3: PITR 时间点恢复演练（独立容器）===")
 
@@ -198,26 +212,50 @@ def test_t3_pitr():
                       "-d", "nocobase", "-t", "-A", "-c", "SHOW archive_mode;"], check=False)
     check("生产库 archive_mode = on", "on" in out.strip().lower(), out.strip())
 
-    rc, out, _ = run(["docker", "exec", "-u", "postgres", "nocobase-postgres",
-                      "ls", "-1", "/var/lib/postgresql/data/pg_archive/"], check=False)
-    archived = [l for l in out.splitlines() if l.strip()]
-    check("生产库 WAL 归档文件已生成", len(archived) > 0, f"{len(archived)} 个文件")
+    # 只 ls 归档目录不够：目录里有文件 ≠ 归档成功（归档失败时目录是空的，
+    # 而曾经成功过的旧文件会让人误判）。真正的证据是 pg_stat_archiver。
+    stat = psql("nocobase-postgres",
+                "select archived_count || '|' || failed_count from pg_stat_archiver")
+    parts = (stat or "|").split("|")
+    archived_n, failed_n = (parts + ["", ""])[:2]
+    check("生产库 WAL 已实际归档", archived_n.isdigit() and int(archived_n) > 0,
+          f"archived_count={archived_n}")
+    check("生产库 WAL 归档无失败", failed_n == "0", f"failed_count={failed_n}")
 
     # ---- 独立环境 PITR 演练 ----
-    work = Path("/tmp/phase94_pitr")
-    run(["rm", "-rf", str(work)], check=False)
-    (work / "archive").mkdir(parents=True, exist_ok=True)
-    (work / "base").mkdir(parents=True, exist_ok=True)
-    (work / "restore").mkdir(parents=True, exist_ok=True)
-    run(["chmod", "-R", "777", str(work)], check=False)
-
+    # 归档目录**必须**用 docker 命名卷，不能用宿主机目录：宿主机目录属主是宿主机
+    # 用户（uid 1000），容器内 postgres 是 uid 999，写不进去 → archive_command
+    # 全部 Permission denied。实测：failed_count=22、一个 WAL 都没归档，
+    # 于是恢复实例只能前滚到备份末尾，必然报
+    # "recovery ended before configured recovery target was reached"。
+    # 命名卷允许我们在启动前用 busybox(root) 把它 chown 成 999:999。
     rm_container(PITR_SRC)
     rm_container(PITR_RESTORED)
+    for vol in (PITR_VOL_ARCHIVE, PITR_VOL_BASE):
+        rm_volume(vol)
+        run(["docker", "volume", "create", vol], check=False)
+    run(["docker", "run", "--rm",
+         "-v", f"{PITR_VOL_ARCHIVE}:/archive", "-v", f"{PITR_VOL_BASE}:/base",
+         "busybox", "sh", "-c", "chown -R 999:999 /archive /base && chmod 700 /archive /base"],
+        check=False)
+
+    def q(sql):
+        return psql(PITR_SRC, sql, user="pitr", db="pitrdb")
+
+    def wait_archived(wal_file, tries=40):
+        """等指定 WAL 段真的落到归档目录（归档器是异步的，不能靠 sleep 猜）。"""
+        for _ in range(tries):
+            rc_w, _, _ = run(["docker", "exec", "-u", "postgres", PITR_SRC,
+                              "test", "-f", f"/archive/{wal_file}"], check=False)
+            if rc_w == 0:
+                return True
+            time.sleep(1)
+        return False
 
     rc, _, err = run([
         "docker", "run", "-d", "--name", PITR_SRC,
         "-e", "POSTGRES_PASSWORD=pitrpass", "-e", "POSTGRES_USER=pitr", "-e", "POSTGRES_DB=pitrdb",
-        "-v", f"{work}/archive:/archive",
+        "-v", f"{PITR_VOL_ARCHIVE}:/archive", "-v", f"{PITR_VOL_BASE}:/base_out",
         PG_IMAGE,
         "-c", "wal_level=replica",
         "-c", "archive_mode=on",
@@ -229,72 +267,61 @@ def test_t3_pitr():
         rm_container(PITR_SRC)
         return
 
-    # 建表并插入（这行是"删除前"的数据）
-    run(["docker", "exec", PITR_SRC, "psql", "-U", "pitr", "-d", "pitrdb",
-         "-c", "create table pitr_probe(id int primary key, note text);"], check=False)
-    run(["docker", "exec", PITR_SRC, "psql", "-U", "pitr", "-d", "pitrdb",
-         "-c", "insert into pitr_probe values (1, 'before-delete');"], check=False)
-
-    # 强制归档当前 WAL，确保插入进入归档
-    run(["docker", "exec", PITR_SRC, "psql", "-U", "pitr", "-d", "pitrdb",
-         "-c", "select pg_switch_wal();"], check=False)
-    time.sleep(3)
-
-    # 记下"删除前"的时间点 T（UTC，稍晚于插入以确保 WAL 已落归档）
-    target_t = (datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M:%S.%f %Z")
+    # ① 建表 + 基线数据（备份时点就存在的行，用来验证恢复没有丢备份内的东西）
+    q("create table pitr_probe(id int primary key, note text);")
+    q("insert into pitr_probe values (2, 'baseline');")
+    q("select pg_switch_wal();")
     time.sleep(2)
 
-    # 删除它 —— PITR 之后这行应该"回来"
-    run(["docker", "exec", PITR_SRC, "psql", "-U", "pitr", "-d", "pitrdb",
-         "-c", "delete from pitr_probe where id = 1;"], check=False)
-    run(["docker", "exec", PITR_SRC, "psql", "-U", "pitr", "-d", "pitrdb",
-         "-c", "select pg_switch_wal();"], check=False)
-    time.sleep(2)
-
-    deleted_now = psql(PITR_SRC, "select count(*) from pitr_probe where id = 1",
-                       user="pitr", db="pitrdb")
-    check("删除操作已生效（演练前提）", deleted_now == "0", f"剩余={deleted_now}")
-
-    # base backup
-    # 用 -F plain -X stream：直接产出**完整可启动**的数据目录。
-    # 曾用 -F tar -X none + 手工解包 —— 解出来的目录缺内容，Postgres 一启动就崩
-    # （实测：数据目录里出现 152MB 的 core dump，容器 Exited(1)）。
+    # ② base backup —— 必须在插入/删除**之前**（PITR 只能前滚）
     rc, _, err = run(["docker", "exec", PITR_SRC, "pg_basebackup",
-                      "-U", "pitr", "-D", "/tmp/base_out", "-F", "plain", "-X", "stream", "-c", "fast"],
+                      "-U", "pitr", "-D", "/base_out", "-F", "plain", "-X", "stream", "-c", "fast"],
                      check=False)
-    if rc != 0:
-        check("pg_basebackup 成功", False, err.strip()[:200])
+    if not check("pg_basebackup 成功", rc == 0, err.strip()[:200]):
         rm_container(PITR_SRC)
         return
-    check("pg_basebackup 成功", True)
-    run(["docker", "cp", f"{PITR_SRC}:/tmp/base_out/.", str(work / "base")], check=False)
 
-    # 拷贝基础备份到待恢复的数据目录（plain 格式，无需解包）
-    run(["docker", "cp", f"{PITR_SRC}:/tmp/base_out/.", str(work / "restore")], check=False)
-    # 清理可能存在的崩溃残留（core dump 等），避免干扰
-    run(["docker", "run", "--rm", "-v", f"{work}/restore:/data", "busybox",
-         "sh", "-c", "rm -f /data/core.*"], check=False)
+    # ③ 插入"将被删除"的行，并**等它的 WAL 真的归档**（不靠 sleep 猜）
+    q("insert into pitr_probe values (1, 'before-delete');")
+    wal_insert = q("select pg_walfile_name(pg_current_wal_lsn());")
+    q("select pg_switch_wal();")
+    check("插入操作的 WAL 已归档", wait_archived(wal_insert), f"{wal_insert}")
+    failed_n = q("select failed_count from pg_stat_archiver;")
+    check("PITR 源库归档无失败", failed_n == "0", f"failed_count={failed_n}")
 
-    # 注意：解包出来的 data 目录属主是容器内 postgres（uid 999），
-    # 宿主机普通用户**写不进去**（实测 PermissionError）。改由容器自己写。
+    # ④ 记下目标时间点 T（插入之后、删除之前）
+    target_t = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f %Z")
+    time.sleep(1)
+
+    # ⑤ 删除它 —— PITR 到 T 之后这行应该"回来"
+    q("delete from pitr_probe where id = 1;")
+    wal_delete = q("select pg_walfile_name(pg_current_wal_lsn());")
+    q("select pg_switch_wal();")
+    check("删除操作的 WAL 已归档", wait_archived(wal_delete), f"{wal_delete}")
+
+    deleted_now = q("select count(*) from pitr_probe where id = 1")
+    check("删除操作已生效（演练前提）", deleted_now == "0", f"剩余={deleted_now}")
+
+    # ⑥ 给基础备份写入恢复配置（recovery.signal + recovery_target_time）
+    # 用 busybox(root) 写：数据目录属主是容器内 postgres(uid 999)，宿主机用户写不进去。
     conf_text = ("\nrestore_command = 'cp /archive/%f %p'\n"
                  f"recovery_target_time = '{target_t}'\n"
                  "recovery_target_action = 'promote'\n")
     host_conf = "/tmp/phase94_recovery.conf"
     Path(host_conf).write_text(conf_text)
     run(["docker", "run", "--rm",
-         "-v", f"{work}/restore:/data", "-v", "/tmp:/hosttmp",
-         PG_IMAGE, "sh", "-c",
+         "-v", f"{PITR_VOL_BASE}:/data", "-v", "/tmp:/hosttmp",
+         "busybox", "sh", "-c",
          "cat /hosttmp/phase94_recovery.conf >> /data/postgresql.auto.conf "
          "&& touch /data/recovery.signal "
-         "&& chmod 600 /data/recovery.signal"], check=False)
+         "&& chown -R 999:999 /data && chmod 700 /data && chmod 600 /data/recovery.signal"],
+        check=False)
     run(["rm", "-f", host_conf], check=False)
 
     rc, _, err = run([
         "docker", "run", "-d", "--name", PITR_RESTORED,
-        "-e", "POSTGRES_PASSWORD=pitrpass", "-e", "POSTGRES_USER=pitr", "-e", "POSTGRES_DB=pitrdb",
-        "-v", f"{work}/restore:/var/lib/postgresql/data",
-        "-v", f"{work}/archive:/archive",
+        "-v", f"{PITR_VOL_BASE}:/var/lib/postgresql/data",
+        "-v", f"{PITR_VOL_ARCHIVE}:/archive",
         PG_IMAGE,
     ], check=False)
     if not check("PITR 恢复实例启动", rc == 0, err.strip()[:150]):
@@ -310,25 +337,44 @@ def test_t3_pitr():
         _, logs, logerr = run(["docker", "logs", PITR_RESTORED], check=False)
         print("     --- PITR 恢复实例全量日志 ---")
         print((logs or logerr)[-3000:])
-        _, ls, _ = run(["docker", "run", "--rm", "-v", f"{work}/restore:/data",
-                        "-v", "/tmp:/hosttmp", "busybox", "sh", "-c",
-                        "ls -la /data | head -20; echo '--- auto.conf ---'; "
-                        "cat /data/postgresql.auto.conf 2>/dev/null | tail -5"], check=False)
-        print("     --- 恢复数据目录 ---")
-        print(ls[-1500:])
         rm_container(PITR_SRC)
         rm_container(PITR_RESTORED)
         return
+
+    # pg_isready 在"只读回放"阶段就返回成功，此时 recovery 还没跑完、日志也没打全。
+    # 必须等 promote 完成（pg_is_in_recovery() = f）再看日志，否则断言会假失败。
+    in_recovery = "t"
+    for _ in range(60):
+        in_recovery = psql(PITR_RESTORED, "select pg_is_in_recovery()",
+                           user="pitr", db="pitrdb")
+        if in_recovery == "f":
+            break
+        time.sleep(1)
+    check("恢复实例已完成 promote", in_recovery == "f", f"pg_is_in_recovery={in_recovery}")
+
+    # 逻辑证据：日志必须显示"停在目标时间点的提交之前"。
+    # 少了这条，"数据回来了"也可能是"整库恢复到最新"造成的假象。
+    # Postgres 日志走 **stderr**，只取 stdout 会什么都拿不到（实测踩过）。
+    _, logs, logerr = run(["docker", "logs", PITR_RESTORED], check=False)
+    log_all = (logs or "") + (logerr or "")
+    check("恢复确实停在目标时间点（日志证据）",
+          "recovery stopping before commit" in log_all or
+          "recovery stopping before abort" in log_all,
+          log_all[-300:])
 
     restored = psql(PITR_RESTORED,
                     "select note from pitr_probe where id = 1", user="pitr", db="pitrdb")
     check("PITR 恢复到删除前时间点：被删数据回来了",
           restored == "before-delete", f"recovery_target_time={target_t}, 查得 note={restored!r}")
 
+    total = psql(PITR_RESTORED, "select count(*) from pitr_probe", user="pitr", db="pitrdb")
+    check("恢复结果同时保留备份时点的基线数据", total == "2", f"count={total}")
+
     rm_container(PITR_SRC)
     rm_container(PITR_RESTORED)
-    run(["rm", "-rf", str(work)], check=False)
-    print("     （PITR 演练容器已清理）")
+    for vol in (PITR_VOL_ARCHIVE, PITR_VOL_BASE):
+        rm_volume(vol)
+    print("     （PITR 演练容器与卷已清理）")
 
 
 # ---------------- T4 ----------------
@@ -390,4 +436,18 @@ if __name__ == "__main__":
 # 从未真正恢复、也未校验任何数据 —— 却在回报里写了具体记录数（脚本根本产不出）。
 # 教训：① 断言必须"有可能失败"；② 演练的验收点是"数据真的回来"，
 #      不是"命令返回 0"或"文件存在"；③ 回报数字必须能在交付物里找到产出它的代码。
+#
+# 第三版又踩了三个坑（T3 一直 Exited(1) 的真正原因，全都不是权限 777）：
+#   1. 归档目录用了**宿主机绑定挂载**：属主是宿主机用户(uid 1000)，容器内
+#      postgres 是 uid 999 → archive_command 全部 Permission denied，
+#      failed_count=22、一个 WAL 都没归档。改用 docker 命名卷 + busybox chown 999:999。
+#      判断归档是否成功只能看 pg_stat_archiver，"ls 归档目录有文件"会骗人
+#      （失败时目录为空，而历史遗留文件会让人误判）。
+#   2. **PITR 顺序错了**：原流程是"插入 → 记 T → 删除 → pg_basebackup"。
+#      PITR 只能前滚不能回滚，备份时点晚于 T 时根本无法回到 T，必然报
+#      "recovery ended before configured recovery target was reached"。
+#      正确顺序：建表 → **basebackup** → 插入 → 记 T → 删除。
+#   3. 归档是**异步**的，sleep 猜不得：必须轮询归档目录里出现目标 WAL 段。
+# 另外两个小坑：pg_isready 在只读回放阶段就返回成功，要看日志得先等 promote
+# 完成（pg_is_in_recovery() = f）；Postgres 日志走 **stderr**，只取 stdout 是空的。
 # ---------------------------------------------------------------------------
