@@ -80,7 +80,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/mattermost/webhook/incoming").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/wecom/callback").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/events").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
+                        // Actuator: 生产 profile 下仅 health 匿名，其他需要认证
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/**").authenticated()
                         // 统一实时消息总线:WS 握手无法携带 Authorization 头,
                         // 鉴权交由 StompHandshakeInterceptor 在握手阶段完成。
                         // 注意只放行 /ws/im/** —— 不放行 /ws/**,避免既有 /ws/alerts

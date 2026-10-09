@@ -1,0 +1,4 @@
+# Controller Authorization Baseline
+# Generated: 2026-10-09T07:19:27.545253840Z
+# 格式: 文件:行号 -> 方法名 (reason: 理由)
+

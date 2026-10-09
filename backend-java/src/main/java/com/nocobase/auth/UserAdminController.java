@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,12 +41,14 @@ public class UserAdminController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> list() {
         return Map.of("code", 0, "message", "success",
                 "data", userService.listAll().stream().map(this::toDto).toList());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> get(@PathVariable UUID id) {
         Map<String, Object> dto = toDto(userService.get(id));
         dto.put("roles", userService.getUserRoles(id).stream().map(this::toRoleDto).toList());
@@ -53,6 +56,7 @@ public class UserAdminController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody @Valid CreateUserRequest req,
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -65,6 +69,7 @@ public class UserAdminController {
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> update(
             @PathVariable UUID id,
             @RequestBody UpdateUserRequest req,
@@ -78,6 +83,7 @@ public class UserAdminController {
     }
 
     @PostMapping("/{id}/password")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> resetPassword(
             @PathVariable UUID id,
             @RequestBody Map<String, String> body,
@@ -90,6 +96,7 @@ public class UserAdminController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -103,6 +110,7 @@ public class UserAdminController {
     }
 
     @PostMapping("/{id}/roles/{roleId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> assignRole(
             @PathVariable UUID id,
             @PathVariable UUID roleId,
@@ -115,6 +123,7 @@ public class UserAdminController {
     }
 
     @DeleteMapping("/{id}/roles/{roleId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> removeRole(
             @PathVariable UUID id,
             @PathVariable UUID roleId,
@@ -127,6 +136,7 @@ public class UserAdminController {
     }
 
     @GetMapping("/{id}/effective-permissions")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> effectivePermissions(@PathVariable UUID id,
                                                     @AuthenticationPrincipal AuthenticatedUser user) {
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),

@@ -5,6 +5,7 @@ import com.nocobase.auth.keystore.KeyRingService;
 import com.nocobase.tenant.TenantContext;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +38,7 @@ public class JwtKeyRotationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> snapshot() {
         return Map.of(
                 "code", 0, "message", "success",
@@ -48,6 +50,7 @@ public class JwtKeyRotationController {
     }
 
     @PostMapping("/rotate")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> rotate() {
         try {
             String newKid = keyRing.rotate();

@@ -87,6 +87,15 @@ public class AuthController {
                 Map.of("username", user.getUsername(), "userId", user.getId().toString(),
                         "tenantId", user.getTenantId()));
 
+        // PHASE95 T1: 从真实角色体系取 roles，不再硬编码 admin
+        var roleNames = userRoleRepository.findByIdUserId(user.getId())
+                .stream()
+                .map(ur -> roleRepository.findById(ur.getId().getRoleId()))
+                .filter(java.util.Optional::isPresent)
+                .map(java.util.Optional::get)
+                .map(r -> r.getName())
+                .toList();
+
         return ResponseEntity.ok(Map.of(
                 "code", 0,
                 "message", "success",
@@ -100,7 +109,7 @@ public class AuthController {
                                 "username", user.getUsername(),
                                 "display_name", user.getDisplayName() != null ? user.getDisplayName() : user.getUsername(),
                                 "tenant_id", user.getTenantId(),
-                                "roles", new String[]{"admin"}
+                                "roles", roleNames
                         ),
                         "issued_at", Instant.now().toString()
                 )
