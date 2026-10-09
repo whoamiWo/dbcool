@@ -25,4 +25,19 @@ public interface AuditLogRepository extends JpaRepository<AuditLogEntity, UUID> 
             Pageable pageable);
 
     long countByTenantId(String tenantId);
+
+    /**
+     * PHASE93 合规：批量匿名化某用户的审计日志用户名（**只改 username，保留日志本身**）。
+     *
+     * <p>必须用批量 UPDATE 而非逐条 save：审计日志可能有数千条，
+     * 逐条 save 会让删除接口超时（实测因此返回 HTTP 0）。
+     *
+     * @return 受影响行数
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE AuditLogEntity a SET a.username = :anon "
+            + "WHERE a.tenantId = :tenantId AND a.userId = :userId")
+    int anonymizeUsername(@Param("tenantId") String tenantId,
+                          @Param("userId") String userId,
+                          @Param("anon") String anon);
 }

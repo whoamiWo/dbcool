@@ -52,7 +52,9 @@ public class UserDataComplianceController {
             "user.data.export", "UserDataExport", userId,
             Map.of("action", "admin_export", "userId", userId));
 
-        UserDataExport export = service.exportUserData(userId, adminUser.tenantId());
+        // exportedBy 传真实操作者：留痕要能回答"谁导出的"，不能恒记 system
+        UserDataExport export = service.exportUserData(userId, adminUser.tenantId(),
+                adminUser.userId().toString());
         return ResponseEntity.ok(Map.of(
             "code", 0,
             "message", "success",
@@ -93,7 +95,8 @@ public class UserDataComplianceController {
             "user.data.export", "UserDataExport", user.userId().toString(),
             Map.of("source", "self-service"));
 
-        UserDataExport export = service.exportUserData(user.userId().toString(), user.tenantId());
+        UserDataExport export = service.exportUserData(user.userId().toString(),
+                user.tenantId(), user.userId().toString());
         return ResponseEntity.ok(Map.of(
             "code", 0,
             "message", "success",

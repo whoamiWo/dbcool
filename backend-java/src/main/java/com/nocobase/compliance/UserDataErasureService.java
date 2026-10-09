@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,29 +36,88 @@ public class UserDataErasureService {
     private final AuditLogRepository auditLogRepository;
     private final AuditService auditService;
     private final AiConversationEntityRepository aiConversationRepo;
+    private final com.nocobase.tenant.UserTenantRepository userTenantRepo;
+    private final com.nocobase.im.ImMessageRepository imMessageRepo;
+    private final com.nocobase.auth.UserRepository userRepo;
 
     public UserDataErasureService(AuditLogRepository auditLogRepository,
                                     AuditService auditService,
-                                    AiConversationEntityRepository aiConversationRepo) {
+                                    AiConversationEntityRepository aiConversationRepo,
+                                    com.nocobase.tenant.UserTenantRepository userTenantRepo,
+                                    com.nocobase.im.ImMessageRepository imMessageRepo,
+                                    com.nocobase.auth.UserRepository userRepo) {
         this.auditLogRepository = auditLogRepository;
         this.auditService = auditService;
         this.aiConversationRepo = aiConversationRepo;
+        this.userTenantRepo = userTenantRepo;
+        this.imMessageRepo = imMessageRepo;
+        this.userRepo = userRepo;
     }
 
     /**
-     * 导出用户数据（不含凭据）
+     * 归属校验：目标用户必须存在**且属于当前租户**，否则 403。
+     *
+     * <p>判据用 {@code UserRepository.findByIdAndTenantId}（用户实体自带 tenantId），
+     * 而不是 UserTenant 关联表 —— 后者对平台管理员 admin 可能根本没有记录，
+     * 用它做校验会把合法操作也挡掉（PHASE93 收尾时实测踩到：合法导出被 403）。
+     */
+    private com.nocobase.auth.UserEntity requireUserInTenant(String userId, String tenantId) {
+        if (userId == null || tenantId == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "租户上下文缺失");
+        }
+        try {
+            return userRepo.findByIdAndTenantId(UUID.fromString(userId), tenantId)
+                    .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "目标用户不属于当前租户"));
+        } catch (IllegalArgumentException e) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "无效的用户 ID: " + userId);
+        }
+    }
+
+    /**
+     * 导出用户数据（不含凭据）。
+     *
+     * <p><b>租户归属校验（安全红线）</b>：目标用户必须属于调用方所在租户，否则 403。
+     * 此前没有这层校验 —— 任意租户管理员可导出其他租户用户的数据（实测返回 200）。
+     *
+     * @param exportedBy 真实操作者（此前恒为 "system"，导致留痕无法回答"谁导出的"）
      */
     @Transactional(readOnly = true)
-    public UserDataExport exportUserData(String userId, String tenantId) {
+    public UserDataExport exportUserData(String userId, String tenantId, String exportedBy) {
+        // 1) 归属校验：用户不存在或不属于当前租户 → 拒绝
+        requireUserInTenant(userId, tenantId);
+
         UserDataExport export = new UserDataExport();
         export.setUserId(userId);
         export.setTenantId(tenantId);
         export.setExportedAt(new Date().toInstant());
-        export.setExportedBy("system");
+        export.setExportedBy(exportedBy != null ? exportedBy : "unknown");
 
-        // TODO: 填充各模块数据
-        // 当前版本：占位符，返回空结构
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
 
+        // 2) 用户-租户关联（个人信息：所属租户列表）
+        data.put("tenantMemberships", userTenantRepo.findByUserId(userId).stream()
+                .map(ut -> Map.of(
+                        "tenantId", ut.getTenantId(),
+                        "createdAt", String.valueOf(ut.getCreatedAt())))
+                .toList());
+
+        // 3) 该用户产生的操作留痕（个人信息：可查阅自己做过什么）
+        //    注意只输出元数据，不含凭据字段
+        data.put("auditTrail", auditLogRepository.findByFilter(
+                        tenantId, null, null, userId,
+                        org.springframework.data.domain.PageRequest.of(0, 1000)).stream()
+                .map(l -> Map.of(
+                        "action", String.valueOf(l.getAction()),
+                        "resource", String.valueOf(l.getResource()),
+                        "resourceId", String.valueOf(l.getResourceId()),
+                        "createdAt", String.valueOf(l.getCreatedAt())))
+                .toList());
+
+        export.setUserData(data);
         return export;
     }
 
@@ -74,6 +134,8 @@ public class UserDataErasureService {
      */
     @Transactional
     public UserDataErasureRequest erasesUserData(String userId, String adminUserId, String adminTenantId) {
+        // 归属校验：与导出同理 —— 不得删除其他租户用户的数据
+        requireUserInTenant(userId, adminTenantId);
         String anonymousId = "deleted-" + UUID.randomUUID().toString().substring(0, 8);
 
         UserDataErasureRequest result = new UserDataErasureRequest();
@@ -94,18 +156,28 @@ public class UserDataErasureService {
     }
 
     private void eraseImMessages(String userId, String anonymousId, UserDataErasureRequest result) {
-        // TODO: 通过 ImMessageRepository 实现
-        result.incrementMessagesErased(0);
+        // IM 消息：正文替换为 [已删除]（不删记录，保留频道上下文）
+        int n = 0;
+        try {
+            n = imMessageRepo.anonymizeContentBySender(UUID.fromString(userId), "[已删除]");
+        } catch (IllegalArgumentException e) {
+            log.warn("[compliance] userId 非 UUID，跳过 IM 消息匿名化: {}", userId);
+        }
+        result.incrementMessagesErased(n);
     }
 
     private void eraseAiConversations(String userId, String anonymousId, UserDataErasureRequest result) {
-        // TODO: 通过 AiConversationEntityRepository 实现
+        // AI 对话：现有仓储只支持 (agentId, channelId, userId) 组合查询，
+        // 无法仅按 userId 定位 —— 保留计数 0 并在日志中说明，避免静默假装已处理。
+        log.warn("[compliance] AI 对话匿名化未实现：AiConversationEntityRepository "
+                + "缺少按 userId 的查询方法，需补充后再接入（userId={}）", userId);
         result.incrementConversationsErased(0);
     }
 
     private void anonymizeAuditLogs(String userId, String anonymousId, UserDataErasureRequest result) {
-        // 只替换用户名，不删除日志
-        // TODO: 通过 AuditLogRepository 实现
-        result.incrementAuditLogsAnonymized(0);
+        // 只替换用户名，**保留日志本身与 userId** —— 合规要求操作留痕不得因
+        // 用户删除而消失（这也保护了 PHASE83-85 建起来的审计能力）。
+        int n = auditLogRepository.anonymizeUsername(result.getTenantId(), userId, anonymousId);
+        result.incrementAuditLogsAnonymized(n);
     }
 }

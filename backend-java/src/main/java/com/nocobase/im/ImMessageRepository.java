@@ -58,6 +58,18 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
     List<ImMessageEntity> findByExpiresAtBeforeAndDeletedAtIsNull(Instant now);
 
     /**
+     * PHASE93 合规：批量将该发送者的消息正文替换为占位（保留消息记录本身）。
+     * 批量 UPDATE 而非逐条 save，理由同 AuditLogRepository#anonymizeUsername。
+     *
+     * @return 受影响行数
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(
+            "UPDATE ImMessageEntity m SET m.content = :placeholder WHERE m.senderId = :senderId")
+    int anonymizeContentBySender(@org.springframework.data.repository.query.Param("senderId") UUID senderId,
+                                 @org.springframework.data.repository.query.Param("placeholder") String placeholder);
+
+    /**
      * 高级搜索（支持多维度过滤，所有过滤在查询侧完成，先过滤再分页）。
      * 注意：关键词匹配使用 LIKE（%kw% 前缀通配，全表扫描），未接 tsvector 全文索引；
      * 历史 V43 tsvector 迁移已删除（R2 明确决策：避免 Flyway 事务与 GIN 死索引）。
