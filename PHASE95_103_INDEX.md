@@ -33,7 +33,7 @@
 
 | 批次 | 主题 | 覆盖的 P0 | 交付物 |
 |---|---|---|---|
-| **PHASE95** | 授权与多租户隔离基线 | P0-1、P0-2 | 角色模型落地、`@PreAuthorize` 全量补齐、admin 端点收口、`AuthController` 硬编码 roles 修复、actuator 收口、Hibernate Schema 隔离真正接线、跨租户越权全量修复 + 越权回归测试 |
+| **PHASE95** ⚠️**返工中** | 授权与多租户隔离基线 | P0-1、P0-2 | **Round 1 未通过审计**：T1 ✅；T2 ❌ 无效（无 `@EnableMethodSecurity`，11 个 `@PreAuthorize` 是死注解，且 authority 恒为 `ROLE_USER`）；T3 ❌ 恒真（基线空 + 自动生成即通过 + 正则漏检泛型）；T4 ⚠️ 半完成（`show-details: always` 未改）。返工见 **`PHASE95_REWORK_TASKS.md` / `PHASE95_REWORK_PROMPT.md`**。原交付物：角色模型落地、`@PreAuthorize` 全量补齐、admin 端点收口、actuator 收口、Hibernate Schema 隔离真正接线、跨租户越权全量修复 + 越权回归测试 |
 | **PHASE96** | 假实现与静默成功清零 | P0-3 | 外部用户映射、EmailDispatcher、AI 会话删除、BI 空实体、SlashCommand、LDAP 占位口令；统一改为"真实现或显式失败" |
 | **PHASE97** | 前后端契约 + 真契约测试 | P0-4 | 消除 `/api` 双前缀与 10 处路径错位、删除空心 `endpoints.contract.test.ts` 改为**解析后端映射做真实比对**、清理全部恒真断言 |
 | **PHASE98** | 错误态与好用 | — | 主列表/看板/告警页补 error 态与空态引导、清除硬编码 admin 身份与假用户兜底、Livechat 假回复、移动端横幅与横向滚动、图标按钮 aria-label |
@@ -54,10 +54,11 @@
 | E2E | `cd frontend && npx playwright test` | **≥ 135** |
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 48 passed / 1 skipped |
 | 备份演练 | `python3 scripts/backup-e2e-verify.py` | 29 / 29 |
+| 管理员鉴权（HTTP） | `python3 scripts/admin-authz-e2e-verify.py` | 全 PASS（PHASE95 返工新增） |
+| 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 全 PASS（PHASE95 T7） |
+| 契约比对 | `python3 scripts/api-contract-verify.py` | 0 处漂移（PHASE97 T5） |
 
 > 基线来源：`PHASE94_GLM53_BACKUP_TASKS.md` §4（2026-10-07），早于它的 `LAUNCH_READINESS_REPORT.md`（1279 / 362 / 64 / 43）不采用。每批开跑前先实测一次取真值。
-| 越权回归 | PHASE95 新增 | 全 PASS |
-| 契约比对 | PHASE97 新增 | 0 处漂移 |
 
 ## 四、全局红线（每批任务书内已内建，此处为准绳）
 
@@ -70,6 +71,14 @@
 4. **每批必须跑全量门禁** —— 不允许"只跑我改的那一块"。
 5. **变更必须落盘并汇报 commit hash** —— 不允许只在对话里说做完了。
 6. **发现评估文档与代码不符时，以代码为准并回报差异** —— 历史文档已被多次证伪。
+7. **安全类改动必须有真实 HTTP 证据** —— "加了注解""单测过了"都不算，必须是 `curl`/脚本打出来的
+   实际状态码（如管理员 200 + 普通用户 403，**两者都要**）。
+   反面案例（PHASE95 Round 1）：加了 11 个 `@PreAuthorize` 却没发现项目根本没开
+   `@EnableMethodSecurity`，注解静默失效；只报"门禁通过"不报状态码。
+8. **禁止"自动生成基线即通过"式测试** —— 首次运行把当前状态写进基线然后 PASS，等于把
+   所有存量问题合法化。架构测试第一版必须**先红**，报出真实缺失数量再逐条修。
+   反面案例（PHASE95 Round 1）：`ControllerAuthorizationCoverageTest` 生成的基线文件
+   只有 3 行注释、0 条数据（正则漏检泛型返回类型导致扫描结果为空）。
 
 ## 五、每批完成定义（DoD）
 
