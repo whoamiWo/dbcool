@@ -16,6 +16,14 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: nocobase-postgres
+    # PHASE94 🔒-7 PITR：开启 WAL 归档，使"恢复到任意时间点"成为可能。
+    # 此前这段配置只放在 docker-compose.override.yml（被 gitignore），
+    # 换环境重建就没有 PITR —— 归档配置不是敏感信息，应当纳入版本控制。
+    command: >
+      postgres -c wal_level=replica
+      -c archive_mode=on
+      -c archive_command='test ! -f /var/lib/postgresql/data/pg_archive/%f && cp %p /var/lib/postgresql/data/pg_archive/%f'
+      -c max_wal_senders=5
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
       POSTGRES_USER: ${POSTGRES_USER:-nocobase}
