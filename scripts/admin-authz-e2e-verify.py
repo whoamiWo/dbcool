@@ -241,18 +241,25 @@ def main():
         admin_ok = admin_status in valid_admin
         print(f"    {'✅' if admin_ok else '❌'} admin   → {admin_status} (want one of {valid_admin})")
 
-        # User token → MUST be exactly 403 (not 400, not 404, not 200)
-        # If user status equals admin status, the authorization did NOT produce a difference.
+        # User token
+        # For self-service endpoints (e.g. /api/tenant/quota) where valid_user == [200],
+        # admin and user are BOTH expected to get 200 — that is correct by design
+        # (any authenticated user can check their own quota).  In that case we simply
+        # require user_status to be in valid_user and do NOT flag "same as admin".
         user_status = http(method, path, user_token, body)
-        user_ok = user_status == 403
+        user_ok = user_status in valid_user
         same_as_admin = (user_status == admin_status)
-        diff_mark = " ⚠️  SAME as admin" if same_as_admin else ""
-        print(f"    {'✅' if user_ok else '❌'} user    → {user_status} (want 403){diff_mark}")
+        # Only flag as "same as admin" when valid_user does NOT include the observed status
+        # (i.e. the user should have been rejected but wasn't)
+        flagged = same_as_admin and (user_status not in valid_user)
+        diff_mark = " ⚠️  SAME as admin (unproven)" if flagged else ""
+        expected_desc = "403" if 403 in valid_user else f"one of {valid_user}"
+        print(f"    {'✅' if user_ok else '❌'} user    → {user_status} (want {expected_desc}){diff_mark}")
 
         passed = no_auth_ok and admin_ok and user_ok
         results.append((label, passed,
             f"no-auth={no_auth_status} admin={admin_status} user={user_status}"
-            + ("  ← SAME (unproven)" if same_as_admin else "")))
+            + ("  ← SAME (unproven)" if flagged else "")))
 
     print("\n" + "=" * 70)
     total = len(results)

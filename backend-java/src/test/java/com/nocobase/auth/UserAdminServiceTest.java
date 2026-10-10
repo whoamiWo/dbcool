@@ -232,6 +232,7 @@ class UserAdminServiceTest {
         UUID userId = UUID.randomUUID();
         UUID roleId = UUID.randomUUID();
         when(userRoleRepository.findById(any())).thenReturn(Optional.empty());
+        when(roleRepository.findById(roleId)).thenReturn(Optional.of(makeRole("test-role")));
 
         service.assignRole(userId, roleId);
 
@@ -251,6 +252,17 @@ class UserAdminServiceTest {
         service.assignRole(userId, roleId);
 
         verify(userRoleRepository, times(0)).save(any());
+    }
+
+    @Test
+    void assignRole_roleNotFound_throwsBadRequest() {
+        UUID userId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+        when(userRoleRepository.findById(any())).thenReturn(Optional.empty());
+        when(roleRepository.findById(roleId)).thenReturn(Optional.empty());
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.assignRole(userId, roleId));
     }
 
     // ============ removeRole ============
