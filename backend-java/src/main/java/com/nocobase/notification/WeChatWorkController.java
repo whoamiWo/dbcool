@@ -4,6 +4,7 @@ import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,13 +30,14 @@ public class WeChatWorkController {
         this.notificationService = notificationService;
     }
 
-    /**
+/**
      * 发送企微消息。
      * body = {channelId, recipient, title, body, msgType}
      *
-     * <p>msgType 可选:markdown(默认) / text / card。
+     * <p>msgType 可选:markdown(默认) / text / 卡片。
      * 若 channel 未配置 webhook_url,recipient 可作备用地址。
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/send")
     public ResponseEntity<Map<String, Object>> send(@RequestBody Map<String, Object> body,
                                                     @AuthenticationPrincipal AuthenticatedUser user) {
@@ -78,6 +80,7 @@ public class WeChatWorkController {
     }
 
     /** 校验企微 webhook 可达性(HEAD 探活)。 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/ping")
     public ResponseEntity<Map<String, Object>> ping(@RequestParam String webhookUrl) {
         try {

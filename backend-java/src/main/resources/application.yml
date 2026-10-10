@@ -92,7 +92,7 @@ management:
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
       # 开启 K8s readiness/liveness 分组(/actuator/health/readiness、/liveness)
       probes:
         enabled: true
@@ -169,6 +169,10 @@ spring:
       on-profile: docker
   jpa:
     show-sql: false
+  # PHASE69: 生产环境关闭 Swagger UI
+  springdoc:
+    swagger-ui:
+      enabled: ${SPRINGDOC_SWAGGER_ENABLED:false}
 
 logging:
   level:

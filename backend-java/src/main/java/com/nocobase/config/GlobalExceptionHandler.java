@@ -49,6 +49,15 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "code", 1002,
+                "message", "无权限",
+                "data", Map.of()
+        ));
+    }
+
     /**
      * Bean Validation 失败(比如 @Pattern 不匹配)→ 400 而不是 1001.
      */

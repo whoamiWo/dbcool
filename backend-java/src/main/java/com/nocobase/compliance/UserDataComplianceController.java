@@ -88,6 +88,7 @@ public class UserDataComplianceController {
     /**
      * 本人自助导出数据
      */
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "本人数据导出")
     @GetMapping("/users/me/data-export")
     public ResponseEntity<Map<String, Object>> exportMyData(@AuthenticationPrincipal AuthenticatedUser user) {
@@ -108,6 +109,7 @@ public class UserDataComplianceController {
      * 本人请求删除数据
      * 删除后返回确认信息
      */
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "请求删除个人数据")
     @DeleteMapping("/users/me/data-erasure")
     public ResponseEntity<Map<String, Object>> requestErasureMyData(@AuthenticationPrincipal AuthenticatedUser user) {

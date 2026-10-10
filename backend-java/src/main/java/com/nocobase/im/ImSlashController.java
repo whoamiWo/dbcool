@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
@@ -34,6 +35,7 @@ public class ImSlashController {
     }
 
     /** 列出可用 Slash 命令。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/commands")
     public Map<String, Object> commands() {
         return Map.of("code", 0, "message", "success",
@@ -41,6 +43,7 @@ public class ImSlashController {
     }
 
     /** 执行 Slash 命令（接真：调用真实 handler，非占位）。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/commands/execute")
     public ResponseEntity<Map<String, Object>> execute(@RequestBody Map<String, Object> body) {
         String command = (String) body.get("command");

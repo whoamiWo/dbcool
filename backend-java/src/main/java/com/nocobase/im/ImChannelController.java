@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +36,7 @@ public class ImChannelController {
         this.auditService = auditService;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(@AuthenticationPrincipal AuthenticatedUser user) {
         List<Map<String, Object>> data = channelService
@@ -43,6 +45,7 @@ public class ImChannelController {
         return Map.of("code", 0, "message", "success", "data", data);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody Map<String, Object> body,
@@ -60,6 +63,7 @@ public class ImChannelController {
     }
 
     /** 获取或创建与某人的一对一会话(幂等)。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/direct/{userId}")
     public Map<String, Object> direct(
             @PathVariable UUID userId,
@@ -69,6 +73,7 @@ public class ImChannelController {
         return Map.of("code", 0, "message", "success", "data", toDto(c));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public Map<String, Object> get(
             @PathVariable UUID id,
@@ -78,6 +83,7 @@ public class ImChannelController {
                 "data", toDto(channelService.mustGet(user.tenantId(), id)));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}/members")
     public Map<String, Object> members(
             @PathVariable UUID id,
@@ -93,6 +99,7 @@ public class ImChannelController {
         return Map.of("code", 0, "message", "success", "data", data);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{id}/members")
     public Map<String, Object> join(
             @PathVariable UUID id,
@@ -113,6 +120,7 @@ public class ImChannelController {
                 "data", Map.of("channelId", id.toString(), "userId", target.toString()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}/members/me")
     public Map<String, Object> leave(
             @PathVariable UUID id,
@@ -127,6 +135,7 @@ public class ImChannelController {
     }
 
     /** 在线状态心跳。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/presence/heartbeat")
     public Map<String, Object> heartbeat(@AuthenticationPrincipal AuthenticatedUser user) {
         presenceService.heartbeat(user.tenantId(), user.userId());

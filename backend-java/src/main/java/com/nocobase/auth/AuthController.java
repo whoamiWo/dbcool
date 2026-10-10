@@ -78,23 +78,19 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "账号或密码错误");
         }
 
+        // 🔒-SaaS-P0 R1: 从角色体系加载 roles，写入 JWT claims
+        // R5: 用批量查询替代 N+1，传入 tenantId 作租户维度
+        var roleNames = roleRepository.findRoleNamesByUserId(user.getId(), user.getTenantId());
+
         String accessToken = jwtService.issueAccessToken(
-                user.getId(), user.getUsername(), user.getTenantId());
+                user.getId(), user.getUsername(), user.getTenantId(), roleNames);
+
         String refreshToken = refreshTokenService.issue(user.getId());
 
         auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
                 "auth.login.success", "auth", user.getId().toString(),
                 Map.of("username", user.getUsername(), "userId", user.getId().toString(),
                         "tenantId", user.getTenantId()));
-
-        // PHASE95 T1: 从真实角色体系取 roles，不再硬编码 admin
-        var roleNames = userRoleRepository.findByIdUserId(user.getId())
-                .stream()
-                .map(ur -> roleRepository.findById(ur.getId().getRoleId()))
-                .filter(java.util.Optional::isPresent)
-                .map(java.util.Optional::get)
-                .map(r -> r.getName())
-                .toList();
 
         return ResponseEntity.ok(Map.of(
                 "code", 0,
@@ -139,8 +135,12 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户不存在");
         }
 
+        // 🔒-SaaS-P0 R1: 从角色体系加载 roles，写入 JWT claims
+        // R5: 用批量查询替代 N+1，传入 tenantId 作租户维度
+        var refreshRoleNames = roleRepository.findRoleNamesByUserId(user.getId(), user.getTenantId());
+
         String newAccessToken = jwtService.issueAccessToken(
-                user.getId(), user.getUsername(), user.getTenantId());
+                user.getId(), user.getUsername(), user.getTenantId(), refreshRoleNames);
         String newRefreshToken = refreshTokenService.issue(user.getId());
 
         auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),

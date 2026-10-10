@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,36 +45,49 @@ public class JwtService {
         this.accessTtl = Duration.ofMinutes(accessTtlMinutes);
     }
 
-    /**
+/**
      * 签发 access token.
      *
      * @return 紧凑型 JWT(header 含 kid)
      * @throws IllegalStateException 当前无 ACTIVE key
      */
-    public String issueAccessToken(UUID userId, String username, String tenantId) {
-        Optional<KeyRingEntry> active = keyRing.currentActive();
-        if (active.isEmpty()) {
-            throw new IllegalStateException("无可用 ACTIVE 签名密钥");
-        }
-        KeyRingEntry entry = active.get();
-        SecretKey signingKey = toHmacKey(entry.secret());
+     public String issueAccessToken(UUID userId, String username, String tenantId, List<String> roles) {
+         Optional<KeyRingEntry> active = keyRing.currentActive();
+         if (active.isEmpty()) {
+             throw new IllegalStateException("无可用 ACTIVE 签名密钥");
+         }
+         KeyRingEntry entry = active.get();
+         SecretKey signingKey = toHmacKey(entry.secret());
 
-        Instant now = Instant.now();
-        Instant exp = now.plus(accessTtl);
+         Instant now = Instant.now();
+         Instant exp = now.plus(accessTtl);
 
-        return Jwts.builder()
-                .header().keyId(entry.kid()).and()
-                .subject(userId.toString())
-                .claims(Map.of(
-                        "username", username,
-                        "tid", tenantId,
-                        "typ", "access"
-                ))
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(exp))
-                .signWith(signingKey)
-                .compact();
-    }
+         Map<String, Object> claims = new java.util.HashMap<>();
+         claims.put("username", username);
+         claims.put("tid", tenantId);
+         claims.put("typ", "access");
+         if (roles != null && !roles.isEmpty()) {
+             claims.put("roles", roles);
+         }
+
+         return Jwts.builder()
+                 .header().keyId(entry.kid()).and()
+                 .subject(userId.toString())
+                 .claims(claims)
+                 .issuedAt(Date.from(now))
+                 .expiration(Date.from(exp))
+                 .signWith(signingKey)
+                 .compact();
+     }
+
+     /**
+     * 旧版兼容方法（不带 roles）→ 保留仅供第三方使用。
+     * @deprecated 用 {@link #issueAccessToken(UUID, String, String, List)} 取代
+     */
+    @Deprecated
+     public String issueAccessToken(UUID userId, String username, String tenantId) {
+         return issueAccessToken(userId, username, tenantId, null);
+     }
 
     /**
      * 解析 access token.支持 kid 查找(轮换期间老 token 仍可用).

@@ -14,6 +14,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.time.Duration;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -59,13 +60,27 @@ class JwtServiceTest {
     void issueAndParse_roundTrip_returnsSameData() {
         JwtService svc = newService();
         UUID userId = UUID.randomUUID();
-        String token = svc.issueAccessToken(userId, "alice", "tenant_default");
+        String token = svc.issueAccessToken(userId, "alice", "tenant_default", null);
         Claims claims = svc.parseAccessToken(token);
         assertNotNull(claims);
         assertEquals(userId.toString(), claims.getSubject());
         assertEquals("alice", claims.get("username"));
         assertEquals("tenant_default", claims.get("tid"));
         assertEquals("access", claims.get("typ"));
+    }
+
+    @Test
+    void issueAccessToken_withRoles_writesRolesToClaims() {
+        JwtService svc = newService();
+        UUID userId = UUID.randomUUID();
+        List<String> roles = List.of("admin", "manager");
+        String token = svc.issueAccessToken(userId, "alice", "tenant_default", roles);
+
+        Claims claims = svc.parseAccessToken(token);
+        assertNotNull(claims);
+        @SuppressWarnings("unchecked")
+        List<String> claimsRoles = (List<String>) claims.get("roles");
+        assertThat(claimsRoles).containsExactly("admin", "manager");
     }
 
     @Test

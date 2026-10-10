@@ -9,23 +9,18 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * JWT 鉴权过滤器.
- *
- * <p>从 Authorization: Bearer {token} 解析 JWT,写入 SecurityContext.
- * 若 token 缺失或非法,放行(交给 SecurityConfig 决定是否拦截).
- *
- * <p>Week 41 D6 Step G1:解析 JWT 后设置 TenantContext,finally 清零防线程复用泄漏。
- */
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
     private final JwtService jwtService;
 
     public JwtAuthFilter(JwtService jwtService) {
@@ -49,10 +44,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     String tenantId = (String) claims.get("tid");
 
                     AuthenticatedUser principal = new AuthenticatedUser(userId, username, tenantId);
+                    var authorities = new java.util.ArrayList<org.springframework.security.core.authority.SimpleGrantedAuthority>();
+                    authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+                    log.info("JWT roles: {}", claims.get("roles"));
+                    log.info("Initial authorities: {}", authorities);
+                    // 从 JWT roles claim 添加角色 authorities
+                    Object rolesObj = claims.get("roles");
+                    if (rolesObj instanceof List<?>) {
+                        @SuppressWarnings("unchecked")
+                        List<String> roles = (List<String>) rolesObj;
+                        for (String roleName : roles) {
+                            String normalized = roleName.trim().toUpperCase();
+                            if (!normalized.isBlank()) {
+                                authorities.add(new SimpleGrantedAuthority("ROLE_" + normalized));
+                            }
+                        }
+                    }
                     var auth = new UsernamePasswordAuthenticationToken(
                             principal,
                             null,
-                            List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                            authorities
                     );
                     SecurityContextHolder.getContext().setAuthentication(auth);
                     // Week 41 D6 Step G1:绑定 tenantId 到 ThreadLocal

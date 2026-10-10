@@ -81,6 +81,7 @@ public class TenantQuotaController {
     /**
      * 登录用户查询自己租户配额
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/tenant/quota")
     public ResponseEntity<Map<String, Object>> getMyQuota(@AuthenticationPrincipal AuthenticatedUser user) {
         TenantEntity tenant = tenantRepository.findById(user.tenantId())

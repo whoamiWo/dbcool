@@ -3,6 +3,7 @@ package com.nocobase.bi;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.meta.CollectionService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,7 @@ public class BiReportController {
     /**
      * 数据透视:body = {collection, rows[], columns[], values[{field,agg}], filters[]}
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pivot")
     public ResponseEntity<Map<String, Object>> executePivot(
             @RequestBody Map<String, Object> body,
@@ -53,6 +55,7 @@ public class BiReportController {
     /**
      * 图表数据:body = {collection, chartType, xField, yField, seriesField, agg, filters[]}
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/chart")
     public ResponseEntity<Map<String, Object>> executeChart(
             @RequestBody Map<String, Object> body,
@@ -79,6 +82,7 @@ public class BiReportController {
     /**
      * 已保存报表列表(按 collection)。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/reports")
     public ResponseEntity<Map<String, Object>> listReports(
             @RequestParam String collectionName,
@@ -91,6 +95,7 @@ public class BiReportController {
     /**
      * 保存报表定义。
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/reports")
     public ResponseEntity<Map<String, Object>> saveReport(
             @RequestBody Map<String, Object> body,

@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
@@ -27,6 +28,7 @@ public class NotificationChannelController {
     }
 
     @Operation(summary = "列出当前 tenant 所有通知 channel")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<Map<String, Object>> list(@AuthenticationPrincipal AuthenticatedUser user) {
         List<Map<String, Object>> data = repository.findByTenantId(user.tenantId())
@@ -35,6 +37,7 @@ public class NotificationChannelController {
     }
 
     @Operation(summary = "创建新 channel")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@AuthenticationPrincipal AuthenticatedUser user,
                                                        @RequestBody @Valid ChannelRequest req) {
@@ -47,6 +50,7 @@ public class NotificationChannelController {
     }
 
     @Operation(summary = "更新 channel")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<Map<String, Object>> update(@AuthenticationPrincipal AuthenticatedUser user,
                                                        @PathVariable UUID id,
@@ -63,6 +67,7 @@ public class NotificationChannelController {
     }
 
     @Operation(summary = "删除 channel")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> delete(@AuthenticationPrincipal AuthenticatedUser user,
                                                        @PathVariable UUID id) {
@@ -76,6 +81,7 @@ public class NotificationChannelController {
     }
 
     @Operation(summary = "测试发送 — 用真实 channel 配置发一条 demo 消息")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{id}/test")
     public ResponseEntity<Map<String, Object>> test(@AuthenticationPrincipal AuthenticatedUser user,
                                                      @PathVariable UUID id,
@@ -99,6 +105,7 @@ public class NotificationChannelController {
     }
 
     @Operation(summary = "列出支持的 channel 类型及默认配置示例")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/types")
     public ResponseEntity<Map<String, Object>> types() {
         List<Map<String, Object>> types = List.of(

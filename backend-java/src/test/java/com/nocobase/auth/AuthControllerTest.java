@@ -1,6 +1,7 @@
 package com.nocobase.auth;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -87,7 +88,8 @@ class AuthControllerTest {
         UUID uid = UUID.randomUUID();
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(uid, "alice")));
         when(passwordEncoder.matches("pw", "$2a$10$hash")).thenReturn(true);
-        when(jwtService.issueAccessToken(uid, "alice", "tenant_default")).thenReturn("ACCESS.jwt");
+        when(userRoleRepository.findByIdUserId(uid)).thenReturn(List.of());
+        when(jwtService.issueAccessToken(eq(uid), eq("alice"), eq("tenant_default"), anyList())).thenReturn("ACCESS.jwt");
         when(refreshTokenService.issue(uid)).thenReturn("REFRESH.token");
         when(jwtService.getAccessTtl()).thenReturn(Duration.ofHours(1));
 
@@ -163,7 +165,8 @@ class AuthControllerTest {
         UUID uid = UUID.randomUUID();
         when(refreshTokenService.consume("REFRESH.token")).thenReturn(uid);
         when(userRepository.findById(uid)).thenReturn(Optional.of(user(uid, "alice")));
-        when(jwtService.issueAccessToken(uid, "alice", "tenant_default")).thenReturn("NEW.jwt");
+        when(userRoleRepository.findByIdUserId(uid)).thenReturn(List.of());
+        when(jwtService.issueAccessToken(eq(uid), eq("alice"), eq("tenant_default"), anyList())).thenReturn("NEW.jwt");
         when(refreshTokenService.issue(uid)).thenReturn("NEW.REFRESH");
         when(jwtService.getAccessTtl()).thenReturn(Duration.ofHours(1));
 
