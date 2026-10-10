@@ -170,9 +170,12 @@ spring:
   jpa:
     show-sql: false
   # PHASE69: 生产环境关闭 Swagger UI
+  # PHASE95 R4: api-docs 也关闭 — 匿名 curl /v3/api-docs 必须 401/403/404
   springdoc:
     swagger-ui:
       enabled: ${SPRINGDOC_SWAGGER_ENABLED:false}
+    api-docs:
+      enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
 
 logging:
   level:

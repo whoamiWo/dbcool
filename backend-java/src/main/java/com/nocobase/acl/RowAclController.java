@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,6 +36,7 @@ public class RowAclController {
         this.auditService = auditService;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public Map<String, Object> list(@AuthenticationPrincipal AuthenticatedUser user) {
         List<Map<String, Object>> data = repository.findAll().stream()
@@ -43,6 +45,7 @@ public class RowAclController {
         return Map.of("code", 0, "data", data);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/by-collection/{collection}")
     public Map<String, Object> byCollection(@PathVariable String collection,
                                             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -52,6 +55,7 @@ public class RowAclController {
         return Map.of("code", 0, "data", data);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public Map<String, Object> create(@RequestBody PolicyRequest req,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
@@ -80,6 +84,7 @@ public class RowAclController {
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public Map<String, Object> update(@PathVariable UUID id,
                                       @RequestBody PolicyRequest req,
@@ -110,6 +115,7 @@ public class RowAclController {
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id,
                                       @AuthenticationPrincipal AuthenticatedUser user) {

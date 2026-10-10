@@ -6,6 +6,7 @@ import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +29,7 @@ public class ImHuddleController {
     }
 
     /** 创建语音会话 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody Map<String, Object> body,
@@ -51,6 +53,7 @@ public class ImHuddleController {
     }
 
     /** 加入语音会话 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{huddleId}/join")
     public ResponseEntity<Map<String, Object>> join(
             @PathVariable UUID huddleId,
@@ -69,6 +72,7 @@ public class ImHuddleController {
     }
 
     /** 离开语音会话 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{huddleId}/leave")
     public ResponseEntity<Map<String, Object>> leave(
             @PathVariable UUID huddleId,
@@ -83,6 +87,7 @@ public class ImHuddleController {
     }
 
     /** 结束语音会话 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{huddleId}/end")
     public ResponseEntity<Map<String, Object>> end(
             @PathVariable UUID huddleId,
@@ -101,6 +106,7 @@ public class ImHuddleController {
     }
 
     /** 切换静音 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{huddleId}/mute")
     public ResponseEntity<Map<String, Object>> toggleMute(
             @PathVariable UUID huddleId,
@@ -118,6 +124,7 @@ public class ImHuddleController {
     }
 
     /** 切换屏幕共享 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{huddleId}/screen-share")
     public ResponseEntity<Map<String, Object>> toggleScreenShare(
             @PathVariable UUID huddleId,
@@ -149,6 +156,7 @@ public class ImHuddleController {
     }
 
     /** 获取会话详情 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{huddleId}")
     public ResponseEntity<Map<String, Object>> get(
             @PathVariable UUID huddleId,
@@ -163,6 +171,7 @@ public class ImHuddleController {
     }
 
     /** 获取会话参与者列表 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{huddleId}/participants")
     public ResponseEntity<Map<String, Object>> listParticipants(
             @PathVariable UUID huddleId,

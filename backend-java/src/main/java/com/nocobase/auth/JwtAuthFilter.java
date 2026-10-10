@@ -46,8 +46,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     AuthenticatedUser principal = new AuthenticatedUser(userId, username, tenantId);
                     var authorities = new java.util.ArrayList<org.springframework.security.core.authority.SimpleGrantedAuthority>();
                     authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-                    log.info("JWT roles: {}", claims.get("roles"));
-                    log.info("Initial authorities: {}", authorities);
                     // 从 JWT roles claim 添加角色 authorities
                     Object rolesObj = claims.get("roles");
                     if (rolesObj instanceof List<?>) {

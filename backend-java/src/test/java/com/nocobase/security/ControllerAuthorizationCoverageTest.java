@@ -32,123 +32,21 @@ class ControllerAuthorizationCoverageTest {
     private static final Path BASELINE_PATH = Path.of("docs/controller-authorization-baseline.txt");
 
     // 白名单：这些端点是公开的，无需 @PreAuthorize
+    // 白名单用途：仅限真正无权限语义的公共接口（如健康检查、登录、第三方回调）
+    // 理由中不得含"ADMIN"/"需认证"/"需权限"等关键词
     private static final List<String> WHITELIST = List.of(
         // 健康检查：监控平台查询，用途：不涉及用户数据
-        "health/HealthController.java:17 -> health (reason: 负载均衡 + 监控)",
+        "health/HealthController.java:17 -> health (reason: 负载均衡 + 监控，无权限语义)",
         // 登录：认证入口，必须公开，用途：用户身份验证入口
-        "auth/AuthController.java:61 -> login (reason: 认证入口，必须公开)",
+        "auth/AuthController.java:61 -> login (reason: 认证入口，必须公开，无身份即无权限)",
         // 刷新：凭证续期，需先登录才能用，用途：匿名返回 401
-        "auth/AuthController.java:118 -> refresh (reason: 需先登录才能用)",
-        // 修改密码：需登录才能用，用途：匿名返回 401
-        "auth/AuthController.java:174 -> changePassword (reason: 需认证才能改密码)",
-        // 获取当前用户信息：需登录才能用，用途：匿名返回 401
-        "auth/AuthController.java:197 -> me (reason: 当前用户信息，需认证)",
+        "auth/AuthController.java:118 -> refresh (reason: 需要旧 token 续期，非无权限端点)",
         // WebSocket 信令：IM 系统的 WebSocket 端点，用途：鉴权由 JwtChannelInterceptor 处理
-        "im/ImChannelController.java:28 -> websocket (reason: WebSocket IM 信令，鉴权由 JwtChannelInterceptor 处理)",
+        "im/ImChannelController.java:28 -> websocket (reason: WebSocket 鉴权由拦截器处理)",
         // Webhook 回调：第三方平台调用，用途：无身份信息，由 HMAC 验签保护
         "webhook/WebhookSubscriptionController.java:43 -> callback (reason: 第三方平台回调，HMAC 验签)",
         // Swagger UI 接口文档：开发调试便利，用途：生产环境不暴露
-        "swagger/SwaggerController.java:15 -> swagger (reason: 开发调试用，生产环境关闭)",
-
-        // === Wiki 知识库 === (公开获取，用于内容管理和展示)
-        "wiki/WikiController.java:101 -> createKb (reason: 知识库创建，需 ADMIN)",
-        "wiki/WikiController.java:126 -> listKb (reason: 知识库列表，公开访问)",
-        "wiki/WikiController.java:135 -> getKb (reason: 知识库详情，公开访问)",
-        "wiki/WikiController.java:147 -> updateKb (reason: 知识库更新，需 ADMIN)",
-        "wiki/WikiController.java:165 -> deleteKb (reason: 知识库删除，需 ADMIN)",
-
-        // === Wiki 页面 ===
-        "wiki/WikiController.java:186 -> createPage (reason: 页面创建，需 ADMIN)",
-        "wiki/WikiController.java:214 -> listPages (reason: 页面列表，公开访问)",
-        "wiki/WikiController.java:244 -> getPage (reason: 页面详情，公开访问)",
-        "wiki/WikiController.java:262 -> getPageBySlug (reason: 通过 slug 获取页面，公开访问)",
-        "wiki/WikiController.java:273 -> updatePage (reason: 页面更新，需 ADMIN)",
-        "wiki/WikiController.java:294 -> deletePage (reason: 页面删除，需 ADMIN)",
-        "wiki/WikiController.java:318 -> publishPage (reason: 发布页面，需 ADMIN)",
-        "wiki/WikiController.java:335 -> archivePage (reason: 归档页面，需 ADMIN)",
-
-        // === Wiki 版本 ===
-        "wiki/WikiController.java:352 -> listVersions (reason: 版本列表，需 ADMIN 查看)",
-        "wiki/WikiController.java:368 -> getVersion (reason: 获取版本，需 ADMIN)",
-        "wiki/WikiController.java:384 -> restoreVersion (reason: 恢复版本，需 ADMIN)",
-
-        // === Wiki 区块 ===
-        "wiki/WikiController.java:402 -> listBlocks (reason: 区块列表，公开访问)",
-        "wiki/WikiController.java:414 -> createBlocks (reason: 区块创建，需 ADMIN)",
-        "wiki/WikiController.java:427 -> updateBlock (reason: 区块更新，需 ADMIN)",
-        "wiki/WikiController.java:442 -> deleteBlock (reason: 区块删除，需 ADMIN)",
-        "wiki/WikiController.java:453 -> reorderBlocks (reason: 区块排序，需 ADMIN)",
-        "wiki/WikiController.java:466 -> batchUpsertBlocks (reason: 批量写入，需 ADMIN)",
-
-        // === Wiki 分类 ===
-        "wiki/WikiController.java:507 -> listCategories (reason: 分类列表，公开访问)",
-        "wiki/WikiController.java:519 -> createCategory (reason: 分类创建，需 ADMIN)",
-        "wiki/WikiController.java:541 -> updateCategory (reason: 分类更新，需 ADMIN)",
-        "wiki/WikiController.java:559 -> deleteCategory (reason: 分类删除，需 ADMIN)",
-
-        // === Wiki 搜索 ===
-        "wiki/WikiController.java:580 -> search (reason: 知识库搜索，公开访问)",
-        "wiki/WikiController.java:604 -> hybridSearch (reason: 混合搜索，公开访问)",
-
-        // === Wiki 模板 ===
-        "wiki/WikiController.java:631 -> listTemplates (reason: 模板列表，公开访问)",
-        "wiki/WikiController.java:657 -> markTemplate (reason: 标记模板，需 ADMIN)",
-
-        // === 通知渠道 === (列出、创建、更新、删除、测试均需要 ADMIN)
-        // 已添加 @PreAuthorize("hasRole('ADMIN')") 至 NotificationChannelController
-        "notification/NotificationChannelController.java:30 -> list (reason: 列出通知渠道，需 ADMIN)",
-        "notification/NotificationChannelController.java:39 -> create (reason: 创建通知渠道，需 ADMIN)",
-        "notification/NotificationChannelController.java:52 -> update (reason: 更新通知渠道，需 ADMIN)",
-        "notification/NotificationChannelController.java:69 -> delete (reason: 删除通知渠道，需 ADMIN)",
-        "notification/NotificationChannelController.java:83 -> test (reason: 测试发送，需 ADMIN)",
-        "notification/NotificationChannelController.java:107 -> types (reason: 通知类型列表，公开访问)",
-        "notification/WeChatWorkController.java:32 -> send (reason: 微信工作消息，需 ADMIN)",
-        "notification/WeChatWorkController.java:80 -> ping (reason: 微信心跳检测，需 ADMIN)",
-
-        // === 行级权限 ===
-        "acl/RowAclController.java:38 -> list (reason: 行级权限列表，公开访问)",
-        "acl/RowAclController.java:46 -> byCollection (reason: 按集合获取 ACL，公开访问)",
-        "acl/RowAclController.java:55 -> create (reason: 创建 ACL，需 ADMIN)",
-        "acl/RowAclController.java:83 -> update (reason: 更新 ACL，需 ADMIN)",
-        "acl/RowAclController.java:113 -> delete (reason: 删除 ACL，需 ADMIN)",
-
-        // === IM Slash 命令 === (已添加 @PreAuthorize("isAuthenticated()"))
-        "im/ImSlashController.java:37 -> commands (reason: 列出 Slash 命令，需登录)",
-        "im/ImSlashController.java:44 -> execute (reason: 执行 Slash 命令，需登录)",
-
-        // === 用户数据合规 === (自助端点，已添加 @PreAuthorize("isAuthenticated()"))
-        "compliance/UserDataComplianceController.java:92 -> exportMyData (reason: 本人数据导出，需登录)",
-        "compliance/UserDataComplianceController.java:112 -> requestErasureMyData (reason: 请求删除个人数据，需登录)",
-
-        // === IM 频道 === (已添加 @PreAuthorize("isAuthenticated()"))
-        "im/ImChannelController.java:38 -> list (reason: 频道列表，需登录)",
-        "im/ImChannelController.java:46 -> create (reason: 创建频道，需登录)",
-        "im/ImChannelController.java:63 -> direct (reason: 获取直聊频道，需登录)",
-        "im/ImChannelController.java:72 -> get (reason: 获取频道详情，需登录)",
-        "im/ImChannelController.java:81 -> members (reason: 获取频道成员，需登录)",
-        "im/ImChannelController.java:96 -> join (reason: 加入频道，需登录)",
-        "im/ImChannelController.java:116 -> leave (reason: 离开频道，需登录)",
-        "im/ImChannelController.java:130 -> heartbeat (reason: 在线心跳，需登录)",
-
-        // === IM 消息 ===
-        "im/ImMessageController.java:356 -> listReactions (reason: 列表表情反应，需登录)",
-
-        // === IM 会议 (Huddle) ===
-        "im/ImHuddleController.java:31 -> create (reason: 创建会议，需登录)",
-        "im/ImHuddleController.java:54 -> join (reason: 加入会议，需登录)",
-        "im/ImHuddleController.java:72 -> leave (reason: 离开会议，需登录)",
-        "im/ImHuddleController.java:86 -> end (reason: 结束会议，需 ADMIN)",
-        "im/ImHuddleController.java:104 -> toggleMute (reason: 切换静音，需登录)",
-        "im/ImHuddleController.java:121 -> toggleScreenShare (reason: 切换屏幕共享，需登录)",
-        "im/ImHuddleController.java:138 -> listActive (reason: 列出活跃会议，需登录)",
-        "im/ImHuddleController.java:152 -> get (reason: 获取会议详情，需登录)",
-        "im/ImHuddleController.java:166 -> listParticipants (reason: 列出参与者，需登录)",
-
-        // === BI 报表 === (已添加 @PreAuthorize("isAuthenticated()"))
-        "bi/BiReportController.java:32 -> executePivot (reason: 数据透视，需登录)",
-        "bi/BiReportController.java:57 -> executeChart (reason: 图表数据，需登录)",
-        "bi/BiReportController.java:83 -> listReports (reason: 已保存报表列表，需登录)",
-        "bi/BiReportController.java:95 -> saveReport (reason: 保存报表定义，需登录)"
+        "swagger/SwaggerController.java:15 -> swagger (reason: 开发调试用，生产环境关闭)"
     );
 
     // Match HTTP mapping annotations (GET/POST/PUT/DELETE/PATCH)

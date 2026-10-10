@@ -17,6 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +54,7 @@ public class ImMessageController {
     }
 
     /** 置顶消息列表(按置顶时间倒序)。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pins")
     public Map<String, Object> listPins(
             @RequestParam UUID channelId,
@@ -63,6 +65,7 @@ public class ImMessageController {
     }
 
     /** 置顶某条消息。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pins")
     public Map<String, Object> pin(
             @RequestBody Map<String, Object> body,
@@ -79,6 +82,7 @@ public class ImMessageController {
     }
 
     /** 取消置顶。 */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/pins")
     public Map<String, Object> unpin(
             @RequestBody Map<String, Object> body,
@@ -142,6 +146,7 @@ public class ImMessageController {
                 Map.of("code", 0, "message", "success", "data", ImMessageDto.from(m)));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public Map<String, Object> edit(
             @PathVariable UUID id,
@@ -158,6 +163,7 @@ public class ImMessageController {
         return Map.of("code", 0, "message", "success", "data", ImMessageDto.from(m));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(
             @PathVariable UUID id,
@@ -182,6 +188,7 @@ public class ImMessageController {
     }
 
     /** 线程回复。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}/thread")
     public Map<String, Object> thread(
             @PathVariable UUID id,
@@ -195,6 +202,7 @@ public class ImMessageController {
         return Map.of("code", 0, "message", "success", "data", Map.of("replies", replies));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/search")
     public Map<String, Object> search(
             @RequestParam UUID channelId,
@@ -213,6 +221,7 @@ public class ImMessageController {
      *
      * <p>支持：关键词 + 提及我 + 发送者 + 时间范围，带 total 与分页。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/advanced-search")
     public Map<String, Object> advancedSearch(
             @RequestParam(required = false) UUID channelId,
@@ -258,6 +267,7 @@ public class ImMessageController {
     /**
      * 查询用户被提及的消息（跨频道）。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/mentions")
     public Map<String, Object> mentions(
             @RequestParam(required = false) UUID channelId,
@@ -288,6 +298,7 @@ public class ImMessageController {
      *
      * <p>channelId 可选：不传时搜当前用户已加入的全部频道，传时只搜该频道（仍校验成员身份）。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/search/cross")
     public Map<String, Object> searchCross(
             @RequestParam String keyword,
@@ -313,6 +324,7 @@ public class ImMessageController {
     }
 
     /** 标记已读到 lastMessageId(推进未读游标)。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/read")
     public Map<String, Object> markRead(
             @RequestBody Map<String, Object> body,
@@ -327,6 +339,7 @@ public class ImMessageController {
     }
 
     /** 添加表情回应(幂等)。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{id}/reactions")
     public Map<String, Object> addReaction(
             @PathVariable UUID id,
@@ -342,6 +355,7 @@ public class ImMessageController {
         ));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}/reactions")
     public Map<String, Object> removeReaction(
             @PathVariable UUID id,
@@ -353,6 +367,7 @@ public class ImMessageController {
                 "data", Map.of("messageId", id.toString()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}/reactions")
     public Map<String, Object> listReactions(
             @PathVariable UUID id,
