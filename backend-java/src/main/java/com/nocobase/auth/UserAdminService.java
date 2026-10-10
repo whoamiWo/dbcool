@@ -100,6 +100,10 @@ public class UserAdminService {
         if (userRoleRepository.findById(new UserRoleEntity.UserRoleId(userId, roleId)).isPresent()) {
             return; // 已存在
         }
+        // 校验 role 存在，避免 FK 约束违反导致 500
+        if (!roleRepository.findById(roleId).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "角色不存在: " + roleId);
+        }
         userRoleRepository.save(new UserRoleEntity(userId, roleId));
     }
 
