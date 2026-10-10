@@ -87,3 +87,6 @@ frontend/test_thread_click.cjs
 
 # 备份产物(含数据库 dump / 生产数据),严禁入库
 backend-python/backups/
+
+# Playwright 产物(根目录)
+test-results/
