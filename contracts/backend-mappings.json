@@ -1,0 +1,1829 @@
+[
+  {
+    "class": "AgentController",
+    "method": "POST",
+    "path": "/api/ai/agent/execute",
+    "file": "backend-java/src/main/java/com/nocobase/ai/AgentController.java",
+    "line": 28
+  },
+  {
+    "class": "AiController",
+    "method": "GET",
+    "path": "/api/ai/quota",
+    "file": "backend-java/src/main/java/com/nocobase/ai/AiController.java",
+    "line": 110
+  },
+  {
+    "class": "AiController",
+    "method": "GET",
+    "path": "/api/ai/status",
+    "file": "backend-java/src/main/java/com/nocobase/ai/AiController.java",
+    "line": 73
+  },
+  {
+    "class": "AiController",
+    "method": "POST",
+    "path": "/api/ai/ask",
+    "file": "backend-java/src/main/java/com/nocobase/ai/AiController.java",
+    "line": 43
+  },
+  {
+    "class": "AiController",
+    "method": "POST",
+    "path": "/api/ai/chat",
+    "file": "backend-java/src/main/java/com/nocobase/ai/AiController.java",
+    "line": 89
+  },
+  {
+    "class": "AiController",
+    "method": "POST",
+    "path": "/api/ai/code",
+    "file": "backend-java/src/main/java/com/nocobase/ai/AiController.java",
+    "line": 58
+  },
+  {
+    "class": "AiController",
+    "method": "POST",
+    "path": "/api/ai/wiki",
+    "file": "backend-java/src/main/java/com/nocobase/ai/AiController.java",
+    "line": 28
+  },
+  {
+    "class": "AlertController",
+    "method": "DELETE",
+    "path": "/api/alerts/subscriptions",
+    "file": "backend-java/src/main/java/com/nocobase/alert/web/AlertController.java",
+    "line": 123
+  },
+  {
+    "class": "AlertController",
+    "method": "GET",
+    "path": "/api/alerts/recent",
+    "file": "backend-java/src/main/java/com/nocobase/alert/web/AlertController.java",
+    "line": 51
+  },
+  {
+    "class": "AlertController",
+    "method": "GET",
+    "path": "/api/alerts/store/stats",
+    "file": "backend-java/src/main/java/com/nocobase/alert/web/AlertController.java",
+    "line": 137
+  },
+  {
+    "class": "AlertController",
+    "method": "GET",
+    "path": "/api/alerts/subscriptions/{userId}",
+    "file": "backend-java/src/main/java/com/nocobase/alert/web/AlertController.java",
+    "line": 132
+  },
+  {
+    "class": "AlertController",
+    "method": "POST",
+    "path": "/api/alerts/subscriptions",
+    "file": "backend-java/src/main/java/com/nocobase/alert/web/AlertController.java",
+    "line": 107
+  },
+  {
+    "class": "AlertController",
+    "method": "POST",
+    "path": "/api/alerts/{eventId}/ack",
+    "file": "backend-java/src/main/java/com/nocobase/alert/web/AlertController.java",
+    "line": 74
+  },
+  {
+    "class": "AlertController",
+    "method": "POST",
+    "path": "/api/alerts/{eventId}/resolve",
+    "file": "backend-java/src/main/java/com/nocobase/alert/web/AlertController.java",
+    "line": 92
+  },
+  {
+    "class": "ApiKeyController",
+    "method": "DELETE",
+    "path": "/api/admin/api-keys/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/apikey/ApiKeyController.java",
+    "line": 81
+  },
+  {
+    "class": "AttachmentController",
+    "method": "GET",
+    "path": "/api/attachments/download",
+    "file": "backend-java/src/main/java/com/nocobase/attachment/AttachmentController.java",
+    "line": 158
+  },
+  {
+    "class": "AttachmentController",
+    "method": "POST",
+    "path": "/api/attachments/metadata",
+    "file": "backend-java/src/main/java/com/nocobase/attachment/AttachmentController.java",
+    "line": 52
+  },
+  {
+    "class": "AttachmentController",
+    "method": "POST",
+    "path": "/api/attachments/upload",
+    "file": "backend-java/src/main/java/com/nocobase/attachment/AttachmentController.java",
+    "line": 116
+  },
+  {
+    "class": "AuditController",
+    "method": "GET",
+    "path": "/api/audit/logs",
+    "file": "backend-java/src/main/java/com/nocobase/audit/AuditController.java",
+    "line": 26
+  },
+  {
+    "class": "AuthController",
+    "method": "GET",
+    "path": "/api/auth/me",
+    "file": "backend-java/src/main/java/com/nocobase/auth/AuthController.java",
+    "line": 213
+  },
+  {
+    "class": "AuthController",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "file": "backend-java/src/main/java/com/nocobase/auth/AuthController.java",
+    "line": 66
+  },
+  {
+    "class": "AuthController",
+    "method": "POST",
+    "path": "/api/auth/password",
+    "file": "backend-java/src/main/java/com/nocobase/auth/AuthController.java",
+    "line": 190
+  },
+  {
+    "class": "AuthController",
+    "method": "POST",
+    "path": "/api/auth/refresh",
+    "file": "backend-java/src/main/java/com/nocobase/auth/AuthController.java",
+    "line": 134
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "DELETE",
+    "path": "/api/automation/{ruleId}",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 101
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "GET",
+    "path": "/api/automation/{ruleId}",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 129
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "GET",
+    "path": "/api/automation/{ruleId}/executions",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 162
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "POST",
+    "path": "/api/automation/{ruleId}/execute",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 144
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "POST",
+    "path": "/api/automation/{ruleId}/toggle",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 83
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "PUT",
+    "path": "/api/automation/{ruleId}",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 59
+  },
+  {
+    "class": "BiReportController",
+    "method": "GET",
+    "path": "/api/bi/reports",
+    "file": "backend-java/src/main/java/com/nocobase/bi/BiReportController.java",
+    "line": 86
+  },
+  {
+    "class": "BiReportController",
+    "method": "POST",
+    "path": "/api/bi/chart",
+    "file": "backend-java/src/main/java/com/nocobase/bi/BiReportController.java",
+    "line": 59
+  },
+  {
+    "class": "BiReportController",
+    "method": "POST",
+    "path": "/api/bi/pivot",
+    "file": "backend-java/src/main/java/com/nocobase/bi/BiReportController.java",
+    "line": 34
+  },
+  {
+    "class": "BiReportController",
+    "method": "POST",
+    "path": "/api/bi/reports",
+    "file": "backend-java/src/main/java/com/nocobase/bi/BiReportController.java",
+    "line": 99
+  },
+  {
+    "class": "CollectionController",
+    "method": "DELETE",
+    "path": "/api/collections/{name}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 141
+  },
+  {
+    "class": "CollectionController",
+    "method": "DELETE",
+    "path": "/api/collections/{name}/fields/{fieldName}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 166
+  },
+  {
+    "class": "CollectionController",
+    "method": "DELETE",
+    "path": "/api/collections/{name}/records/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 392
+  },
+  {
+    "class": "CollectionController",
+    "method": "GET",
+    "path": "/api/collections/_jobs/{jobId}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 190
+  },
+  {
+    "class": "CollectionController",
+    "method": "GET",
+    "path": "/api/collections/{name}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 122
+  },
+  {
+    "class": "CollectionController",
+    "method": "GET",
+    "path": "/api/collections/{name}/records",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 271
+  },
+  {
+    "class": "CollectionController",
+    "method": "GET",
+    "path": "/api/collections/{name}/records/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 340
+  },
+  {
+    "class": "CollectionController",
+    "method": "PATCH",
+    "path": "/api/collections/{name}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 131
+  },
+  {
+    "class": "CollectionController",
+    "method": "POST",
+    "path": "/api/collections/{name}/aggregate",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 596
+  },
+  {
+    "class": "CollectionController",
+    "method": "POST",
+    "path": "/api/collections/{name}/fields",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 156
+  },
+  {
+    "class": "CollectionController",
+    "method": "POST",
+    "path": "/api/collections/{name}/records",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 245
+  },
+  {
+    "class": "CollectionController",
+    "method": "PUT",
+    "path": "/api/collections/{name}/fields/{fieldName}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 176
+  },
+  {
+    "class": "CollectionController",
+    "method": "PUT",
+    "path": "/api/collections/{name}/records/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 364
+  },
+  {
+    "class": "DingTalkController",
+    "method": "GET",
+    "path": "/api/dingtalk/approval-status",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 205
+  },
+  {
+    "class": "DingTalkController",
+    "method": "GET",
+    "path": "/api/dingtalk/auth-url",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 84
+  },
+  {
+    "class": "DingTalkController",
+    "method": "GET",
+    "path": "/api/dingtalk/config",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 154
+  },
+  {
+    "class": "DingTalkController",
+    "method": "GET",
+    "path": "/api/dingtalk/sync-status",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 337
+  },
+  {
+    "class": "DingTalkController",
+    "method": "GET",
+    "path": "/api/dingtalk/user-info",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 162
+  },
+  {
+    "class": "DingTalkController",
+    "method": "GET",
+    "path": "/api/dingtalk/user-mappings",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 326
+  },
+  {
+    "class": "DingTalkController",
+    "method": "POST",
+    "path": "/api/dingtalk/approval",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 215
+  },
+  {
+    "class": "DingTalkController",
+    "method": "POST",
+    "path": "/api/dingtalk/approval-callback",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 242
+  },
+  {
+    "class": "DingTalkController",
+    "method": "POST",
+    "path": "/api/dingtalk/auth-url",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 92
+  },
+  {
+    "class": "DingTalkController",
+    "method": "POST",
+    "path": "/api/dingtalk/events",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 354
+  },
+  {
+    "class": "DingTalkController",
+    "method": "POST",
+    "path": "/api/dingtalk/login",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 111
+  },
+  {
+    "class": "DingTalkController",
+    "method": "POST",
+    "path": "/api/dingtalk/logout",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 182
+  },
+  {
+    "class": "DingTalkController",
+    "method": "POST",
+    "path": "/api/dingtalk/sync-org",
+    "file": "backend-java/src/main/java/com/nocobase/integration/dingtalk/DingTalkController.java",
+    "line": 316
+  },
+  {
+    "class": "FeishuController",
+    "method": "GET",
+    "path": "/api/feishu/auth-url",
+    "file": "backend-java/src/main/java/com/nocobase/integration/feishu/FeishuController.java",
+    "line": 41
+  },
+  {
+    "class": "FeishuController",
+    "method": "POST",
+    "path": "/api/feishu/events",
+    "file": "backend-java/src/main/java/com/nocobase/integration/feishu/FeishuController.java",
+    "line": 68
+  },
+  {
+    "class": "FeishuController",
+    "method": "POST",
+    "path": "/api/feishu/message/reply",
+    "file": "backend-java/src/main/java/com/nocobase/integration/feishu/FeishuController.java",
+    "line": 140
+  },
+  {
+    "class": "FeishuController",
+    "method": "POST",
+    "path": "/api/feishu/message/send",
+    "file": "backend-java/src/main/java/com/nocobase/integration/feishu/FeishuController.java",
+    "line": 114
+  },
+  {
+    "class": "FeishuController",
+    "method": "POST",
+    "path": "/api/feishu/oauth/callback",
+    "file": "backend-java/src/main/java/com/nocobase/integration/feishu/FeishuController.java",
+    "line": 48
+  },
+  {
+    "class": "FormController",
+    "method": "DELETE",
+    "path": "/api/forms/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/form/FormController.java",
+    "line": 88
+  },
+  {
+    "class": "FormController",
+    "method": "GET",
+    "path": "/api/forms/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/form/FormController.java",
+    "line": 64
+  },
+  {
+    "class": "FormController",
+    "method": "PUT",
+    "path": "/api/forms/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/form/FormController.java",
+    "line": 76
+  },
+  {
+    "class": "HealthController",
+    "method": "GET",
+    "path": "/api/health",
+    "file": "backend-java/src/main/java/com/nocobase/health/HealthController.java",
+    "line": 41
+  },
+  {
+    "class": "HealthController",
+    "method": "GET",
+    "path": "/api/health/pool",
+    "file": "backend-java/src/main/java/com/nocobase/health/HealthController.java",
+    "line": 82
+  },
+  {
+    "class": "HealthController",
+    "method": "GET",
+    "path": "/api/health/ready",
+    "file": "backend-java/src/main/java/com/nocobase/health/HealthController.java",
+    "line": 52
+  },
+  {
+    "class": "ImChannelController",
+    "method": "DELETE",
+    "path": "/api/im/channels/{id}/members/me",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 124
+  },
+  {
+    "class": "ImChannelController",
+    "method": "GET",
+    "path": "/api/im/channels/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 77
+  },
+  {
+    "class": "ImChannelController",
+    "method": "GET",
+    "path": "/api/im/channels/{id}/members",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 87
+  },
+  {
+    "class": "ImChannelController",
+    "method": "POST",
+    "path": "/api/im/channels/direct/{userId}",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 67
+  },
+  {
+    "class": "ImChannelController",
+    "method": "POST",
+    "path": "/api/im/channels/presence/heartbeat",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 139
+  },
+  {
+    "class": "ImChannelController",
+    "method": "POST",
+    "path": "/api/im/channels/{id}/members",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 103
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "GET",
+    "path": "/api/im/huddle/{huddleId}",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 160
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "GET",
+    "path": "/api/im/huddle/{huddleId}/participants",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 175
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "POST",
+    "path": "/api/im/huddle/{huddleId}/end",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 91
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "POST",
+    "path": "/api/im/huddle/{huddleId}/join",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 57
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "POST",
+    "path": "/api/im/huddle/{huddleId}/leave",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 76
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "POST",
+    "path": "/api/im/huddle/{huddleId}/mute",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 110
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "POST",
+    "path": "/api/im/huddle/{huddleId}/screen-share",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 128
+  },
+  {
+    "class": "ImMessageController",
+    "method": "DELETE",
+    "path": "/api/im/messages/pins",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 86
+  },
+  {
+    "class": "ImMessageController",
+    "method": "DELETE",
+    "path": "/api/im/messages/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 167
+  },
+  {
+    "class": "ImMessageController",
+    "method": "DELETE",
+    "path": "/api/im/messages/{id}/reactions",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 359
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/advanced-search",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 225
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/mentions",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 271
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/pins",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 58
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/search",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 206
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/search/cross",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 302
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/unread",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 315
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/{id}/reactions",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 371
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
+    "path": "/api/im/messages/{id}/thread",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 192
+  },
+  {
+    "class": "ImMessageController",
+    "method": "POST",
+    "path": "/api/im/messages/pins",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 69
+  },
+  {
+    "class": "ImMessageController",
+    "method": "POST",
+    "path": "/api/im/messages/read",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 328
+  },
+  {
+    "class": "ImMessageController",
+    "method": "POST",
+    "path": "/api/im/messages/{id}/reactions",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 343
+  },
+  {
+    "class": "ImMessageController",
+    "method": "PUT",
+    "path": "/api/im/messages/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 150
+  },
+  {
+    "class": "ImSlashController",
+    "method": "GET",
+    "path": "/api/im/slash/commands",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImSlashController.java",
+    "line": 39
+  },
+  {
+    "class": "ImSlashController",
+    "method": "POST",
+    "path": "/api/im/slash/commands/execute",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImSlashController.java",
+    "line": 47
+  },
+  {
+    "class": "IntegrationMarketController",
+    "method": "GET",
+    "path": "/api/integrations/market",
+    "file": "backend-java/src/main/java/com/nocobase/integration/market/IntegrationMarketController.java",
+    "line": 36
+  },
+  {
+    "class": "IntegrationMarketController",
+    "method": "POST",
+    "path": "/api/integrations/install/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/integration/market/IntegrationMarketController.java",
+    "line": 49
+  },
+  {
+    "class": "IntegrationMarketController",
+    "method": "POST",
+    "path": "/api/integrations/uninstall/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/integration/market/IntegrationMarketController.java",
+    "line": 60
+  },
+  {
+    "class": "JwtKeyRotationController",
+    "method": "POST",
+    "path": "/api/admin/jwt-keys/rotate",
+    "file": "backend-java/src/main/java/com/nocobase/auth/JwtKeyRotationController.java",
+    "line": 52
+  },
+  {
+    "class": "LdapSyncController",
+    "method": "GET",
+    "path": "/api/ldap/{configId}/mappings",
+    "file": "backend-java/src/main/java/com/nocobase/ldap/LdapSyncController.java",
+    "line": 103
+  },
+  {
+    "class": "LdapSyncController",
+    "method": "POST",
+    "path": "/api/ldap/{configId}/sync",
+    "file": "backend-java/src/main/java/com/nocobase/ldap/LdapSyncController.java",
+    "line": 75
+  },
+  {
+    "class": "LdapSyncController",
+    "method": "POST",
+    "path": "/api/ldap/{configId}/toggle",
+    "file": "backend-java/src/main/java/com/nocobase/ldap/LdapSyncController.java",
+    "line": 58
+  },
+  {
+    "class": "MattermostController",
+    "method": "GET",
+    "path": "/api/mattermost/webhook-url",
+    "file": "backend-java/src/main/java/com/nocobase/integration/mattermost/MattermostController.java",
+    "line": 35
+  },
+  {
+    "class": "MattermostController",
+    "method": "POST",
+    "path": "/api/mattermost/message/reply",
+    "file": "backend-java/src/main/java/com/nocobase/integration/mattermost/MattermostController.java",
+    "line": 95
+  },
+  {
+    "class": "MattermostController",
+    "method": "POST",
+    "path": "/api/mattermost/message/send",
+    "file": "backend-java/src/main/java/com/nocobase/integration/mattermost/MattermostController.java",
+    "line": 69
+  },
+  {
+    "class": "MattermostController",
+    "method": "POST",
+    "path": "/api/mattermost/webhook/incoming",
+    "file": "backend-java/src/main/java/com/nocobase/integration/mattermost/MattermostController.java",
+    "line": 42
+  },
+  {
+    "class": "MessageController",
+    "method": "POST",
+    "path": "/api/messages/{id}/read",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/MessageController.java",
+    "line": 86
+  },
+  {
+    "class": "NotificationChannelController",
+    "method": "DELETE",
+    "path": "/api/admin/notification-channels/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
+    "line": 71
+  },
+  {
+    "class": "NotificationChannelController",
+    "method": "GET",
+    "path": "/api/admin/notification-channels/types",
+    "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
+    "line": 109
+  },
+  {
+    "class": "NotificationChannelController",
+    "method": "POST",
+    "path": "/api/admin/notification-channels/{id}/test",
+    "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
+    "line": 85
+  },
+  {
+    "class": "NotificationChannelController",
+    "method": "PUT",
+    "path": "/api/admin/notification-channels/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
+    "line": 54
+  },
+  {
+    "class": "PlaybookController",
+    "method": "GET",
+    "path": "/api/playbooks/runs/overdue",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 113
+  },
+  {
+    "class": "PlaybookController",
+    "method": "GET",
+    "path": "/api/playbooks/runs/{runId}",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 119
+  },
+  {
+    "class": "PlaybookController",
+    "method": "GET",
+    "path": "/api/playbooks/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 46
+  },
+  {
+    "class": "PlaybookController",
+    "method": "GET",
+    "path": "/api/playbooks/{id}/runs",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 107
+  },
+  {
+    "class": "PlaybookController",
+    "method": "POST",
+    "path": "/api/playbooks/runs/{runId}/finish",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 139
+  },
+  {
+    "class": "PlaybookController",
+    "method": "POST",
+    "path": "/api/playbooks/{id}/activate",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 79
+  },
+  {
+    "class": "PlaybookController",
+    "method": "POST",
+    "path": "/api/playbooks/{id}/archive",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 86
+  },
+  {
+    "class": "PlaybookController",
+    "method": "POST",
+    "path": "/api/playbooks/{id}/run",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 93
+  },
+  {
+    "class": "PlaybookController",
+    "method": "PUT",
+    "path": "/api/playbooks/runs/{runId}/checklist",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 125
+  },
+  {
+    "class": "PlaybookController",
+    "method": "PUT",
+    "path": "/api/playbooks/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 69
+  },
+  {
+    "class": "PluginMarketplaceController",
+    "method": "GET",
+    "path": "/api/marketplace/apps",
+    "file": "backend-java/src/main/java/com/nocobase/plugin/PluginMarketplaceController.java",
+    "line": 29
+  },
+  {
+    "class": "PluginMarketplaceController",
+    "method": "GET",
+    "path": "/api/marketplace/apps/{appKey}",
+    "file": "backend-java/src/main/java/com/nocobase/plugin/PluginMarketplaceController.java",
+    "line": 45
+  },
+  {
+    "class": "PluginMarketplaceController",
+    "method": "GET",
+    "path": "/api/marketplace/apps/{appKey}/update-check",
+    "file": "backend-java/src/main/java/com/nocobase/plugin/PluginMarketplaceController.java",
+    "line": 114
+  },
+  {
+    "class": "PluginMarketplaceController",
+    "method": "GET",
+    "path": "/api/marketplace/installed",
+    "file": "backend-java/src/main/java/com/nocobase/plugin/PluginMarketplaceController.java",
+    "line": 129
+  },
+  {
+    "class": "PluginMarketplaceController",
+    "method": "POST",
+    "path": "/api/marketplace/apps/{appKey}/install",
+    "file": "backend-java/src/main/java/com/nocobase/plugin/PluginMarketplaceController.java",
+    "line": 60
+  },
+  {
+    "class": "PluginMarketplaceController",
+    "method": "POST",
+    "path": "/api/marketplace/apps/{appKey}/uninstall",
+    "file": "backend-java/src/main/java/com/nocobase/plugin/PluginMarketplaceController.java",
+    "line": 80
+  },
+  {
+    "class": "PluginMarketplaceController",
+    "method": "PUT",
+    "path": "/api/marketplace/apps/{appKey}/config",
+    "file": "backend-java/src/main/java/com/nocobase/plugin/PluginMarketplaceController.java",
+    "line": 94
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "DELETE",
+    "path": "/api/project-boards/checklist-items/{itemId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 306
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "DELETE",
+    "path": "/api/project-boards/checklists/{checklistId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 223
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "DELETE",
+    "path": "/api/project-boards/labels/{labelId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 387
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "DELETE",
+    "path": "/api/project-boards/lists/{listId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 124
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "DELETE",
+    "path": "/api/project-boards/tasks/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 487
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "GET",
+    "path": "/api/project-boards/checklist-items/by-checklist/{checklistId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 269
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "GET",
+    "path": "/api/project-boards/checklists/by-task/{taskId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 188
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "GET",
+    "path": "/api/project-boards/labels/by-project/{projectId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 349
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "GET",
+    "path": "/api/project-boards/{projectId}/lists",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 83
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "POST",
+    "path": "/api/project-boards/cards/move",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 140
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "POST",
+    "path": "/api/project-boards/checklist-items",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 242
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "POST",
+    "path": "/api/project-boards/checklists",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 164
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "POST",
+    "path": "/api/project-boards/labels",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 325
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "POST",
+    "path": "/api/project-boards/lists",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 56
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "POST",
+    "path": "/api/project-boards/members/assign",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 403
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "POST",
+    "path": "/api/project-boards/tasks",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 430
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "PUT",
+    "path": "/api/project-boards/checklist-items/{itemId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 288
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "PUT",
+    "path": "/api/project-boards/checklists/{checklistId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 206
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "PUT",
+    "path": "/api/project-boards/labels/{labelId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 369
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "PUT",
+    "path": "/api/project-boards/lists/{listId}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 103
+  },
+  {
+    "class": "ProjectBoardController",
+    "method": "PUT",
+    "path": "/api/project-boards/tasks/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectBoardController.java",
+    "line": 464
+  },
+  {
+    "class": "ProjectController",
+    "method": "DELETE",
+    "path": "/api/projects/tasks/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 139
+  },
+  {
+    "class": "ProjectController",
+    "method": "GET",
+    "path": "/api/projects/tasks/mine",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 107
+  },
+  {
+    "class": "ProjectController",
+    "method": "GET",
+    "path": "/api/projects/{projectId}/gantt",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 97
+  },
+  {
+    "class": "ProjectController",
+    "method": "GET",
+    "path": "/api/projects/{projectId}/tasks",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 82
+  },
+  {
+    "class": "ProjectController",
+    "method": "POST",
+    "path": "/api/projects/tasks",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 54
+  },
+  {
+    "class": "ProjectController",
+    "method": "PUT",
+    "path": "/api/projects/tasks/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 116
+  },
+  {
+    "class": "RoleAclController",
+    "method": "DELETE",
+    "path": "/api/admin/acl/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 191
+  },
+  {
+    "class": "RoleAclController",
+    "method": "DELETE",
+    "path": "/api/admin/roles/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 88
+  },
+  {
+    "class": "RoleAclController",
+    "method": "GET",
+    "path": "/api/admin/acl",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 148
+  },
+  {
+    "class": "RoleAclController",
+    "method": "GET",
+    "path": "/api/admin/roles",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 39
+  },
+  {
+    "class": "RoleAclController",
+    "method": "GET",
+    "path": "/api/admin/roles/tree",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 111
+  },
+  {
+    "class": "RoleAclController",
+    "method": "GET",
+    "path": "/api/admin/roles/{id}/inheritance",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 127
+  },
+  {
+    "class": "RoleAclController",
+    "method": "POST",
+    "path": "/api/admin/acl",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 155
+  },
+  {
+    "class": "RoleAclController",
+    "method": "POST",
+    "path": "/api/admin/roles",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 46
+  },
+  {
+    "class": "RoleAclController",
+    "method": "PUT",
+    "path": "/api/admin/acl/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 177
+  },
+  {
+    "class": "RoleAclController",
+    "method": "PUT",
+    "path": "/api/admin/roles/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/RoleAclController.java",
+    "line": 70
+  },
+  {
+    "class": "RowAclController",
+    "method": "DELETE",
+    "path": "/api/admin/row-acl/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/acl/RowAclController.java",
+    "line": 119
+  },
+  {
+    "class": "RowAclController",
+    "method": "GET",
+    "path": "/api/admin/row-acl/by-collection/{collection}",
+    "file": "backend-java/src/main/java/com/nocobase/acl/RowAclController.java",
+    "line": 49
+  },
+  {
+    "class": "RowAclController",
+    "method": "PUT",
+    "path": "/api/admin/row-acl/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/acl/RowAclController.java",
+    "line": 88
+  },
+  {
+    "class": "SlackController",
+    "method": "GET",
+    "path": "/api/slack/auth-url",
+    "file": "backend-java/src/main/java/com/nocobase/integration/slack/SlackController.java",
+    "line": 50
+  },
+  {
+    "class": "SlackController",
+    "method": "POST",
+    "path": "/api/slack/events",
+    "file": "backend-java/src/main/java/com/nocobase/integration/slack/SlackController.java",
+    "line": 77
+  },
+  {
+    "class": "SlackController",
+    "method": "POST",
+    "path": "/api/slack/message/reply",
+    "file": "backend-java/src/main/java/com/nocobase/integration/slack/SlackController.java",
+    "line": 221
+  },
+  {
+    "class": "SlackController",
+    "method": "POST",
+    "path": "/api/slack/message/send",
+    "file": "backend-java/src/main/java/com/nocobase/integration/slack/SlackController.java",
+    "line": 161
+  },
+  {
+    "class": "SlackController",
+    "method": "POST",
+    "path": "/api/slack/oauth/callback",
+    "file": "backend-java/src/main/java/com/nocobase/integration/slack/SlackController.java",
+    "line": 57
+  },
+  {
+    "class": "TenantController",
+    "method": "DELETE",
+    "path": "/api/admin/tenants/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/tenant/TenantController.java",
+    "line": 72
+  },
+  {
+    "class": "TenantController",
+    "method": "GET",
+    "path": "/api/admin/tenants/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/tenant/TenantController.java",
+    "line": 53
+  },
+  {
+    "class": "TenantQuotaController",
+    "method": "GET",
+    "path": "/api/admin/tenants/{id}/quota",
+    "file": "backend-java/src/main/java/com/nocobase/quota/TenantQuotaController.java",
+    "line": 43
+  },
+  {
+    "class": "TenantQuotaController",
+    "method": "GET",
+    "path": "/api/tenant/quota",
+    "file": "backend-java/src/main/java/com/nocobase/quota/TenantQuotaController.java",
+    "line": 85
+  },
+  {
+    "class": "TenantQuotaController",
+    "method": "PUT",
+    "path": "/api/admin/tenants/{id}/quota",
+    "file": "backend-java/src/main/java/com/nocobase/quota/TenantQuotaController.java",
+    "line": 55
+  },
+  {
+    "class": "TicketController",
+    "method": "GET",
+    "path": "/api/livechat/tickets",
+    "file": "backend-java/src/main/java/com/nocobase/ticket/TicketController.java",
+    "line": 77
+  },
+  {
+    "class": "TicketController",
+    "method": "POST",
+    "path": "/api/livechat/close",
+    "file": "backend-java/src/main/java/com/nocobase/ticket/TicketController.java",
+    "line": 54
+  },
+  {
+    "class": "TicketController",
+    "method": "POST",
+    "path": "/api/livechat/message",
+    "file": "backend-java/src/main/java/com/nocobase/ticket/TicketController.java",
+    "line": 39
+  },
+  {
+    "class": "TicketController",
+    "method": "POST",
+    "path": "/api/livechat/session",
+    "file": "backend-java/src/main/java/com/nocobase/ticket/TicketController.java",
+    "line": 28
+  },
+  {
+    "class": "TicketController",
+    "method": "POST",
+    "path": "/api/livechat/tickets/{id}/notes",
+    "file": "backend-java/src/main/java/com/nocobase/ticket/TicketController.java",
+    "line": 86
+  },
+  {
+    "class": "UserAdminController",
+    "method": "DELETE",
+    "path": "/api/admin/users/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 99
+  },
+  {
+    "class": "UserAdminController",
+    "method": "DELETE",
+    "path": "/api/admin/users/{id}/roles/{roleId}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 126
+  },
+  {
+    "class": "UserAdminController",
+    "method": "GET",
+    "path": "/api/admin/users/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 50
+  },
+  {
+    "class": "UserAdminController",
+    "method": "GET",
+    "path": "/api/admin/users/{id}/effective-permissions",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 139
+  },
+  {
+    "class": "UserAdminController",
+    "method": "PATCH",
+    "path": "/api/admin/users/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 72
+  },
+  {
+    "class": "UserAdminController",
+    "method": "POST",
+    "path": "/api/admin/users/{id}/password",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 86
+  },
+  {
+    "class": "UserAdminController",
+    "method": "POST",
+    "path": "/api/admin/users/{id}/roles/{roleId}",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 113
+  },
+  {
+    "class": "UserController",
+    "method": "GET",
+    "path": "/api/users/me",
+    "file": "backend-java/src/main/java/com/nocobase/api/UserController.java",
+    "line": 34
+  },
+  {
+    "class": "UserDataComplianceController",
+    "method": "DELETE",
+    "path": "/api/admin/users/{userId}/data-erasure",
+    "file": "backend-java/src/main/java/com/nocobase/compliance/UserDataComplianceController.java",
+    "line": 69
+  },
+  {
+    "class": "UserDataComplianceController",
+    "method": "DELETE",
+    "path": "/api/users/me/data-erasure",
+    "file": "backend-java/src/main/java/com/nocobase/compliance/UserDataComplianceController.java",
+    "line": 114
+  },
+  {
+    "class": "UserDataComplianceController",
+    "method": "GET",
+    "path": "/api/admin/users/{userId}/data-export",
+    "file": "backend-java/src/main/java/com/nocobase/compliance/UserDataComplianceController.java",
+    "line": 45
+  },
+  {
+    "class": "UserDataComplianceController",
+    "method": "GET",
+    "path": "/api/users/me/data-export",
+    "file": "backend-java/src/main/java/com/nocobase/compliance/UserDataComplianceController.java",
+    "line": 93
+  },
+  {
+    "class": "UserTenantController",
+    "method": "DELETE",
+    "path": "/api/admin/users/{userId}/tenants/{tenantId}",
+    "file": "backend-java/src/main/java/com/nocobase/tenant/UserTenantController.java",
+    "line": 91
+  },
+  {
+    "class": "UserTenantController",
+    "method": "GET",
+    "path": "/api/admin/users/{userId}/tenants",
+    "file": "backend-java/src/main/java/com/nocobase/tenant/UserTenantController.java",
+    "line": 46
+  },
+  {
+    "class": "UserTenantController",
+    "method": "POST",
+    "path": "/api/admin/users/{userId}/tenants",
+    "file": "backend-java/src/main/java/com/nocobase/tenant/UserTenantController.java",
+    "line": 73
+  },
+  {
+    "class": "ViewController",
+    "method": "DELETE",
+    "path": "/api/views/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
+    "line": 120
+  },
+  {
+    "class": "ViewController",
+    "method": "GET",
+    "path": "/api/views/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
+    "line": 79
+  },
+  {
+    "class": "ViewController",
+    "method": "GET",
+    "path": "/api/views/{id}/timeline-records",
+    "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
+    "line": 90
+  },
+  {
+    "class": "ViewController",
+    "method": "PUT",
+    "path": "/api/views/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
+    "line": 107
+  },
+  {
+    "class": "WeChatWorkController",
+    "method": "GET",
+    "path": "/api/notifications/wechat-work/ping",
+    "file": "backend-java/src/main/java/com/nocobase/notification/WeChatWorkController.java",
+    "line": 84
+  },
+  {
+    "class": "WeChatWorkController",
+    "method": "POST",
+    "path": "/api/notifications/wechat-work/send",
+    "file": "backend-java/src/main/java/com/nocobase/notification/WeChatWorkController.java",
+    "line": 41
+  },
+  {
+    "class": "WeComController",
+    "method": "GET",
+    "path": "/api/wecom/auth-url",
+    "file": "backend-java/src/main/java/com/nocobase/integration/wecom/WeComController.java",
+    "line": 56
+  },
+  {
+    "class": "WeComController",
+    "method": "POST",
+    "path": "/api/wecom/callback",
+    "file": "backend-java/src/main/java/com/nocobase/integration/wecom/WeComController.java",
+    "line": 78
+  },
+  {
+    "class": "WeComController",
+    "method": "POST",
+    "path": "/api/wecom/message/send",
+    "file": "backend-java/src/main/java/com/nocobase/integration/wecom/WeComController.java",
+    "line": 145
+  },
+  {
+    "class": "WeComController",
+    "method": "POST",
+    "path": "/api/wecom/sync-contacts",
+    "file": "backend-java/src/main/java/com/nocobase/integration/wecom/WeComController.java",
+    "line": 127
+  },
+  {
+    "class": "WebhookSubscriptionController",
+    "method": "DELETE",
+    "path": "/api/admin/webhooks/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java",
+    "line": 103
+  },
+  {
+    "class": "WebhookSubscriptionController",
+    "method": "PUT",
+    "path": "/api/admin/webhooks/{id}/enabled",
+    "file": "backend-java/src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java",
+    "line": 90
+  },
+  {
+    "class": "WikiController",
+    "method": "DELETE",
+    "path": "/api/wiki/blocks/{blockId}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 439
+  },
+  {
+    "class": "WikiController",
+    "method": "DELETE",
+    "path": "/api/wiki/categories/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 566
+  },
+  {
+    "class": "WikiController",
+    "method": "DELETE",
+    "path": "/api/wiki/kb/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 165
+  },
+  {
+    "class": "WikiController",
+    "method": "DELETE",
+    "path": "/api/wiki/pages/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 291
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/kb",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 126
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/kb/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 135
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/kb/{kbId}/categories",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 504
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/kb/{kbId}/templates",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 638
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/pages",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 214
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/pages/by-slug/{slug}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 259
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/pages/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 244
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/pages/{id}/backlinks",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 715
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/pages/{id}/blocks",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 399
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/pages/{id}/versions",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 349
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/pages/{id}/versions/{version}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 365
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/search",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 587
+  },
+  {
+    "class": "WikiController",
+    "method": "GET",
+    "path": "/api/wiki/search/hybrid",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 611
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/ai/polish",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 855
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/blocks/batch-upsert",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 463
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/kb",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 101
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/kb/{kbId}/categories",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 526
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 186
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{id}/archive",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 332
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{id}/blocks",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 411
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{id}/from-template",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 687
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{id}/mark-template",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 673
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{id}/publish",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 315
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{id}/versions/{version}/restore",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 381
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{pageId}/ask",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 755
+  },
+  {
+    "class": "WikiController",
+    "method": "POST",
+    "path": "/api/wiki/pages/{pageId}/generate-outline",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 819
+  },
+  {
+    "class": "WikiController",
+    "method": "PUT",
+    "path": "/api/wiki/blocks/{blockId}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 424
+  },
+  {
+    "class": "WikiController",
+    "method": "PUT",
+    "path": "/api/wiki/categories/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 548
+  },
+  {
+    "class": "WikiController",
+    "method": "PUT",
+    "path": "/api/wiki/kb/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 147
+  },
+  {
+    "class": "WikiController",
+    "method": "PUT",
+    "path": "/api/wiki/pages/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 270
+  },
+  {
+    "class": "WikiController",
+    "method": "PUT",
+    "path": "/api/wiki/pages/{id}/blocks/reorder",
+    "file": "backend-java/src/main/java/com/nocobase/wiki/WikiController.java",
+    "line": 450
+  },
+  {
+    "class": "WorkflowController",
+    "method": "DELETE",
+    "path": "/api/workflows/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 170
+  },
+  {
+    "class": "WorkflowController",
+    "method": "GET",
+    "path": "/api/workflows/instances",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 275
+  },
+  {
+    "class": "WorkflowController",
+    "method": "GET",
+    "path": "/api/workflows/instances/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 286
+  },
+  {
+    "class": "WorkflowController",
+    "method": "GET",
+    "path": "/api/workflows/tasks/my",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 300
+  },
+  {
+    "class": "WorkflowController",
+    "method": "GET",
+    "path": "/api/workflows/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 82
+  },
+  {
+    "class": "WorkflowController",
+    "method": "POST",
+    "path": "/api/workflows/tasks/{id}/approve",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 309
+  },
+  {
+    "class": "WorkflowController",
+    "method": "POST",
+    "path": "/api/workflows/tasks/{id}/reject",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 396
+  },
+  {
+    "class": "WorkflowController",
+    "method": "POST",
+    "path": "/api/workflows/{id}/trigger",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 195
+  },
+  {
+    "class": "WorkflowController",
+    "method": "PUT",
+    "path": "/api/workflows/{id}",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 130
+  },
+  {
+    "class": "WorkflowTemplateController",
+    "method": "GET",
+    "path": "/api/workflow/templates/{key}",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowTemplateController.java",
+    "line": 58
+  },
+  {
+    "class": "WorkflowTemplateController",
+    "method": "POST",
+    "path": "/api/workflow/templates/{key}/install",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowTemplateController.java",
+    "line": 66
+  }
+]

@@ -75,7 +75,9 @@ describe('HomePage', () => {
     renderHome();
 
     // 渲染摘要卡片(loading 状态)
-    expect(screen.getAllByText(/加载中/).length).toBeGreaterThanOrEqual(0);
+    // PHASE97 T4: 原断言 length >= 0 恒真（数组长度不可能为负），
+    // 改为 > 0 —— 若 skeleton 未渲染，测试必须红。
+    expect(screen.getAllByText(/加载中/).length).toBeGreaterThan(0);
   });
 
   it('未登录加载中:显示 loading 状态', async () => {

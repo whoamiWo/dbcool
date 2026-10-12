@@ -1,0 +1,107 @@
+[
+  {
+    "path": "/dingtalk/approval",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 79
+  },
+  {
+    "path": "/dingtalk/approval-callback",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 63
+  },
+  {
+    "path": "/dingtalk/approval-status",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 75
+  },
+  {
+    "path": "/dingtalk/auth-url",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 51
+  },
+  {
+    "path": "/dingtalk/login",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 55
+  },
+  {
+    "path": "/dingtalk/logout",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 71
+  },
+  {
+    "path": "/dingtalk/sync-org",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 59
+  },
+  {
+    "path": "/dingtalk/sync-status",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 87
+  },
+  {
+    "path": "/dingtalk/user-info",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 67
+  },
+  {
+    "path": "/dingtalk/user-mappings",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 83
+  },
+  {
+    "path": "/integrations/market",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 112
+  },
+  {
+    "path": "/livechat/message",
+    "file": "frontend/src/features/im/LivechatWidget.tsx",
+    "line": 96
+  },
+  {
+    "path": "/project-boards/cards/move",
+    "file": "frontend/src/features/project/BoardView.tsx",
+    "line": 91
+  },
+  {
+    "path": "/project-boards/tasks",
+    "file": "frontend/src/features/project/BoardView.tsx",
+    "line": 117
+  },
+  {
+    "path": "/wecom/auth-url",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 157
+  },
+  {
+    "path": "/wecom/callback",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 161
+  },
+  {
+    "path": "/wecom/message/send",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 169
+  },
+  {
+    "path": "/wecom/sync-contacts",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 165
+  },
+  {
+    "path": "/wiki/kb",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 37
+  },
+  {
+    "path": "/wiki/pages",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 47
+  },
+  {
+    "path": "/wiki/search",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 77
+  }
+]

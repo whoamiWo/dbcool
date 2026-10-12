@@ -48,43 +48,43 @@ export interface DingTalkApprovalCallbackResponse {
 export const dingtalkApi = {
   /** 获取钉钉授权 URL */
   getAuthUrl: (): Promise<DingTalkAuthUrlResponse> =>
-    client.get('/api/dingtalk/auth-url'),
+    client.get('/dingtalk/auth-url'),
 
   /** 钉钉登录回调 */
   login: (code: string): Promise<DingTalkLoginResponse> =>
-    client.post('/api/dingtalk/login', { code }),
+    client.post('/dingtalk/login', { code }),
 
   /** 同步组织架构 */
   syncOrganization: (): Promise<DingTalkSyncOrgResponse> =>
-    client.post('/api/dingtalk/sync-org'),
+    client.post('/dingtalk/sync-org'),
 
   /** OA 审批回调 */
   approvalCallback: (data: Record<string, unknown>): Promise<DingTalkApprovalCallbackResponse> =>
-    client.post('/api/dingtalk/approval-callback', data),
+    client.post('/dingtalk/approval-callback', data),
 
   /** 获取钉钉用户信息 */
   getUserInfo: (accessToken: string): Promise<{ code: number; message: string; data: { nickname: string; userId: string } }> =>
-    client.get('/api/dingtalk/user-info', { params: { accessToken } }),
+    client.get('/dingtalk/user-info', { params: { accessToken } }),
 
   /** 钉钉退出登录 */
   logout: (): Promise<{ code: number; message: string; data: { loggedOut: boolean } }> =>
-    client.post('/api/dingtalk/logout'),
+    client.post('/dingtalk/logout'),
 
   /** 查询审批实例状态 */
   getApprovalStatus: (instanceId: string): Promise<{ code: number; message: string; data: { instanceId: string; status: string } }> =>
-    client.get('/api/dingtalk/approval-status', { params: { instanceId } }),
+    client.get('/dingtalk/approval-status', { params: { instanceId } }),
 
   /** 创建审批实例 */
   createApproval: (body: { processCode: string; title: string; formValues: Record<string, unknown> }): Promise<{ code: number; message: string; data: { instanceId: string } }> =>
-    client.post('/api/dingtalk/approval', body),
+    client.post('/dingtalk/approval', body),
 
   /** 获取用户映射列表 */
   getUserMappings: (tenantId?: string): Promise<{ code: number; message: string; data: { mappings: any[] } }> =>
-    client.get('/api/dingtalk/user-mappings', { params: { tenantId } }),
+    client.get('/dingtalk/user-mappings', { params: { tenantId } }),
 
   /** 获取同步状态 */
   getSyncStatus: (): Promise<{ code: number; message: string; data: { lastSyncTime: number; syncEnabled: boolean; cron: string } }> =>
-    client.get('/api/dingtalk/sync-status'),
+    client.get('/dingtalk/sync-status'),
 };
 
 // ============================================================
@@ -109,15 +109,15 @@ export interface IntegrationMarketResponse {
 export const integrationApi = {
   /** 获取集成市场列表 */
   getMarket: (): Promise<IntegrationMarketResponse> =>
-    client.get('/api/integrations/market'),
+    client.get('/integrations/market'),
 
   /** 安装集成 */
   install: (id: string): Promise<{ code: number; message: string }> =>
-    client.post(`/api/integrations/install/${id}`),
+    client.post(`/integrations/install/${id}`),
 
   /** 卸载集成 */
   uninstall: (id: string): Promise<{ code: number; message: string }> =>
-    client.post(`/api/integrations/uninstall/${id}`),
+    client.post(`/integrations/uninstall/${id}`),
 };
 
 // ============================================================
@@ -154,23 +154,19 @@ export interface WeComSyncContactsResponse {
 export const wecomApi = {
   /** 获取企业微信授权 URL */
   getAuthUrl: (): Promise<WeComAuthUrlResponse> =>
-    client.get('/api/wecom/auth-url'),
+    client.get('/wecom/auth-url'),
 
   /** 企业微信登录回调 */
   login: (code: string): Promise<WeComLoginResponse> =>
-    client.post('/api/wecom/callback', { code }),
+    client.post('/wecom/callback', { code }),
 
   /** 同步通讯录 */
   syncContacts: (): Promise<WeComSyncContactsResponse> =>
-    client.post('/api/wecom/sync-contacts'),
+    client.post('/wecom/sync-contacts'),
 
   /** 发送消息 */
   sendMessage: (body: Record<string, unknown>): Promise<{ code: number; message: string }> =>
-    client.post('/api/wecom/message/send', body),
-
-  /** 获取配置状态 */
-  getConfig: (): Promise<{ code: number; message: string; data: { configured: boolean } }> =>
-    client.get('/api/wecom/config'),
+    client.post('/wecom/message/send', body),
 };
 
 // ============================================================

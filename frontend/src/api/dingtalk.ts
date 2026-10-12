@@ -33,7 +33,7 @@ export interface DingTalkAuthUrl {
  * 用于钉钉内嵌 H5 免密登录
  */
 export function getDingTalkAuthUrl(): Promise<DingTalkAuthUrl> {
-  return client.post('/api/dingtalk/auth-url');
+  return client.post('/dingtalk/auth-url');
 }
 
 /**
@@ -41,7 +41,7 @@ export function getDingTalkAuthUrl(): Promise<DingTalkAuthUrl> {
  * 使用 code 换取用户信息和 JWT Token
  */
 export function dingTalkLogin(code: string): Promise<{ token: string; user: DingTalkUser }> {
-  return client.post('/api/dingtalk/login', { code });
+  return client.post('/dingtalk/login', { code });
 }
 
 /**
@@ -52,7 +52,7 @@ export function syncDingTalkOrganization(): Promise<{
   departments: DingTalkDepartment[];
   users: DingTalkUser[];
 }> {
-  return client.post('/api/dingtalk/sync-org');
+  return client.post('/dingtalk/sync-org');
 }
 
 /**
@@ -64,16 +64,12 @@ export function sendDingTalkApprovalCallback(data: {
   approvalStatus: 'approved' | 'rejected';
   comment?: string;
 }): Promise<{ processed: boolean }> {
-  return client.post('/api/dingtalk/approval-callback', data);
+  return client.post('/dingtalk/approval-callback', data);
 }
 
 /**
  * 发送钉钉群消息
+ * ⚠️ PHASE97 T5: 后端无 /api/dingtalk/group/message 端点，该函数已删除。
+ * 恢复群消息功能时需先在后端 DingTalkController 补 @PostMapping("/group/message")。
  */
-export function sendDingTalkGroupMessage(data: {
-  groupId: string;
-  content: string;
-  type: 'text' | 'markdown' | 'actionCard';
-}): Promise<{ sent: boolean }> {
-  return client.post('/api/dingtalk/group/message', data);
-}
+

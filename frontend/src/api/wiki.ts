@@ -64,12 +64,10 @@ export const wikiApi = {
     apiClient.post(`/wiki/pages/${id}/versions/${version}/restore`),
 
   // 分类
-  listCategories: (kbId?: string) =>
-    kbId
-      ? apiClient.get(`/wiki/kb/${kbId}/categories`)
-      : apiClient.get('/wiki/categories'),
-  createCategory: (body: { name: string; slug: string; parent_id?: string; knowledge_base_id?: string }) =>
-    apiClient.post('/wiki/categories', body),
+  listCategories: (kbId: string) =>
+    apiClient.get(`/wiki/kb/${kbId}/categories`),
+  createCategory: (body: { name: string; slug: string; parent_id?: string; knowledge_base_id: string }) =>
+    apiClient.post(`/wiki/kb/${body.knowledge_base_id}/categories`, body),
   updateCategory: (id: string, body: { name?: string; slug?: string; parent_id?: string }) =>
     apiClient.put(`/wiki/categories/${id}`, body),
   deleteCategory: (id: string) => apiClient.delete(`/wiki/categories/${id}`),

@@ -51,8 +51,8 @@ export function BoardView({ projectId }: { projectId: string }) {
     setLoading(true);
     try {
       const [colsRes, cardsRes] = await Promise.all([
-        apiClient.get(`/api/project-boards/${projectId}/lists`) as Promise<{ data: Column[] }>,
-        apiClient.get(`/api/project-boards/${projectId}/tasks`) as Promise<{ data: Card[] }>,
+        apiClient.get(`/project-boards/${projectId}/lists`) as Promise<{ data: Column[] }>,
+        apiClient.get(`/project-boards/${projectId}/tasks`) as Promise<{ data: Card[] }>,
       ]);
       setColumns(colsRes.data);
       setCards(cardsRes.data);
@@ -88,7 +88,7 @@ export function BoardView({ projectId }: { projectId: string }) {
     const targetCol = columns.find(c => c.id === toListId);
     if (!targetCol) return;
     setCards(prev => prev.map(c => (c.id === cardId ? { ...c, status: targetCol.type } : c)));
-    apiClient.post('/api/project-boards/cards/move', {
+    apiClient.post('/project-boards/cards/move', {
       taskId: cardId,
       toListId,
       toIndex,
@@ -114,7 +114,7 @@ export function BoardView({ projectId }: { projectId: string }) {
   const handleAddCard = (columnId: string) => {
     const title = prompt('输入卡片标题:');
     if (!title) return;
-    apiClient.post('/api/project-boards/tasks', {
+    apiClient.post('/project-boards/tasks', {
       projectId,
       title,
       status: columnId.startsWith('col-') ? columnId.slice(4) : columnId
