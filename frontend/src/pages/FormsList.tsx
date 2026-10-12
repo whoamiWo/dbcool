@@ -1,12 +1,14 @@
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { ErrorState } from '@/components/ErrorState';
+import { EmptyState } from '@/components/EmptyState';
 import type { } from '@/types/collection';
 import type { FormMeta } from '@/types/form';
 
 export function FormsListPage() {
   const { collection } = useParams<{ collection?: string }>();
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['forms', collection ?? 'all'],
     queryFn: async () => {
       // 后端 envelope: {code, message, data: FormMeta[]}
@@ -19,8 +21,19 @@ export function FormsListPage() {
     },
   });
 
+  // PHASE98 R3: 错误态改为可重试 + 展示真实原因
   if (isLoading) return <p>加载中…</p>;
-  if (error) return <p style={{ color: 'var(--color-error)' }}>加载失败</p>;
+  if (error) {
+    return (
+      <div>
+        <h1>📋 表单</h1>
+        <ErrorState
+          message={`表单列表加载失败：${(error as Error)?.message ?? ''}`}
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
+  }
 
   const forms = data ?? [];
 
@@ -44,19 +57,18 @@ export function FormsListPage() {
         )}
       </div>
 
+      {/* PHASE98 R3: 空态带 CTA（原引导语"点上方"不可点击） */}
       {forms.length === 0 ? (
-        <div
-          style={{
-            marginTop: 24,
-            padding: 32,
-            background: 'var(--color-text-primary)',
-            borderRadius: 8,
-            textAlign: 'center',
-            color: 'var(--color-text-disabled)',
-          }}
-        >
-          {collection ? '该 collection 还没有表单,点上方"新建表单"开始' : '你还没有创建任何表单'}
-        </div>
+        <EmptyState
+          title={collection ? '该 collection 还没有表单' : '你还没有创建任何表单'}
+          description="表单用于收集和录入结构化数据。"
+          actionLabel={collection ? '+ 新建表单' : undefined}
+          onAction={
+            collection
+              ? () => (window.location.href = `/designer/forms/${collection}/new`)
+              : undefined
+          }
+        />
       ) : (
         <div
           style={{

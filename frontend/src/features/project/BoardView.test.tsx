@@ -86,9 +86,14 @@ describe('BoardView', () => {
     promptSpy.mockRestore();
   });
 
-  it('接口失败时不崩溃（loading 结束、不抛未捕获异常）', async () => {
+  /**
+   * PHASE98 R3 改写说明：
+   * 原用例断言"接口失败后仍渲染看板（空看板）"——那正是被修复的缺陷：
+   * catch 里只 `console.error`，用户看到的是一个静默的空看板，
+   * 分不清"没有任务"和"加载失败"。现在失败应展示错误态 + 重试入口。
+   */
+  it('接口失败时显示错误态与重试入口，而不是静默渲染空看板', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('network error'));
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(<BoardView projectId="proj-1" />);
 
@@ -96,7 +101,13 @@ describe('BoardView', () => {
     await waitFor(() => {
       expect(screen.queryByRole('progressbar')).toBeNull();
     });
-    expect(await screen.findByText('看板')).toBeInTheDocument();
-    consoleSpy.mockRestore();
+
+    // 错误对用户可见（此前只 console.error，页面无任何提示）
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/看板数据加载失败/)).toBeInTheDocument();
+
+    // 提供重试入口（此前用户只能手动按"刷新"才知道要重试）
+    const retryButtons = screen.getAllByRole('button');
+    expect(retryButtons.length).toBeGreaterThan(0);
   });
 });

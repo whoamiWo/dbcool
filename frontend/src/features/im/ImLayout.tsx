@@ -213,7 +213,7 @@ export function ImChatPage() {
         {/* Mobile: Hamburger menu button */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
-            <IconButton onClick={() => setChannelDrawerOpen(true)} size="small">
+            <IconButton onClick={() => setChannelDrawerOpen(true)} size="small" aria-label="打开频道列表">
               <MenuIcon />
             </IconButton>
             <span style={{ marginLeft: 8, fontWeight: 600 }}>{currentChannel?.name || t('im.channels')}</span>
@@ -244,7 +244,7 @@ export function ImChatPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid var(--color-border)' }}>
               <span style={{ fontWeight: 600 }}>{t('im.channels')}</span>
-              <IconButton onClick={() => setChannelDrawerOpen(false)} size="small">
+              <IconButton onClick={() => setChannelDrawerOpen(false)} size="small" aria-label="关闭频道列表">
                 <CloseIcon />
               </IconButton>
             </div>

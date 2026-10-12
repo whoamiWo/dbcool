@@ -370,6 +370,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
         <Tooltip title={isMuted ? t('im.unmute') : t('im.mute')}>
           <IconButton
             onClick={toggleMute}
+            aria-label={isMuted ? t('im.unmute') : t('im.mute')}
             sx={{
               bgcolor: isMuted ? 'var(--color-error)' : 'var(--color-bg-tertiary)',
               color: 'var(--color-text-primary)',
@@ -382,6 +383,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
         <Tooltip title={isVideoOff ? t('im.enableVideo') : t('im.disableVideo')}>
           <IconButton
             onClick={toggleVideo}
+            aria-label={isVideoOff ? t('im.enableVideo') : t('im.disableVideo')}
             sx={{
               bgcolor: isVideoOff ? 'var(--color-bg-tertiary)' : 'var(--color-primary-500)',
               color: 'var(--color-text-primary)',
@@ -394,6 +396,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
         <Tooltip title={t('im.hangup')}>
           <IconButton
             onClick={onLeave}
+            aria-label={t('im.hangup')}
             sx={{ bgcolor: 'var(--color-error)', color: 'var(--color-text-primary)', '&:hover': { bgcolor: 'var(--color-error)' } }}
           >
             <HangupIcon />

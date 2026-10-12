@@ -165,6 +165,7 @@ export function AgentChatPage() {
         <Tooltip title={`发送 (${selectedTool})`}>
           <IconButton
             onClick={handleSend}
+            aria-label="发送消息"
             disabled={mutation.isPending || !prompt.trim()}
             sx={{
               bgcolor: 'var(--color-primary-500)',

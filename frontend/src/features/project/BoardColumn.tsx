@@ -149,7 +149,7 @@ function SortableCard({ card, columnId }: { card: CardItem; columnId: string }) 
             )}
           </Box>
         </Box>
-        <IconButton size="small" sx={{ p: 0.25 }}>
+        <IconButton size="small" sx={{ p: 0.25 }} aria-label="列操作菜单">
           <MoreHoriz fontSize="small" />
         </IconButton>
       </Box>

@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { ErrorState } from '@/components/ErrorState';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { KanbanConfig, ViewFull } from '@/types/view';
 
@@ -23,23 +24,65 @@ interface Record { id: string; [k: string]: unknown; }
 export function KanbanViewPage() {
   const { id } = useParams<{ id: string }>();
   const isMobile = useIsMobile();
-  const { data: viewData } = useQuery({
+  // PHASE98 R3: 三个 query 全部取 isError/refetch。
+  // 此前只解构 data —— 404/500 时 viewData 恒为 undefined，
+  // 页面永远停在"加载中…"，用户看到的是"慢"而不是"坏"。
+  const {
+    data: viewData,
+    isError: viewError,
+    error: viewErrObj,
+    refetch: refetchView,
+  } = useQuery({
     queryKey: ['view', id],
     queryFn: () => apiClient.get<ViewFull>(`/views/${id}`),
     enabled: !!id,
   });
   const collectionName = viewData?.collection_name;
-  const { data: collectionData } = useQuery({
+  const {
+    data: collectionData,
+    isError: collectionError,
+    error: collectionErrObj,
+    refetch: refetchCollection,
+  } = useQuery({
     queryKey: ['collection', collectionName],
     queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collectionName}`),
     enabled: !!collectionName,
   });
-  const { data: recordsData } = useQuery({
+  const {
+    data: recordsData,
+    isError: recordsError,
+    error: recordsErrObj,
+    refetch: refetchRecords,
+  } = useQuery({
     queryKey: ['records', collectionName],
     queryFn: () => apiClient.get<Record[]>(`/collections/${collectionName}/records?limit=500`),
     enabled: !!collectionName,
   });
 
+  if (viewError) {
+    return (
+      <ErrorState
+        message={`视图加载失败：${(viewErrObj as Error)?.message ?? ''}`}
+        onRetry={() => void refetchView()}
+      />
+    );
+  }
+  if (collectionError) {
+    return (
+      <ErrorState
+        message={`集合元信息加载失败：${(collectionErrObj as Error)?.message ?? ''}`}
+        onRetry={() => void refetchCollection()}
+      />
+    );
+  }
+  if (recordsError) {
+    return (
+      <ErrorState
+        message={`记录加载失败：${(recordsErrObj as Error)?.message ?? ''}`}
+        onRetry={() => void refetchRecords()}
+      />
+    );
+  }
   if (!viewData) return <p>加载中…</p>;
   const view = viewData;
   const config = view.config as unknown as KanbanConfig;
@@ -65,13 +108,20 @@ export function KanbanViewPage() {
         按 <code>{config.groupBy}</code> 分组({groups.size} 个分组)
       </p>
 
+      {/*
+        PHASE98 R6: 移动端原为 `overflowX:'visible'` —— 主动关掉了横向滚动兜底，
+        而 styles.css 的 `.kanban-view-container { grid-auto-columns: 260px }` 又把列宽钉死，
+        一旦 CSS 优先级使 260px 生效，260px×N 列在 375px 视口下会直接撑破页面
+        （页面级横滚在 iOS Safari 上表现为整页左右抖动）。
+        统一改为 `overflowX:'auto'`，让溢出由容器承担，页面本身不横滚。
+      */}
       <div
         style={{
           display: 'grid',
           gridAutoFlow: isMobile ? 'row' : 'column',
           gridAutoColumns: isMobile ? '1fr' : '280px',
           gap: 12,
-          overflowX: isMobile ? 'visible' : 'auto',
+          overflowX: 'auto',
           overflowY: isMobile ? 'auto' : 'visible',
           maxHeight: isMobile ? 'calc(100vh - 140px)' : 'none',
           paddingBottom: 12,

@@ -21,6 +21,30 @@ function subscribeTokenRefresh(cb: (token: string | null) => void) {
   refreshSubscribers.push(cb);
 }
 
+/**
+ * PHASE98 R2: 登录态失效时强制登出并跳登录页。
+ *
+ * 用于"token 刷新成功但取不到用户信息"这类不可自愈的状态 —— 此时不能造一个
+ * 假用户继续跑（见 handleRefreshToken 内的说明），必须让用户重新认证。
+ */
+function forceLogout() {
+  try {
+    useAuthStore.getState().clear();
+  } catch {
+    /* store 不可用时也要清 localStorage */
+  }
+  try {
+    localStorage.removeItem('nocobase_access_token');
+    localStorage.removeItem('nocobase_refresh_token');
+    localStorage.removeItem('nocobase-auth');
+  } catch {
+    /* localStorage 不可用时忽略 */
+  }
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login';
+  }
+}
+
 function notifyRefreshCallbacks(token: string | null) {
   refreshSubscribers.forEach((cb) => cb(token));
   refreshSubscribers = [];
@@ -66,19 +90,27 @@ async function handleRefreshToken(): Promise<string> {
           const parsed = JSON.parse(stored);
           storedUser = parsed?.state?.user ?? null;
         } catch {
-          // 解析失败，使用默认用户
+          storedUser = null;
         }
       }
+
       if (storedUser) {
         useAuthStore.getState().setAuth(access_token, refresh_token, storedUser);
       } else {
-        useAuthStore.getState().setAuth(access_token, refresh_token, {
-          id: 'unknown',
-          username: 'unknown',
-          tenant_id: 'default',
-          roles: []
-        });
+        // PHASE98 R2: 取不到用户信息时**不得凭空造人**。
+        //
+        // 原实现会写入 { id:'unknown', username:'unknown', tenant_id:'default', roles:[] }，
+        // 制造一个"已登录但身份未知"的静默降级态，三处后果：
+        //   1. UI 显示已登录、用户名 unknown；
+        //   2. tenant_id:'default' 不是合法租户（应为 tenant_default），后续所有带租户的
+        //      请求都会指向不存在的租户 —— 可能绕过 PHASE95 刚加固的租户隔离；
+        //   3. roles:[] 让权限判断静默为"无权限"，页面大面积空白且无任何提示。
+        // 正确做法：认定登录态已失效 → 强制登出并跳登录页，让用户重新认证。
+        forceLogout();
+        notifyRefreshCallbacks(null);
+        throw new Error('User info missing after refresh — forcing re-login');
       }
+
       notifyRefreshCallbacks(access_token);
       return access_token;
     } catch (e) {

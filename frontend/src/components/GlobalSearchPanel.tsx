@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { IconButtonA11y } from '@/components/IconButtonA11y';
 import {
   Box,
   Button,
@@ -136,8 +137,10 @@ export function GlobalSearchPanel() {
 
   return (
     <>
+      {/* PHASE98 R4: 图标按钮必须有可访问名 */}
       <Button
         onClick={handleOpen}
+        aria-label={t('globalSearch.title')}
         sx={{
           minWidth: 'auto',
           width: 40,
@@ -155,7 +158,14 @@ export function GlobalSearchPanel() {
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {t('globalSearch.title')}
-          <CloseIcon sx={{ cursor: 'pointer' }} onClick={handleClose} />
+          {/*
+            PHASE98 R4: 原先是 <CloseIcon onClick={handleClose} /> —— 一个裸 SVG，
+            没有 role、没有 tabIndex、无法用键盘触发（WCAG 2.1.1 键盘可访问性失败）。
+            改为真正的图标按钮并给出可访问名。
+          */}
+          <IconButtonA11y aria-label={t('common.cancel')} onClick={handleClose} size="small">
+            <CloseIcon />
+          </IconButtonA11y>
         </DialogTitle>
         <DialogContent>
           <TextField

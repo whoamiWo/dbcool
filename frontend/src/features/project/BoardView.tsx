@@ -7,6 +7,7 @@ import {
 } from '@dnd-kit/core';
 import { BoardColumn } from './BoardColumn';
 import apiClient from '@/api/client';
+import { ErrorState } from '@/components/ErrorState';
 
 interface Column {
   id: string;
@@ -46,9 +47,13 @@ export function BoardView({ projectId }: { projectId: string }) {
   ]);
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
+  // PHASE98 R3: 加载失败必须对用户可见。此前 catch 只 console.error，
+  // 然后静默渲染一个空看板 —— 用户分不清"没有任务"和"加载失败"。
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [colsRes, cardsRes] = await Promise.all([
         apiClient.get(`/project-boards/${projectId}/lists`) as Promise<{ data: Column[] }>,
@@ -57,7 +62,7 @@ export function BoardView({ projectId }: { projectId: string }) {
       setColumns(colsRes.data);
       setCards(cardsRes.data);
     } catch (e) {
-      console.error('Failed to load board data', e);
+      setLoadError(e instanceof Error ? e.message : '看板数据加载失败');
     } finally {
       setLoading(false);
     }
@@ -72,6 +77,11 @@ export function BoardView({ projectId }: { projectId: string }) {
   // Hooks 必须全部位于任何提前 return 之前，否则两次渲染的 hook 数量不一致，
   // React 会抛 "Rendered more hooks than during the previous render"。
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
+
+  // PHASE98 R3: 错误态优先于 loading —— 失败时给出原因与重试入口
+  if (loadError) {
+    return <ErrorState message={`看板数据加载失败：${loadError}`} onRetry={loadData} />;
+  }
 
   if (loading) return <CircularProgress sx={{ mt: 4 }} />;
 

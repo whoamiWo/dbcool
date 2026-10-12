@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ErrorState } from '@/components/ErrorState';
+import { EmptyState } from '@/components/EmptyState';
 import apiClient from '@/api/client';
 import type { UserMeta } from '@/types/acl';
 
@@ -15,12 +17,15 @@ export function UsersListPage() {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  // PHASE98 R3: 取 isError/error/refetch。此前只解构 data/isLoading ——
+  // 请求 500 时 data 为 undefined，页面渲染「用户管理(0)」+ 空表头，
+  // 与"真的没有用户"完全无法区分。
+  const { data, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ['admin', 'users'],
     queryFn: async () => {
       // 后端 envelope: {code, message, data: UserMeta[]}
       const r = await apiClient.get<{ code: number; data: UserMeta[] }>('/admin/users');
-      // 兼容 vitest mock 直接返数组 + 后端 envelope: r 是数组 OR {code, data: [...]} 
+      // 兼容 vitest mock 直接返数组 + 后端 envelope: r 是数组 OR {code, data: [...]}
       if (Array.isArray(r)) return r;  // vitest 模式
       return r.data ?? [];  // 真后端 envelope
     },
@@ -45,6 +50,19 @@ export function UsersListPage() {
       apiClient.patch<UserMeta>(`/admin/users/${id}`, { enabled }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
   });
+
+  // PHASE98 R3: 错误态优先（失败 ≠ 空列表）
+  if (isError) {
+    return (
+      <div>
+        <h1>👥 用户管理</h1>
+        <ErrorState
+          message={`用户列表加载失败：${(queryError as Error)?.message ?? ''}`}
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
+  }
 
   if (isLoading) return <p>加载中…</p>;
   const users = data ?? [];
@@ -89,6 +107,17 @@ export function UsersListPage() {
             {createMutation.isPending ? '创建中…' : '创建'}
           </button>
         </div>
+      )}
+
+      {/* PHASE98 R3: 空态带 CTA —— 此前 0 用户时只渲染一个空表头，无法引导新建。
+          注意文案与顶部「+ 新建用户」按钮区分开，避免同一可访问名重复出现。 */}
+      {users.length === 0 && (
+        <EmptyState
+          title="还没有用户"
+          description="创建第一个用户，或等待管理员分配账号。"
+          actionLabel="创建第一个用户"
+          onAction={() => setShowCreate(true)}
+        />
       )}
 
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>

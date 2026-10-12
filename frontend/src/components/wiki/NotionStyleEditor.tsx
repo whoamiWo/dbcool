@@ -518,12 +518,19 @@ export function NotionStyleEditor({
           '&:hover .drag-handle': { opacity: 1 },
         }}
       >
-        {/* 拖拽手柄 */}
+        {/*
+          拖拽手柄 —— PHASE98 R4：onMouseDown 是空实现（注释写着"可后续接入 dnd-kit"），
+          即"看起来能拖、实际拖不动"的假交互。在真正接入 dnd-kit 之前，
+          必须对它隐藏无障碍语义（aria-hidden + 不可聚焦），
+          否则屏幕阅读器和键盘用户会遇到一个点了没反应的控件。
+        */}
         <IconButton
           className="drag-handle"
           size="small"
+          aria-hidden="true"
+          tabIndex={-1}
           sx={{ opacity: 0, cursor: 'grab', mt: 0.25, transition: 'opacity 0.15s' }}
-          onMouseDown={() => {/* 拖拽逻辑可后续接入 dnd-kit */}}
+          onMouseDown={() => {/* 拖拽逻辑待接入 dnd-kit；在此之前对无障碍隐藏 */}}
         >
           <DragIndicator fontSize="small" />
         </IconButton>
@@ -532,6 +539,7 @@ export function NotionStyleEditor({
         {isTodo && (
           <IconButton
             size="small"
+            aria-label={block.checked ? '标记为未完成' : '标记为已完成'}
             onClick={() => updateBlock(block.id, { checked: !block.checked })}
             sx={{ mt: 0.25, p: 0.5 }}
           >

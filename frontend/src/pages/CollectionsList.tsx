@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { ErrorState } from '@/components/ErrorState';
+import { EmptyState } from '@/components/EmptyState';
 import type { CollectionMeta } from '@/types/collection';
 
 export function CollectionsListPage() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['collections'],
     queryFn: async () => {
       // 后端 envelope: {code, message, data: CollectionMeta[]}
@@ -15,8 +17,19 @@ export function CollectionsListPage() {
     },
   });
 
+  // PHASE98 R3: 错误态改为可重试 + 展示真实原因（原先只有一句"加载失败"）
   if (isLoading) return <p>加载中…</p>;
-  if (error) return <p style={{ color: 'var(--color-error)' }}>加载失败</p>;
+  if (error) {
+    return (
+      <div>
+        <h1>📚 Collections</h1>
+        <ErrorState
+          message={`Collection 列表加载失败：${(error as Error)?.message ?? ''}`}
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
+  }
 
   const collections = data ?? [];
 
@@ -38,19 +51,14 @@ export function CollectionsListPage() {
         </Link>
       </div>
 
+      {/* PHASE98 R3: 空态改为带 CTA —— 原引导语"点上方"里的"上方"不可点击 */}
       {collections.length === 0 ? (
-        <div
-          style={{
-            marginTop: 24,
-            padding: 32,
-            background: 'var(--color-text-primary)',
-            borderRadius: 8,
-            textAlign: 'center',
-            color: 'var(--color-text-disabled)',
-          }}
-        >
-          还没有 Collection,点上方"新建 Collection"开始
-        </div>
+        <EmptyState
+          title="还没有 Collection"
+          description="Collection 是数据的结构定义，创建后才能录入记录。"
+          actionLabel="+ 新建 Collection"
+          onAction={() => (window.location.href = '/designer/schemas')}
+        />
       ) : (
         <div
           style={{

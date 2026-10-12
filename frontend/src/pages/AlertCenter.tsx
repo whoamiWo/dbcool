@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { subscribeToAlerts } from '@/lib/stompClient';
+import { useAuthStore } from '@/stores/auth';
+import { ErrorState } from '@/components/ErrorState';
 
 /**
  * R11 / R15 告警监控中心 — 运维可观测性页面.
@@ -183,9 +185,19 @@ export function AlertCenterPage() {
   const qc = useQueryClient();
   const [refreshSec, setRefreshSec] = useState(5);
   const [showResolved, setShowResolved] = useState(true);
-  const [ackBy, setAckBy] = useState('admin');
+  // PHASE98 R2b: 原默认写死 'admin' —— 告警确认人（审计留痕字段 acked_by）
+  // 会以 admin 身份记入审计，任何未手动修改的 ack 都无法追责，
+  // 合规审计（SOC2/等保）会被直接打回。改为取当前登录用户名。
+  const currentUser = useAuthStore((s) => s.user);
+  const [ackBy, setAckBy] = useState(currentUser?.username ?? '');
   const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // 登录态恢复后（异步）同步一次，避免首渲染时 user 尚未加载
+  useEffect(() => {
+    const username = currentUser?.username;
+    if (username) setAckBy(username);
+  }, [currentUser?.username]);
 
   // WebSocket 实时推送
   useEffect(() => {
@@ -262,6 +274,9 @@ export function AlertCenterPage() {
     return unsubscribe;
   }, [qc]);
 
+  // PHASE98 R3: 四个查询全部取 isError/error/refetch。
+  // 告警中心自身无 error 态是最讽刺也最危险的一点 —— webhook 统计接口挂掉时，
+  // 卡片会永远显示"加载中…"，运维看到的是"慢"而不是"坏"，从而漏报真实告警。
   const alertsQuery = useQuery({
     queryKey: ['alerts', 'recent', showResolved],
     queryFn: () =>
@@ -286,6 +301,11 @@ export function AlertCenterPage() {
     refetchInterval: refreshSec * 1000,
   });
 
+  // 任一关键数据源失败都要显式告知，而不是静默显示"加载中…"
+  const alertsError = alertsQuery.isError
+    ? `告警列表加载失败：${(alertsQuery.error as Error)?.message ?? ''}`
+    : null;
+
   const simulateMutation = useMutation({
     mutationFn: () =>
       apiClient.post<unknown>('/ai/chat', { model: 'demo', prompt: `demo-${Date.now()}` }),
@@ -295,9 +315,15 @@ export function AlertCenterPage() {
     },
   });
 
+  // PHASE98 R2b: 无登录身份时禁止 ack —— 否则 acked_by 会写入空串或残留的
+  // 默认值，审计留痕无法回答"谁确认的"。
   const ackMutation = useMutation({
-    mutationFn: (eventId: string) =>
-      apiClient.post<{ ok: boolean }>(`/ai/alerts/${eventId}/ack`, { by: ackBy }),
+    mutationFn: async (eventId: string) => {
+      if (!ackBy.trim()) {
+        throw new Error('登录态失效：无法确定确认人，请重新登录后再确认告警');
+      }
+      return apiClient.post<{ ok: boolean }>(`/ai/alerts/${eventId}/ack`, { by: ackBy.trim() });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts'] }),
   });
 
@@ -315,6 +341,10 @@ export function AlertCenterPage() {
 
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+      {/* PHASE98 R3: 告警列表是本页面最重要的数据源，失败必须显式告知 + 可重试 */}
+      {alertsError && (
+        <ErrorState message={alertsError} onRetry={() => void alertsQuery.refetch()} minHeight={0} />
+      )}
       <div
         style={{
           display: 'flex',
@@ -479,6 +509,14 @@ export function AlertCenterPage() {
                 </strong>
               </div>
             </>
+          ) : webhookQuery.isError ? (
+            // PHASE98 R3: 原来是 `加载中…` —— 接口挂掉时永远停在这一句，
+            // 运维以为只是慢，实际是这个数据源已经坏了。
+            <ErrorState
+              message={`Webhook 统计加载失败：${(webhookQuery.error as Error)?.message ?? ''}`}
+              onRetry={() => void webhookQuery.refetch()}
+              minHeight={0}
+            />
           ) : (
             <div style={{ color: 'var(--color-text-muted)' }}>加载中…</div>
           )}

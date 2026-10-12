@@ -23,6 +23,7 @@ import {
   Tooltip,
   Alert,
 } from '@mui/material';
+import { IconButtonA11y } from '@/components/IconButtonA11y';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -117,8 +118,11 @@ export function WikiPageListPage() {
           {kbLoading ? (
             <CircularProgress size={24} />
           ) : kbError ? (
-            <Alert severity="error">
-              无权限访问 / 拒绝访问（403）
+            // PHASE98 R3: 原实现把**任何**错误都硬编码成「无权限访问 / 拒绝访问（403）」。
+            // 网络超时、500、404 都会显示 403，用户会去申请权限而不是重试，
+            // 错误诊断成本被转嫁给客户支持。改为展示真实错误。
+            <Alert severity="error" role="alert">
+              知识库加载失败：{(kbError as Error)?.message || '未知错误'}
             </Alert>
           ) : (
             <Typography variant="h4" component="h1">
@@ -190,15 +194,58 @@ export function WikiPageListPage() {
                 <span>v{page.version}</span>
                 <span>{new Date(page.updated_at).toLocaleString('zh-CN')}</span>
               </Box>
+              {/*
+                PHASE98 R4: 移动端卡片视图此前既无 Tooltip 也无 aria-label
+                —— 桌面表格视图（:239 起）至少有 Tooltip 兜底，卡片视图完全没有，
+                屏幕阅读器读到的是一串"按钮"。这里补齐可访问名；
+                删除是破坏性操作，另加二次确认。
+              */}
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton size="small" onClick={() => window.location.href = `/wiki/${page.slug}/edit`}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" onClick={() => window.location.href = `/wiki/${page.slug}/versions`}><HistoryIcon fontSize="small" /></IconButton>
+                <IconButtonA11y
+                  size="small"
+                  aria-label={`编辑 ${page.title}`}
+                  onClick={() => (window.location.href = `/wiki/${page.slug}/edit`)}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButtonA11y>
+                <IconButtonA11y
+                  size="small"
+                  aria-label={`查看 ${page.title} 的版本历史`}
+                  onClick={() => (window.location.href = `/wiki/${page.slug}/versions`)}
+                >
+                  <HistoryIcon fontSize="small" />
+                </IconButtonA11y>
                 {page.status === 'DRAFT' ? (
-                  <IconButton size="small" color="success" onClick={() => publishMutation.mutate(page.id)}><PublishIcon fontSize="small" /></IconButton>
+                  <IconButtonA11y
+                    size="small"
+                    color="success"
+                    aria-label={`发布 ${page.title}`}
+                    onClick={() => publishMutation.mutate(page.id)}
+                  >
+                    <PublishIcon fontSize="small" />
+                  </IconButtonA11y>
                 ) : (
-                  <IconButton size="small" color="default" onClick={() => archiveMutation.mutate(page.id)}><ArchiveIcon fontSize="small" /></IconButton>
+                  <IconButtonA11y
+                    size="small"
+                    color="default"
+                    aria-label={`归档 ${page.title}`}
+                    onClick={() => archiveMutation.mutate(page.id)}
+                  >
+                    <ArchiveIcon fontSize="small" />
+                  </IconButtonA11y>
                 )}
-                <IconButton size="small" color="error" onClick={() => deleteMutation.mutate(page.id)}><DeleteIcon fontSize="small" /></IconButton>
+                <IconButtonA11y
+                  size="small"
+                  color="error"
+                  aria-label={`删除 ${page.title}`}
+                  onClick={() => {
+                    if (window.confirm(`确定删除《${page.title}》？该操作不可撤销。`)) {
+                      deleteMutation.mutate(page.id);
+                    }
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButtonA11y>
               </Box>
             </Paper>
           ))}
