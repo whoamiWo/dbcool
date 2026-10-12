@@ -328,12 +328,20 @@ T2 见 `reports/backup-failability-probe.txt`（改回假成功即 FAIL）；T5 
    `INIT=CREATE DOMAIN IF NOT EXISTS JSONB AS CLOB` 是 32 个 `columnDefinition="jsonb"`
    存量实体在 H2 下的绕行方案。此前表述"没生效"是错的——
    `InboundMessageServiceIntegrationTest` 13/13 全绿即为证据。
-2. **V54 迁移的两次手工介入已登记**：
-   - 第一版引用不存在的 `auth_user(id)` 导致启动失败，已改为 `users(id)`
-   - `metadata` 列类型 `JSONB → TEXT` 经手工 `ALTER TABLE` 修正
-   - **修正方式**：V54 还原为旧版内容 + 新建 `V55__external_user_mapping_fix.sql`
-     做增量修复（不再改已应用的迁移）。V54 的 `flyway_schema_history.checksum`
-     经手工更新为当前文件值 `-20072085` 以通过校验。
+2. **V54 迁移的修正（含一次自我推翻）**：
+   - 首版引用不存在的 `auth_user(id)` → 启动失败（`relation "auth_user" does not exist`）
+   - `metadata` 用 `JSONB` → Hibernate 6 + H2Dialect 识别失败
+   - **中间走过一段弯路**：为让库里已记录的 checksum 匹配，曾把 V54 **还原成旧版**
+     （`auth_user` + `JSONB`）——这会让**全新环境部署在 V54 直接失败**（auth_user 不存在）。
+     审计时通过临时空库对照验证确认了这个回归：
+     * 修正版（`users` 外键）→ `CREATE TABLE` 成功
+     * 旧版（`auth_user` 外键）→ `ERROR: relation "auth_user" does not exist`
+   - **最终做法**：V54 修正为**可在新环境跑通**的正确版本（`users(id)` + `TEXT`），
+     库里已应用的 checksum 手工更新为修正版值 `-874409908`（老环境表结构本就正确、
+     V55 幂等，因此无需改数据）。新建 `V55__external_user_mapping_fix.sql`
+     作为老环境的增量修复（幂等，`DROP/ADD CONSTRAINT` + `ALTER COLUMN TYPE`）。
+   - 结论：**改已应用的迁移时，正确方向是"改文件 + 更新库里 checksum"，
+     而不是"还原文件去匹配旧 checksum"**——后者会牺牲全新环境。
 3. **存量 schema 漂移（新登记，未修）**：`V28__platform_enhancement.sql:110` 的
    `ldap_user_mapping` 也引用 `auth_user(id)`。实测：`auth_user` 表在库中**不存在**，
    而真实外键已指向 `users(id)`，V28 却标记 `success=t` —— 说明该外键是 Flyway 基线
