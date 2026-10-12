@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Collection REST API — Week 7 扩展支持修改表(US-005).
@@ -33,6 +35,8 @@ import org.springframework.web.server.ResponseStatusException;
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Collections", description = "数据模型")
 @RequestMapping("/api/collections")
 public class CollectionController {
+
+    private static final Logger log = LoggerFactory.getLogger(CollectionController.class);
 
     private final CollectionService service;
     private final AsyncMigrationService migrationService;
@@ -436,7 +440,11 @@ public class CollectionController {
             for (Map<String, Object> f : fields) {
                 headers.add((String) f.get("name"));
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            // PHASE96 B4a: 此前是空 catch —— fieldsJson 解析失败时 headers 静默为空，
+            // 导出的 CSV 只剩一个空表头，用户完全看不出哪里错了。改为记 WARN。
+            log.warn("[CSV 导出] 表头解析失败，导出将只有空表头：collection={}, err={}", name, e.getMessage());
+        }
         StringBuilder csv = new StringBuilder();
         csv.append(String.join(",", headers)).append("\n");
         for (Map<String, Object> r : records) {

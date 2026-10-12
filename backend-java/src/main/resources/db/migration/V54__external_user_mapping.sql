@@ -13,12 +13,12 @@ CREATE TABLE IF NOT EXISTS external_user_mapping (
     id UUID PRIMARY KEY,
     platform VARCHAR(64) NOT NULL,            -- slack / mattermost / feishu / dingtalk / wecom ...
     external_user_id VARCHAR(256) NOT NULL,   -- 第三方平台内的用户标识
-    local_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    local_user_id UUID REFERENCES auth_user(id) ON DELETE CASCADE,
     tenant_id VARCHAR(64) NOT NULL,
     display_name VARCHAR(256),                -- 第三方展示名（便于排障）
     -- 与实体 ExternalUserMappingEntity.metadata(String) 保持一致：
     -- Hibernate ddl 校验会比对列类型，不一致会导致启动失败。
-    metadata TEXT NOT NULL DEFAULT '{}',
+    metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (platform, external_user_id, tenant_id)
@@ -29,3 +29,4 @@ CREATE INDEX IF NOT EXISTS idx_external_user_mapping_lookup
 
 CREATE INDEX IF NOT EXISTS idx_external_user_mapping_local
     ON external_user_mapping(local_user_id);
+

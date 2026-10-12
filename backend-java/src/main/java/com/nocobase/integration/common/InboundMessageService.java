@@ -46,7 +46,10 @@ public class InboundMessageService {
     @Value("${integration.inbound.enabled:true}")
     private boolean inboundEnabled;
 
-    @Value("${integration.inbound.auto-provision-user:false}")
+    // PHASE96 B1: 默认改为 true。此前默认 false，未预置映射时第三方入站消息 100% 被丢弃
+    // —— 等于无声下线该功能（红线 3）。现在默认自动建号：映射不存在即建本地用户
+    // （口令 bcrypt 随机、不可本地登录）并回写 external_user_mapping。
+    @Value("${integration.inbound.auto-provision-user:true}")
     private boolean autoProvisionUser;
 
     public InboundMessageService(ImMessageRepository messageRepository,
@@ -224,8 +227,15 @@ public class InboundMessageService {
             String candidate = source + ":" + externalUserId;
             username = candidate.length() > 128 ? candidate.substring(0, 128) : candidate;
         }
+        // PHASE96 B0: username 由 source+externalUserId 拼接，不含租户，
+        // 而 findByUsername 是全局查询 —— 不同租户下的同一外部用户（同一人分属两个
+        // Slack workspace）会命中对方租户已建的同名用户，再回写出一条
+        // "tenantId=B 但 localUserId 属于 A" 的错配映射（跨租户串号）。
+        // 因此必须按 tenantId 过滤，不匹配就按"不存在"处理并新建本租户用户。
         final com.nocobase.auth.UserEntity user =
-                userRepository.findByUsername(username).orElseGet(() -> {
+                userRepository.findByUsername(username)
+                        .filter(u -> tenantId.equals(u.getTenantId()))
+                        .orElseGet(() -> {
             com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
             u.setId(UUID.randomUUID());
             u.setUsername(username);

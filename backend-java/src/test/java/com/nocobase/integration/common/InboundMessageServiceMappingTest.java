@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.mockito.ArgumentCaptor;
+
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
 import com.nocobase.im.ImChannelMemberRepository;
@@ -127,6 +129,47 @@ class InboundMessageServiceMappingTest {
 
         assertThat(saved).isNull();
         verify(messageRepository, never()).save(any());
+    }
+
+    /**
+     * PHASE96 B0 回归：不同租户下同一外部用户不得串到对方的本地账号。
+     *
+     * <p>username = {@code source + ":" + externalUserId}，不含租户；而
+     * {@code findByUsername} 是全局查询。若不过滤 tenantId，本租户入站会命中
+     * 他租户已建的同名用户，并回写出一条 "tenantId=本租户 但 localUserId 属于他租户"
+     * 的错配映射（跨租户串号）。该路径在 auto-provision-user 默认 false 时不会触发，
+     * 默认翻转为 true 后成为默认路径，因此必须有回归锁住。
+     */
+    @Test
+    void autoProvision_sameExternalUserDifferentTenant_noCrossTenantReuse() {
+        ReflectionTestUtils.setField(service, "autoProvisionUser", true);
+        UserEntity otherTenantUser = new UserEntity();
+        otherTenantUser.setId(UUID.randomUUID());
+        otherTenantUser.setUsername("slack:shared-1");
+        otherTenantUser.setTenantId("tenant_other");
+
+        when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(anyString(), anyString(), eq(TENANT)))
+                .thenReturn(Optional.empty());
+        // 全局能按 username 查到，但那个用户属于另一个租户 —— 不得复用
+        when(userRepository.findByUsername("slack:shared-1"))
+                .thenReturn(Optional.of(otherTenantUser));
+        when(userRepository.save(any(UserEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(messageRepository.save(any(ImMessageEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(memberRepository.existsByChannelIdAndUserId(any(), any())).thenReturn(true);
+        when(mappingRepository.save(any(ExternalUserMappingEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        ImMessageEntity saved = service.processInboundMessage(
+                TENANT, UUID.randomUUID(), "slack", "Ev-x1", "shared-1", "hi", null);
+
+        assertThat(saved).isNotNull();
+        assertThat(saved.getSenderId()).isNotEqualTo(otherTenantUser.getId());
+
+        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getTenantId()).isEqualTo(TENANT);
     }
 
     /** 自动建号开启：两个不同外部用户 → 两个不同本地用户。 */

@@ -429,6 +429,40 @@ def main():
         return isinstance(data, list) and len(data) == 0
     check("13-reports B→A", "GET", f"/api/bi/reports?collectionName={report_collection}", 200, 200, check_reports)
 
+    # PHASE96 B2: 写端点跨租户覆盖改写 → 404。
+    # saveReport 在 body 带 id 时走 findByIdAndTenantId + orElseThrow(NOT_FOUND)，
+    # 因此 B 传 A 的报表 id 必须 404（此前 findById 无租户校验，可覆盖改写他租户报表配置）。
+    # 这是本批唯一针对"写操作"的跨租户断言——只测 GET 列表证明不了越权写入被堵住。
+    log("\n--- PHASE96 B2: BI 报表写端点跨租户覆盖改写 ---")
+    overwrite_status = http("POST", "/api/bi/reports", b_token, {
+        "id": report_id_a,
+        "collectionName": report_collection,
+        "name": "hijacked-by-tenant-b",
+        "type": "PIVOT",
+        "config": {"injected": True}
+    })
+    total += 1
+    if overwrite_status == 404:
+        passed += 1
+        log(f"  ✅ 15-biReport-write B→A: B 传 A 的报表 id → 404（越权覆盖被拒）")
+    else:
+        log(f"  ❌ 15-biReport-write B→A: B 传 A 的报表 id → {overwrite_status}（期望 404，越权写入未被拦住）")
+    # 正向基线：A 用自己的报表 id 必须能保存成功（证明 404 归因于租户校验，而非端点本身报错）
+    _, a = raw_post("/api/bi/reports", {
+        "id": report_id_a,
+        "collectionName": report_collection,
+        "name": "report-a-updated-by-owner",
+        "type": "PIVOT",
+        "config": {}
+    }, admin_token)
+    a_ok = a.get("code") == 0 and a.get("data", {}).get("id") == report_id_a
+    total += 1
+    if a_ok:
+        passed += 1
+        log(f"  ✅ 16-biReport-write A→A 正向基线: A 保存自己的报表 → 200（证明 404 归因于租户隔离）")
+    else:
+        log(f"  ❌ 16-biReport-write A→A 正向基线: A 保存自己的报表失败 → {a}")
+
     # 14. B → GET /api/admin/users → 200 且列表不含 A 的任何用户名
     def check_users(body):
         if not body or body.get("code") != 0:

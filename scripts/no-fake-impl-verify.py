@@ -72,27 +72,21 @@ WHITELIST = [
                   '是为拦住 LdapSyncService 历史写死的已知口令，属显式失败设计',
         'until': '存量 LDAP_SYNCED 账号全部清理后（当前库内 0 条）',
     },
-    {
-        # UUID.fromString 的常规容错：解析失败走默认分支，属于入参防御而非吞异常
-        'file': 'backend-java/src/main/java/com/nocobase/meta/CollectionController.java',
-        'pattern': r'catch\s*\(\s*Exception\s+ignored\s*\)\s*\{\s*\}',
-        'owner': 'platform',
-        'reason': '入参 UUID 解析容错，失败走默认分支；不涉及外部服务调用的静默失败',
-        'until': '入参校验重构时统一收敛为显式 400',
-    },
+    # PHASE96 B4a: CollectionController 的空 catch 已修复为记 WARN 日志，
+    # 该白名单条目随之删除 —— 修代码优先于扩白名单。
     {
         'file': 'backend-java/src/main/java/com/nocobase/workflow',
         'pattern': r'catch\s*\(\s*Exception\s+ignored\s*\)\s*\{\s*\}',
         'owner': 'workflow',
         'reason': 'workflow 节点参数解析容错（UUID.fromString），失败走默认分支',
-        'until': '入参校验重构时统一收敛为显式 400',
+        'until': 'PHASE98 错误态批次：节点入参统一收敛为显式 400',
     },
     {
         'file': 'backend-java/src/main/java/com/nocobase/im/SlashCommandInitializer.java',
         'pattern': r'catch\s*\(\s*NumberFormatException\s+ignored\s*\)\s*\{\s*\}',
         'owner': 'im',
         'reason': '/remind 的分钟数解析容错，失败回落默认 10 分钟，属用户输入容错',
-        'until': '斜杠命令入参统一加 400 校验时',
+        'until': 'PHASE98 错误态批次：斜杠命令入参统一加 400 校验',
     },
 ]
 

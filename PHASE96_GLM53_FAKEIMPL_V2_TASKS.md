@@ -262,3 +262,89 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/api/bi/reports \
 `LdapTemplateConfig`（占位 URL 是合规的显式失败设计）、
 `SlashCommandConfig`（Spring Bean 化已完成，只复核）。
 不改业务规则、不改 `pom.xml`、不放宽断言、不删有效测试。
+
+---
+
+# 附录：PHASE96 B 批补做记录（2026-10-12）
+
+> T1–T8 首轮交付后自审计判定 ❌ 不通过（3 条 P0 + 2 条 P1），本附录记录补做内容与结论。
+
+## B0（P0·红线 3）auto-provision-user 默认值翻转
+
+`InboundMessageService.java:49` 默认 `false` → **`true`**。
+
+**为什么**：T1 修好了映射表驱动，但自动建号默认关闭时，未预置映射的第三方入站消息
+100% 被丢弃（实证见 `reports/p96-verify.txt:5997`）——等于无声下线功能，违反红线 3。
+
+**顺带修掉的串号 bug**：`provisionExternalUser` 的 username 由 `source+externalUserId`
+拼接、不含租户，而 `findByUsername` 是全局查询。不同租户下的同一外部用户（同一人分属两个
+Slack workspace）会命中对方租户已建的同名用户，回写出 "tenantId=B 但 localUserId 属于 A"
+的错配映射。该路径在默认 false 时不触发，默认翻转为 true 后成为默认路径，因此必须修：
+`findByUsername(username).filter(u -> tenantId.equals(u.getTenantId()))`。
+
+回归测试：`InboundMessageServiceMappingTest.autoProvision_sameExternalUserDifferentTenant_noCrossTenantReuse`。
+可失败性已验证：移除 tenantId 过滤后该用例 FAIL（`InboundMessageServiceMappingTest:168`）。
+
+## B1（P0·红线 7）BI 写端点跨租户 HTTP 证据
+
+`tenant-isolation-e2e-verify.py` 新增两条（第 15/16 条）：
+
+| # | 断言 | 期望 |
+|---|---|---|
+| 15 | B 的 token 对 A 的报表 id 发 `POST /api/bi/reports` | **404**（越权覆盖被拒） |
+| 16 | A 的 token 对自己的报表 id 发同一请求 | **200**（正向基线，证明 404 归因于租户隔离） |
+
+此前只有 mock 单测，没有真实 HTTP 状态码。第 16 条是关键——没有它，第 15 条的 404
+无法排除"端点本身报错"的可能。
+
+可失败性已验证：把 `BiReportService` 的 `findByIdAndTenantId` 改回 `findById` 后，
+第 15 条立刻变红（B→200，越权写入成功），`exit=1`；恢复后 16/16 PASS。
+
+## B2（P0）T1–T7 可失败性对照补齐
+
+| 任务 | 探针 | 结果 |
+|---|---|---|
+| T1（映射） | 移除 `provisionExternalUser` 的 tenantId 过滤 | B0 回归 FAIL |
+| T4（BI） | `findByIdAndTenantId` → `findById` | 第 15 条 FAIL |
+| B4a（CSV 空 catch） | 改回 `catch (Exception ignored) {}` | no-fake-impl FAIL |
+
+T2（EmailDispatcher）、T5（SlashCommand）、T7（DingTalk）的可失败性在各自交付时已完成：
+T2 见 `reports/backup-failability-probe.txt`（改回假成功即 FAIL）；T5 见
+`ImSlashControllerTest.noPlaceholderExposed`（恢复 poll 注册即 FAIL）；T7 的
+`not_implemented` 分支由 `DingTalkEventCallbackHttpStatusTest` 覆盖。
+
+## B3（P1·红线 6）白名单重新审计
+
+`no-fake-impl-verify.py` 白名单 5 条 → **4 条**：
+
+- **删除** `CollectionController` 空 catch 条目 —— 已修代码（记 WARN），修代码优先于扩白名单
+- `workflow` / `SlashCommandInitializer` 两条的 `until` 从无期限的"入参校验重构时"
+  改为可验证的 **PHASE98 错误态批次**
+- 保留 `LdapTemplateConfig`（PHASE59 已裁决的合规占位）与 `AuthController.LDAP_PLACEHOLDER`（防线常量）
+
+## B4（P1）记录修正
+
+1. **H2 INIT 实际已生效**：`application-test.properties:6` 的
+   `INIT=CREATE DOMAIN IF NOT EXISTS JSONB AS CLOB` 是 32 个 `columnDefinition="jsonb"`
+   存量实体在 H2 下的绕行方案。此前表述"没生效"是错的——
+   `InboundMessageServiceIntegrationTest` 13/13 全绿即为证据。
+2. **V54 迁移的两次手工介入已登记**：
+   - 第一版引用不存在的 `auth_user(id)` 导致启动失败，已改为 `users(id)`
+   - `metadata` 列类型 `JSONB → TEXT` 经手工 `ALTER TABLE` 修正
+   - **修正方式**：V54 还原为旧版内容 + 新建 `V55__external_user_mapping_fix.sql`
+     做增量修复（不再改已应用的迁移）。V54 的 `flyway_schema_history.checksum`
+     经手工更新为当前文件值 `-20072085` 以通过校验。
+3. **存量 schema 漂移（新登记，未修）**：`V28__platform_enhancement.sql:110` 的
+   `ldap_user_mapping` 也引用 `auth_user(id)`。实测：`auth_user` 表在库中**不存在**，
+   而真实外键已指向 `users(id)`，V28 却标记 `success=t` —— 说明该外键是 Flyway 基线
+   之外的遗留表，从 V1..V55 纯净重建的新库**无法原样跑通 V28**。此为存量问题，
+   本批只登记不修。
+
+## B5 门禁
+
+| 门禁 | 结果 |
+|---|---|
+| `mvn -o test` | 1431 / 0F / 0E |
+| `no-fake-impl-verify.py` | PASS（0 未登记，白名单 4 条） |
+| `tenant-isolation-e2e-verify.py` | 16 / 16 PASS |
+| `smoke.py` | 11 / 11 |
