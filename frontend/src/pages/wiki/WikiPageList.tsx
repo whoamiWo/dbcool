@@ -282,31 +282,45 @@ export function WikiPageListPage() {
                     {new Date(page.updated_at).toLocaleString('zh-CN')}
                   </TableCell>
                   <TableCell align="right">
+                    {/*
+                      PHASE98 R4: 桌面视图此前只包了 Tooltip —— MUI Tooltip 默认
+                      describeChild=false，运行时会把 title 作为 aria-label 注入子元素，
+                      静态不可见且依赖 MUI 内部行为。这里补显式 aria-label。
+                    */}
                     <Tooltip title="编辑">
-                      <IconButton size="small" onClick={() => window.location.href = `/wiki/${page.slug}/edit`}>
+                      <IconButton size="small" aria-label={`编辑 ${page.title}`} onClick={() => window.location.href = `/wiki/${page.slug}/edit`}>
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="版本历史">
-                      <IconButton size="small" onClick={() => window.location.href = `/wiki/${page.slug}/versions`}>
+                      <IconButton size="small" aria-label={`查看 ${page.title} 的版本历史`} onClick={() => window.location.href = `/wiki/${page.slug}/versions`}>
                         <HistoryIcon />
                       </IconButton>
                     </Tooltip>
                     {page.status === 'DRAFT' ? (
                       <Tooltip title="发布">
-                        <IconButton size="small" color="success" onClick={() => publishMutation.mutate(page.id)}>
+                        <IconButton size="small" color="success" aria-label={`发布 ${page.title}`} onClick={() => publishMutation.mutate(page.id)}>
                           <PublishIcon />
                         </IconButton>
                       </Tooltip>
                     ) : (
                       <Tooltip title="归档">
-                        <IconButton size="small" color="default" onClick={() => archiveMutation.mutate(page.id)}>
+                        <IconButton size="small" color="default" aria-label={`归档 ${page.title}`} onClick={() => archiveMutation.mutate(page.id)}>
                           <ArchiveIcon />
                         </IconButton>
                       </Tooltip>
                     )}
                     <Tooltip title="删除">
-                      <IconButton size="small" color="error" onClick={() => deleteMutation.mutate(page.id)}>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        aria-label={`删除 ${page.title}`}
+                        onClick={() => {
+                          if (window.confirm(`确定删除《${page.title}》？该操作不可撤销。`)) {
+                            deleteMutation.mutate(page.id);
+                          }
+                        }}
+                      >
                         <DeleteIcon />
                       </IconButton>
                     </Tooltip>

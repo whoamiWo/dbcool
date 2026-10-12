@@ -236,6 +236,8 @@ export function SchemaDesignerPage() {
                   {f.type === 'formula' && (
                     <button
                       onClick={() => setFormulaTarget(i)}
+                      aria-label="编辑公式表达式"
+                      title="编辑公式表达式"
                       style={{
                         marginLeft: 4,
                         padding: '2px 6px',
@@ -245,7 +247,6 @@ export function SchemaDesignerPage() {
                         borderRadius: 4,
                         cursor: 'pointer',
                       }}
-                      title="编辑公式表达式"
                     >
                       🧮
                     </button>
