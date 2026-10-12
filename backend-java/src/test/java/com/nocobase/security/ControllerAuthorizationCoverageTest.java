@@ -38,9 +38,11 @@ class ControllerAuthorizationCoverageTest {
         // 健康检查：监控平台查询，用途：不涉及用户数据
         "health/HealthController.java:17 -> health (reason: 负载均衡 + 监控，无权限语义)",
         // 登录：认证入口，必须公开，用途：用户身份验证入口
-        "auth/AuthController.java:61 -> login (reason: 认证入口，必须公开，无身份即无权限)",
+        // PHASE96 T6: 行号 61→66（本批在 login 前插入了 LDAP 占位口令防线）
+        "auth/AuthController.java:66 -> login (reason: 认证入口，必须公开，无身份即无权限)",
         // 刷新：凭证续期，需先登录才能用，用途：匿名返回 401
-        "auth/AuthController.java:118 -> refresh (reason: 需要旧 token 续期，非无权限端点)",
+        // PHASE96 T6: 行号 118→134（同上，防线代码导致的下移）
+        "auth/AuthController.java:134 -> refresh (reason: 需要旧 token 续期，非无权限端点)",
         // WebSocket 信令：IM 系统的 WebSocket 端点，用途：鉴权由 JwtChannelInterceptor 处理
         "im/ImChannelController.java:28 -> websocket (reason: WebSocket 鉴权由拦截器处理)",
         // Webhook 回调：第三方平台调用，用途：无身份信息，由 HMAC 验签保护

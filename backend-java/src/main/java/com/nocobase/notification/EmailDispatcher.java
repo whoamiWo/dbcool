@@ -53,16 +53,18 @@ public class EmailDispatcher implements NotificationDispatcher {
         String body = String.valueOf(payload.getOrDefault("body", ""));
 
         if (host == null || host.isBlank()) {
-            // 未配置 SMTP:模拟模式(保持既有行为)
-            log.info("[EMAIL-MOCK to={}] subject={} body={}", recipient, subject, body);
-            return SendResult.ok("mock-sent (no smtp_host configured): " + recipient);
+            // PHASE96 T2: 未配置 SMTP 一律显式失败。此前返回 SendResult.ok("mock-sent …")，
+            // 调用方拿到"成功"却从未发信 —— 对外 SaaS 下这是对客户的服务欺诈且无法自查。
+            log.error("[EMAIL 发送失败 to={}]: smtp_host 未配置，拒绝假装发送成功", recipient);
+            return SendResult.error("smtp_host 未配置：请先在渠道配置中填写 SMTP 服务器");
         }
 
-        // 真实投递需显式开启,未开启时保持既有 logged-send 行为
+        // PHASE96 T2: 配了 host 但未显式开启 real_send，同样显式失败。
+        // 此前返回 ok("logged-send …") —— 一封不发却报成功，比上一处更隐蔽。
         if (!isRealSend(cfg)) {
-            log.info("[EMAIL to={} via {}] subject={} (real_send 未开启,仅记录)",
-                    recipient, host, subject);
-            return SendResult.ok("logged-send: " + recipient + " via " + host);
+            log.error("[EMAIL 发送失败 to={} via {}]: real_send 未开启（需显式 real_send=true 才会真实投递）",
+                    recipient, host);
+            return SendResult.error("real_send 未开启：渠道已配置 SMTP 但未授权真实投递，请显式设置 real_send=true");
         }
 
         try {

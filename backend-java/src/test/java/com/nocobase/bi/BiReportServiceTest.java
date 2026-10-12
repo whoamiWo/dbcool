@@ -92,7 +92,7 @@ class BiReportServiceTest {
         existing.setName("Old Name");
         existing.setType(BiReportEntity.Type.PIVOT);
         existing.setConfigJson("{}");
-        when(reportRepo.findById(id)).thenReturn(java.util.Optional.of(existing));
+        when(reportRepo.findByIdAndTenantId(id, tid)).thenReturn(java.util.Optional.of(existing));
         when(reportRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> body = Map.of(
@@ -103,6 +103,28 @@ class BiReportServiceTest {
         Map<String, Object> result = service.saveReport(body, tid, UUID.randomUUID());
         assertThat(result.get("name")).isEqualTo("Updated Name");
         assertThat(result.get("type")).isEqualTo("CHART");
+    }
+
+    @Test
+    void saveReport_unknownId_throws404() {
+        // PHASE96 T4: id 不存在必须 404，禁止 orElseGet 造 tenantId=null 的孤儿报表
+        UUID id = UUID.randomUUID();
+        when(reportRepo.findByIdAndTenantId(id, tid)).thenReturn(java.util.Optional.empty());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> service.saveReport(Map.of("id", id.toString(), "name", "X"), tid, UUID.randomUUID()));
+    }
+
+    @Test
+    void saveReport_otherTenantsId_throws404() {
+        // PHASE96 T4: 传他租户的报表 id 不得覆盖改写，必须 404
+        UUID id = UUID.randomUUID();
+        when(reportRepo.findByIdAndTenantId(id, tid)).thenReturn(java.util.Optional.empty());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> service.saveReport(Map.of("id", id.toString(), "name", "hijack"), tid, UUID.randomUUID()));
     }
 
     // ============================================================

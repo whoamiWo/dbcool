@@ -56,6 +56,11 @@ public class AuthController {
     }
 
     /**
+     * PHASE96 T6: LdapSyncService 历史占位口令。命中该值的账号一律禁止本地登录。
+     */
+    private static final String LDAP_PLACEHOLDER = "LDAP_SYNCED";
+
+    /**
      * 登录.
      */
     @PostMapping("/login")
@@ -69,6 +74,17 @@ public class AuthController {
                     "auth.login.failed", "auth", "username_" + request.username(),
                     Map.of("username", request.username(), "reason", "user_not_found"));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "账号或密码错误");
+        }
+
+        // PHASE96 T6: 拒绝历史占位口令的账号本地登录。
+        // LdapSyncService 曾把 password_hash 全库写为字面量 "LDAP_SYNCED"（已知口令），
+        // 现虽已改为 bcrypt(随机UUID)，仍需拦住库里可能存在的存量明文账号。
+        if (LDAP_PLACEHOLDER.equals(user.getPasswordHash())) {
+            auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
+                    "auth.login.failed", "auth", user.getId().toString(),
+                    Map.of("username", user.getUsername(), "reason", "ldap_placeholder_password"));
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "该账号由 LDAP 同步创建，请通过企业身份提供商（IdP）登录");
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {

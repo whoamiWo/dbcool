@@ -7,15 +7,18 @@ import com.nocobase.im.ImChannelMemberRepository;
 import com.nocobase.im.ImMessageRepository;
 import com.nocobase.im.entity.ImChannelMemberEntity;
 import com.nocobase.im.entity.ImMessageEntity;
+import com.nocobase.auth.UserRepository;
 import com.nocobase.integration.slack.SlackAppService;
 import com.nocobase.realtime.RedisStompBridge;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -37,9 +40,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ActiveProfiles("test")
 class InboundMessageServiceIntegrationTest {
 
-    /** mapExternalUser 的回落用户（实现固定映射为此 ID）。 */
-    private static final UUID MAPPED_USER =
-            UUID.fromString("00000000-0000-0000-0000-000000000001");
+    /** PHASE96 T1: 映射不再回落到硬编码 UUID，改由 external_user_mapping 表驱动。 */
     private static final String TENANT = "tenant_default";
 
     @Autowired
@@ -48,6 +49,16 @@ class InboundMessageServiceIntegrationTest {
     private ImChannelMemberRepository memberRepository;
     @Autowired
     private ExternalMessageLogRepository externalMessageLogRepository;
+    @Autowired
+    private ExternalUserMappingRepository externalUserMappingRepository;
+    @Autowired
+    private UserRepository userRepository;
+
+    /**
+     * 不使用 @Autowired：@DataJpaTest 切片不加载 Security 配置，没有 PasswordEncoder bean。
+     * 这里手动构造一个，仅供自动建号时生成不可登录口令。
+     */
+    private final PasswordEncoder passwordEncoder = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
 
     /** 外部通道，非被测主路径 —— 仅隔离，不影响落库断言。 */
     @MockBean
@@ -55,16 +66,40 @@ class InboundMessageServiceIntegrationTest {
 
     private InboundMessageService service;
     private UUID channelId;
+    private UUID localUser;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         channelId = UUID.randomUUID();
         service = new InboundMessageService(
-                messageRepository, memberRepository, bridge, externalMessageLogRepository);
+                messageRepository, memberRepository, bridge, externalMessageLogRepository,
+                externalUserMappingRepository, userRepository, passwordEncoder);
         ReflectionTestUtils.setField(service, "defaultChannelId", channelId.toString());
         ReflectionTestUtils.setField(service, "inboundEnabled", true);
-        addMember(channelId, MAPPED_USER);
+        ReflectionTestUtils.setField(service, "autoProvisionUser", false);
+
+        // 造一个本地用户 + 一条外部映射（替代原来的硬编码 MAPPED_USER）
+        com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
+        u.setId(UUID.randomUUID());
+        u.setUsername("inbound-it-" + u.getId());
+        u.setPasswordHash("x");
+        u.setTenantId(TENANT);
+        u.setDisplayName("Inbound IT User");
+        u.setCreatedAt(java.time.Instant.now());
+        localUser = userRepository.save(u).getId();
+
+        ExternalUserMappingEntity m = new ExternalUserMappingEntity();
+        m.setId(UUID.randomUUID());
+        m.setPlatform("slack");
+        m.setExternalUserId("U-ext-1");
+        m.setLocalUserId(localUser);
+        m.setTenantId(TENANT);
+        m.setCreatedAt(java.time.Instant.now());
+        m.setUpdatedAt(java.time.Instant.now());
+        externalUserMappingRepository.save(m);
+
+        addMember(channelId, localUser);
     }
 
     private void addMember(UUID ch, UUID user) {
@@ -105,7 +140,7 @@ class InboundMessageServiceIntegrationTest {
         List<ImMessageEntity> all = messageRepository.findAll();
         assertThat(all).anyMatch(m -> "hello inbound".equals(m.getContent()));
         assertThat(saved.getChannelId()).isEqualTo(channelId);
-        assertThat(saved.getSenderId()).isEqualTo(MAPPED_USER);
+        assertThat(saved.getSenderId()).isEqualTo(localUser);
     }
 
     @Test
@@ -127,7 +162,7 @@ class InboundMessageServiceIntegrationTest {
 
     @Test
     void inbound_senderNotMember_dropped() {
-        // 清掉成员关系，使 MAPPED_USER 不再是频道成员
+        // 清掉成员关系，使映射用户不再是频道成员
         memberRepository.deleteAll();
 
         assertThat(inbound("Ev-nonmember", "should drop")).isNull();
@@ -165,7 +200,7 @@ class InboundMessageServiceIntegrationTest {
     void slack_realEventCallbackFormat_isSaved() throws Exception {
         SlackAppService slack = newSlackService();
         String payload = "{\"type\":\"event_callback\",\"event_id\":\"Ev-real-1\","
-                + "\"event\":{\"type\":\"message\",\"channel\":\"C123\",\"user\":\"U123\","
+                + "\"event\":{\"type\":\"message\",\"channel\":\"C123\",\"user\":\"U-ext-1\","
                 + "\"text\":\"real slack format\",\"ts\":\"1710000000.000100\"}}";
 
         slack.handleEvent(mapper.readTree(payload));
@@ -177,7 +212,7 @@ class InboundMessageServiceIntegrationTest {
     @Test
     void slack_flatFormat_isSaved() throws Exception {
         SlackAppService slack = newSlackService();
-        String payload = "{\"type\":\"message\",\"channel\":\"C123\",\"user\":\"U123\","
+        String payload = "{\"type\":\"message\",\"channel\":\"C123\",\"user\":\"U-ext-1\","
                 + "\"text\":\"flat format\",\"ts\":\"1710000000.000200\"}";
 
         slack.handleEvent(mapper.readTree(payload));
@@ -196,5 +231,67 @@ class InboundMessageServiceIntegrationTest {
         slack.handleEvent(mapper.readTree(payload));
 
         assertThat(countByContent("bot echo")).isZero();
+    }
+
+    // ============================================================
+    //  PHASE96 T1: 映射真实现 —— 不再回落到硬编码 UUID
+    // ============================================================
+
+    /**
+     * 未配置映射且未开自动建号时必须丢弃，而不是回落到固定 UUID。
+     *
+     * <p>这是假实现的证伪点：修复前任何外部用户都会"映射成功"到 00000000-…-0001。
+     */
+    @Test
+    void inbound_unknownExternalUser_dropped() {
+        // "U-unknown" 没有映射记录，且 autoProvisionUser=false
+        assertThat(service.processInboundMessage(
+                TENANT, null, "slack", "Ev-unknown", "U-unknown", "no mapping", null)).isNull();
+        assertThat(countByContent("no mapping")).isZero();
+    }
+
+    /**
+     * 两个不同外部用户 → 两个不同本地用户（auto-provision 开启时）。
+     *
+     * <p>注意：新 provision 的用户尚未加入频道，按设计会被成员校验丢弃（返回 null）——
+     * 那是正确的"显式失败"。这里断言的是**映射表的差异化**：两个不同外部用户
+     * 必须解析到两个不同 local_user_id，而不是都回落到同一个硬编码 UUID。
+     */
+    @Test
+    void inbound_autoProvision_distinctLocalUsers() {
+        ReflectionTestUtils.setField(service, "autoProvisionUser", true);
+
+        service.processInboundMessage(
+                TENANT, channelId, "slack", "Ev-p1", "U-provision-a", "pa", null);
+        service.processInboundMessage(
+                TENANT, channelId, "slack", "Ev-p2", "U-provision-b", "pb", null);
+
+        List<UUID> localIds = externalUserMappingRepository.findAll().stream()
+                .filter(m -> "slack".equals(m.getPlatform()))
+                .filter(m -> m.getExternalUserId().startsWith("U-provision-"))
+                .map(ExternalUserMappingEntity::getLocalUserId)
+                .distinct()
+                .toList();
+        assertThat(localIds).hasSize(2);
+        // 关键：不复用硬编码 UUID 00000000-…-0001
+        assertThat(localIds).doesNotContain(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+    }
+
+    /** 映射存在但 local_user_id 指向不存在/跨租户的用户 → 必须丢弃，不得静默成功。 */
+    @Test
+    void inbound_staleMapping_dropped() {
+        ExternalUserMappingEntity stale = new ExternalUserMappingEntity();
+        stale.setId(UUID.randomUUID());
+        stale.setPlatform("slack");
+        stale.setExternalUserId("U-stale");
+        stale.setLocalUserId(UUID.randomUUID());  // 指向不存在的用户
+        stale.setTenantId(TENANT);
+        stale.setCreatedAt(java.time.Instant.now());
+        stale.setUpdatedAt(java.time.Instant.now());
+        externalUserMappingRepository.save(stale);
+
+        assertThat(service.processInboundMessage(
+                TENANT, null, "slack", "Ev-stale", "U-stale", "stale", null)).isNull();
+        assertThat(countByContent("stale")).isZero();
     }
 }

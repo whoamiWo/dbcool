@@ -61,8 +61,13 @@ public class BiReportService {
         String idStr = (String) body.get("id");
         BiReportEntity e;
         if (idStr != null && !idStr.isBlank()) {
-            e = reportRepository.findById(UUID.fromString(idStr))
-                    .orElseGet(BiReportEntity::new);
+            // PHASE96 T4: id 不存在时抛 404，禁止 orElseGet 造 tenantId=null 的孤儿报表；
+            // 同时用 findByIdAndTenantId 做租户校验，堵住"传他租户 id 覆盖改写"的越权写入。
+            UUID rid = UUID.fromString(idStr);
+            e = reportRepository.findByIdAndTenantId(rid, tenantId)
+                    .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.NOT_FOUND,
+                            "报表不存在或不属于当前租户: " + rid));
         } else {
             e = new BiReportEntity();
             e.setId(UUID.randomUUID());

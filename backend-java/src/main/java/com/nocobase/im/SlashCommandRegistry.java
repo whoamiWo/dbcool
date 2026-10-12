@@ -51,14 +51,18 @@ public class SlashCommandRegistry {
                 .toList();
     }
 
-    /** 初始化默认 5 个内置命令（handler 体由 {@link SlashCommandInitializer} 启动后注入）。 */
+    /**
+     * 初始化默认内置命令的**描述占位**（handler 体由 {@link SlashCommandInitializer} 启动后注入）。
+     *
+     * <p>PHASE96 T5: 此处原本还注册了 poll / code 两个占位命令，它们只有"待后续迭代"回显，
+     * 却会被 {@code GET /api/im/slash/commands} 主动广告给前端，构成对用户的虚假承诺，已摘除。
+     * 现在默认描述占位为 3 个（remind / invite / ai），与 Initializer 的真实 handler 一一对应。
+     */
     public static SlashCommandRegistry defaultRegistry() {
         SlashCommandRegistry reg = new SlashCommandRegistry();
-        reg.register("remind", "设置定时提醒（/remind 内容）", (content, ctx) -> { /* 占位 */ });
-        reg.register("poll", "发起投票（/poll 问题）", (content, ctx) -> { /* 占位 */ });
-        reg.register("code", "插入代码块（/code 语言）", (content, ctx) -> { /* 占位 */ });
-        reg.register("invite", "邀请成员加入频道（/invite 用户）", (content, ctx) -> { /* 占位 */ });
-        reg.register("ai", "触发 AI Agent 处理（/ai 提示词）", (content, ctx) -> { /* 占位 */ });
+        reg.register("remind", "设置定时提醒（/remind 内容）", (content, ctx) -> { /* 占位，Initializer 接真 */ });
+        reg.register("invite", "邀请成员加入频道（/invite 用户）", (content, ctx) -> { /* 占位，Initializer 接真 */ });
+        reg.register("ai", "触发 AI Agent 处理（/ai 提示词）", (content, ctx) -> { /* 占位，Initializer 接真 */ });
         return reg;
     }
 }

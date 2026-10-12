@@ -27,12 +27,28 @@ class ImSlashControllerTest {
         @SuppressWarnings("unchecked")
         List<Map<String, String>> commands = (List<Map<String, String>>) data.get("commands");
 
-        // 内置 5 个命令且均带描述（描述为空说明注册表与端点不同步）
-        assertThat(commands).hasSize(5);
+        // PHASE96 T5: 占位命令 poll / code 已摘除，内置命令收敛为 3 个（remind / invite / ai），
+        // 每个都必须有真实 handler（由 SlashCommandInitializer 注入）且描述非空。
+        assertThat(commands).hasSize(3);
         assertThat(commands).allSatisfy(c -> {
             assertThat(c.get("name")).startsWith("/");
             assertThat(c.get("description")).isNotEmpty();
         });
+        // 不再出现"待后续迭代"式占位命令
+        assertThat(commands).noneSatisfy(c ->
+                assertThat(c.get("name")).isIn("/poll", "/code"));
+    }
+
+    @Test
+    void commands_noPlaceholderExposed() {
+        // 摘除的占位命令不得通过 commands 端点重新暴露给前端
+        Map<String, Object> resp = controller.commands();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> commands = (List<Map<String, String>>) data.get("commands");
+        List<String> names = commands.stream().map(c -> c.get("name")).toList();
+        assertThat(names).containsExactlyInAnyOrder("/remind", "/invite", "/ai");
     }
 
     @Test

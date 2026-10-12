@@ -15,6 +15,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.*;
@@ -34,22 +36,27 @@ import java.util.UUID;
 @Service
 public class LdapSyncService {
 
+    private static final Logger log = LoggerFactory.getLogger(LdapSyncService.class);
+
     private final LdapConfigRepository ldapConfigRepository;
     private final LdapUserMappingRepository ldapUserMappingRepository;
     private final UserRepository userRepository;
     private final LdapTemplate ldapTemplate;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public LdapSyncService(
             LdapConfigRepository ldapConfigRepository,
             LdapUserMappingRepository ldapUserMappingRepository,
             UserRepository userRepository,
-            LdapTemplate ldapTemplate
+            LdapTemplate ldapTemplate,
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder
     ) {
         this.ldapConfigRepository = ldapConfigRepository;
         this.ldapUserMappingRepository = ldapUserMappingRepository;
         this.userRepository = userRepository;
         this.ldapTemplate = ldapTemplate;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -156,19 +163,28 @@ public class LdapSyncService {
 
     /**
      * 定时同步（按配置的 syncIntervalMinutes 执行）。
+     *
+     * <p>PHASE96 T6: 原实现硬编码 {@code findByTenantId("system")} —— 对外多租户下，
+     * 除 system 之外的租户配的 LDAP 永远不会被同步；且 catch 块空吞异常，失败无痕。
+     * 现改为遍历所有启用配置，并记录错误日志。
      */
     @Scheduled(fixedDelay = 60000)
     @Transactional
     public void scheduledSync() {
         try {
-            List<LdapConfigEntity> configs = ldapConfigRepository.findByTenantId("system");
+            List<LdapConfigEntity> configs = ldapConfigRepository.findByEnabledTrue();
             for (LdapConfigEntity config : configs) {
-                if (Boolean.TRUE.equals(config.getEnabled())) {
+                try {
                     syncUsers(config.getId(), config.getTenantId());
+                } catch (Exception e) {
+                    // 单个配置失败不影响其他租户，但必须留痕
+                    log.error("[LDAP] 定时同步失败：configId={}, tenantId={}, err={}",
+                            config.getId(), config.getTenantId(), e.getMessage());
                 }
             }
         } catch (Exception e) {
-            // 定时任务失败不影响其他任务
+            // 查询本身失败也要留痕，禁止静默吞异常
+            log.error("[LDAP] 定时同步查询启用配置失败：{}", e.getMessage());
         }
     }
 
@@ -209,7 +225,8 @@ public class LdapSyncService {
                     localUser.setDisplayName(displayName);
                     localUser.setEmail(email);
                     localUser.setTenantId(tenantId);
-                    localUser.setPasswordHash("LDAP_SYNCED");
+                    // PHASE96 T6: 随机不可登录口令（此前为全库统一的 "LDAP_SYNCED"）
+                    localUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
                     localUser.setCreatedAt(Instant.now());
                     userRepository.save(localUser);
                     mapping.setLocalUserId(localUser.getId());

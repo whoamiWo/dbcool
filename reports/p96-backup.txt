@@ -1,0 +1,52 @@
+============================================================
+PHASE94 备份/恢复/PITR 端到端验证
+============================================================
+注意：恢复与 PITR 演练均在**独立容器**中进行，不触碰生产数据库。
+
+
+=== T1: 实际备份验证 ===
+  ✓ PASS 备份文件存在 — 26450421 bytes
+  ✓ PASS 包含 PostgreSQL dump
+  ✓ PASS PostgreSQL 备份字节 > 0 — bytes=26650964
+
+=== T2: 恢复演练（真恢复 + 数据校验，独立容器）===
+  ✓ PASS 从备份提取 dump — 26650964 bytes
+  ✓ PASS 当场生成源库 dump（记录数一致的比对基准） — rc=0, 26725790 bytes
+  ✓ PASS 启动独立恢复容器
+  ✓ PASS 独立容器就绪
+     （pg_restore rc=0，继续校验数据）
+  ✓ PASS 恢复库包含关键表 users/tenant/audit_log — 缺失=[]
+  ✓ PASS 记录数一致: users — 导出时源库=4 恢复库=4
+  ✓ PASS 记录数一致: tenant — 导出时源库=3 恢复库=3
+  ✓ PASS 具体记录内容一致（首条用户名） — 源库=admin 恢复库=admin
+     （独立容器已清理，未触碰生产库）
+
+=== T3: PITR 时间点恢复演练（独立容器）===
+  ✓ PASS 生产库 archive_mode = on — on
+  ✓ PASS 生产库 WAL 已实际归档 — archived_count=8
+  ✓ PASS 生产库 WAL 归档无失败 — failed_count=0
+  ✓ PASS PITR 源容器启动（已开归档）
+  ✓ PASS PITR 源容器就绪
+  ✓ PASS pg_basebackup 成功
+  ✓ PASS 插入操作的 WAL 已归档 — 000000010000000000000004
+  ✓ PASS PITR 源库归档无失败 — failed_count=0
+  ✓ PASS 删除操作的 WAL 已归档 — 000000010000000000000005
+  ✓ PASS 删除操作已生效（演练前提） — 剩余=0
+  ✓ PASS PITR 恢复实例启动
+  ✓ PASS PITR 恢复实例就绪
+  ✓ PASS 恢复实例已完成 promote — pg_is_in_recovery=f
+  ✓ PASS 恢复确实停在目标时间点（日志证据） — 0.0%); 0 WAL file(s) added, 0 removed, 2 recycled; write=0.006 s, sync=0.006 s, total=0.031 s; sync files=4, longest=0.003 s, average=0.002 s; distance=32768 kB, estimate=32768 kB; lsn=0/5000060, redo lsn=0/5000060
+2026-10-12 03:09:16.611 UTC [1] LOG:  database system is ready to accept connections
+
+  ✓ PASS PITR 恢复到删除前时间点：被删数据回来了 — recovery_target_time=2026-10-12 03:09:08.896682 UTC, 查得 note='before-delete'
+  ✓ PASS 恢复结果同时保留备份时点的基线数据 — count=2
+     （PITR 演练容器与卷已清理）
+
+=== T4: 副本恢复验证 ===
+  ✓ PASS 备份副本已创建
+  ✓ PASS 副本包含 PostgreSQL dump
+  ✓ PASS 副本 manifest 可读
+
+============================================================
+总计: 30 | PASS: 30 | FAIL: 0
+============================================================

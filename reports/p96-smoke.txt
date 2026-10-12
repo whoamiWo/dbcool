@@ -1,0 +1,37 @@
+======================================================================
+PHASE89 跨模块端到端冒烟（真调后端，禁止 mock）
+目标: http://localhost:8080  前缀: smoke53c5d1cd
+======================================================================
+  ✅ [1] 存活/就绪 GET /api/health (13ms)
+  ✅ [2] 认证 POST /api/auth/login (109ms)
+
+  ✅ [3] 租户 GET /api/admin/tenants (10ms)
+  ✅ [4] 集合 POST+GET /api/collections (96ms)
+  ✅ [5] 记录 POST+GET /collections/{name}/records (94ms)
+  ✅ [6] 视图 GET /api/views (14ms)
+  ✅ [7] Wiki POST+GET /api/wiki/pages (71ms)
+  ✅ [8] IM POST /api/im/channels+messages (41ms)
+  ✅ [9] 附件 POST upload+GET download (61ms)
+  ✅ [10] 工作流 POST /api/workflows/{id}/trigger (43ms)
+  ✅ [11] 审计回查 GET /api/audit (36ms)
+
+======================================================================
+汇总表
+======================================================================
+步骤    链路                                      结果      耗时ms      失败原因
+----------------------------------------------------------------------------------------------------
+1     存活/就绪 GET /api/health                   PASS    13        
+2     认证 POST /api/auth/login                 PASS    109       
+3     租户 GET /api/admin/tenants               PASS    10        
+4     集合 POST+GET /api/collections            PASS    96        
+5     记录 POST+GET /collections/{name}/records PASS    94        
+6     视图 GET /api/views                       PASS    14        
+7     Wiki POST+GET /api/wiki/pages           PASS    71        
+8     IM POST /api/im/channels+messages       PASS    41        
+9     附件 POST upload+GET download             PASS    61        
+10    工作流 POST /api/workflows/{id}/trigger    PASS    43        
+11    审计回查 GET /api/audit                     PASS    36        
+----------------------------------------------------------------------------------------------------
+总计: 11 | PASS: 11 | FAIL: 0 | SKIP: 0
+
+✅ 冒烟全部通过

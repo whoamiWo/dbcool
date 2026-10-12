@@ -1,0 +1,32 @@
+........s........................................                        [100%]
+=============================== warnings summary ===============================
+../../.local/lib/python3.14/site-packages/fastapi/testclient.py:1
+  /home/who/.local/lib/python3.14/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_jwt_algorithms.py::TestJWTMultiAlgorithm::test_hs256_token_accepted
+  /home/who/multistack-project/backend-python/tests/test_jwt_algorithms.py:25: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "exp": datetime.utcnow() + timedelta(hours=1),
+
+tests/test_jwt_algorithms.py::TestJWTMultiAlgorithm::test_hs384_token_accepted
+  /home/who/multistack-project/backend-python/tests/test_jwt_algorithms.py:41: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "exp": datetime.utcnow() + timedelta(hours=1),
+
+tests/test_jwt_algorithms.py::TestJWTMultiAlgorithm::test_hs512_token_accepted
+  /home/who/multistack-project/backend-python/tests/test_jwt_algorithms.py:57: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "exp": datetime.utcnow() + timedelta(hours=1),
+
+tests/test_jwt_algorithms.py::TestJWTMultiAlgorithm::test_wrong_key_token_rejected
+  /home/who/multistack-project/backend-python/tests/test_jwt_algorithms.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "exp": datetime.utcnow() + timedelta(hours=1),
+
+tests/test_jwt_algorithms.py::TestJWTMultiAlgorithm::test_expired_token_rejected
+  /home/who/multistack-project/backend-python/tests/test_jwt_algorithms.py:88: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "exp": datetime.utcnow() - timedelta(hours=1),  # 已过期
+
+tests/test_jwt_algorithms.py::TestJWTMultiAlgorithm::test_non_access_token_rejected
+  /home/who/multistack-project/backend-python/tests/test_jwt_algorithms.py:103: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "exp": datetime.utcnow() + timedelta(hours=1),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+48 passed, 1 skipped, 7 warnings in 5.32s

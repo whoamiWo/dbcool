@@ -71,21 +71,10 @@ public class SlashCommandInitializer implements CommandLineRunner {
                     }
                 });
 
-        // /poll：无投票模型，回显占位
-        registry.register("poll",
-                "发起投票（/poll 问题）",
-                (content, ctx) -> {
-                    ctx.put("status", "ok");
-                    ctx.put("message", "投票功能待后续迭代（当前频道无投票模型）");
-                });
-
-        // /code：插入代码块到频道，回显占位
-        registry.register("code",
-                "插入代码块（/code 语言）",
-                (content, ctx) -> {
-                    ctx.put("status", "ok");
-                    ctx.put("message", "代码块回显功能待后续迭代");
-                });
+        // PHASE96 T5: /poll 与 /code 原为占位实现（ctx.put("status","ok") + "待后续迭代"回显），
+        // 已被摘除 —— 它们既未对用户兑现承诺，又通过 GET /api/im/slash/commands 被主动广告给前端，
+        // 属于"返回成功但什么都没做"。摘除后 Registry 中不再出现这两个名字。
+        // 若未来实现投票/代码块，需在本类重新注册**真实** handler，不得回退到占位回显。
 
         // /invite <userId 或用户名>：接 ChannelService.join + MessageService.send
         registry.register("invite",

@@ -36,16 +36,19 @@ class EmailDispatcherTest {
     }
 
     @Test
-    void send_noSmtpHost_returnsMockOk() {
+    void send_noSmtpHost_returnsError() {
+        // PHASE96 T2: 未配 smtp_host 必须显式失败，禁止 ok("mock-sent …") 假成功
         var ch = makeChannel(Map.of());  // 没 smtp_host
         var r = dispatcher.send(ch, "user@example.com",
                 Map.of("title", "Hello", "body", "World"));
-        assertThat(r.success()).isTrue();
-        assertThat(r.detail()).contains("mock-sent").contains("user@example.com");
+        assertThat(r.success()).isFalse();
+        assertThat(r.detail()).contains("smtp_host");
     }
 
     @Test
-    void send_withSmtpHost_returnsLoggedOk() {
+    void send_smtpHostWithoutRealSend_returnsError() {
+        // PHASE96 T2: 配了 host 但 real_send 未开启，同样必须显式失败
+        // （此前返回 ok("logged-send …") —— 一封不发却报成功，比上一处更隐蔽）
         var ch = makeChannel(Map.of(
                 "smtp_host", "smtp.example.com",
                 "username", "noreply",
@@ -53,23 +56,34 @@ class EmailDispatcherTest {
                 "from", "noreply@example.com"));
         var r = dispatcher.send(ch, "user@example.com",
                 Map.of("title", "Subj", "body", "Body"));
-        assertThat(r.success()).isTrue();
-        assertThat(r.detail()).contains("logged-send").contains("smtp.example.com");
+        assertThat(r.success()).isFalse();
+        assertThat(r.detail()).contains("real_send");
+    }
+
+    @Test
+    void send_realSendFalse_returnsError() {
+        // real_send 显式为 false 与未配置同罪：不授权真实投递就不得报成功
+        var ch = makeChannel(Map.of(
+                "smtp_host", "smtp.example.com",
+                "real_send", false));
+        var r = dispatcher.send(ch, "user@example.com", Map.of("title", "T"));
+        assertThat(r.success()).isFalse();
+        assertThat(r.detail()).contains("real_send");
     }
 
     @Test
     void send_missingTitle_defaultsToNoTitle() {
         var ch = makeChannel(Map.of());
         var r = dispatcher.send(ch, "u@e.com", Map.of("body", "only body"));
-        // 不抛异常,使用默认 title
-        assertThat(r.success()).isTrue();
+        // 不抛异常；未配 SMTP 时返回显式失败（PHASE96 T2），title 缺省仍走默认值不 NPE
+        assertThat(r.success()).isFalse();
     }
 
     @Test
     void send_missingBody_emptyString() {
         var ch = makeChannel(Map.of());
         var r = dispatcher.send(ch, "u@e.com", Map.of("title", "OnlyTitle"));
-        assertThat(r.success()).isTrue();
+        assertThat(r.success()).isFalse();
     }
 
     @Test

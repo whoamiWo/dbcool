@@ -1,0 +1,118 @@
+======================================================================
+PHASE95 R3: Admin Authorization E2E Validation
+Base: http://localhost:8080
+======================================================================
+Admin roles: ['admin']
+Test user UUID: d7b82c70-cbaa-46a5-afa1-ce66165e2174
+Test user roles: []
+
+  list users [GET /api/admin/users]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200, 404, 405])
+    ✅ user    → 403 (want 403)
+
+  get user by id (nonexistent) [GET /api/admin/users/00000000-0000-0000-0000-000000000001]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200, 404])
+    ✅ user    → 403 (want 403)
+
+  update user [PATCH /api/admin/users/d7b82c70-cbaa-46a5-afa1-ce66165e2174]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 403 (want 403)
+
+  delete user (nonexistent) [DELETE /api/admin/users/deadbeef-dead-beef-dead-deadbeef0000]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 404 (want one of [200, 404, 400])
+    ✅ user    → 403 (want 403)
+
+  assign role (valid role) [POST /api/admin/users/d7b82c70-cbaa-46a5-afa1-ce66165e2174/roles/00000000-0000-0000-0000-000000000010]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200, 404])
+    ✅ user    → 403 (want 403)
+
+  assign role (invalid role) [POST /api/admin/users/d7b82c70-cbaa-46a5-afa1-ce66165e2174/roles/00000000-0000-0000-0000-000000000099]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 404 (want one of [400, 404])
+    ✅ user    → 403 (want 403)
+
+  reset user password [POST /api/admin/users/d7b82c70-cbaa-46a5-afa1-ce66165e2174/password]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 403 (want 403)
+
+  jwt keys snapshot [GET /api/admin/jwt-keys]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 403 (want 403)
+
+  rotate jwt key [POST /api/admin/jwt-keys/rotate]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200, 429])
+    ✅ user    → 403 (want 403)
+
+  get my quota (self-service) [GET /api/tenant/quota]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 200 (want one of [200])
+
+  audit logs [GET /api/audit/logs?limit=5]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 403 (want 403)
+
+  compliance check [GET /api/admin/users/00000000-0000-0000-0000-000000000001/data-export]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200, 404])
+    ✅ user    → 403 (want 403)
+
+  user tenants [GET /api/admin/users/00000000-0000-0000-0000-000000000001/tenants]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200, 404])
+    ✅ user    → 403 (want 403)
+
+  list tenants [GET /api/admin/tenants]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 403 (want 403)
+
+  get tenant by id [GET /api/admin/tenants/00000000-0000-0000-0000-000000000001]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 404 (want one of [200, 404])
+    ✅ user    → 403 (want 403)
+
+  list automation rules [GET /api/automation]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 403 (want 403)
+
+  create automation rule [POST /api/automation]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 201 (want one of [201])
+    ✅ user    → 403 (want 403)
+
+  list notification channels [GET /api/admin/notification-channels]
+    ✅ no-auth → 401 (want 401)
+    ✅ admin   → 200 (want one of [200])
+    ✅ user    → 403 (want 403)
+
+======================================================================
+Results: 18/18 PASS
+  ✅ list users — no-auth=401 admin=200 user=403
+  ✅ get user by id (nonexistent) — no-auth=401 admin=200 user=403
+  ✅ update user — no-auth=401 admin=200 user=403
+  ✅ delete user (nonexistent) — no-auth=401 admin=404 user=403
+  ✅ assign role (valid role) — no-auth=401 admin=200 user=403
+  ✅ assign role (invalid role) — no-auth=401 admin=404 user=403
+  ✅ reset user password — no-auth=401 admin=200 user=403
+  ✅ jwt keys snapshot — no-auth=401 admin=200 user=403
+  ✅ rotate jwt key — no-auth=401 admin=200 user=403
+  ✅ get my quota (self-service) — no-auth=401 admin=200 user=200
+  ✅ audit logs — no-auth=401 admin=200 user=403
+  ✅ compliance check — no-auth=401 admin=200 user=403
+  ✅ user tenants — no-auth=401 admin=200 user=403
+  ✅ list tenants — no-auth=401 admin=200 user=403
+  ✅ get tenant by id — no-auth=401 admin=404 user=403
+  ✅ list automation rules — no-auth=401 admin=200 user=403
+  ✅ create automation rule — no-auth=401 admin=201 user=403
+  ✅ list notification channels — no-auth=401 admin=200 user=403

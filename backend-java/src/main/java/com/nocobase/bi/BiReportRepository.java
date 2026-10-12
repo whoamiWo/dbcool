@@ -9,4 +9,7 @@ import java.util.UUID;
 public interface BiReportRepository extends JpaRepository<BiReportEntity, UUID> {
     List<BiReportEntity> findByTenantIdAndCollectionName(String tenantId, String collectionName);
     List<BiReportEntity> findByTenantId(String tenantId);
+
+    /** PHASE96 T4: 报表详情的租户校验查询（跨租户/不存在一律 404）。 */
+    java.util.Optional<BiReportEntity> findByIdAndTenantId(UUID id, String tenantId);
 }

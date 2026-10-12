@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,9 @@ public class InboundMessageService {
     private final ImChannelMemberRepository memberRepository;
     private final RedisStompBridge bridge;
     private final ExternalMessageLogRepository externalMessageLogRepository;
+    private final ExternalUserMappingRepository externalUserMappingRepository;
+    private final com.nocobase.auth.UserRepository userRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Value("${integration.inbound.default-channel-id:}")
     private String defaultChannelId;
@@ -42,14 +46,23 @@ public class InboundMessageService {
     @Value("${integration.inbound.enabled:true}")
     private boolean inboundEnabled;
 
+    @Value("${integration.inbound.auto-provision-user:false}")
+    private boolean autoProvisionUser;
+
     public InboundMessageService(ImMessageRepository messageRepository,
                                   ImChannelMemberRepository memberRepository,
                                   RedisStompBridge bridge,
-                                  ExternalMessageLogRepository externalMessageLogRepository) {
+                                  ExternalMessageLogRepository externalMessageLogRepository,
+                                  ExternalUserMappingRepository externalUserMappingRepository,
+                                  com.nocobase.auth.UserRepository userRepository,
+                                  org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.messageRepository = messageRepository;
         this.memberRepository = memberRepository;
         this.bridge = bridge;
         this.externalMessageLogRepository = externalMessageLogRepository;
+        this.externalUserMappingRepository = externalUserMappingRepository;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -158,15 +171,90 @@ public class InboundMessageService {
     }
 
     /**
-     * 映射第三方用户 → 我方用户。
+     * 映射第三方用户 → 我方用户（PHASE96 T1 真实现）。
      *
-     * <p>生产环境应查询 user_mapping 表或使用类似 DingTalk UserMappingService 的逻辑。
-     * 当前简化实现：返回固定测试用户 ID（用于演示）。
+     * <p>解析顺序：
+     * <ol>
+     *   <li>查 {@code external_user_mapping}（platform + externalUserId + tenantId）</li>
+     *   <li>命中且 local_user_id 非空且该用户仍属于本租户 → 返回该用户</li>
+     *   <li>未命中：
+     *       <ul>
+     *         <li>{@code integration.inbound.auto-provision-user=true} → 自动建号并回写映射</li>
+     *         <li>否则返回 {@code null}，由调用方丢弃该消息（显式失败，不再回落到硬编码 UUID）</li>
+     *       </ul>
+     *   </li>
+     * </ol>
+     *
+     * <p><b>绝不返回硬编码 UUID</b> —— 那会让所有第三方入站消息的作者变成同一个人，
+     * 并使 {@code senderId == null} 的失败分支成为死代码。
      */
     private UUID mapExternalUser(String source, String externalUserId, String tenantId) {
-        // TODO: 实现真实的用户映射逻辑
-        // 当前返回一个固定的测试用户 ID（假设该用户已存在且是频道成员）
-        // 生产环境应替换为查询数据库的映射表
-        return UUID.fromString("00000000-0000-0000-0000-000000000001");
+        if (source == null || source.isBlank() || externalUserId == null || externalUserId.isBlank()) {
+            log.warn("[Inbound] 映射参数不完整，拒绝映射：source={}, externalUserId={}", source, externalUserId);
+            return null;
+        }
+
+        Optional<ExternalUserMappingEntity> existing =
+                externalUserMappingRepository.findByPlatformAndExternalUserIdAndTenantId(
+                        source, externalUserId, tenantId);
+        if (existing.isPresent() && existing.get().getLocalUserId() != null) {
+            UUID localUserId = existing.get().getLocalUserId();
+            if (userRepository.findByIdAndTenantId(localUserId, tenantId).isPresent()) {
+                return localUserId;
+            }
+            log.warn("[Inbound] 映射指向的用户已不存在或跨租户，作废映射：source={}, externalUserId={}, localUserId={}",
+                    source, externalUserId, localUserId);
+            return null;
+        }
+
+        if (!autoProvisionUser) {
+            log.warn("[Inbound] 未找到外部用户映射且未开启自动建号，丢弃："
+                    + "source={}, externalUserId={}, tenantId={}（可在 external_user_mapping 预置映射，"
+                    + "或开启 integration.inbound.auto-provision-user）", source, externalUserId, tenantId);
+            return null;
+        }
+
+        return provisionExternalUser(source, externalUserId, tenantId);
+    }
+
+    /** 自动创建本地用户并回写映射（仅在 auto-provision-user=true 时进入）。 */
+    private UUID provisionExternalUser(String source, String externalUserId, String tenantId) {
+        final String username;
+        {
+            String candidate = source + ":" + externalUserId;
+            username = candidate.length() > 128 ? candidate.substring(0, 128) : candidate;
+        }
+        final com.nocobase.auth.UserEntity user =
+                userRepository.findByUsername(username).orElseGet(() -> {
+            com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
+            u.setId(UUID.randomUUID());
+            u.setUsername(username);
+            // 第三方同步用户不得持有可本地登录的口令
+            u.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+            u.setTenantId(tenantId);
+            u.setDisplayName(username);
+            u.setCreatedAt(java.time.Instant.now());
+            return userRepository.save(u);
+        });
+
+        ExternalUserMappingEntity mapping = new ExternalUserMappingEntity();
+        mapping.setId(UUID.randomUUID());
+        mapping.setPlatform(source);
+        mapping.setExternalUserId(externalUserId);
+        mapping.setLocalUserId(user.getId());
+        mapping.setTenantId(tenantId);
+        mapping.setDisplayName(user.getDisplayName());
+        mapping.setCreatedAt(java.time.Instant.now());
+        mapping.setUpdatedAt(java.time.Instant.now());
+        try {
+            externalUserMappingRepository.save(mapping);
+        } catch (org.springframework.dao.DataIntegrityViolationException dup) {
+            // 并发下唯一键冲突：重新读取已存在的映射即可
+            log.info("[Inbound] 映射已由并发请求创建，直接复用：source={}, externalUserId={}",
+                    source, externalUserId);
+        }
+        log.info("[Inbound] 已自动创建外部用户映射：source={}, externalUserId={}, localUserId={}",
+                source, externalUserId, user.getId());
+        return user.getId();
     }
 }

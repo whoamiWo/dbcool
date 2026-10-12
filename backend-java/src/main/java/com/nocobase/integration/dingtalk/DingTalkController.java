@@ -388,9 +388,22 @@ public class DingTalkController {
         }
 
         // 4. 处理事件
+        // PHASE96 T7: contact_updated 原实现只打日志 + TODO，外层却返回 processed=true ——
+        // 钉钉认为事件已被消费，实际什么都没做。改为显式返回未实现状态，
+        // 不再对调用方谎称"已处理"。
         switch (String.valueOf(eventType)) {
             case "approval_status_changed" -> handleApprovalStatusChanged(payload, tenantId);
-            case "contact_updated" -> handleContactUpdated(payload, tenantId);
+            case "contact_updated" -> {
+                Object userId = payload.get("user_id");
+                log.warn("[DingTalk] 通讯录变更事件未实现，不对调用方谎称已处理：user={}", userId);
+                return ResponseEntity.ok(Map.of(
+                        "code", 0,
+                        "message", "not_implemented",
+                        "data", Map.of(
+                                "processed", false,
+                                "reason", "contact_updated 事件处理尚未实现："
+                                        + "请在 PHASE96 白名单登记责任人后接入用户同步")));
+            }
             default -> log.warn("[DingTalk] 未知事件类型: {}", eventType);
         }
 
@@ -486,15 +499,6 @@ public class DingTalkController {
         }
     }
     
-    /**
-     * 处理通讯录变更事件。
-     */
-    private void handleContactUpdated(Map<String, Object> payload, String tenantId) {
-        Object userId = payload.get("user_id");
-        log.info("[DingTalk] 通讯录变更: user={}", userId);
-        // TODO: 触发用户同步或更新逻辑
-    }
-
     /**
      * 更新工作流任务状态（钉钉审批回调后调用）。
      */
