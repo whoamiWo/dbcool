@@ -105,6 +105,27 @@
     "line": 81
   },
   {
+    "class": "ApiKeyController",
+    "method": "GET",
+    "path": "/api/admin/api-keys",
+    "file": "backend-java/src/main/java/com/nocobase/apikey/ApiKeyController.java",
+    "line": 37
+  },
+  {
+    "class": "ApiKeyController",
+    "method": "POST",
+    "path": "/api/admin/api-keys",
+    "file": "backend-java/src/main/java/com/nocobase/apikey/ApiKeyController.java",
+    "line": 47
+  },
+  {
+    "class": "AttachmentController",
+    "method": "GET",
+    "path": "/api/attachments",
+    "file": "backend-java/src/main/java/com/nocobase/attachment/AttachmentController.java",
+    "line": 92
+  },
+  {
     "class": "AttachmentController",
     "method": "GET",
     "path": "/api/attachments/download",
@@ -170,6 +191,13 @@
   {
     "class": "AutomationRuleController",
     "method": "GET",
+    "path": "/api/automation",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 115
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "GET",
     "path": "/api/automation/{ruleId}",
     "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
     "line": 129
@@ -180,6 +208,13 @@
     "path": "/api/automation/{ruleId}/executions",
     "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
     "line": 162
+  },
+  {
+    "class": "AutomationRuleController",
+    "method": "POST",
+    "path": "/api/automation",
+    "file": "backend-java/src/main/java/com/nocobase/automation/AutomationRuleController.java",
+    "line": 33
   },
   {
     "class": "AutomationRuleController",
@@ -254,6 +289,13 @@
   {
     "class": "CollectionController",
     "method": "GET",
+    "path": "/api/collections",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 114
+  },
+  {
+    "class": "CollectionController",
+    "method": "GET",
     "path": "/api/collections/_jobs/{jobId}",
     "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
     "line": 190
@@ -264,6 +306,13 @@
     "path": "/api/collections/{name}",
     "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
     "line": 122
+  },
+  {
+    "class": "CollectionController",
+    "method": "GET",
+    "path": "/api/collections/{name}/export",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 419
   },
   {
     "class": "CollectionController",
@@ -289,6 +338,13 @@
   {
     "class": "CollectionController",
     "method": "POST",
+    "path": "/api/collections",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 100
+  },
+  {
+    "class": "CollectionController",
+    "method": "POST",
     "path": "/api/collections/{name}/aggregate",
     "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
     "line": 596
@@ -299,6 +355,13 @@
     "path": "/api/collections/{name}/fields",
     "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
     "line": 156
+  },
+  {
+    "class": "CollectionController",
+    "method": "POST",
+    "path": "/api/collections/{name}/import",
+    "file": "backend-java/src/main/java/com/nocobase/meta/CollectionController.java",
+    "line": 469
   },
   {
     "class": "CollectionController",
@@ -413,6 +476,13 @@
     "line": 316
   },
   {
+    "class": "ErDiagramController",
+    "method": "GET",
+    "path": "/api/admin/er-diagram",
+    "file": "backend-java/src/main/java/com/nocobase/meta/ErDiagramController.java",
+    "line": 31
+  },
+  {
     "class": "FeishuController",
     "method": "GET",
     "path": "/api/feishu/auth-url",
@@ -457,9 +527,23 @@
   {
     "class": "FormController",
     "method": "GET",
+    "path": "/api/forms",
+    "file": "backend-java/src/main/java/com/nocobase/form/FormController.java",
+    "line": 50
+  },
+  {
+    "class": "FormController",
+    "method": "GET",
     "path": "/api/forms/{id}",
     "file": "backend-java/src/main/java/com/nocobase/form/FormController.java",
     "line": 64
+  },
+  {
+    "class": "FormController",
+    "method": "POST",
+    "path": "/api/forms",
+    "file": "backend-java/src/main/java/com/nocobase/form/FormController.java",
+    "line": 36
   },
   {
     "class": "FormController",
@@ -499,6 +583,13 @@
   {
     "class": "ImChannelController",
     "method": "GET",
+    "path": "/api/im/channels",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 40
+  },
+  {
+    "class": "ImChannelController",
+    "method": "GET",
     "path": "/api/im/channels/{id}",
     "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
     "line": 77
@@ -509,6 +600,13 @@
     "path": "/api/im/channels/{id}/members",
     "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
     "line": 87
+  },
+  {
+    "class": "ImChannelController",
+    "method": "POST",
+    "path": "/api/im/channels",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImChannelController.java",
+    "line": 49
   },
   {
     "class": "ImChannelController",
@@ -534,6 +632,13 @@
   {
     "class": "ImHuddleController",
     "method": "GET",
+    "path": "/api/im/huddle",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 145
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "GET",
     "path": "/api/im/huddle/{huddleId}",
     "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
     "line": 160
@@ -544,6 +649,13 @@
     "path": "/api/im/huddle/{huddleId}/participants",
     "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
     "line": 175
+  },
+  {
+    "class": "ImHuddleController",
+    "method": "POST",
+    "path": "/api/im/huddle",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImHuddleController.java",
+    "line": 33
   },
   {
     "class": "ImHuddleController",
@@ -604,6 +716,13 @@
   {
     "class": "ImMessageController",
     "method": "GET",
+    "path": "/api/im/messages",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 99
+  },
+  {
+    "class": "ImMessageController",
+    "method": "GET",
     "path": "/api/im/messages/advanced-search",
     "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
     "line": 225
@@ -656,6 +775,13 @@
     "path": "/api/im/messages/{id}/thread",
     "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
     "line": 192
+  },
+  {
+    "class": "ImMessageController",
+    "method": "POST",
+    "path": "/api/im/messages",
+    "file": "backend-java/src/main/java/com/nocobase/im/ImMessageController.java",
+    "line": 124
   },
   {
     "class": "ImMessageController",
@@ -722,6 +848,13 @@
   },
   {
     "class": "JwtKeyRotationController",
+    "method": "GET",
+    "path": "/api/admin/jwt-keys",
+    "file": "backend-java/src/main/java/com/nocobase/auth/JwtKeyRotationController.java",
+    "line": 40
+  },
+  {
+    "class": "JwtKeyRotationController",
     "method": "POST",
     "path": "/api/admin/jwt-keys/rotate",
     "file": "backend-java/src/main/java/com/nocobase/auth/JwtKeyRotationController.java",
@@ -730,9 +863,23 @@
   {
     "class": "LdapSyncController",
     "method": "GET",
+    "path": "/api/ldap",
+    "file": "backend-java/src/main/java/com/nocobase/ldap/LdapSyncController.java",
+    "line": 90
+  },
+  {
+    "class": "LdapSyncController",
+    "method": "GET",
     "path": "/api/ldap/{configId}/mappings",
     "file": "backend-java/src/main/java/com/nocobase/ldap/LdapSyncController.java",
     "line": 103
+  },
+  {
+    "class": "LdapSyncController",
+    "method": "POST",
+    "path": "/api/ldap",
+    "file": "backend-java/src/main/java/com/nocobase/ldap/LdapSyncController.java",
+    "line": 31
   },
   {
     "class": "LdapSyncController",
@@ -778,6 +925,13 @@
   },
   {
     "class": "MessageController",
+    "method": "GET",
+    "path": "/api/messages",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/MessageController.java",
+    "line": 42
+  },
+  {
+    "class": "MessageController",
     "method": "POST",
     "path": "/api/messages/{id}/read",
     "file": "backend-java/src/main/java/com/nocobase/workflow/MessageController.java",
@@ -793,9 +947,23 @@
   {
     "class": "NotificationChannelController",
     "method": "GET",
+    "path": "/api/admin/notification-channels",
+    "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
+    "line": 32
+  },
+  {
+    "class": "NotificationChannelController",
+    "method": "GET",
     "path": "/api/admin/notification-channels/types",
     "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
     "line": 109
+  },
+  {
+    "class": "NotificationChannelController",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
+    "line": 41
   },
   {
     "class": "NotificationChannelController",
@@ -810,6 +978,13 @@
     "path": "/api/admin/notification-channels/{id}",
     "file": "backend-java/src/main/java/com/nocobase/notification/NotificationChannelController.java",
     "line": 54
+  },
+  {
+    "class": "PlaybookController",
+    "method": "GET",
+    "path": "/api/playbooks",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 35
   },
   {
     "class": "PlaybookController",
@@ -838,6 +1013,13 @@
     "path": "/api/playbooks/{id}/runs",
     "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
     "line": 107
+  },
+  {
+    "class": "PlaybookController",
+    "method": "POST",
+    "path": "/api/playbooks",
+    "file": "backend-java/src/main/java/com/nocobase/playbook/PlaybookController.java",
+    "line": 54
   },
   {
     "class": "PlaybookController",
@@ -1087,6 +1269,13 @@
   {
     "class": "ProjectController",
     "method": "GET",
+    "path": "/api/projects",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 28
+  },
+  {
+    "class": "ProjectController",
+    "method": "GET",
     "path": "/api/projects/tasks/mine",
     "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
     "line": 107
@@ -1104,6 +1293,13 @@
     "path": "/api/projects/{projectId}/tasks",
     "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
     "line": 82
+  },
+  {
+    "class": "ProjectController",
+    "method": "POST",
+    "path": "/api/projects",
+    "file": "backend-java/src/main/java/com/nocobase/project/ProjectController.java",
+    "line": 37
   },
   {
     "class": "ProjectController",
@@ -1199,9 +1395,23 @@
   {
     "class": "RowAclController",
     "method": "GET",
+    "path": "/api/admin/row-acl",
+    "file": "backend-java/src/main/java/com/nocobase/acl/RowAclController.java",
+    "line": 40
+  },
+  {
+    "class": "RowAclController",
+    "method": "GET",
     "path": "/api/admin/row-acl/by-collection/{collection}",
     "file": "backend-java/src/main/java/com/nocobase/acl/RowAclController.java",
     "line": 49
+  },
+  {
+    "class": "RowAclController",
+    "method": "POST",
+    "path": "/api/admin/row-acl",
+    "file": "backend-java/src/main/java/com/nocobase/acl/RowAclController.java",
+    "line": 59
   },
   {
     "class": "RowAclController",
@@ -1255,9 +1465,23 @@
   {
     "class": "TenantController",
     "method": "GET",
+    "path": "/api/admin/tenants",
+    "file": "backend-java/src/main/java/com/nocobase/tenant/TenantController.java",
+    "line": 46
+  },
+  {
+    "class": "TenantController",
+    "method": "GET",
     "path": "/api/admin/tenants/{id}",
     "file": "backend-java/src/main/java/com/nocobase/tenant/TenantController.java",
     "line": 53
+  },
+  {
+    "class": "TenantController",
+    "method": "POST",
+    "path": "/api/admin/tenants",
+    "file": "backend-java/src/main/java/com/nocobase/tenant/TenantController.java",
+    "line": 60
   },
   {
     "class": "TenantQuotaController",
@@ -1316,6 +1540,13 @@
     "line": 86
   },
   {
+    "class": "UnifiedSearchController",
+    "method": "GET",
+    "path": "/api/search",
+    "file": "backend-java/src/main/java/com/nocobase/search/UnifiedSearchController.java",
+    "line": 28
+  },
+  {
     "class": "UserAdminController",
     "method": "DELETE",
     "path": "/api/admin/users/{id}",
@@ -1328,6 +1559,13 @@
     "path": "/api/admin/users/{id}/roles/{roleId}",
     "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
     "line": 126
+  },
+  {
+    "class": "UserAdminController",
+    "method": "GET",
+    "path": "/api/admin/users",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 43
   },
   {
     "class": "UserAdminController",
@@ -1349,6 +1587,13 @@
     "path": "/api/admin/users/{id}",
     "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
     "line": 72
+  },
+  {
+    "class": "UserAdminController",
+    "method": "POST",
+    "path": "/api/admin/users",
+    "file": "backend-java/src/main/java/com/nocobase/auth/UserAdminController.java",
+    "line": 59
   },
   {
     "class": "UserAdminController",
@@ -1430,6 +1675,13 @@
   {
     "class": "ViewController",
     "method": "GET",
+    "path": "/api/views",
+    "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
+    "line": 65
+  },
+  {
+    "class": "ViewController",
+    "method": "GET",
     "path": "/api/views/{id}",
     "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
     "line": 79
@@ -1440,6 +1692,13 @@
     "path": "/api/views/{id}/timeline-records",
     "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
     "line": 90
+  },
+  {
+    "class": "ViewController",
+    "method": "POST",
+    "path": "/api/views",
+    "file": "backend-java/src/main/java/com/nocobase/view/ViewController.java",
+    "line": 38
   },
   {
     "class": "ViewController",
@@ -1496,6 +1755,20 @@
     "path": "/api/admin/webhooks/{id}",
     "file": "backend-java/src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java",
     "line": 103
+  },
+  {
+    "class": "WebhookSubscriptionController",
+    "method": "GET",
+    "path": "/api/admin/webhooks",
+    "file": "backend-java/src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java",
+    "line": 44
+  },
+  {
+    "class": "WebhookSubscriptionController",
+    "method": "POST",
+    "path": "/api/admin/webhooks",
+    "file": "backend-java/src/main/java/com/nocobase/webhook/WebhookSubscriptionController.java",
+    "line": 52
   },
   {
     "class": "WebhookSubscriptionController",
@@ -1759,6 +2032,13 @@
   {
     "class": "WorkflowController",
     "method": "GET",
+    "path": "/api/workflows",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 71
+  },
+  {
+    "class": "WorkflowController",
+    "method": "GET",
     "path": "/api/workflows/instances",
     "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
     "line": 275
@@ -1787,6 +2067,13 @@
   {
     "class": "WorkflowController",
     "method": "POST",
+    "path": "/api/workflows",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
+    "line": 98
+  },
+  {
+    "class": "WorkflowController",
+    "method": "POST",
     "path": "/api/workflows/tasks/{id}/approve",
     "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
     "line": 309
@@ -1811,6 +2098,13 @@
     "path": "/api/workflows/{id}",
     "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowController.java",
     "line": 130
+  },
+  {
+    "class": "WorkflowTemplateController",
+    "method": "GET",
+    "path": "/api/workflow/templates",
+    "file": "backend-java/src/main/java/com/nocobase/workflow/WorkflowTemplateController.java",
+    "line": 49
   },
   {
     "class": "WorkflowTemplateController",

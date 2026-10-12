@@ -25,7 +25,15 @@ SCAN_ROOT = BASE_DIR / "backend-java" / "src" / "main" / "java"
 
 # Spring MVC 注解正则
 CLASS_MAPPING_RE = re.compile(r'@RequestMapping\s*\(\s*"([^"]+)"')
-METHOD_MAPPING_RE = re.compile(r'@(GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)\s*\(\s*"([^"]+)"')
+# 方法级注解：路径可选。
+# 支持三种写法：
+#   @GetMapping                                  → 路径 = 类级路径
+#   @GetMapping("/path")                         → 路径 = /path
+#   @GetMapping(value = "/path", produces = ...) → 路径 = /path
+METHOD_MAPPING_RE = re.compile(
+    r'@(GetMapping|PostMapping|PutMapping|PatchMapping|DeleteMapping)\s*'
+    r'(?:\(\s*(?:value\s*=\s*)?"([^"]+)"[^)]*\))?'
+)
 
 # 方法路径合并
 def combine_paths(class_path: str, method_path: str) -> str:
@@ -60,8 +68,9 @@ def scan_controllers():
                 # 注解名 → HTTP 方法
                 # @GetMapping → GET, @PostMapping → POST, @DeleteMapping → DELETE
                 http_method = m.group(1).replace("Mapping", "").upper()
-                method_path = m.group(2)
-                full_path = combine_paths(class_path, method_path)
+                # 无路径注解（@GetMapping）→ 路径 = 类级路径本身
+                method_path = m.group(2) if m.group(2) else ""
+                full_path = combine_paths(class_path, method_path) if method_path else class_path
                 mappings.append({
                     "class": class_name,
                     "method": http_method,

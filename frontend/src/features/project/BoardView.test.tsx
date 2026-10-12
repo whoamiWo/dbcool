@@ -36,8 +36,8 @@ describe('BoardView', () => {
     render(<BoardView projectId="proj-1" />);
 
     await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledWith('/api/project-boards/proj-1/lists');
-      expect(apiClient.get).toHaveBeenCalledWith('/api/project-boards/proj-1/tasks');
+      expect(apiClient.get).toHaveBeenCalledWith('/project-boards/proj-1/lists');
+      expect(apiClient.get).toHaveBeenCalledWith('/project-boards/proj-1/tasks');
     });
   });
 
@@ -68,7 +68,7 @@ describe('BoardView', () => {
 
     await waitFor(() => {
       expect(apiClient.post).toHaveBeenCalledWith(
-        '/api/project-boards/tasks',
+        '/project-boards/tasks',
         expect.objectContaining({ projectId: 'proj-1', title: '新任务标题' }),
       );
     });

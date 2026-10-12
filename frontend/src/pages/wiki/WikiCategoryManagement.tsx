@@ -26,6 +26,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
+import { useParams } from 'react-router-dom';
 import { wikiApi } from '@/api/wiki';
 import type { WikiCategory } from '@/types/wiki';
 
@@ -38,9 +39,13 @@ export function WikiCategoryManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // PHASE97: 分类端点必须带 kbId（后端只有 /api/wiki/kb/{kbId}/categories，无平铺版）。
+  // 路由为 /wiki/kb/:kbId/categories，kbId 从 URL 取，而非无参调用不存在的平铺端点。
+  const { kbId } = useParams<{ kbId: string }>();
+
   const { data: categoriesData, isLoading } = useQuery({
-    queryKey: ['wiki-categories'],
-    queryFn: () => wikiApi.listCategories(),
+    queryKey: ['wiki-categories', kbId],
+    queryFn: () => wikiApi.listCategories(kbId!),
     select: (r: any) => {
       const data = Array.isArray(r) ? r : r?.data || [];
       return data as WikiCategory[];
@@ -49,7 +54,7 @@ export function WikiCategoryManagementPage() {
 
   const createMutation = useMutation({
     mutationFn: (body: { name: string; slug: string; parent_id?: string }) =>
-      wikiApi.createCategory(body),
+      wikiApi.createCategory({ ...body, knowledge_base_id: kbId! }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wiki-categories'] });
       setOpen(false);

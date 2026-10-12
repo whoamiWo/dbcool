@@ -28,7 +28,8 @@ interface FrontendMapping {
 }
 
 function loadJson<T>(path: string): T {
-  return JSON.parse(readFileSync(resolve(__dirname, '..', '..', path), 'utf-8'));
+  // __dirname = frontend/src/api → 上三级到仓库根，contracts/ 在仓库根而非 frontend/ 下
+  return JSON.parse(readFileSync(resolve(__dirname, '..', '..', '..', path), 'utf-8'));
 }
 
 describe('前后端 API 契约比对', () => {
