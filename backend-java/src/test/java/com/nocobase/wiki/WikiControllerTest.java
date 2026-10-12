@@ -133,7 +133,7 @@ class WikiControllerTest {
         kb.setTenantId(tenantId);
         kb.setCreatedAt(Instant.now());
         kb.setUpdatedAt(Instant.now());
-        when(kbService.get(any())).thenReturn(kb);
+        when(kbService.get(any(), any())).thenReturn(kb);
         Map<String, Object> result = controller.getKb(kb.getId(), testUser);
         assertEquals(0, result.get("code"));
     }
@@ -143,7 +143,7 @@ class WikiControllerTest {
         KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
         kb.setId(UUID.randomUUID());
         kb.setTenantId("other-tenant");
-        when(kbService.get(any())).thenReturn(kb);
+        when(kbService.get(any(), any())).thenReturn(kb);
         assertThrows(ResponseStatusException.class, () -> controller.getKb(kb.getId(), testUser));
     }
 
@@ -201,7 +201,7 @@ class WikiControllerTest {
 
     @Test
     void listCategories_success() {
-        when(categoryService.tree(any())).thenReturn(List.of());
+        when(categoryService.tree(any(), any())).thenReturn(List.of());
         Map<String, Object> result = controller.listCategories(UUID.randomUUID(), testUser);
         assertEquals(0, result.get("code"));
     }

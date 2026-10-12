@@ -1,0 +1,61 @@
+======================================================================
+PHASE95 R5: Cross-tenant Isolation E2E Validation (Improved)
+Base: http://localhost:8080
+======================================================================
+Tenant A admin: tid=tenant_default roles=['admin']
+
+... Seeding tenant B ...
+Tenant B admin: tid=tenant_b roles=['admin']
+
+--- Creating resources in tenant A ---
+  KB A: id=b8aba85f-1e74-44d8-9409-0defb9d20bd5
+  Page A: id=c90c2a76-ca0c-4112-b9ca-0b03315a8848
+  Automation rule A: id=94e35b0d-748e-4c4a-b6b8-502ae3fd3e37
+  Channel A: id=2c62dcaf-1220-4eac-81c6-4e39dc730e9e
+  Message A: id=ac373de1-b04e-4ebd-bd14-0873c951b6fc
+  Huddle A: id=e9c21104-b5b1-48dd-b6af-62801266f780
+  BI Report A: id=fc06016b-1555-41cd-9d1e-a146a051e324
+  Test User A: id=294d3fe3-6e06-412d-8555-1207d4b550e6
+  Role A (admin): id=00000000-0000-0000-0000-000000000010
+  Role B: id=ade1f9df-4576-4ce4-b11e-84cb531bb6f2
+
+--- Cross-tenant access tests ---
+  ✅ 1-automation A own: A→200 B→404 (want A=200 B=404)
+  ✅ role-assign baseline A→A: A→200 B→404 (want A=200 B=404)
+  ✅ 3-users B→A (GET): A→200 B→404 (want A=200 B=404)
+  ✅ 4-role-assign B→A: A→404 B→404 (want A=404 B=404)
+  ✅ 6-wikiKB B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 7-wikiPage B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 8-categories B→A: A→200 B→200 (want A=200 B=200), content={"message": "success", "code": 0, "data": []}
+  ✅ 9-templates B→A: A→200 B→200 (want A=200 B=200), content={"data": [], "message": "success", "code": 0, "total": 0}
+  ✅ 10-huddle B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 11-thread B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 12-pins B→A: A→200 B→200 (want A=200 B=200), content={"message": "success", "code": 0, "data": {"pins": []}}
+  ✅ 13-reports B→A: A→200 B→200 (want A=200 B=200), content={"message": "success", "code": 0, "data": []}
+  ✅ 14-users B≠A: A→200 B→200 (want A=200 B=200), content={"message": "success", "code": 0, "data": [{"tenant_id": "tenant_b", "created_at": "2026-10-11T23:54
+
+--- R5-7: Control assertion for random IDs ---
+  ✅ control random KB A→404: A→404 B→404 (want A=404 B=404)
+  Random KB ID B→404 (diagnostic, not judged)
+
+======================================================================
+Results: 14/14 PASS
+  ✅ 1-automation A own
+  ✅ role-assign baseline A→A
+  ✅ 3-users B→A (GET)
+  ✅ 4-role-assign B→A
+  ✅ 6-wikiKB B→A
+  ✅ 7-wikiPage B→A
+  ✅ 8-categories B→A
+  ✅ 9-templates B→A
+  ✅ 10-huddle B→A
+  ✅ 11-thread B→A
+  ✅ 12-pins B→A
+  ✅ 13-reports B→A
+  ✅ 14-users B≠A
+  ✅ control random KB A→404
+
+--- Cleaning up tenant_default resources ---
+  tenant_default cleanup complete
+
+--- Cleaning up tenant B ---

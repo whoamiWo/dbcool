@@ -156,7 +156,7 @@ class ImMessageControllerTest {
     @Test
     void thread_returnsReplies() {
         UUID messageId = UUID.randomUUID();
-        when(messageService.mustGet(messageId)).thenReturn(message());
+        when(messageService.mustGet(messageId, "tenant_default")).thenReturn(message());
         when(messageService.thread(any())).thenReturn(List.of(message()));
 
         Map<String, Object> resp = controller.thread(messageId, user);
@@ -196,7 +196,7 @@ class ImMessageControllerTest {
     @Test
     void thread_nonMember_returns403() {
         UUID messageId = UUID.randomUUID();
-        when(messageService.mustGet(messageId)).thenReturn(message());
+        when(messageService.mustGet(messageId, "tenant_default")).thenReturn(message());
         doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员"))
                 .when(messageService).assertMember(any(), any());
 
@@ -275,7 +275,7 @@ class ImMessageControllerTest {
     @Test
     void listReactions_returnsList() {
         UUID messageId = UUID.randomUUID();
-        when(messageService.mustGet(messageId)).thenReturn(message());
+        when(messageService.mustGet(messageId, "tenant_default")).thenReturn(message());
         when(reactionService.list(messageId)).thenReturn(List.of());
 
         Map<String, Object> resp = controller.listReactions(messageId, user);
@@ -292,7 +292,7 @@ class ImMessageControllerTest {
     @Test
     void listReactions_nonMember_returns403() {
         UUID messageId = UUID.randomUUID();
-        when(messageService.mustGet(messageId)).thenReturn(message());
+        when(messageService.mustGet(messageId, "tenant_default")).thenReturn(message());
         doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "不是频道成员"))
                 .when(messageService).assertMember(any(), any());
 

@@ -31,7 +31,7 @@ public class WikiCategoryService {
     public WikiCategoryEntity create(
             UUID kbId, UUID parentId, String name, String slug, String tenantId
     ) {
-        knowledgeBaseService.get(kbId); // 验证知识库存在
+        knowledgeBaseService.get(kbId, tenantId); // 验证知识库存在且属于当前租户
         if (categoryRepository.existsByKnowledgeBaseIdAndSlug(kbId, slug)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "分类 slug 已存在: " + slug);
         }
@@ -48,18 +48,19 @@ public class WikiCategoryService {
         return categoryRepository.save(entity);
     }
 
-    public List<WikiCategoryEntity> tree(UUID kbId) {
-        return categoryRepository.findByKnowledgeBaseIdOrderBySortOrderAscCreatedAtAsc(kbId);
+    /** PHASE95: 分类树按租户过滤，避免跨租户枚举他人知识库的分类。 */
+    public List<WikiCategoryEntity> tree(UUID kbId, String tenantId) {
+        return categoryRepository.findByKnowledgeBaseIdAndTenantIdOrderBySortOrderAscCreatedAtAsc(kbId, tenantId);
     }
 
-    public WikiCategoryEntity get(UUID id) {
-        return categoryRepository.findById(id)
+    public WikiCategoryEntity get(UUID id, String tenantId) {
+        return categoryRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "分类不存在: " + id));
     }
 
     @Transactional
     public WikiCategoryEntity update(UUID id, String name, String slug, UUID parentId, String tenantId) {
-        WikiCategoryEntity entity = get(id);
+        WikiCategoryEntity entity = get(id, tenantId);
         if (!entity.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权修改该分类");
         }
@@ -72,7 +73,7 @@ public class WikiCategoryService {
 
     @Transactional
     public void delete(UUID id, String tenantId) {
-        WikiCategoryEntity entity = get(id);
+        WikiCategoryEntity entity = get(id, tenantId);
         if (!entity.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除该分类");
         }

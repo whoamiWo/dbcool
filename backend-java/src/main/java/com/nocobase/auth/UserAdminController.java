@@ -42,15 +42,16 @@ public class UserAdminController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public Map<String, Object> list() {
+    public Map<String, Object> list(@AuthenticationPrincipal AuthenticatedUser user) {
         return Map.of("code", 0, "message", "success",
-                "data", userService.listAll().stream().map(this::toDto).toList());
+                "data", userService.listAll(user.tenantId()).stream().map(this::toDto).toList());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Map<String, Object> get(@PathVariable UUID id) {
-        Map<String, Object> dto = toDto(userService.get(id));
+    public Map<String, Object> get(@PathVariable UUID id,
+                                   @AuthenticationPrincipal AuthenticatedUser user) {
+        Map<String, Object> dto = toDto(userService.get(id, user.tenantId()));
         dto.put("roles", userService.getUserRoles(id).stream().map(this::toRoleDto).toList());
         return Map.of("code", 0, "message", "success", "data", dto);
     }
@@ -74,7 +75,7 @@ public class UserAdminController {
             @PathVariable UUID id,
             @RequestBody UpdateUserRequest req,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        UserEntity before = userService.get(id);
+        UserEntity before = userService.get(id, user.tenantId());
         UserEntity u = userService.update(id, req.displayName(), req.enabled(), user.tenantId());
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
                 "user.update", "user", id.toString(),
@@ -100,7 +101,7 @@ public class UserAdminController {
     public Map<String, Object> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        UserEntity before = userService.get(id);
+        UserEntity before = userService.get(id, user.tenantId());
         userService.delete(id, user.tenantId());
         userRoleRepository.deleteByIdUserId(id);
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
@@ -115,7 +116,7 @@ public class UserAdminController {
             @PathVariable UUID id,
             @PathVariable UUID roleId,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        userService.assignRole(id, roleId);
+        userService.assignRole(id, roleId, user.tenantId());
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
                 "user.role.assign", "user", id.toString(),
                 Map.of("role_id", roleId.toString()));
@@ -128,7 +129,7 @@ public class UserAdminController {
             @PathVariable UUID id,
             @PathVariable UUID roleId,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        userService.removeRole(id, roleId);
+        userService.removeRole(id, roleId, user.tenantId());
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
                 "user.role.revoke", "user", id.toString(),
                 Map.of("role_id", roleId.toString()));

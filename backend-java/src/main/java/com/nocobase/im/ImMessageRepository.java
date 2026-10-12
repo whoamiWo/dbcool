@@ -57,6 +57,9 @@ public interface ImMessageRepository extends JpaRepository<ImMessageEntity, UUID
     /** 查询已过期且未删除的消息 (用于 Burn-on-Read 清理)。 */
     List<ImMessageEntity> findByExpiresAtBeforeAndDeletedAtIsNull(Instant now);
 
+    /** PHASE95: 消息详情的租户校验查询（跨租户一律 404）。 */
+    java.util.Optional<ImMessageEntity> findByIdAndTenantId(UUID id, String tenantId);
+
     /**
      * PHASE93 合规：批量将该发送者的消息正文替换为占位（保留消息记录本身）。
      * 批量 UPDATE 而非逐条 save，理由同 AuditLogRepository#anonymizeUsername。

@@ -21,6 +21,9 @@ public interface WikiPageRepository extends JpaRepository<WikiPageEntity, UUID> 
 
     Optional<WikiPageEntity> findBySlugAndTenantId(String slug, String tenantId);
 
+    /** PHASE95: 页面详情的租户校验查询（跨租户一律 404，而不是先取后比对）。 */
+    Optional<WikiPageEntity> findByIdAndTenantId(UUID id, String tenantId);
+
     Optional<WikiPageEntity> findBySlugAndKnowledgeBaseId(String slug, UUID knowledgeBaseId);
 
     List<WikiPageEntity> findByKnowledgeBaseIdAndTenantIdOrderByUpdatedAtDesc(UUID knowledgeBaseId, String tenantId);

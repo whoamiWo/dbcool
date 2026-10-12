@@ -17,6 +17,9 @@ public interface WikiCategoryRepository extends JpaRepository<WikiCategoryEntity
 
     List<WikiCategoryEntity> findByKnowledgeBaseIdAndTenantIdOrderBySortOrderAscCreatedAtAsc(UUID knowledgeBaseId, String tenantId);
 
+    /** PHASE95: 分类详情的租户校验查询。 */
+    Optional<WikiCategoryEntity> findByIdAndTenantId(UUID id, String tenantId);
+
     List<WikiCategoryEntity> findByParentIdOrderBySortOrderAscCreatedAtAsc(UUID parentId);
 
     Optional<WikiCategoryEntity> findByKnowledgeBaseIdAndSlug(UUID knowledgeBaseId, String slug);

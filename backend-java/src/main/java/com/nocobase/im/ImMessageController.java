@@ -195,7 +195,7 @@ public class ImMessageController {
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
         // 归属校验:入参是 messageId,先取消息再校验其所属频道(防跨租户越权)
-        ImMessageEntity msg = messageService.mustGet(id);
+        ImMessageEntity msg = messageService.mustGet(id, user.tenantId());
         messageService.assertMember(msg.getChannelId(), user.userId());
         List<ImMessageDto> replies = messageService.thread(id).stream()
                 .map(ImMessageDto::from).toList();
@@ -372,7 +372,7 @@ public class ImMessageController {
     public Map<String, Object> listReactions(
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        ImMessageEntity msg = messageService.mustGet(id);
+        ImMessageEntity msg = messageService.mustGet(id, user.tenantId());
         messageService.assertMember(msg.getChannelId(), user.userId());
         List<Map<String, Object>> data = reactionService.list(id).stream()
                 .map(r -> Map.<String, Object>of(

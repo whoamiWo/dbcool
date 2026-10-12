@@ -82,6 +82,12 @@ public class WikiPageService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "页面不存在: " + id));
     }
 
+    /** PHASE95: 带租户校验版本 —— 对外一律走这个，跨租户访问返回 404。 */
+    public WikiPageEntity get(UUID id, String tenantId) {
+        return pageRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "页面不存在: " + id));
+    }
+
     public WikiPageEntity getBySlug(String slug, String tenantId) {
         return pageRepository.findBySlugAndTenantId(slug, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "页面不存在: " + slug));

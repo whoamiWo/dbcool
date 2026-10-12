@@ -39,7 +39,7 @@ public class WikiTemplateService {
     public WikiTemplateEntity createTemplate(UUID kbId, String name, String title,
                                               List<Map<String, Object>> blocks,
                                               String icon, String tenantId, UUID createdBy) {
-        knowledgeBaseService.get(kbId); // 验证知识库存在
+        knowledgeBaseService.get(kbId, tenantId); // 验证知识库存在且属于当前租户
         WikiTemplateEntity tpl = new WikiTemplateEntity();
         tpl.setId(UUID.randomUUID());
         tpl.setKbId(kbId);
@@ -57,15 +57,16 @@ public class WikiTemplateService {
     /**
      * 列出知识库下的所有模板。
      */
-    public List<WikiTemplateEntity> listTemplates(UUID kbId) {
-        return templateRepository.findByKbId(kbId);
+    /** PHASE95: 模板列表按租户过滤，避免跨租户枚举他人知识库的模板。 */
+    public List<WikiTemplateEntity> listTemplates(UUID kbId, String tenantId) {
+        return templateRepository.findByKbIdAndTenantIdOrderByUpdatedAtDesc(kbId, tenantId);
     }
 
     /**
-     * 获取模板详情。
+     * 获取模板详情（带租户校验）。
      */
-    public WikiTemplateEntity getTemplate(UUID id) {
-        return templateRepository.findById(id)
+    public WikiTemplateEntity getTemplate(UUID id, String tenantId) {
+        return templateRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板不存在"));
     }
 
@@ -74,8 +75,7 @@ public class WikiTemplateService {
      */
     @Transactional
     public void deleteTemplate(UUID id, String tenantId) {
-        WikiTemplateEntity tpl = templateRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板不存在"));
+        WikiTemplateEntity tpl = getTemplate(id, tenantId);
         if (!tpl.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除");
         }
@@ -88,7 +88,7 @@ public class WikiTemplateService {
     @Transactional
     public WikiPageEntity createPageFromTemplate(UUID templateId, UUID kbId, UUID parentId,
                                                   String title, String slug, UUID createdBy, String tenantId) {
-        WikiTemplateEntity tpl = getTemplate(templateId);
+        WikiTemplateEntity tpl = getTemplate(templateId, tenantId);
         if (!tpl.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权使用模板");
         }

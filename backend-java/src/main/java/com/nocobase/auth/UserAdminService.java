@@ -35,8 +35,8 @@ public class UserAdminService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public List<UserEntity> listAll() {
-        return userRepository.findAll();
+    public List<UserEntity> listAll(String tenantId) {
+        return userRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
     }
 
     public UserEntity get(UUID id) {
@@ -95,20 +95,33 @@ public class UserAdminService {
                 .toList();
     }
 
+    /**
+     * 赋角色 —— PHASE95 F1：用户与角色双方都必须属于当前租户。
+     * 缺任一条校验，租户 A 的管理员就能给租户 B 的用户赋任意角色（含 admin）。
+     */
     @Transactional
-    public void assignRole(UUID userId, UUID roleId) {
+    public void assignRole(UUID userId, UUID roleId, String tenantId) {
+        userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "用户不存在或不属于当前租户: " + userId));
+        roleRepository.findByIdAndTenantId(roleId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "角色不存在或不属于当前租户: " + roleId));
         if (userRoleRepository.findById(new UserRoleEntity.UserRoleId(userId, roleId)).isPresent()) {
             return; // 已存在
-        }
-        // 校验 role 存在，避免 FK 约束违反导致 500
-        if (!roleRepository.findById(roleId).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "角色不存在: " + roleId);
         }
         userRoleRepository.save(new UserRoleEntity(userId, roleId));
     }
 
+    /** 撤角色 —— 同 assignRole，双向租户校验。 */
     @Transactional
-    public void removeRole(UUID userId, UUID roleId) {
+    public void removeRole(UUID userId, UUID roleId, String tenantId) {
+        userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "用户不存在或不属于当前租户: " + userId));
+        roleRepository.findByIdAndTenantId(roleId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "角色不存在或不属于当前租户: " + roleId));
         userRoleRepository.deleteById(new UserRoleEntity.UserRoleId(userId, roleId));
     }
 

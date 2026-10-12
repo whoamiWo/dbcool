@@ -12,8 +12,10 @@ import com.nocobase.notification.WebhookDispatcher;
 import com.nocobase.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -157,7 +159,7 @@ public class AutomationRuleService {
      */
     public AutomationRuleEntity getRule(UUID ruleId, String tenantId) {
         return ruleRepository.findByIdAndTenantId(ruleId, tenantId)
-                .orElseThrow(() -> new RuntimeException("规则不存在或无权访问"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "规则不存在或无权访问"));
     }
 
     /**

@@ -233,6 +233,12 @@ public class MessageService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
     }
 
+    /** PHASE95: 带租户校验版本 —— 对外一律走这个，跨租户访问返回 404。 */
+    public ImMessageEntity mustGet(UUID messageId, String tenantId) {
+        return messageRepository.findByIdAndTenantId(messageId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "消息不存在"));
+    }
+
     /**
      * 校验用户是否为某频道的成员（用于搜索 ACL 过滤）。
      */

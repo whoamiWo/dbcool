@@ -1,6 +1,7 @@
 package com.nocobase.auth;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -85,7 +86,11 @@ class UserAdminControllerTest {
     @Test
     void list_returnsAllUsers() throws Exception {
         UUID u1 = UUID.randomUUID();
-        when(userService.listAll()).thenReturn(List.of(user(u1, "alice"), user(UUID.randomUUID(), "bob")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        new AuthenticatedUser(u1, "admin", "tenant_admin"), null,
+                        List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+        when(userService.listAll("tenant_admin")).thenReturn(List.of(user(u1, "alice"), user(UUID.randomUUID(), "bob")));
 
         mockMvc.perform(get("/api/admin/users"))
                 .andExpect(status().isOk())
@@ -101,8 +106,12 @@ class UserAdminControllerTest {
     void get_returnsUserWithRoles() throws Exception {
         UUID uid = UUID.randomUUID();
         UUID rid = UUID.randomUUID();
-        when(userService.get(uid)).thenReturn(user(uid, "alice"));
+        when(userService.get(uid, "tenant_admin")).thenReturn(user(uid, "alice"));
         when(userService.getUserRoles(uid)).thenReturn(List.of(role(rid, "admin")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
+                        List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
 
         mockMvc.perform(get("/api/admin/users/{id}", uid))
                 .andExpect(status().isOk())
@@ -172,7 +181,7 @@ class UserAdminControllerTest {
     @Test
     void update_partialFields_returnsUpdatedUser() throws Exception {
         UUID uid = UUID.randomUUID();
-        when(userService.get(uid)).thenReturn(user(uid, "alice"));
+        when(userService.get(uid, "tenant_admin")).thenReturn(user(uid, "alice"));
         when(userService.update(eq(uid), eq("New Name"), eq(false), eq("tenant_admin")))
                 .thenReturn(user(uid, "alice"));
 
@@ -262,7 +271,7 @@ class UserAdminControllerTest {
     @Test
     void delete_removesUserAndRoles() throws Exception {
         UUID uid = UUID.randomUUID();
-        when(userService.get(uid)).thenReturn(user(uid, "alice"));
+        when(userService.get(uid, "tenant_admin")).thenReturn(user(uid, "alice"));
         doNothing().when(userService).delete(eq(uid), eq("tenant_admin"));
         doNothing().when(userRoleRepository).deleteByIdUserId(uid);
 
@@ -299,7 +308,7 @@ class UserAdminControllerTest {
     void assignRole_returnsAssigned() throws Exception {
         UUID uid = UUID.randomUUID();
         UUID rid = UUID.randomUUID();
-        doNothing().when(userService).assignRole(uid, rid);
+        doNothing().when(userService).assignRole(uid, rid, "tenant_admin");
 
         var auth = new UsernamePasswordAuthenticationToken(
                 new AuthenticatedUser(uid, "admin", "tenant_admin"), null,
@@ -317,7 +326,7 @@ class UserAdminControllerTest {
     void removeRole_returnsRemoved() throws Exception {
         UUID uid = UUID.randomUUID();
         UUID rid = UUID.randomUUID();
-        doNothing().when(userService).removeRole(uid, rid);
+        doNothing().when(userService).removeRole(uid, rid, "tenant_admin");
 
         var auth = new UsernamePasswordAuthenticationToken(
                 new AuthenticatedUser(uid, "admin", "tenant_admin"), null,

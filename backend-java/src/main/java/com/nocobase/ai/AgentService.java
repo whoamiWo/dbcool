@@ -86,7 +86,7 @@ public class AgentService {
                     "data", Map.of("available", false));
         }
         // 2) 会话管理
-        AiConversationEntity conv = ensureConversation(agent, channelId, userId);
+        AiConversationEntity conv = ensureConversation(agent, channelId, userId, tenantId);
         List<Map<String, Object>> messages = parseMessages(conv.getMessagesJson());
         messages.add(Map.of("role", "user", "content", prompt));
 
@@ -133,11 +133,11 @@ public class AgentService {
                 .findFirst().orElse(null);
     }
 
+    /** PHASE95: 会话查询必须带显式 tenantId，否则跨租户会命中他人会话。 */
     private AiConversationEntity ensureConversation(AiAgentEntity agent,
-                                                     UUID channelId, UUID userId) {
-        return conversationRepo.findByAgentIdAndChannelIdAndUserId(
-                        agent.getId(), channelId, userId)
-                .stream().findFirst()
+                                                     UUID channelId, UUID userId, String tenantId) {
+        return conversationRepo.findByAgentIdAndChannelIdAndUserIdAndTenantId(
+                        agent.getId(), channelId, userId, tenantId)
                 .orElseGet(() -> {
                     AiConversationEntity c = new AiConversationEntity();
                     c.setId(UUID.randomUUID());

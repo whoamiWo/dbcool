@@ -131,6 +131,30 @@ def test_t2_restore_realtime():
         check("从备份提取 dump", False, str(e))
         return
 
+    # Q1（PHASE95 收口补丁 2）：记录数断言的比对基准必须是"导出时点"的源库数据，
+    # 而不是"当前"源库 —— 备份文件是外部生成的快照（可能陈旧），而当前源库会被 E2E
+    # 脚本持续写入 testuser_a_* 等测试用户，两者本就不等（实测源库 users=15、备份内=1）。
+    # 所以这里当场 pg_dump 一份新鲜 dump，后续用它恢复，并断言"记录数一致"，
+    # 这才真正证明"当前数据可以被完整恢复"；而不是"恢复库里有 >=1 条就算通过"。
+    # -Fc（自定义格式）才能被 pg_restore 消费；默认纯文本 dump 要用 psql 回放。
+    # 二进制不经 stdout：在容器内落文件再 docker cp 出来，避免 text=True 解码损坏。
+    live_dump = "/tmp/phase95_live_dump.pg"
+    live_in_ct = "/tmp/phase95_live_dump.pg"
+    rc_live, _, err_live = run(["docker", "exec", "nocobase-postgres", "pg_dump",
+                                "-U", POSTGRES_USER, "-d", "nocobase",
+                                "-Fc", "-f", live_in_ct], check=False)
+    if rc_live == 0:
+        run(["docker", "cp", f"nocobase-postgres:{live_in_ct}", live_dump], check=False)
+    run(["docker", "exec", "nocobase-postgres", "rm", "-f", live_in_ct], check=False)
+    live_size = os.path.getsize(live_dump) if os.path.exists(live_dump) else 0
+    src_at_dump = {}
+    for table in ("users", "tenant"):
+        src_at_dump[table] = psql("nocobase-postgres", f"select count(*) from {table}")
+    check("当场生成源库 dump（记录数一致的比对基准）",
+          rc_live == 0 and live_size > 0,
+          f"rc={rc_live}, {live_size} bytes"
+          + (f" {err_live.strip()[:120]}" if rc_live != 0 else ""))
+
     rm_container(RESTORE_CONTAINER)
     rc, _, err = run(["docker", "run", "-d", "--name", RESTORE_CONTAINER,
                       "-e", f"POSTGRES_USER={POSTGRES_USER}",
@@ -143,7 +167,8 @@ def test_t2_restore_realtime():
         rm_container(RESTORE_CONTAINER)
         return
 
-    run(["docker", "cp", dump_path, f"{RESTORE_CONTAINER}:/tmp/dump.pg"], check=False)
+    # Q1: 用当场导出的新鲜 dump 做恢复（比对基准见上），而非可能陈旧的备份文件
+    run(["docker", "cp", live_dump, f"{RESTORE_CONTAINER}:/tmp/dump.pg"], check=False)
     rc, out, err = run(["docker", "exec", RESTORE_CONTAINER, "pg_restore",
                         "-U", POSTGRES_USER, "-d", "nocobase",
                         "--no-owner", "--no-privileges", "/tmp/dump.pg"], check=False)
@@ -171,11 +196,14 @@ def test_t2_restore_realtime():
     check("恢复库包含关键表 users/tenant/audit_log", not missing_key, f"缺失={missing_key}")
 
     # 校验：关键表记录数
+    # Q1：恢复的是**当场导出**的 dump，因此必须与导出时点的源库记录数**完全一致**。
+    # 这是强断言：恢复不完整（少表/少行）必须红，不接受"恢复库 >=1 条就算通过"。
     for table in ("users", "tenant"):
-        src_n = psql("nocobase-postgres", f"select count(*) from {table}")
+        exp_n = src_at_dump.get(table, "")
         got_n = psql(RESTORE_CONTAINER, f"select count(*) from {table}")
         check(f"记录数一致: {table}",
-              src_n != "" and src_n == got_n, f"源库={src_n} 恢复库={got_n}")
+              exp_n != "" and got_n != "" and got_n == exp_n,
+              f"导出时源库={exp_n} 恢复库={got_n}")
 
     # 校验：具体一条记录的内容（不是只看数量）
     src_user = psql("nocobase-postgres", "select username from users order by username limit 1")

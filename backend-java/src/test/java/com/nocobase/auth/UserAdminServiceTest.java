@@ -78,8 +78,8 @@ class UserAdminServiceTest {
 
     @Test
     void listAll_returnsAll() {
-        when(userRepository.findAll()).thenReturn(List.of(makeUser(), makeUser()));
-        assertEquals(2, service.listAll().size());
+        when(userRepository.findByTenantIdOrderByCreatedAtDesc("tenant_default")).thenReturn(List.of(makeUser(), makeUser()));
+        assertEquals(2, service.listAll("tenant_default").size());
     }
 
     @Test
@@ -231,10 +231,11 @@ class UserAdminServiceTest {
     void assignRole_newAssignment_saves() {
         UUID userId = UUID.randomUUID();
         UUID roleId = UUID.randomUUID();
+        when(userRepository.findByIdAndTenantId(userId, "tenant_default")).thenReturn(Optional.of(makeUser()));
         when(userRoleRepository.findById(any())).thenReturn(Optional.empty());
-        when(roleRepository.findById(roleId)).thenReturn(Optional.of(makeRole("test-role")));
+        when(roleRepository.findByIdAndTenantId(roleId, "tenant_default")).thenReturn(Optional.of(makeRole("test-role")));
 
-        service.assignRole(userId, roleId);
+        service.assignRole(userId, roleId, "tenant_default");
 
         ArgumentCaptor<UserRoleEntity> cap = ArgumentCaptor.forClass(UserRoleEntity.class);
         verify(userRoleRepository).save(cap.capture());
@@ -247,9 +248,11 @@ class UserAdminServiceTest {
         UUID userId = UUID.randomUUID();
         UUID roleId = UUID.randomUUID();
         UserRoleEntity existing = makeUserRole(userId, roleId);
+        when(userRepository.findByIdAndTenantId(userId, "tenant_default")).thenReturn(Optional.of(makeUser()));
+        when(roleRepository.findByIdAndTenantId(roleId, "tenant_default")).thenReturn(Optional.of(makeRole("test-role")));
         when(userRoleRepository.findById(any())).thenReturn(Optional.of(existing));
 
-        service.assignRole(userId, roleId);
+        service.assignRole(userId, roleId, "tenant_default");
 
         verify(userRoleRepository, times(0)).save(any());
     }
@@ -258,11 +261,12 @@ class UserAdminServiceTest {
     void assignRole_roleNotFound_throwsBadRequest() {
         UUID userId = UUID.randomUUID();
         UUID roleId = UUID.randomUUID();
+        when(userRepository.findByIdAndTenantId(userId, "tenant_default")).thenReturn(Optional.of(makeUser()));
         when(userRoleRepository.findById(any())).thenReturn(Optional.empty());
-        when(roleRepository.findById(roleId)).thenReturn(Optional.empty());
+        when(roleRepository.findByIdAndTenantId(roleId, "tenant_default")).thenReturn(Optional.empty());
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> service.assignRole(userId, roleId));
+                () -> service.assignRole(userId, roleId, "tenant_default"));
     }
 
     // ============ removeRole ============
@@ -272,7 +276,10 @@ class UserAdminServiceTest {
         UUID userId = UUID.randomUUID();
         UUID roleId = UUID.randomUUID();
 
-        service.removeRole(userId, roleId);
+        when(userRepository.findByIdAndTenantId(userId, "tenant_default")).thenReturn(Optional.of(makeUser()));
+        when(roleRepository.findByIdAndTenantId(roleId, "tenant_default")).thenReturn(Optional.of(makeRole("test-role")));
+
+        service.removeRole(userId, roleId, "tenant_default");
 
         ArgumentCaptor<UserRoleEntity.UserRoleId> cap =
                 ArgumentCaptor.forClass(UserRoleEntity.UserRoleId.class);

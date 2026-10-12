@@ -137,7 +137,7 @@ public class WikiController {
                                      @AuthenticationPrincipal AuthenticatedUser user) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "knowledge_base",
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
-        KnowledgeBaseEntity entity = knowledgeBaseService.get(id);
+        KnowledgeBaseEntity entity = knowledgeBaseService.get(id, user.tenantId());
         if (!entity.getTenantId().equals(user.tenantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问");
         }
@@ -169,7 +169,7 @@ public class WikiController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "knowledge_base",
                 com.nocobase.auth.AclPolicyEntity.Action.DELETE);
-        KnowledgeBaseEntity entity = knowledgeBaseService.get(id);
+        KnowledgeBaseEntity entity = knowledgeBaseService.get(id, user.tenantId());
         if (!entity.getTenantId().equals(user.tenantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除");
         }
@@ -248,10 +248,7 @@ public class WikiController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
-        WikiPageEntity entity = pageService.get(id);
-        if (!entity.getTenantId().equals(user.tenantId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问");
-        }
+        WikiPageEntity entity = pageService.get(id, user.tenantId());
         return Map.of("code", 0, "message", "success", "data", toPageDto(entity));
     }
 
@@ -509,9 +506,19 @@ public class WikiController {
             @PathVariable UUID kbId,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
+        // PHASE95: 先检查 KB 是否归属当前租户；不归属直接返回空列表，
+        // 避免越权暴露他人 KB 的结构信息（也不让后续查询落到他人租户）。
+        try {
+            knowledgeBaseService.get(kbId, user.tenantId());
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            if (e.getStatusCode() == org.springframework.http.HttpStatus.NOT_FOUND) {
+                return Map.of("code", 0, "message", "success", "data", java.util.List.of());
+            }
+            throw e;
+        }
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_category",
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
-        List<WikiCategoryEntity> tree = categoryService.tree(kbId);
+        List<WikiCategoryEntity> tree = categoryService.tree(kbId, user.tenantId());
         return Map.of("code", 0, "message", "success",
                 "data", tree.stream().map(this::toCategoryDto).toList());
     }
@@ -563,7 +570,7 @@ public class WikiController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_category",
                 com.nocobase.auth.AclPolicyEntity.Action.DELETE);
-        WikiCategoryEntity entity = categoryService.get(id);
+        WikiCategoryEntity entity = categoryService.get(id, user.tenantId());
         if (!entity.getTenantId().equals(user.tenantId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除");
         }
@@ -633,9 +640,18 @@ public class WikiController {
             @PathVariable UUID kbId,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
+        // PHASE95: 同 listCategories，先做 KB 归属检查，不归属返回空列表。
+        try {
+            knowledgeBaseService.get(kbId, user.tenantId());
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            if (e.getStatusCode() == org.springframework.http.HttpStatus.NOT_FOUND) {
+                return Map.of("code", 0, "message", "success", "data", java.util.List.of(), "total", 0);
+            }
+            throw e;
+        }
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "wiki_page",
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
-        var templates = templateService.listTemplates(kbId);
+        var templates = templateService.listTemplates(kbId, user.tenantId());
         List<Map<String, Object>> dtoList = templates.stream()
                 .map(t -> {
                     Map<String, Object> m = new HashMap<>();

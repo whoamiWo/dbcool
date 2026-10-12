@@ -58,6 +58,12 @@ public class KnowledgeBaseService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "知识库不存在: " + id));
     }
 
+    /** PHASE95: 带租户校验版本 —— 对外一律走这个，跨租户访问返回 404。 */
+    public KnowledgeBaseEntity get(UUID id, String tenantId) {
+        return repository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "知识库不存在: " + id));
+    }
+
     public KnowledgeBaseEntity getBySlug(String slug, String tenantId) {
         return repository.findBySlugAndTenantId(slug, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "知识库不存在: " + slug));

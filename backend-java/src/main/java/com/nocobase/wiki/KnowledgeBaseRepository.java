@@ -17,6 +17,9 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
 
     Optional<KnowledgeBaseEntity> findBySlugAndTenantId(String slug, String tenantId);
 
+    /** PHASE95: 知识库详情的租户校验查询。 */
+    Optional<KnowledgeBaseEntity> findByIdAndTenantId(UUID id, String tenantId);
+
     List<KnowledgeBaseEntity> findByTenantIdOrderBySortOrderAscCreatedAtAsc(String tenantId);
 
     boolean existsBySlug(String slug);

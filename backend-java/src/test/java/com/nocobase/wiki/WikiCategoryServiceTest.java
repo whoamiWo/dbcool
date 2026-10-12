@@ -42,7 +42,7 @@ class WikiCategoryServiceTest {
         WikiCategoryEntity c2 = categoryService.create(kbId, c1.getId(), "Subcategory", "subcat", tenantId);
         WikiCategoryEntity c3 = categoryService.create(kbId, null, "Category 2", "cat2", tenantId);
 
-        List<WikiCategoryEntity> tree = categoryService.tree(kbId);
+        List<WikiCategoryEntity> tree = categoryService.tree(kbId, tenantId);
         assertEquals(3, tree.size());
 
         // 验证层级关系
@@ -75,6 +75,6 @@ class WikiCategoryServiceTest {
         WikiCategoryEntity c = categoryService.create(kbId, null, "To Delete", "del", tenantId);
         categoryService.delete(c.getId(), tenantId);
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> categoryService.get(c.getId()));
+                () -> categoryService.get(c.getId(), tenantId));
     }
 }
