@@ -113,9 +113,13 @@ management:
       slo:
         http.server.requests: 100ms,300ms,1s,3s
   # PHASE 56 P1-2 分布式追踪：OpenTelemetry + Jaeger
+  # PHASE100 T7 修正：Compose 部署下**没有 OTel Collector**，otlp.endpoint 指向
+  # localhost:4318 时 span 会被静默丢弃（红线 5：禁止留下静默丢弃）。
+  # 因此采样概率默认改为 **0（显式关闭）**；需要追踪时先部署 collector，
+  # 再通过 TRACING_SAMPLING_RATE 调高（例如 0.1）。
   tracing:
     sampling:
-      probability: ${TRACING_SAMPLING_RATE:0.1}
+      probability: ${TRACING_SAMPLING_RATE:0}
     otlp:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 

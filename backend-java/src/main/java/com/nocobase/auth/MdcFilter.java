@@ -25,10 +25,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public class MdcFilter extends OncePerRequestFilter {
 
+    /** PHASE100 T5: traceId 生成与透传 —— 上游有 X-Request-ID 则沿用，否则 UUID 生成 */
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        // PHASE100 T5: traceId 贯通
+        String traceId = request.getHeader("X-Request-ID");
+        if (traceId == null || traceId.isBlank()) {
+            traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        }
+        MDC.put("traceId", traceId);
+        response.setHeader("X-Request-ID", traceId);
+        
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof JwtAuthFilter.AuthenticatedUser user) {

@@ -27,9 +27,10 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
       POSTGRES_USER: ${POSTGRES_USER:-nocobase}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD，请在 .env 中配置}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # PHASE100 T2: 端口收敛到 127.0.0.1，不对公网暴露
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -37,8 +38,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   redis:
@@ -46,7 +56,8 @@ services:
     container_name: nocobase-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # PHASE100 T2: 端口收敛到 127.0.0.1
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -54,8 +65,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   minio:
@@ -63,11 +83,12 @@ services:
     container_name: nocobase-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?未设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      # PHASE100 T2: 端口收敛到 127.0.0.1
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - miniodata:/data
     healthcheck:
@@ -76,8 +97,17 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   # ============================================================
@@ -89,11 +119,12 @@ services:
     image: rabbitmq:3.13-management-alpine
     container_name: nocobase-rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?未设置 RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?未设置 RABBITMQ_PASSWORD}
     ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+      # PHASE100 T2: 端口收敛到 127.0.0.1
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MGMT_PORT:-15672}:15672"
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
     healthcheck:
@@ -101,8 +132,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   # ============================================================
@@ -142,15 +182,15 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
       POSTGRES_USER: ${POSTGRES_USER:-nocobase}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
-      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:?未设置 RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?未设置 RABBITMQ_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_at_least_32_characters_long_for_hs256}
       JAVA_PORT: 8080
       NOCOBASE_ALERTS_PATH: /tmp/alerts.db
@@ -159,7 +199,7 @@ services:
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
       MINIO_EXTERNAL_URL: ${MINIO_EXTERNAL_URL:-http://localhost:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
       # PHASE62 R2: 集成端到端实测配置（勿提交真实密钥，值放 .env）
       # 注意 Spring Boot relaxed binding：dingtalk.app-secret → DINGTALK_APP_SECRET，
@@ -188,8 +228,18 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          # PHASE100 T4: Spring Boot 后端 512M 会 OOM，提到 1G
+          memory: 1024M
     restart: unless-stopped
 
   # ============================================================
@@ -226,21 +276,41 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
       POSTGRES_USER: ${POSTGRES_USER:-nocobase}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # PHASE69 R3: MinIO 备份配置
       MINIO_ENABLED: "true"
       MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?未设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
+      # PHASE100 T6: 告警持久化 + webhook 外发通道
+      # 路径指向命名卷（不再是 /tmp，容器重启不丢）
+      NOCOBASE_ALERTS_PATH: /data/alerts.db
+      # 告警 webhook（未配置则仅落盘不外发，启动日志会明确提示）
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_WEBHOOK_KIND: ${ALERT_WEBHOOK_KIND:-generic}
+      ALERT_WEBHOOK_SECRET: ${ALERT_WEBHOOK_SECRET:-}
     ports:
       - "${PYTHON_PORT:-8000}:8000"
+    volumes:
+      # PHASE100 T6: 告警 SQLite 落命名卷，重启可恢复
+      - alertsdata:/data
     depends_on:
       - backend-java
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          # PHASE100 T4: Python 后端 768M（含 sentence-transformers）
+          memory: 768M
     restart: unless-stopped
 
   # ============================================================
@@ -256,14 +326,23 @@ services:
       PG_PORT: 5432
       PG_DB: ${POSTGRES_DB:-nocobase}
       PG_USER: ${POSTGRES_USER:-nocobase}
-      PG_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      PG_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
     ports:
       - "${CRDT_PORT:-3100}:3100"
     depends_on:
       postgres:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   # ============================================================
@@ -281,8 +360,17 @@ services:
     depends_on:
       - backend-java
       - backend-python
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
 volumes:
@@ -294,7 +382,15 @@ volumes:
     name: nocobase-miniodata
   rabbitmqdata:
     name: nocobase-rabbitmqdata
+  # PHASE100 T6: 告警 SQLite 持久化（命名卷，容器重建不丢）
+  alertsdata:
+    name: nocobase-alertsdata
 
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 networks:
   nocobase-net:
     name: nocobase-net

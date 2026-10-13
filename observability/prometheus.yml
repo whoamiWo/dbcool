@@ -1,0 +1,28 @@
+# ============================================================
+#  Prometheus 抓取配置（PHASE100 T7）
+#  目标：Java 后端 /actuator/prometheus
+# ============================================================
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    app: nocobase
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Java 后端（micrometer-registry-prometheus 已暴露 /actuator/prometheus）
+  - job_name: 'backend-java'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      # 容器网络内用服务名访问
+      - targets: ['backend-java:8080']
+        labels:
+          service: backend-java
+
+  # Prometheus 自监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

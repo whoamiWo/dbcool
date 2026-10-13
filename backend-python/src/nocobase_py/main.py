@@ -2,15 +2,40 @@
 
 import logging
 import os
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from nocobase_py import __version__
 from nocobase_py.config import get_settings
 from nocobase_py.routers import ai, backup, connectors, health, integration, tasks
+
+logger = logging.getLogger("nocobase_py")
+
+# PHASE100 T5: traceId 上下文（供日志格式器输出 request_id）
+_trace_id_var: ContextVar[str] = ContextVar("trace_id", default="")
+
+
+def get_trace_id() -> str:
+    """当前请求的 traceId（无请求上下文时返回空串）。"""
+    return _trace_id_var.get()
+
+
+async def trace_id_middleware(request: Request, call_next):
+    """PHASE100 T5: traceId 贯通 —— 沿用上游 X-Request-ID，否则生成；响应头回写."""
+    trace_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16]
+    request.state.trace_id = trace_id
+    token = _trace_id_var.set(trace_id)
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = trace_id
+        return response
+    finally:
+        _trace_id_var.reset(token)
 
 
 @asynccontextmanager
@@ -25,6 +50,39 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from nocobase_py.services.scheduler import get_scheduler, install_default_alert_checks
         from nocobase_py.services import backup as backup_service
         from nocobase_py.services.llm_cache import LLMCache
+
+        # PHASE100 T6: 告警持久化 —— 初始化全局 AlertStore 并 attach 到 collector。
+        # 此前 get_store() 无人调用，告警只进内存 deque，重启即丢。
+        try:
+            from nocobase_py.services.alert_store import get_store
+
+            alerts_path = os.environ.get("NOCOBASE_ALERTS_PATH", "alerts.db")
+            get_store(path=alerts_path)
+            print(f"   PHASE100 T6: 告警 SQLite 持久化已启用 ({alerts_path})")
+        except Exception as e:  # noqa: BLE001
+            print(f"   ⚠ PHASE100 T6 告警持久化初始化失败: {e}")
+
+        # PHASE100 T6: 告警 webhook 外发通道（安装/备份失败等可真实送达）
+        # 未配置 ALERT_WEBHOOK_URL 时不启用，绝不静默丢弃 —— 启动日志明确提示。
+        alert_webhook_url = os.environ.get("ALERT_WEBHOOK_URL", "")
+        alert_webhook_kind = os.environ.get("ALERT_WEBHOOK_KIND", "generic")
+        alert_webhook_secret = os.environ.get("ALERT_WEBHOOK_SECRET", "")
+        if alert_webhook_url:
+            try:
+                from nocobase_py.services.webhook import WebhookConfig, WebhookPusher, install_pusher
+
+                pusher = WebhookPusher(WebhookConfig(
+                    url=alert_webhook_url,
+                    kind=alert_webhook_kind,
+                    secret=alert_webhook_secret,
+                    enabled=True,
+                ))
+                install_pusher(pusher)
+                print(f"   PHASE100 T6: 告警 webhook 已启用 → {alert_webhook_kind} (secret={'on' if alert_webhook_secret else 'off'})")
+            except Exception as e:  # noqa: BLE001
+                print(f"   ⚠ PHASE100 T6 告警 webhook 安装失败: {e}")
+        else:
+            print("   ⚠ PHASE100 T6: 未配置 ALERT_WEBHOOK_URL，告警仅落盘不外发（备份失败/服务不可用告警将无接收方）")
 
         sched = get_scheduler()
         # 1. 告警巡检（缓存命中率）
@@ -86,6 +144,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # PHASE100 T5: traceId 中间件（沿用 X-Request-ID 或生成，响应头回写）
+    app.middleware("http")(trace_id_middleware)
 
     # 路由
     app.include_router(health.router)

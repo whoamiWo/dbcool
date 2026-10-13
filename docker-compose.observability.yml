@@ -1,0 +1,48 @@
+# ============================================================
+#  NocoBase Compose 可观测性最小集（PHASE100 T7）
+#
+#  用法：
+#    docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+#  组成：
+#    - Prometheus（抓取 Java /actuator/prometheus）
+#    - 告警规则（服务 down / 5xx 比例 / P99 延迟）
+#
+#  ⚠️ 未部署 OTel Collector：application.yml 的 tracing.otlp.endpoint
+#     指向 http://localhost:4318/v1/traces，Compose 下无 collector 时
+#     trace 会被静默丢弃（红线 5：禁止留下静默丢弃）。
+#     因此本文件同时把 sampling 概率默认降为 0（显式关闭），
+#     需要追踪时应先部署 collector 再把 TRACING_SAMPLING_RATE 调高。
+# ============================================================
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nocobase-prometheus
+    ports:
+      # PHASE100 T2: 仅监听 127.0.0.1
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheusdata:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    networks:
+      - nocobase-net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  prometheusdata:
+    name: nocobase-prometheusdata
