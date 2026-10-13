@@ -325,3 +325,124 @@ jobs:
           if [ -f /tmp/java.pid ]; then
             kill $(cat /tmp/java.pid) 2>/dev/null || true
           fi
+
+      - name: Archive Java logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-integration-java-log
+          path: /tmp/java.log
+          retention-days: 7
+
+  # ============================================================
+  #  PHASE95-101 验证脚本（PHASE103 T4 纳入 CI）
+  #  这些脚本是各批次沉淀的回归防线，必须在 CI 中持续运行
+  # ============================================================
+  verify-scripts:
+    name: 🛡️ Regression Scripts
+    runs-on: ubuntu-latest
+    needs: [java-test]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: nocobase
+          POSTGRES_USER: nocobase
+          POSTGRES_PASSWORD: dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build Java jar
+        working-directory: backend-java
+        run: mvn clean package -DskipTests
+
+      - name: Start Java backend
+        working-directory: backend-java
+        run: |
+          SPRING_PROFILES_ACTIVE=dev \
+          POSTGRES_HOST=localhost \
+          POSTGRES_PORT=5432 \
+          POSTGRES_DB=nocobase \
+          POSTGRES_USER=nocobase \
+          POSTGRES_PASSWORD=dev_password \
+          JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
+          echo $! > /tmp/java.pid
+
+      - name: Wait for Java to be ready
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:8080/api/health > /dev/null; then
+              echo "Java ready after ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Java failed to start"
+          cat /tmp/java.log
+          exit 1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 不需要运行中服务的静态/契约类脚本
+      - name: api-contract-verify (PHASE97)
+        run: python3 scripts/api-contract-verify.py
+
+      - name: no-fake-impl-verify (PHASE96)
+        run: python3 scripts/no-fake-impl-verify.py
+
+      # 需要运行中服务的 E2E 脚本
+      - name: smoke (PHASE89)
+        run: python3 scripts/smoke.py
+
+      - name: tenant-isolation-e2e-verify (PHASE95)
+        run: python3 scripts/tenant-isolation-e2e-verify.py
+
+      - name: admin-authz-e2e-verify (PHASE95)
+        run: python3 scripts/admin-authz-e2e-verify.py
+
+      - name: saas-readiness-verify (PHASE99)
+        run: python3 scripts/saas-readiness-verify.py
+
+      # backup-e2e-verify 耗时较长（含独立容器恢复演练），仅在 main 分支/手动触发
+      - name: backup-e2e-verify (PHASE101, main only)
+        if: github.ref == 'refs/heads/main'
+        run: python3 scripts/backup-e2e-verify.py
+
+      - name: Show Java logs on failure
+        if: failure()
+        run: tail -100 /tmp/java.log
+
+      - name: Cleanup Java process
+        if: always()
+        run: |
+          # T2 例外：cleanup 步骤允许失败（进程可能不存在），不影响门禁结论
+          if [ -f /tmp/java.pid ]; then
+            kill $(cat /tmp/java.pid) 2>/dev/null || true
+          fi
+
+      - name: Archive Java logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-scripts-java-log
+          path: /tmp/java.log
+          retention-days: 7
