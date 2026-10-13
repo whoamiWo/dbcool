@@ -15,6 +15,7 @@
     "test:coverage": "vitest --run --coverage",
     "tsc": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "audit": "npm audit --omit=dev",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "smoke": "python3 ../scripts/smoke.py",

@@ -143,9 +143,11 @@ on:
 ### 6.1 前端 npm audit
 
 ```bash
-cd frontend && npm audit --json
-→ 无漏洞
+cd frontend && npm audit --omit=dev --registry=https://registry.npmjs.org
+→ 2 moderate (react-router 6.x → 7.18.4, breaking change)
 ```
+
+**处理计划**：PHASE104 升级 `react-router-dom` 到 7.18.4（需验证 breaking changes）。
 
 ### 6.2 Python bandit SAST
 
@@ -166,8 +168,9 @@ cd backend-python && bandit -r src -f json
 
 **阻断阈值设定**：
 - HIGH: 0（发现即阻断 CI）
-- MEDIUM: ≤ 10（当前 5，需逐个评审）
+- MEDIUM: ≤ 10（当前 4，需逐个评审）
 - LOW: ≤ 50（当前 26）
+- npm audit moderate: 0（当前 2，PHASE104 修复）
 
 ### 6.3 Java OWASP Dependency Check
 
