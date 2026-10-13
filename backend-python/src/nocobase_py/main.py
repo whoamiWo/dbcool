@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from nocobase_py import __version__
 from nocobase_py.config import get_settings
-from nocobase_py.routers import ai, backup, connectors, health, integration, tasks
+from nocobase_py.routers import ai, alerts, backup, connectors, health, integration, tasks
 
 logger = logging.getLogger("nocobase_py")
 
@@ -194,6 +194,9 @@ def create_app() -> FastAPI:
     app.include_router(connectors.router)
     app.include_router(integration.router)
     app.include_router(tasks.router)
+
+    # PHASE104 T7.3: AlertManager webhook 接收
+    app.include_router(alerts.router)
 
     return app
 

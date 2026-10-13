@@ -1,5 +1,5 @@
 # ============================================================
-#  NocoBase Compose 可观测性最小集（PHASE100 T7）
+#  NocoBase Compose 可观测性最小集（PHASE100 T7 / PHASE104 T7.3）
 #
 #  用法：
 #    docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
@@ -7,6 +7,8 @@
 #  组成：
 #    - Prometheus（抓取 Java /actuator/prometheus）
 #    - 告警规则（服务 down / 5xx 比例 / P99 延迟）
+#    - AlertManager（告警路由 → webhook/email）
+#    - Grafana（面板：QPS/错误率/延迟分位数）
 #
 #  ⚠️ 未部署 OTel Collector：application.yml 的 tracing.otlp.endpoint
 #     指向 http://localhost:4318/v1/traces，Compose 下无 collector 时
@@ -43,6 +45,77 @@ services:
         limits:
           memory: 512M
 
+  # ============================================================
+  #  AlertManager（PHASE104 T7.3）—— 告警路由 + 通知
+  # ============================================================
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: nocobase-alertmanager
+    ports:
+      # 仅监听 127.0.0.1
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanagerdata:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--cluster.listen-address='
+    networks:
+      - nocobase-net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ============================================================
+  #  Grafana（PHASE104 T7.3）—— 面板可视化
+  # ============================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nocobase-grafana
+    ports:
+      # 仅监听 127.0.0.1
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      # 默认账号 admin/admin，首次登录强制改密
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      # 匿名访问关闭（面板含业务指标，不得公开）
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./observability/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    networks:
+      - nocobase-net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
 volumes:
   prometheusdata:
     name: nocobase-prometheusdata
+  alertmanagerdata:
+    name: nocobase-alertmanagerdata
+  grafanadata:
+    name: nocobase-grafanadata
+
+networks:
+  nocobase-net:
+    name: nocobase-net
+    driver: bridge
