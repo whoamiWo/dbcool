@@ -75,36 +75,20 @@ async def alert_webhook(payload: AlertPayload, background_tasks: BackgroundTasks
     """AlertManager 回调端点。
 
     - 同步落盘告警到 SQLite（不丢失）
-    - 后台推送 webhook（若配置了 ALERT_WEBHOOK_URL）
+    - 后台推送 webhook（预留接口，待 webhook 服务完善后启用）
     """
     if not payload.version or not payload.receiver:
         raise HTTPException(status_code=400, detail="Invalid payload structure")
 
     count = persist_alert(payload)
 
-    # 后台推送二次通知（若已配置 webhook）
-    try:
-        from nocobase_py.services.webhook import get_pusher
-
-        pusher = get_pusher()
-        if pusher is not None and pusher.config.is_configured():
-            for alert in payload.alerts:
-                labels = alert.get("labels", {})
-                annotations = alert.get("annotations", {})
-                background_tasks.add_task(
-                    pusher.push,
-                    {
-                        "kind": f"alertmanager.{labels.get('alertname', 'unknown')}",
-                        "user_id": None,
-                        "detail": {
-                            "severity": labels.get("severity", "unknown"),
-                            "summary": annotations.get("summary", ""),
-                            "description": annotations.get("description", ""),
-                        },
-                    },
-                )
-    except Exception as e:  # noqa: BLE001
-        logger.warning("[alert] webhook 推送失败：%s", e)
+    # TODO: 待 webhook 服务完善后启用二次推送
+    # try:
+    #     from nocobase_py.services.webhook import get_pusher
+    #     pusher = get_pusher()
+    #     ...
+    # except Exception as e:
+    #     logger.warning("[alert] webhook 推送失败：%s", e)
 
     return {"status": "ok", "received": count}
 
