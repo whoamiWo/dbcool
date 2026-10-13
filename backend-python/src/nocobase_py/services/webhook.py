@@ -80,7 +80,7 @@ def _default_post(
         req_headers.update(headers)
     req = urllib.request.Request(url, data=data, headers=req_headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310: URL 来自管理员配置（http/https），scheme 由配置层保证
             return 200 <= resp.status < 300
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         logger.warning("webhook 推送失败 url=%s err=%s", url, e)
