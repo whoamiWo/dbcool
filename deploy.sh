@@ -81,7 +81,35 @@ deploy_prod() {
     log "启动全栈(包含前端 nginx)..."
     docker_cmd compose up -d --build
 
+    # PHASE104 T7.4: 启动可观测性栈（AlertManager + Grafana）
+    log "启动可观测性栈 (Prometheus + AlertManager + Grafana)..."
+    if [ -f docker-compose.observability.yml ]; then
+        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d alertmanager grafana
+        ok "可观测性栈已启动"
+        echo ""
+        echo -e "${CYAN}监控访问:${RESET}"
+        echo "  Grafana:    http://localhost:${GRAFANA_PORT:-3000}"
+        echo "  Prometheus: http://localhost:${PROMETHEUS_PORT:-9090}"
+        echo "  AlertMgr:   http://localhost:${ALERTMANAGER_PORT:-9093}"
+    else
+        warn "docker-compose.observability.yml 不存在，跳过可观测性栈"
+    fi
+
     echo ""
+
+    # PHASE104 T7.4: 演示模式也拉起可观测性栈
+    log "启动可观测性栈 (Prometheus + AlertManager + Grafana)..."
+    if [ -f docker-compose.observability.yml ]; then
+        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d alertmanager grafana
+        ok "可观测性栈已启动"
+        echo ""
+        echo -e "${CYAN}监控访问:${RESET}"
+        echo "  Grafana:    http://localhost:${GRAFANA_PORT:-3000}"
+        echo "  Prometheus: http://localhost:${PROMETHEUS_PORT:-9090}"
+        echo "  AlertMgr:   http://localhost:${ALERTMANAGER_PORT:-9093}"
+    else
+        warn "docker-compose.observability.yml 不存在，跳过可观测性栈"
+    fi
     ok "生产部署完成! (tag=$IMAGE_TAG)"
     echo ""
     echo -e "${CYAN}访问:${RESET}"
@@ -140,8 +168,7 @@ deploy_demo() {
     docker_cmd compose up -d --build
 
     echo ""
-    ok "演示部署完成!"
-    echo ""
+
     echo -e "${CYAN}访问:${RESET}"
     echo "  前端:    http://localhost:5173"
     echo "  Java:    http://localhost:8080"
