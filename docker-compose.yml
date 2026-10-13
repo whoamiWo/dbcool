@@ -297,6 +297,10 @@ services:
     volumes:
       # PHASE100 T6: 告警 SQLite 落命名卷，重启可恢复
       - alertsdata:/data
+      # PHASE101 T1: 备份文件落命名卷（不再是 /tmp/backups，容器重建不丢）
+      - backupsdata:/app/backups
+      # PHASE101 T1: 备份目录显式指向挂载点（默认 /tmp/backups 在容器重建后丢失）
+      BACKUP_DIR: /app/backups
     depends_on:
       - backend-java
     logging:
@@ -385,6 +389,9 @@ volumes:
   # PHASE100 T6: 告警 SQLite 持久化（命名卷，容器重建不丢）
   alertsdata:
     name: nocobase-alertsdata
+  # PHASE101 T1: 备份文件持久化（命名卷，容器重建不丢）
+  backupsdata:
+    name: nocobase-backupsdata
 
     logging:
       driver: json-file

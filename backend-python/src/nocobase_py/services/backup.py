@@ -65,7 +65,19 @@ _RETENTION_DAYS = int(os.environ.get("BACKUP_RETENTION_DAYS", "7"))
 
 
 def _now_stamp() -> str:
-    return datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    """秒级时间戳 + 同秒去重后缀。
+
+    PHASE101 T5: restore 前 snapshot 曾与待恢复备份同秒生成，
+    同名 tar.gz 被 "w:gz" 截断覆盖 —— 快照摧毁了恢复源（P0）。
+    现在同名时追加序号保证文件名唯一。
+    """
+    base = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    stamp = base
+    seq = 1
+    while (_BACKUP_DIR / f"backup_{stamp}.tar.gz").exists():
+        stamp = f"{base}_{seq}"
+        seq += 1
+    return stamp
 
 
 def _ensure_dir() -> Path:
@@ -293,6 +305,56 @@ def _restore_postgres(dump_bytes: bytes) -> bool:
         raise
 
 
+def _restore_redis(rdb_bytes: bytes) -> None:
+    """PHASE101 T4: 真恢复 Redis —— 把 rdb 装入 Redis 数据目录并重启加载。
+
+    原实现只是 `Path("dump.rdb").write_bytes(...)`，rdb 从未被 Redis 加载，
+    "恢复成功"是假的（红线 2）。
+
+    实现：docker cp rdb 到 redis 容器 /data/ → docker restart → 校验 key 数。
+
+    注意：与 `_redis_snapshot()` 去掉 docker 依赖不同，恢复阶段必须操作
+    Redis 容器（数据目录在容器内），docker exec 是唯一可靠途径。
+    """
+    import subprocess
+    import tempfile
+
+    container = os.environ.get("REDIS_CONTAINER", "nocobase-redis")
+    tmp = Path(tempfile.mkstemp(suffix=".rdb")[1])
+    tmp.write_bytes(rdb_bytes)
+
+    try:
+        # 1. 拷贝 rdb 进容器数据目录
+        cp = subprocess.run(["docker", "cp", str(tmp), f"{container}:/data/dump.rdb"],
+                            capture_output=True, timeout=60)
+        if cp.returncode != 0:
+            raise RuntimeError(f"docker cp failed: {cp.stderr.decode()[:200]}")
+
+        # 2. 重启 Redis 使其加载新 rdb
+        rst = subprocess.run(["docker", "restart", container],
+                             capture_output=True, timeout=120)
+        if rst.returncode != 0:
+            raise RuntimeError(f"docker restart failed: {rst.stderr.decode()[:200]}")
+
+        # 3. 校验：等待就绪后确认 key 数 > 0（证明数据真的加载了）
+        import time
+        for _ in range(30):
+            time.sleep(1)
+            chk = subprocess.run(
+                ["redis-cli", "-h", _REDIS_HOST, "-p", str(_REDIS_PORT), "DBSIZE"],
+                capture_output=True, timeout=10)
+            if chk.returncode == 0:
+                size = chk.stdout.decode().strip()
+                logger.info("[restore] Redis DBSIZE after reload: %s", size)
+                if size.isdigit() and int(size) > 0:
+                    return
+        # 没等到 key 数：不静默成功，抛错让上层记 warning
+        raise RuntimeError("Redis reloaded but DBSIZE=0 (no keys loaded)")
+
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def create_backup() -> dict[str, Any]:
     """创建全量备份。
 
@@ -440,13 +502,97 @@ def list_backups() -> list[dict[str, Any]]:
     return result
 
 
-def restore_backup(backup_id: str) -> dict[str, Any]:
+def _safe_extract(tar: tarfile.TarFile, member: tarfile.TarInfo, path: str = ".") -> str:
+    """PHASE101 T3: 安全解包 —— 防 tar 路径穿越（CWE-22）。
+
+    原实现直接 `tar.extract(m, path=".")`，恶意/损坏备份里的
+    `../../etc/cron.d/x` 这类成员名会写穿容器文件系统。
+
+    校验规则（任一不满足即拒绝）：
+      1. 规范化后的绝对路径必须仍在 dest 之内
+      2. 拒绝符号链接/硬链接成员（可被用于穿越）
+      3. 拒绝特殊文件（设备、FIFO）
+    """
+    if member.issym() or member.islnk():
+        raise RuntimeError(f"[restore] 拒绝解包链接成员（防路径穿越）: {member.name}")
+    if member.isdev():
+        raise RuntimeError(f"[restore] 拒绝解包设备文件: {member.name}")
+
+    dest_abs = Path(path).resolve()
+    target = (dest_abs / member.name).resolve()
+    if target != dest_abs and not str(target).startswith(str(dest_abs) + os.sep):
+        raise RuntimeError(f"[restore] 拒绝解包越界成员（防路径穿越）: {member.name} -> {target}")
+
+    tar.extract(member, path=path)
+    return str(target)
+
+
+def _dry_run_restore(backup_path: Path) -> dict[str, Any]:
+    """PHASE101 T5: 恢复 dry-run —— 校验备份可用性但不写任何系统。
+
+    校验项（全部真实可失败）：
+      1. tar 可打开（损坏文件立即失败）
+      2. postgresql dump 存在且非空（核心组件）
+      3. 全部成员通过路径穿越检查（复用 _safe_extract 的判定逻辑）
+      4. manifest.json 存在且可解析
+    """
+    checks: list[dict[str, Any]] = []
+
+    with tarfile.open(backup_path, "r:gz") as tar:
+        members = tar.getmembers()
+
+        pg = [m for m in members if m.name.startswith("postgresql/") and m.isfile()]
+        checks.append({
+            "check": "postgresql dump 存在",
+            "pass": bool(pg),
+            "detail": f"{len(pg)} file(s)",
+        })
+
+        mf = [m for m in members if m.name == "manifest.json"]
+        manifest_ok = False
+        if mf:
+            try:
+                data = tar.extractfile(mf[0])
+                if data:
+                    manifest = json.loads(data.read().decode("utf-8"))
+                    manifest_ok = "components" in manifest
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                manifest_ok = False
+        checks.append({"check": "manifest.json 可解析", "pass": manifest_ok,
+                       "detail": "components 字段存在" if manifest_ok else "缺失或损坏"})
+
+        # 路径穿越检查：不真解包，只做判定
+        traversal_bad: list[str] = []
+        for m in members:
+            if m.issym() or m.islnk() or m.isdev():
+                traversal_bad.append(m.name)
+                continue
+            resolved = (backup_path.parent / m.name).resolve()
+            root = backup_path.parent.resolve()
+            if not str(resolved).startswith(str(root) + os.sep):
+                traversal_bad.append(m.name)
+        checks.append({"check": "无路径穿越成员", "pass": not traversal_bad,
+                       "detail": f"bad: {traversal_bad[:3]}" if traversal_bad else f"{len(members)} members ok"})
+
+    return {
+        "backup_id": backup_path.stem,
+        "dry_run": True,
+        "would_restore": [c for c in ("postgresql", "sqlite", "media", "redis")
+                          if any(m.name.startswith(c + "/") for m in members)],
+        "checks": checks,
+        "all_pass": all(c["pass"] for c in checks),
+    }
+
+
+def restore_backup(backup_id: str, dry_run: bool = False) -> dict[str, Any]:
     """从备份恢复（覆盖 PostgreSQL + SQLite + media + redis）。
 
     返回恢复结果。
-    
+
     PHASE 58 P0-1：新增 PostgreSQL 恢复路径。
     PHASE 68 P0: 支持 manifest 验证 + warnings。
+    PHASE101 T5: 新增 dry_run（只校验备份可解包、不落库）与恢复前快照
+                 （真恢复前先自动备份当前库，失败可回退）。
     """
     backup_path = _BACKUP_DIR / f"{backup_id}.tar.gz"
     if not backup_path.exists():
@@ -456,6 +602,22 @@ def restore_backup(backup_id: str) -> dict[str, Any]:
     warnings: list[str] = []
     postgres_bytes: bytes | None = None
     rdb_bytes: bytes | None = None
+
+    # PHASE101 T5: dry-run —— 只校验备份完整性与可解包性，不写任何系统
+    if dry_run:
+        return _dry_run_restore(backup_path)
+
+    # PHASE101 T5: 恢复前快照 —— 真恢复前先备份当前库。
+    # 恢复会覆盖数据，若备份本身有问题，没有快照就等于双重灾难。
+    try:
+        snap = create_backup()
+        warnings.append(f"pre-restore snapshot: {snap['backup_id']}")
+        logger.info("[restore] pre-restore snapshot created: %s", snap["backup_id"])
+    except Exception as e:
+        # 快照失败不阻断恢复（用户可能就是要抢救），但必须显式告警
+        w = f"pre-restore snapshot FAILED (continue anyway): {e}"
+        warnings.append(w)
+        logger.warning("[restore] %s", w)
     
     with tarfile.open(backup_path, "r:gz") as tar:
         members = tar.getmembers()
@@ -467,13 +629,13 @@ def restore_backup(backup_id: str) -> dict[str, Any]:
                     postgres_bytes = data.read()
                     restored.append("postgresql")
             elif m.name.startswith("sqlite/"):
-                tar.extract(m, path=".")
+                _safe_extract(tar, m, path=".")
                 src = Path(m.name)
                 if src.exists():
                     src.rename(Path(m.name).name)
                     restored.append("sqlite")
             elif m.name.startswith("media/"):
-                tar.extract(m, path=".")
+                _safe_extract(tar, m, path=".")
                 restored.append("media")
             elif m.name.startswith("redis/"):
                 data = tar.extractfile(m)
@@ -500,10 +662,16 @@ def restore_backup(backup_id: str) -> dict[str, Any]:
         warnings.append(w)
         logger.warning("[restore] %s", w)
 
-    # 恢复 Redis
+    # 恢复 Redis（PHASE101 T4: 真恢复，不再只落盘）
     if rdb_bytes:
-        Path("dump.rdb").write_bytes(rdb_bytes)
-        logger.info("[restore] Redis dump.rdb restored (%d bytes)", len(rdb_bytes))
+        try:
+            _restore_redis(rdb_bytes)
+            logger.info("[restore] Redis restored successfully (%d bytes)", len(rdb_bytes))
+        except Exception as e:
+            # Redis 非关键组件：恢复失败不阻断整体，但必须显式告警（红线 2）
+            w = f"redis restore failed: {e}"
+            warnings.append(w)
+            logger.warning("[restore] %s", w)
     else:
         w = "redis: no data in backup"
         warnings.append(w)
@@ -539,8 +707,26 @@ def prune_old_backups(retention_days: int | None = None) -> int:
 
 
 def run_scheduled_backup() -> dict[str, Any] | None:
-    """定时备份入口（由 scheduler cron 调用）。"""
+    """定时备份入口（由 scheduler cron 调用）。
+
+    PHASE101 T6: 备份失败必须显式告警（此前异常直接抛给 scheduler，
+    只落一条 warning 日志，运维在告警面板看不到"备份挂了"）。
+    """
     logger.info("[backup] running scheduled backup")
-    result = create_backup()
-    prune_old_backups()
-    return result
+    try:
+        result = create_backup()
+        prune_old_backups()
+        return result
+    except Exception as e:  # noqa: BLE001
+        logger.error("[backup] scheduled backup FAILED: %s", e)
+        try:
+            from nocobase_py.services.alerts import get_collector
+
+            get_collector().emit(
+                kind="backup.scheduled_failed",
+                user_id=None,
+                detail={"error": str(e), "severity": "critical"},
+            )
+        except Exception:  # noqa: BLE001 告警失败不能掩盖原始异常
+            logger.warning("[backup] 告警发送失败（备份失败告警丢失）")
+        raise

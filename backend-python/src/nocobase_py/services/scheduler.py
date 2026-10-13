@@ -188,10 +188,27 @@ class BackgroundScheduler:
                 t.fn()
             except Exception:  # noqa: BLE001
                 logger.warning("调度任务 '%s' 失败:\n%s", t.name, traceback.format_exc())
+                # PHASE101 T6: 调度失败必须显式告警，不能只写日志
+                # （此前只 logger.warning，运维看不到告警面板 → 红线 2）
+                self._emit_task_failure(t.name)
             if t.interval is not None:
                 t.last_run = time.monotonic()
 
         return time.monotonic() + 0.5
+
+    @staticmethod
+    def _emit_task_failure(task_name: str) -> None:
+        """PHASE101 T6: 调度任务失败 → 告警面板 + webhook 外发。"""
+        try:
+            from nocobase_py.services.alerts import get_collector
+
+            get_collector().emit(
+                kind="scheduler.task_failed",
+                user_id=None,
+                detail={"task": task_name, "severity": "critical"},
+            )
+        except Exception:  # noqa: BLE001 告警本身失败不能反噬调度循环
+            logger.warning("[scheduler] 告警发送失败（任务 %s）", task_name)
 
 
 # ── 全局单例 + 预置任务 ────────────────────────────────────────────

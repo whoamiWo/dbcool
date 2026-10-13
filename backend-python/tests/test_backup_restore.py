@@ -101,6 +101,23 @@ def postgres_stubbed(monkeypatch):
     backup_service._restore_postgres = lambda dump_bytes: True
 
 
+@pytest.fixture
+def redis_restore_stubbed(monkeypatch):
+    """PHASE101 T4: stub Redis 真恢复（docker cp + restart），记录调用参数。
+
+    原 `test_redis_snapshot_restored` 断言 `work/dump.rdb` 被写出 —— 那是
+    **旧的假恢复**（只落盘不加载，红线 2）。T4 改为真恢复后，断言改为：
+    `_restore_redis` 被调用且收到备份里的 rdb 字节。
+    """
+    calls: list[bytes] = []
+
+    def _fake_restore(rdb_bytes: bytes) -> None:
+        calls.append(rdb_bytes)
+
+    backup_service._restore_redis = _fake_restore
+    return calls
+
+
 # ==================== 演练：完整闭环 ====================
 
 
@@ -133,18 +150,22 @@ class TestBackupRestoreDrill:
         assert "sqlite" in result["restored"]
         assert "media" in result["restored"]
 
-    def test_redis_snapshot_restored(self, workspace, redis_stubbed, postgres_stubbed):
+    def test_redis_snapshot_restored(self, workspace, redis_stubbed, postgres_stubbed, redis_restore_stubbed):
+        """PHASE101 T4: Redis 恢复必须走真恢复路径（docker cp + restart），不是只落盘。
+
+        旧断言 `work/dump.rdb` 存在 —— 那证明的只是"字节被写到当前目录"，
+        Redis 从未加载它，是假恢复。新断言：`_restore_redis` 被调用且收到
+        备份里的 rdb 字节（内容与 `_redis_snapshot()` 一致）。
+        """
         work, _ = workspace
         _make_db(work / "alerts.db")
         created = backup_service.create_backup()
 
-        dump = work / "dump.rdb"
-        dump.unlink(missing_ok=True)
+        result = backup_service.restore_backup(created["backup_id"])
 
-        backup_service.restore_backup(created["backup_id"])
-
-        assert dump.exists(), "Redis 快照未恢复"
-        assert dump.read_bytes() == FAKE_RDB
+        assert redis_restore_stubbed, "Redis 真恢复路径未被调用"
+        assert redis_restore_stubbed[0] == FAKE_RDB
+        assert "redis" in result["restored"]
 
     def test_restore_twice_is_idempotent(self, workspace, redis_stubbed, postgres_stubbed):
         """重复恢复不应报错，数据保持一致。"""
@@ -190,6 +211,85 @@ class TestBackupRestoreErrors:
             pass
 
         assert not outside.exists(), "路径穿越成员被解压到工作目录之外"
+
+    def test_dry_run_does_not_modify_system(self, workspace, redis_stubbed, postgres_stubbed):
+        """PHASE101 T5: dry_run=True 只校验备份可解包，不写任何系统。"""
+        work, _ = workspace
+        _make_db(work / "alerts.db")
+        created = backup_service.create_backup()
+
+        # 删除 SQLite 文件，模拟需要恢复的状态
+        (work / "alerts.db").unlink()
+
+        # dry-run 只返回校验结果，不恢复
+        result = backup_service.restore_backup(created["backup_id"], dry_run=True)
+
+        assert result["dry_run"] is True
+        assert "sqlite" in result["would_restore"], "dry-run 应识别出可恢复的 sqlite 组件"
+        assert result["all_pass"] is True, f"dry-run 校验未通过: {result['checks']}"
+        # 关键断言：dry-run 不得真正恢复数据
+        assert (work / "alerts.db").exists() is False, "dry-run 后 SQLite 被恢复了（不应发生）"
+
+    def test_pre_restore_snapshot_does_not_overwrite_target(self, workspace, redis_stubbed, postgres_stubbed):
+        """PHASE101 T5: pre-restore snapshot 不得覆盖待恢复的备份（同秒 P0 bug 修复验证）。
+
+        旧 bug: _now_stamp() 精度为秒，restore 内的 snapshot 与原备份同秒 → 同名 tar.gz
+        被 "w:gz" 截断覆盖，导致恢复源被销毁。
+
+        新行为：_now_stamp() 检测到同名时追加序号 (_1, _2...) 保证唯一性。
+        """
+        work, backups = workspace
+        _make_db(work / "alerts.db")
+        created = backup_service.create_backup()
+        original_tar = backups / f"{created['backup_id']}.tar.gz"
+
+        # 验证原备份存在
+        assert original_tar.exists(), "原备份文件不存在"
+
+        # 读取原备份的成员列表（用于后续对比）
+        import tarfile
+        with tarfile.open(original_tar, "r:gz") as t:
+            original_members = set(t.getnames())
+
+        # 删除 alerts.db 模拟需要恢复
+        (work / "alerts.db").unlink()
+
+        # 执行恢复（内部会创建 pre-restore snapshot）
+        result = backup_service.restore_backup(created["backup_id"])
+
+        # 验证原备份文件仍然存在且内容未变
+        assert original_tar.exists(), "原备份文件被 pre-restore snapshot 覆盖（P0 bug）"
+        with tarfile.open(original_tar, "r:gz") as t:
+            restored_members = set(t.getnames())
+        assert original_members == restored_members, "原备份内容被修改"
+
+        # 验证 sqlite 确实恢复了
+        assert (work / "alerts.db").exists(), "SQLite 未恢复"
+
+
+class TestScheduledBackupFailureAlert:
+    """PHASE101 T6: 定时备份失败必须显式告警。"""
+
+    def test_scheduled_backup_failure_emits_alert(self, workspace, redis_stubbed):
+        """当 create_backup 抛出异常时，run_scheduled_backup 应该 emit 告警。"""
+        work, _ = workspace
+        backup_service._postgres_dump = lambda: (_ for _ in ()).throw(RuntimeError("pg_dump failed"))
+
+        from nocobase_py.services.alerts import get_collector
+
+        collector = get_collector()
+
+        with pytest.raises(RuntimeError, match="pg_dump failed"):
+            backup_service.run_scheduled_backup()
+
+        # 断言：emit 了一条 critical 级别的 backup 告警
+        events = [e.to_dict() for e in collector._events]
+        alert_emitted = any(
+            e.get("kind") == "backup.scheduled_failed"
+            and e.get("detail", {}).get("severity") == "critical"
+            for e in events
+        )
+        assert alert_emitted, "备份失败没有 emit 告警（T6 P0）"
 
 
 # ==================== 备份清单 ====================
