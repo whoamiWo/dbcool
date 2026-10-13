@@ -105,14 +105,14 @@ build-frontend: ## 前端构建
 
 lint: ## 三栈 lint
 	@echo "$(CYAN)▶ Java Checkstyle$(RESET)"
-	cd backend-java && mvn checkstyle:check -q || true
+	cd backend-java && mvn checkstyle:check -q
 	@echo "$(CYAN)▶ Python$(RESET)"
 	cd backend-python && uv run ruff check . && uv run mypy .
 	@echo "$(CYAN)▶ Frontend$(RESET)"
 	cd frontend && pnpm lint && pnpm tsc --noEmit
 
 format: ## 三栈格式化
-	cd backend-java && mvn spotless:apply || true
+	cd backend-java && mvn spotless:apply
 	cd backend-python && uv run ruff format .
 	cd frontend && pnpm format
 

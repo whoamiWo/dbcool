@@ -41,9 +41,11 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Run Java tests (test profile, H2)
+      # PHASE103 T1: 改跑 `mvn verify`（而非 `mvn test`）—— JaCoCo 红线
+      # （BUNDLE ≥82%、audit 97% 等）绑定在 verify 阶段，只跑 test 等于红线永不生效。
+      - name: Run Java tests + verify (test profile, H2)
         working-directory: backend-java
-        run: mvn test -B -Dspring.profiles.active=test
+        run: mvn verify -B -Dspring.profiles.active=test
 
       - name: Upload Java coverage
         if: always()
@@ -319,6 +321,7 @@ jobs:
       - name: Cleanup Java process
         if: always()
         run: |
+          # T2 例外：cleanup 步骤允许失败（进程可能不存在），不影响门禁结论
           if [ -f /tmp/java.pid ]; then
             kill $(cat /tmp/java.pid) 2>/dev/null || true
           fi
