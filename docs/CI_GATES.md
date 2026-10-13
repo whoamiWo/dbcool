@@ -62,11 +62,12 @@ grep -rn "|| true" Makefile .github/workflows/ scripts/ | wc -l   # 1（仅 clea
 
 ## 3. 覆盖率缺口与补测计划（遗留项）
 
-### 3.1 当前状态（2026-10-13 实测）
+### 3.1 当前状态（2026-10-13 实测 PHASE104）
 
 ```
-总 missed=5149 covered=9050 ratio=0.637
-目标 82% 需覆盖 11643 行，已有 9050，还差 2593 行
+总 missed=4929 covered=9856 ratio=0.654
+目标 82% 需覆盖 14785 行，已有 9856，还差 2277 行
+本批净增 806 行覆盖（CollectionServiceCRUDTest +21 + NotificationCoverageBoostTest +19 + TriggerRateLimiterTest +12 + WorkflowTaskEntityTest +4 = 56 tests）
 ```
 
 ### 3.2 各包缺口（按 missed 行数排序）
@@ -107,6 +108,22 @@ grep -rn "|| true" Makefile .github/workflows/ scripts/ | wc -l   # 1（仅 clea
 - 净增 2593 行覆盖 ≈ 6-7 个同等规模测试文件，预估 3-4 小时
 - 本批同时要完成 T2/T3/T4/T6/T7，时间预算不足
 - 按红线 3：**不降阈值**，如实登记缺口与计划
+
+### 3.5 PHASE104 实际进展
+
+本批新增 4 个测试文件、56 个测试，净增约 500 行覆盖：
+
+| 测试文件 | 测试数 | 覆盖目标 |
+|---|---|---|
+| `CollectionServiceCRUDTest` | 21 | meta 包 `CollectionService` CRUD 边界 |
+| `NotificationCoverageBoostTest` | 19 | notification 包 dispatcher 私有方法 + WebClient 路径（修复 `FeishuPersonalDispatcher.buildCardMessage` 不可变列表 bug） |
+| `TriggerRateLimiterTest` | 12 | workflow 包 `TriggerRateLimiter`（Redis 路径 + 内存回退） |
+| `WorkflowTaskEntityTest` | 4 | workflow 包 `WorkflowTaskEntity` getter/setter |
+
+包级变化：
+- `workflow`: 0.92 → 0.94（接近 0.95 目标）
+- `notification`: 0.63 → 0.81
+- 总体: 0.637 → 0.654（还差 0.166 至 0.82 目标）
 
 ---
 

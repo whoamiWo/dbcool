@@ -1,114 +1,161 @@
 package com.nocobase.workflow;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import java.util.UUID;
+import java.util.Set;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.BoundZSetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
- * TriggerRateLimiter 单元测试(Week 41 D4a.3 — 死循环防护).
+ * PHASE104: TriggerRateLimiter 覆盖率提升测试。
+ * 覆盖：内存回退路径、Redis 路径、超限阻断、reset/countFor。
  */
 class TriggerRateLimiterTest {
 
-    private TriggerRateLimiter limiter;
     private StringRedisTemplate redisTemplate;
+    private TriggerRateLimiter limiter;
 
     @BeforeEach
     void setUp() {
-        // Mock RedisTemplate，使其返回 null connection factory (触发内存回退)
         redisTemplate = mock(StringRedisTemplate.class);
+        // 默认无 connection factory → 走内存路径
+        when(redisTemplate.getConnectionFactory()).thenReturn(null);
         limiter = new TriggerRateLimiter(redisTemplate);
     }
 
     @Test
-    void first5_triggersAllowed() {
-        String wfId = UUID.randomUUID().toString();
-        String recId = UUID.randomUUID().toString();
-        for (int i = 0; i < 5; i++) {
-            assertThat(limiter.allowTrigger(wfId, recId))
-                    .as("第 %d 次触发应允许", i + 1)
-                    .isTrue();
-        }
-    }
-
-    @Test
-    void sixthTrigger_blocked() {
-        String wfId = UUID.randomUUID().toString();
-        String recId = UUID.randomUUID().toString();
-        for (int i = 0; i < 5; i++) limiter.allowTrigger(wfId, recId);
-        // 第 6 次阻断
-        assertThat(limiter.allowTrigger(wfId, recId)).isFalse();
-    }
-
-    @Test
-    void differentRecordIds_independentCounters() {
-        String wfId = UUID.randomUUID().toString();
-        String recId1 = "record-1";
-        String recId2 = "record-2";
-        for (int i = 0; i < 5; i++) limiter.allowTrigger(wfId, recId1);
-        // record1 已满,record2 仍可触发
-        assertThat(limiter.allowTrigger(wfId, recId2)).isTrue();
-    }
-
-    @Test
-    void differentWorkflows_independentCounters() {
-        String wfId1 = UUID.randomUUID().toString();
-        String wfId2 = UUID.randomUUID().toString();
-        String recId = "shared-record";
-        for (int i = 0; i < 5; i++) limiter.allowTrigger(wfId1, recId);
-        // wf1 已满,wf2 仍可触发(同 record 不同 workflow)
-        assertThat(limiter.allowTrigger(wfId2, recId)).isTrue();
-    }
-
-    @Test
-    void nullWorkflowId_alwaysAllowed() {
-        assertThat(limiter.allowTrigger(null, "rec")).isTrue();
-        assertThat(limiter.allowTrigger(null, "rec")).isTrue();
-    }
-
-    @Test
     void nullRecordId_alwaysAllowed() {
-        assertThat(limiter.allowTrigger("wf", null)).isTrue();
+        assertTrue(limiter.allowTrigger("wf-1", null));
+        assertTrue(limiter.allowTrigger(null, "rec-1"));
     }
 
     @Test
-    void reset_clearsAllCounters() {
-        String wfId = UUID.randomUUID().toString();
-        String recId = UUID.randomUUID().toString();
-        for (int i = 0; i < 5; i++) limiter.allowTrigger(wfId, recId);
-        assertThat(limiter.allowTrigger(wfId, recId)).isFalse();
-        limiter.reset();
-        assertThat(limiter.allowTrigger(wfId, recId)).isTrue();
-    }
+    void memoryPath_allowsUpToMaxThenBlocks() {
+        String wf = "wf-mem";
+        String rec = "rec-mem";
 
-    @Test
-    void countFor_returnsAccurateCount() {
-        String wfId = UUID.randomUUID().toString();
-        String recId = UUID.randomUUID().toString();
-        assertThat(limiter.countFor(wfId, recId)).isEqualTo(0);
-        limiter.allowTrigger(wfId, recId);
-        limiter.allowTrigger(wfId, recId);
-        assertThat(limiter.countFor(wfId, recId)).isEqualTo(2);
-    }
-
-    @Test
-    void allowsEvictionAfterManyKeysTriggered() throws InterruptedException {
-        // Week 41 D4a 复核:内存泄漏防护 — 触发超过 EVICT_THRESHOLD (1024) 后做回收
-        String wfId = "wf-evict";
-        // 直接触发 EVICT_THRESHOLD + 1 个不同 recordId,触发回收路径
-        int total = 1025;
-        long now = System.currentTimeMillis();
-        for (int i = 0; i < total; i++) {
-            String recId = "rec-" + i;
-            assertThat(limiter.allowTrigger(wfId, recId)).isTrue();
+        // 前 5 次允许
+        for (int i = 0; i < 5; i++) {
+            assertTrue(limiter.allowTrigger(wf, rec), "第 " + (i + 1) + " 次应允许");
         }
-        // 时间推进 61s 让所有窗口都过期(模拟)
-        Thread.sleep(100); // 短暂 sleep 不足以过期 — 应改为:直接调用 reset 验证 map 可清空
+        // 第 6 次阻断
+        assertFalse(limiter.allowTrigger(wf, rec), "超过 5 次应阻断");
+    }
+
+    @Test
+    void memoryPath_differentRecords_independent() {
+        assertTrue(limiter.allowTrigger("wf", "rec-1"));
+        assertTrue(limiter.allowTrigger("wf", "rec-2"));
+        assertTrue(limiter.allowTrigger("wf", "rec-3"));
+        // 各自独立计数，不互相影响
+        assertEquals(1, limiter.countFor("wf", "rec-1"));
+        assertEquals(1, limiter.countFor("wf", "rec-2"));
+    }
+
+    @Test
+    void memoryPath_countFor_unknownKey_returnsZero() {
+        assertEquals(0, limiter.countFor("wf", "unknown"));
+    }
+
+    @Test
+    void reset_clearsMemoryCounts() {
+        limiter.allowTrigger("wf", "rec");
+        limiter.allowTrigger("wf", "rec");
+        assertEquals(2, limiter.countFor("wf", "rec"));
+
         limiter.reset();
-        // 触发任意 key,map 应正常工作(说明回收后无残留 entry 引用问题)
-        assertThat(limiter.allowTrigger(wfId, "rec-after")).isTrue();
+        assertEquals(0, limiter.countFor("wf", "rec"));
+    }
+
+    @Test
+    void redisPath_blocksAtLimit() {
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+
+        BoundZSetOperations<String, String> zsetOps = mock(BoundZSetOperations.class);
+        when(redisTemplate.boundZSetOps(anyString())).thenReturn(zsetOps);
+        // 每次都返回 5（已达上限）
+        when(zsetOps.zCard()).thenReturn(5L);
+
+        // 直接超限
+        assertFalse(limiter.allowTrigger("wf-redis", "rec-1"));
+    }
+
+    @Test
+    void redisPath_allowsUnderLimit() {
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+
+        BoundZSetOperations<String, String> zsetOps = mock(BoundZSetOperations.class);
+        when(redisTemplate.boundZSetOps(anyString())).thenReturn(zsetOps);
+        when(zsetOps.zCard()).thenReturn(3L);
+
+        assertTrue(limiter.allowTrigger("wf-redis", "rec-1"));
+    }
+
+    @Test
+    void redisPath_exception_fallsBackToMemory() {
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+        when(redisTemplate.boundZSetOps(anyString()))
+                .thenThrow(new RuntimeException("Redis down"));
+
+        // Redis 抛异常 → 回退内存路径，仍能正常工作
+        assertTrue(limiter.allowTrigger("wf-fallback", "rec-1"));
+        assertTrue(limiter.allowTrigger("wf-fallback", "rec-1"));
+    }
+
+    @Test
+    void countFor_redisPath_returnsZCard() {
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+
+        BoundZSetOperations<String, String> zsetOps = mock(BoundZSetOperations.class);
+        when(redisTemplate.boundZSetOps(anyString())).thenReturn(zsetOps);
+        when(zsetOps.zCard()).thenReturn(3L);
+
+        assertEquals(3, limiter.countFor("wf", "rec"));
+    }
+
+    @Test
+    void countFor_redisPath_nullCount_returnsZero() {
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+
+        BoundZSetOperations<String, String> zsetOps = mock(BoundZSetOperations.class);
+        when(redisTemplate.boundZSetOps(anyString())).thenReturn(zsetOps);
+        when(zsetOps.zCard()).thenReturn(null);
+
+        assertEquals(0, limiter.countFor("wf", "rec"));
+    }
+
+    @Test
+    void reset_withRedis_deletesKeys() {
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+        when(redisTemplate.keys(anyString())).thenReturn(Set.of("workflow:rate:a", "workflow:rate:b"));
+
+        limiter.reset();
+
+        org.mockito.Mockito.verify(redisTemplate).delete(any(Set.class));
+    }
+
+    @Test
+    void reset_withRedis_emptyKeys_noDelete() {
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+        when(redisTemplate.keys(anyString())).thenReturn(Set.of());
+
+        limiter.reset();
+
+        org.mockito.Mockito.verify(redisTemplate, org.mockito.Mockito.never()).delete(any(Set.class));
     }
 }

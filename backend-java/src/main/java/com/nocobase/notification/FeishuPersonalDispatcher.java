@@ -132,23 +132,25 @@ public class FeishuPersonalDispatcher implements NotificationDispatcher {
         String content = (String) payload.getOrDefault("content", "");
         String link = (String) payload.get("link");
 
-        var card = Map.of(
-                "tag", "lark_card",
-                "header", Map.of("title", title),
-                "elements", java.util.Arrays.asList(
-                        Map.of("tag", "markdown", "content", content)
-                )
-        );
+        var elements = new java.util.ArrayList<Map<String, Object>>(java.util.Arrays.asList(
+                Map.of("tag", "markdown", "content", content)
+        ));
 
         if (link != null) {
-            var action = Map.of(
+            var action = Map.<String, Object>of(
                     "tag", "button",
                     "text", Map.of("tag", "plain_text", "content", "查看详情"),
                     "url", link,
                     "type", "primary"
             );
-            ((java.util.List) card.get("elements")).add(action);
+            elements.add(action);
         }
+
+        var card = Map.<String, Object>of(
+                "tag", "lark_card",
+                "header", Map.of("title", title),
+                "elements", elements
+        );
 
         return Map.of("msg_type", "interactive", "card", card);
     }
