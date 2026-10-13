@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.nocobase.integration.dingtalk.DingTalkAppService;
 import com.nocobase.integration.feishu.FeishuAppService;
 import com.nocobase.integration.mattermost.MattermostAppService;
+import com.nocobase.integration.credential.TenantCredentialService;
 import com.nocobase.audit.AuditService;
 import com.nocobase.ratelimit.GlobalRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +30,7 @@ class DefaultSecurityRegressionTest {
 
     @Test
     void feishu_verifySignature_returnsFalse_whenEncryptKeyMissing() throws Exception {
-        FeishuAppService mockService = Mockito.spy(new FeishuAppService());
+        FeishuAppService mockService = Mockito.spy(new FeishuAppService(Mockito.mock(TenantCredentialService.class)));
         Field f = FeishuAppService.class.getDeclaredField("encryptKey");
         f.setAccessible(true);
         f.set(mockService, null);
@@ -41,7 +42,7 @@ class DefaultSecurityRegressionTest {
 
     @Test
     void feishu_verifySignature_returnsFalse_whenEncryptKeyBlank() throws Exception {
-        FeishuAppService mockService = Mockito.spy(new FeishuAppService());
+        FeishuAppService mockService = Mockito.spy(new FeishuAppService(Mockito.mock(TenantCredentialService.class)));
         Field f = FeishuAppService.class.getDeclaredField("encryptKey");
         f.setAccessible(true);
         f.set(mockService, "");

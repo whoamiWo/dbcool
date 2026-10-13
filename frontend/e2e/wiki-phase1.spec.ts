@@ -52,7 +52,9 @@ test.describe('Wiki Phase 1 E2E', () => {
     await page.goto('/wiki/search');
     await page.waitForLoadState('networkidle');
     await page.getByPlaceholder(/搜索/).fill('测试');
-    await page.getByRole('button', { name: '搜索' }).click();
+    // PHASE98 修复：全局搜索按钮的 aria-label 是"全局搜索"，包含"搜索"子串，
+    // 导致 getByRole('button', { name: '搜索' }) 匹配到 2 个元素。用 exact 精确匹配。
+    await page.getByRole('button', { name: '搜索', exact: true }).click();
     await expect(page.locator('text=测试文档')).toBeVisible();
   });
 });

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
+import com.nocobase.integration.credential.TenantCredentialService;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
@@ -26,7 +27,7 @@ class DingTalkAppServiceTest {
         userRepo = mock(UserRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
         when(passwordEncoder.encode(any())).thenAnswer(inv -> "encoded_" + inv.getArgument(0));
-        service = new DingTalkAppService(userRepo, passwordEncoder);
+        service = new DingTalkAppService(userRepo, passwordEncoder, mock(TenantCredentialService.class));
         // Set app-key/secret via reflection to enable isConfigured()
         setField(service, "appKey", "testAppKey");
         setField(service, "appSecret", "testAppSecret");

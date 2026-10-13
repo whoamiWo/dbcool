@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.im.ImMessageRepository;
 import com.nocobase.integration.common.InboundMessageService;
+import com.nocobase.integration.credential.TenantCredentialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,10 @@ public class SlackAppService {
     @Value("${slack.default-channel-id:}")
     private String defaultChannelId;
 
+    /** PHASE99 T1: 租户级凭证服务（优先于全局 @Value） */
+    private final TenantCredentialService credentialService;
+
+    // 以下 @Value 字段保留为**回退默认值**：租户级未配置时使用，存量部署零破坏
     @Value("${slack.client-id:}")
     private String clientId;
 
@@ -53,25 +58,55 @@ public class SlackAppService {
     /** 存储已安装的 Slack 工作区配置 */
     private final Map<String, SlackWorkspaceConfig> workspaces = new ConcurrentHashMap<>();
 
-    public SlackAppService(InboundMessageService inboundMessageService) {
+    public SlackAppService(InboundMessageService inboundMessageService,
+                           TenantCredentialService credentialService) {
         this.inboundMessageService = inboundMessageService;
+        this.credentialService = credentialService;
+    }
+
+    /**
+     * 按 key 解析凭证：租户级优先，回退全局 @Value。
+     *
+     * @param tenantId 租户 ID；传 null 时只取全局（用于无租户上下文的场景）
+     */
+    private Optional<String> resolveForKey(String key, String tenantId) {
+        if (tenantId != null && !tenantId.isBlank()) {
+            Optional<String> tenantVal = credentialService.get(tenantId, "slack", key);
+            if (tenantVal.isPresent()) {
+                return tenantVal;
+            }
+        }
+        // 回退全局 @Value
+        String fallback = switch (key) {
+            case "client-id" -> clientId;
+            case "client-secret" -> clientSecret;
+            case "redirect-uri" -> redirectUri;
+            case "signing-secret" -> signingSecret;
+            case "bot-token" -> botToken;
+            case "team-id" -> teamId;
+            default -> null;
+        };
+        return (fallback != null && !fallback.isBlank()) ? Optional.of(fallback) : Optional.empty();
     }
 
     public String getOAuthUrl() {
-        if (clientId == null || clientId.isBlank()) {
+        String clientId = resolveForKey("client-id", null).orElse("");
+        if (clientId.isBlank()) {
             throw new IllegalStateException("Slack client-id 未配置");
         }
+        String redirect = resolveForKey("redirect-uri", null).orElse("");
         String url = "https://slack.com/oauth/v2/authorize" +
                 "?client_id=" + clientId +
                 "&scope=chat:write,commands,im:write" +
                 "&user_scope=" +
-                "&redirect_uri=" + redirectUri;
+                "&redirect_uri=" + redirect;
         return url;
     }
 
     public Map<String, Object> handleOAuthCallback(String code) throws Exception {
-        if (clientId == null || clientId.isBlank()
-                || clientSecret == null || clientSecret.isBlank()) {
+        String clientId = resolveForKey("client-id", null).orElse("");
+        String clientSecret = resolveForKey("client-secret", null).orElse("");
+        if (clientId.isBlank() || clientSecret.isBlank()) {
             throw new IllegalStateException("Slack OAuth 凭证未配置");
         }
 
@@ -80,8 +115,9 @@ public class SlackAppService {
         params.put("client_id", clientId);
         params.put("client_secret", clientSecret);
         params.put("code", code);
-        if (redirectUri != null && !redirectUri.isBlank()) {
-            params.put("redirect_uri", redirectUri);
+        String redirect = resolveForKey("redirect-uri", null).orElse("");
+        if (!redirect.isBlank()) {
+            params.put("redirect_uri", redirect);
         }
 
         JsonNode resp = restTemplate.postForObject(
@@ -170,20 +206,20 @@ public class SlackAppService {
     }
 
     public boolean isConfigured() {
-        return clientId != null && !clientId.isBlank() &&
-               clientSecret != null && !clientSecret.isBlank() &&
-               signingSecret != null && !signingSecret.isBlank();
+        return resolveForKey("client-id", null).isPresent()
+                && resolveForKey("client-secret", null).isPresent()
+                && resolveForKey("signing-secret", null).isPresent();
     }
 
     public String getSigningSecret() {
-        return signingSecret;
+        return resolveForKey("signing-secret", null).orElse("");
     }
 
     public String getBotToken() {
-        return botToken;
+        return resolveForKey("bot-token", null).orElse("");
     }
 
     public String getTeamId() {
-        return teamId;
+        return resolveForKey("team-id", null).orElse("");
     }
 }

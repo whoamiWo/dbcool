@@ -74,7 +74,9 @@ class InboundMessageServiceIntegrationTest {
         channelId = UUID.randomUUID();
         service = new InboundMessageService(
                 messageRepository, memberRepository, bridge, externalMessageLogRepository,
-                externalUserMappingRepository, userRepository, passwordEncoder);
+                externalUserMappingRepository, userRepository, passwordEncoder,
+                // PHASE99 T3: 入站消息审计依赖，非被测主路径，mock 隔离
+                org.mockito.Mockito.mock(com.nocobase.audit.AuditService.class));
         ReflectionTestUtils.setField(service, "defaultChannelId", channelId.toString());
         ReflectionTestUtils.setField(service, "inboundEnabled", true);
         ReflectionTestUtils.setField(service, "autoProvisionUser", false);
@@ -121,7 +123,9 @@ class InboundMessageServiceIntegrationTest {
      * 因此需显式设置默认租户，否则落库时 tenant_id 为 null 触发非空约束。
      */
     private SlackAppService newSlackService() {
-        SlackAppService slack = new SlackAppService(service);
+        // PHASE99 T1: 传入 mock 的 TenantCredentialService（非被测主路径）
+        SlackAppService slack = new SlackAppService(service,
+                org.mockito.Mockito.mock(com.nocobase.integration.credential.TenantCredentialService.class));
         ReflectionTestUtils.setField(slack, "defaultTenantId", TENANT);
         return slack;
     }

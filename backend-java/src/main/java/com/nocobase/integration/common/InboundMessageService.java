@@ -1,5 +1,6 @@
 package com.nocobase.integration.common;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.im.ImChannelMemberRepository;
 import com.nocobase.im.ImMessageRepository;
 import com.nocobase.im.entity.ImMessageEntity;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,6 +41,8 @@ public class InboundMessageService {
     private final ExternalUserMappingRepository externalUserMappingRepository;
     private final com.nocobase.auth.UserRepository userRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    /** PHASE99 T3: 入站消息审计 */
+    private final AuditService auditService;
 
     @Value("${integration.inbound.default-channel-id:}")
     private String defaultChannelId;
@@ -58,7 +62,8 @@ public class InboundMessageService {
                                   ExternalMessageLogRepository externalMessageLogRepository,
                                   ExternalUserMappingRepository externalUserMappingRepository,
                                   com.nocobase.auth.UserRepository userRepository,
-                                  org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
+                                  org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
+                                  AuditService auditService) {
         this.messageRepository = messageRepository;
         this.memberRepository = memberRepository;
         this.bridge = bridge;
@@ -66,6 +71,7 @@ public class InboundMessageService {
         this.externalUserMappingRepository = externalUserMappingRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditService = auditService;
     }
 
     /**
@@ -139,6 +145,19 @@ public class InboundMessageService {
         // 6. 记录外部消息 ID 以防重复
         ExternalMessageLogEntity logEntry = new ExternalMessageLogEntity(externalSource, externalMessageId, tenantId);
         externalMessageLogRepository.save(logEntry);
+
+        // PHASE99 T3: 入站消息审计（对外 SaaS 客户安全问卷必答项：能否追溯第三方数据来源）
+        // 注意：入站消息无本地用户，userId 传 null（AuditService 会写 "anonymous"），
+        // 外部身份放 payload 里保证可追溯。
+        auditService.log(tenantId, null, "external:" + externalUserId,
+                "integration.inbound", "integration", externalSource,
+                Map.of(
+                        "externalUserId", externalUserId == null ? "" : externalUserId,
+                        "externalMessageId", externalMessageId,
+                        "channelId", channelId.toString(),
+                        "senderId", senderId.toString(),
+                        "senderName", senderName == null ? "" : senderName
+                ));
 
         // 7. 广播到前端
         bridge.broadcast(StompDestinations.channelTopic(tenantId, channelId), saved);

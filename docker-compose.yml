@@ -173,6 +173,10 @@ services:
       RATELIMIT_FILEUPLOAD_LIMIT: ${RATELIMIT_FILEUPLOAD_LIMIT:-10}
       # 入站消息默认落到的频道（InboundMessageService#resolveTargetChannel）
       INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID: ${INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID:-}
+      # PHASE99 T1: 集成凭证加密主密钥（AES-256，Base64 编码 32 字节）
+      # 生成：openssl rand -base64 32
+      # 未配置时 CredentialCryptoService 启动即失败（红线 1：禁止硬编码密钥）
+      INTEGRATION_CREDENTIAL_MASTER_KEY: ${INTEGRATION_CREDENTIAL_MASTER_KEY:-}
     ports:
       - "${JAVA_PORT:-8080}:8080"
     depends_on:

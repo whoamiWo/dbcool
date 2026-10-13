@@ -2,6 +2,7 @@ package com.nocobase.integration.feishu;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.integration.credential.TenantCredentialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,9 +13,8 @@ import org.springframework.web.client.RestTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
+import java.util.*;
 import java.util.HexFormat;
-import java.util.Map;
 
 /**
  * 飞书应用服务：OAuth2、事件处理、配置管理。
@@ -23,6 +23,10 @@ import java.util.Map;
 public class FeishuAppService {
     private static final Logger log = LoggerFactory.getLogger(FeishuAppService.class);
 
+    /** PHASE99 T1: 租户级凭证服务（优先于全局 @Value） */
+    private final TenantCredentialService credentialService;
+
+    // 以下 @Value 字段保留为**回退默认值**：租户级未配置时使用，存量部署零破坏
     @Value("${feishu.app-id:}")
     private String appId;
 
@@ -40,12 +44,54 @@ public class FeishuAppService {
 
     private static final String BASE_URL = "https://open.feishu.cn/open-apis";
 
+    public FeishuAppService(TenantCredentialService credentialService) {
+        this.credentialService = credentialService;
+    }
+
+    /**
+     * 按 key 解析凭证：租户级优先，回退全局 @Value。
+     *
+     * @param tenantId 租户 ID；传 null 时只取全局（用于无租户上下文的场景）
+     */
+    private Optional<String> resolveForKey(String key, String tenantId) {
+        if (tenantId != null && !tenantId.isBlank()) {
+            Optional<String> tenantVal = credentialService.get(tenantId, "feishu", key);
+            if (tenantVal.isPresent()) {
+                return tenantVal;
+            }
+        }
+        // 回退全局 @Value
+        String fallback = switch (key) {
+            case "app-id" -> appId;
+            case "app-secret" -> appSecret;
+            case "redirect-uri" -> redirectUri;
+            case "encrypt-key" -> encryptKey;
+            default -> null;
+        };
+        return (fallback != null && !fallback.isBlank()) ? Optional.of(fallback) : Optional.empty();
+    }
+
+    /** 兼容旧签名：无租户上下文时只取全局配置 */
+    public String getAppId() {
+        return resolveForKey("app-id", null).orElse("");
+    }
+
+    public String getAppSecret() {
+        return resolveForKey("app-secret", null).orElse("");
+    }
+
+    public String getEncryptKey() {
+        return resolveForKey("encrypt-key", null).orElse("");
+    }
+
     public String getOAuthUrl() {
-        if (appId == null || appId.isBlank()) {
+        String appId = resolveForKey("app-id", null).orElse("");
+        if (appId.isBlank()) {
             throw new IllegalStateException("飞书 app-id 未配置");
         }
+        String redirect = resolveForKey("redirect-uri", null).orElse("");
         String url = BASE_URL + "/auth/v3/auth/url?app_id=" + appId +
-                "&redirect_uri=" + redirectUri +
+                "&redirect_uri=" + redirect +
                 "&scope=im:message:send_as_bot,im:message:send_internal";
         return url;
     }
@@ -99,8 +145,8 @@ public class FeishuAppService {
     }
 
     public boolean isConfigured() {
-        return appId != null && !appId.isBlank() &&
-               appSecret != null && !appSecret.isBlank();
+        return resolveForKey("app-id", null).isPresent()
+                && resolveForKey("app-secret", null).isPresent();
     }
 
     /**
@@ -114,7 +160,8 @@ public class FeishuAppService {
             log.warn("[Feishu] 签名校验：缺少必填参数(timestamp/nonce/signature)");
             return false;
         }
-        if (encryptKey == null || encryptKey.isBlank()) {
+        String encryptKey = resolveForKey("encrypt-key", null).orElse("");
+        if (encryptKey.isBlank()) {
             log.warn("[Feishu] 签名校验：encrypt-key 未配置，拒绝请求");
             return false;
         }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.nocobase.integration.common.InboundMessageService;
+import com.nocobase.integration.credential.TenantCredentialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +19,7 @@ class SlackAppServiceTest {
     @BeforeEach
     void setUp() {
         inboundMessageService = mock(InboundMessageService.class);
-        service = new SlackAppService(inboundMessageService);
+        service = new SlackAppService(inboundMessageService, mock(TenantCredentialService.class));
         setField(service, "clientId", "testClientId");
         setField(service, "clientSecret", "testClientSecret");
         setField(service, "redirectUri", "https://example.com/callback");

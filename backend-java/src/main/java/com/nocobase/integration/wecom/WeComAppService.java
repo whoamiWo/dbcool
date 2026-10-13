@@ -2,6 +2,7 @@ package com.nocobase.integration.wecom;
 
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
+import com.nocobase.integration.credential.TenantCredentialService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +18,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -39,6 +41,10 @@ public class WeComAppService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** PHASE99 T1: 租户级凭证服务（优先于全局 @Value） */
+    private final TenantCredentialService credentialService;
+
+    // 以下 @Value 字段保留为**回退默认值**：租户级未配置时使用，存量部署零破坏
     @Value("${wecom.corp-id:}")
     private String corpId;
 
@@ -55,22 +61,55 @@ public class WeComAppService {
     private volatile String cachedToken;
     private volatile long cachedTokenExpireAt = 0;
 
-    public WeComAppService(UserRepository userRepository, PasswordEncoder passwordEncoder, RestTemplate restTemplate) {
+    public WeComAppService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                           RestTemplate restTemplate, TenantCredentialService credentialService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.restTemplate = restTemplate;
+        this.credentialService = credentialService;
     }
 
-    public String getCorpId() { return corpId; }
-    public String getAgentId() { return agentId; }
-    public String getSecret() { return secret; }
+    /**
+     * 按 key 解析凭证：租户级优先，回退全局 @Value。
+     *
+     * @param tenantId 租户 ID；传 null 时只取全局（用于无租户上下文的场景）
+     */
+    private Optional<String> resolveForKey(String key, String tenantId) {
+        if (tenantId != null && !tenantId.isBlank()) {
+            Optional<String> tenantVal = credentialService.get(tenantId, "wecom", key);
+            if (tenantVal.isPresent()) {
+                return tenantVal;
+            }
+        }
+        // 回退全局 @Value
+        String fallback = switch (key) {
+            case "corp-id" -> corpId;
+            case "agent-id" -> agentId;
+            case "secret" -> secret;
+            case "redirect-uri" -> redirectUri;
+            default -> null;
+        };
+        return (fallback != null && !fallback.isBlank()) ? Optional.of(fallback) : Optional.empty();
+    }
+
+    public String getCorpId() {
+        return resolveForKey("corp-id", null).orElse("");
+    }
+
+    public String getAgentId() {
+        return resolveForKey("agent-id", null).orElse("");
+    }
+
+    public String getSecret() {
+        return resolveForKey("secret", null).orElse("");
+    }
 
     /** 是否已配置企业微信应用凭证。 */
     public boolean isConfigured() {
-        return corpId != null && !corpId.isBlank()
-                && agentId != null && !agentId.isBlank()
-                && secret != null && !secret.isBlank()
-                && redirectUri != null && !redirectUri.isBlank();
+        return resolveForKey("corp-id", null).isPresent()
+                && resolveForKey("agent-id", null).isPresent()
+                && resolveForKey("secret", null).isPresent()
+                && resolveForKey("redirect-uri", null).isPresent();
     }
 
     /**
@@ -81,6 +120,11 @@ public class WeComAppService {
         long now = System.currentTimeMillis();
         if (cachedToken != null && now < cachedTokenExpireAt) {
             return cachedToken;
+        }
+        String corpId = resolveForKey("corp-id", null).orElse("");
+        String secret = resolveForKey("secret", null).orElse("");
+        if (corpId.isBlank() || secret.isBlank()) {
+            throw new IllegalStateException("企业微信 corp-id 或 secret 未配置");
         }
         String url = "https://qyapi.weixin.qq.com/cgi-bin/gettoken" +
                 "?corpid=" + corpId + "&corpsecret=" + secret;

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
+import com.nocobase.integration.credential.TenantCredentialService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -39,7 +41,10 @@ public class DingTalkAppService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    /** PHASE99 T1: 租户级凭证服务（优先于全局 @Value） */
+    private final TenantCredentialService credentialService;
 
+    // 以下 @Value 字段保留为**回退默认值**：租户级未配置时使用，存量部署零破坏
     @Value("${dingtalk.app-key:}")
     private String appKey;
 
@@ -52,27 +57,64 @@ public class DingTalkAppService {
     @Value("${dingtalk.redirect-uri:}")
     private String redirectUri;
 
-    public DingTalkAppService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public DingTalkAppService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                              TenantCredentialService credentialService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.credentialService = credentialService;
     }
 
-    /** 是否已配置钉钉应用凭证。 */
-    public boolean isConfigured() {
-        return appKey != null && !appKey.isBlank()
-                && appSecret != null && !appSecret.isBlank();
+    /** 是否已配置钉钉应用凭证（租户级或全局任一即可）。 */
+    public boolean isConfigured(String tenantId) {
+        return resolveForKey("app-key", tenantId).isPresent()
+                && resolveForKey("app-secret", tenantId).isPresent();
     }
-    
+
+    /** 兼容旧签名：无租户上下文时只取全局配置 */
+    public boolean isConfigured() {
+        return isConfigured(null);
+    }
+
+    /**
+     * 按 key 解析凭证：租户级优先，回退全局 @Value。
+     *
+     * @param tenantId 租户 ID；传 null 时只取全局（用于无租户上下文的场景）
+     */
+    private Optional<String> resolveForKey(String key, String tenantId) {
+        if (tenantId != null && !tenantId.isBlank()) {
+            Optional<String> tenantVal = credentialService.get(tenantId, "dingtalk", key);
+            if (tenantVal.isPresent()) {
+                return tenantVal;
+            }
+        }
+        // 回退全局 @Value
+        String fallback = switch (key) {
+            case "app-key" -> appKey;
+            case "app-secret" -> appSecret;
+            case "agent-id" -> agentId;
+            case "redirect-uri" -> redirectUri;
+            default -> null;
+        };
+        return (fallback != null && !fallback.isBlank()) ? Optional.of(fallback) : Optional.empty();
+    }
+
     /** 获取 appSecret（用于签名校验）。 */
+    public String getAppSecret(String tenantId) {
+        return resolveForKey("app-secret", tenantId).orElse("");
+    }
+
+    /** 兼容旧签名：无租户上下文时只取全局配置 */
     public String getAppSecret() {
-        return appSecret;
+        return getAppSecret(null);
     }
 
     /** 生成钉钉扫码授权 URL。 */
     public String getAuthUrl(String state, String tenantId) {
+        String key = resolveForKey("app-key", tenantId).orElse("");
+        String redirect = resolveForKey("redirect-uri", tenantId).orElse("");
         return "https://login.dingtalk.com/oauth2/auth?" +
-                "client_id=" + appKey +
-                "&redirect_uri=" + redirectUri +
+                "client_id=" + key +
+                "&redirect_uri=" + redirect +
                 "&response_type=code" +
                 "&scope=openid" +
                 "&state=" + (state == null ? "" : state) +
@@ -86,7 +128,7 @@ public class DingTalkAppService {
      */
     @Transactional
     public Map<String, Object> exchangeCode(String code, String tenantId) {
-        if (!isConfigured()) {
+        if (!isConfigured(tenantId)) {
             return Map.of("code", 500,
                     "message", "钉钉应用未配置(dingtalk.app-key / app-secret)", "data", Map.of());
         }
@@ -96,6 +138,8 @@ public class DingTalkAppService {
 
         try {
             // 1) 换 access_token(openid / unionid)
+            String appKey = resolveForKey("app-key", tenantId).orElse("");
+            String appSecret = resolveForKey("app-secret", tenantId).orElse("");
             String tokenUrl = "https://oapi.dingtalk.com/connect/oauth2/access_token" +
                     "?appid=" + appKey + "&secret=" + appSecret +
                     "&code=" + code + "&grant_type=authorization_code";
@@ -176,7 +220,7 @@ public class DingTalkAppService {
 
     /** 组织架构同步入口(全量拉取通讯录并按需建号)。 */
     public Map<String, Object> syncOrganization(String tenantId) {
-        if (!isConfigured()) {
+        if (!isConfigured(tenantId)) {
             return Map.of("code", 500, "message", "钉钉应用未配置", "data", Map.of());
         }
         // 当前范围:单用户建号能力已由 syncUserFromDingTalk 提供(登录即同步);
@@ -189,10 +233,10 @@ public class DingTalkAppService {
     /** 微应用配置(供前端/运维核对)。 */
     public Map<String, Object> getAppConfig() {
         return Map.of(
-                "appKey", appKey == null ? "" : appKey,
-                "agentId", agentId == null ? "" : agentId,
-                "redirectUri", redirectUri == null ? "" : redirectUri,
-                "configured", isConfigured()
+                "appKey", resolveForKey("app-key", null).orElse(""),
+                "agentId", resolveForKey("agent-id", null).orElse(""),
+                "redirectUri", resolveForKey("redirect-uri", null).orElse(""),
+                "configured", isConfigured(null)
         );
     }
 

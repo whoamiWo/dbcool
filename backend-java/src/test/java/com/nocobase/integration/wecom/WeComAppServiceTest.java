@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
+import com.nocobase.integration.credential.TenantCredentialService;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,8 @@ class WeComAppServiceTest {
         passwordEncoder = mock(PasswordEncoder.class);
         when(passwordEncoder.encode(anyString())).thenAnswer(inv -> "encoded_" + inv.getArgument(0));
         restTemplate = mock(RestTemplate.class);
-        service = new WeComAppService(userRepository, passwordEncoder, restTemplate);
+        service = new WeComAppService(userRepository, passwordEncoder, restTemplate,
+                mock(TenantCredentialService.class));
         setField(service, "corpId", "testCorpId");
         setField(service, "agentId", "12345");
         setField(service, "secret", "testSecret");

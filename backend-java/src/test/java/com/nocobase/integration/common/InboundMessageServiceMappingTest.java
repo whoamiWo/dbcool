@@ -60,7 +60,9 @@ class InboundMessageServiceMappingTest {
 
         service = new InboundMessageService(
                 messageRepository, memberRepository, bridge, externalMessageLogRepository,
-                mappingRepository, userRepository, new BCryptPasswordEncoder());
+                mappingRepository, userRepository, new BCryptPasswordEncoder(),
+                // PHASE99 T3: 入站消息审计依赖，mock 隔离
+                mock(com.nocobase.audit.AuditService.class));
         ReflectionTestUtils.setField(service, "inboundEnabled", true);
         ReflectionTestUtils.setField(service, "autoProvisionUser", false);
     }

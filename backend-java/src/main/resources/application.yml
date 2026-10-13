@@ -56,6 +56,12 @@ server:
   port: ${JAVA_PORT:8080}
   shutdown: graceful
 
+# PHASE99 T1: 集成凭证加密密钥（环境变量注入，禁止硬编码）
+# 生成方式：openssl rand -base64 32
+integration:
+  credential:
+    master-key: ""
+
 # JWT 配置
 app:
   # R09: 连接池监控参数
@@ -192,6 +198,10 @@ ratelimit:
     window-seconds: 60
   file-upload:
     limit: 10
+    window-seconds: 60
+  # PHASE99 T2: 第三方回调入站限流（匿名放行端点防刷）
+  inbound:
+    limit: 60
     window-seconds: 60
 
 # PHASE69: MinIO 配置 (app.storage.minio prefix for @ConfigurationProperties)

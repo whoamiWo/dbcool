@@ -30,6 +30,16 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
     private static final Pattern IM_SEND_PATTERN = Pattern.compile("^/api/im/messages$");
     private static final Pattern UPLOAD_PATTERN = Pattern.compile("^/api/upload$");
 
+    /**
+     * PHASE99 T2: 第三方回调入站端点（匿名放行，必须限流）。
+     *
+     * <p>匹配 /api/{slack|dingtalk|feishu|wecom|mattermost}/events 与
+     * /api/dingtalk/approval-callback 等回调。这些端点对外暴露后无任何保护，
+     * 任何人拿到地址即可打爆服务。
+     */
+    private static final Pattern INBOUND_PATTERN = Pattern.compile(
+            "^/api/(slack|dingtalk|feishu|wecom|mattermost)/(events|approval-callback)$");
+
     public GlobalRateLimitFilter(GlobalRateLimiter rateLimiter, GlobalRateLimitProperties properties,
                                   TenantQuotaService tenantQuotaService, TenantRepository tenantRepository) {
         this.rateLimiter = rateLimiter;
@@ -64,24 +74,38 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
         // 压测 109301 个请求，配额拦截数为 0）。
         // 已移到 TenantQuotaFilter（注册在 JwtAuthFilter 之后）执行。
 
-        String key = buildKey(request, path);
         int limit;
         int windowSeconds;
+        String key;
 
         if (LOGIN_PATTERN.matcher(path).matches()) {
             limit = properties.getLogin().getLimit();
             windowSeconds = properties.getLogin().getWindowSeconds();
+            key = buildKey(request, path);
         } else if (IM_SEND_PATTERN.matcher(path).matches() && "POST".equals(request.getMethod())) {
             limit = properties.getIm().getLimit();
             windowSeconds = properties.getIm().getWindowSeconds();
+            key = buildKey(request, path);
         } else if (UPLOAD_PATTERN.matcher(path).matches() && "POST".equals(request.getMethod())) {
             // 存储配额同样不在这里检查（原因同 API 配额：此刻拿不到 tenantId），
             // 已移到 TenantQuotaFilter。
             limit = properties.getFileUpload().getLimit();
             windowSeconds = properties.getFileUpload().getWindowSeconds();
+            key = buildKey(request, path);
         } else {
-            filterChain.doFilter(request, response);
-            return;
+            // PHASE99 T2: 第三方回调入站限流（匿名放行端点）。
+            // 维度：来源 IP + provider（取路径里的 provider 段），
+            // 避免同一 IP 打多个 provider 时互相挤兑，也让"某 provider 被恶意刷"可单独定位。
+            var inboundMatcher = INBOUND_PATTERN.matcher(path);
+            if (inboundMatcher.matches()) {
+                String provider = inboundMatcher.group(1);
+                limit = properties.getInbound().getLimit();
+                windowSeconds = properties.getInbound().getWindowSeconds();
+                key = "inbound:" + request.getRemoteAddr() + ":" + provider;
+            } else {
+                filterChain.doFilter(request, response);
+                return;
+            }
         }
 
         if (!rateLimiter.allowRequest(key, limit, windowSeconds)) {

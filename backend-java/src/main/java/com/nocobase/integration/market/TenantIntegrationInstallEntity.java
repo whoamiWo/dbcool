@@ -1,6 +1,8 @@
 package com.nocobase.integration.market;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -32,7 +34,14 @@ public class TenantIntegrationInstallEntity {
     @Column(name = "status", nullable = false, length = 20)
     private String status = "INSTALLED";
 
+    /**
+     * PHASE99 T3: 加 @JdbcTypeCode(SqlTypes.JSON) —— 此前只有 columnDefinition="jsonb"，
+     * Hibernate 6 会把 String 以 character varying 绑定，PostgreSQL 直接报
+     * "column config_json is of type jsonb but expression is of type character varying"，
+     * 导致安装端点从来是 500（存量 bug，PHASE99 要求安装审计时暴露）。
+     */
     @Column(name = "config_json", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String configJson = "{}";
 
     @Column(name = "installed_by")

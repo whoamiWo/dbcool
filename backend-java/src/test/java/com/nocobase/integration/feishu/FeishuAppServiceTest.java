@@ -3,6 +3,7 @@ package com.nocobase.integration.feishu;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.nocobase.integration.credential.TenantCredentialService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -18,7 +19,7 @@ class FeishuAppServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FeishuAppService();
+        service = new FeishuAppService(mock(TenantCredentialService.class));
         setField(service, "appId", "testAppId");
         setField(service, "appSecret", "testAppSecret");
         setField(service, "redirectUri", "https://example.com/callback");

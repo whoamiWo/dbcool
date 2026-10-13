@@ -1,5 +1,6 @@
 package com.nocobase.integration.market;
 
+import com.nocobase.audit.AuditService;
 import com.nocobase.plugin.PluginManifest;
 import com.nocobase.plugin.PluginRegistry;
 import org.slf4j.Logger;
@@ -37,11 +38,15 @@ public class IntegrationMarketService {
 
     private final PluginRegistry pluginRegistry;
     private final TenantIntegrationInstallRepository installRepository;
+    /** PHASE99 T3: 集成安装/卸载审计 */
+    private final AuditService auditService;
 
     public IntegrationMarketService(PluginRegistry pluginRegistry,
-                                     TenantIntegrationInstallRepository installRepository) {
+                                     TenantIntegrationInstallRepository installRepository,
+                                     AuditService auditService) {
         this.pluginRegistry = pluginRegistry;
         this.installRepository = installRepository;
+        this.auditService = auditService;
     }
 
     /** 市场列表：内置渠道 + 已注册插件，附带本租户安装状态。 */
@@ -103,6 +108,10 @@ public class IntegrationMarketService {
                 );
                 install.setInstalledBy(userId);
                 installRepository.save(install);
+                // PHASE99 T3: 安装审计（对外 SaaS 客户安全问卷必答项）
+                auditService.log(tenantId, userId, null,
+                        "integration.install", "integration", appId,
+                        Map.of("appName", appName, "kind", "builtin"));
                 return Map.of("code", 0, "message", "installed",
                         "data", Map.of("id", appId, "installed", true, "name", appName));
             }
@@ -117,6 +126,11 @@ public class IntegrationMarketService {
         );
         install.setInstalledBy(userId);
         installRepository.save(install);
+        // PHASE99 T3: 安装审计
+        auditService.log(tenantId, userId, null,
+                "integration.install", "integration", appId,
+                Map.of("appName", manifest.name(), "kind", "plugin",
+                        "version", manifest.version() == null ? "" : manifest.version()));
         return Map.of("code", 0, "message", "installed",
                 "data", Map.of(
                         "id", manifest.name(),
@@ -146,6 +160,11 @@ public class IntegrationMarketService {
         if (existing.isPresent()) {
             installRepository.delete(existing.get());
         }
+
+        // PHASE99 T3: 卸载审计（无论是否实际安装都记录操作意图）
+        auditService.log(tenantId, null, null,
+                "integration.uninstall", "integration", appId,
+                Map.of("tenantId", tenantId, "wasInstalled", existing.isPresent()));
 
         // 内置渠道
         for (Map<String, Object> c : BUILTIN_CHANNELS) {
