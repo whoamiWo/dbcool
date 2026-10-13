@@ -25,6 +25,45 @@ def get_trace_id() -> str:
     return _trace_id_var.get()
 
 
+def setup_logging() -> None:
+    """PHASE100 T5: 结构化日志 —— 每条日志自动带上当前请求的 traceId。
+
+    默认文本格式 `[req:<traceId>] message`；设 LOG_JSON=1 时输出 JSON。
+    """
+    use_json = os.getenv("LOG_JSON", "").lower() in ("1", "true", "yes")
+
+    class TraceIdFormatter(logging.Formatter):
+        def format(self, record: logging.LogRecord) -> str:
+            trace_id = _trace_id_var.get()
+            if not use_json:
+                msg = super().format(record)
+                return f"[req:{trace_id}] {msg}" if trace_id else msg
+            import json
+
+            data = {
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+                "request_id": trace_id or None,
+            }
+            if record.exc_info:
+                data["exception"] = self.formatException(record.exc_info)
+            return json.dumps(data, ensure_ascii=False)
+
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        root.removeHandler(h)
+    handler = logging.StreamHandler()
+    handler.setFormatter(TraceIdFormatter())
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+    # uvicorn 自带访问日志，降噪到 WARNING
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+
+
+setup_logging()
+
+
 async def trace_id_middleware(request: Request, call_next):
     """PHASE100 T5: traceId 贯通 —— 沿用上游 X-Request-ID，否则生成；响应头回写."""
     trace_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16]
