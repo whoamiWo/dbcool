@@ -229,5 +229,8 @@ export default function (data) {
     check(trig, { 'workflow triggered': (r) => r.status === 200 || r.status === 404 });
   }
 
-  sleep(1);
+  // PHASE102 T3：去掉固定 sleep(1)（客户端限速会让 QPS≈VUS，测不出服务端拐点）。
+  // 如需模拟思考时间，用环境变量 THINK_TIME（秒）显式指定。
+  const think = Number(__ENV.THINK_TIME || 0);
+  if (think > 0) sleep(think);
 }

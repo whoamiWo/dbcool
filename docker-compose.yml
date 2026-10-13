@@ -292,6 +292,8 @@ services:
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
       ALERT_WEBHOOK_KIND: ${ALERT_WEBHOOK_KIND:-generic}
       ALERT_WEBHOOK_SECRET: ${ALERT_WEBHOOK_SECRET:-}
+      # PHASE101 T1: 备份目录显式指向挂载点（默认 /tmp/backups 在容器重建后丢失）
+      BACKUP_DIR: /app/backups
     ports:
       - "${PYTHON_PORT:-8000}:8000"
     volumes:
@@ -299,8 +301,6 @@ services:
       - alertsdata:/data
       # PHASE101 T1: 备份文件落命名卷（不再是 /tmp/backups，容器重建不丢）
       - backupsdata:/app/backups
-      # PHASE101 T1: 备份目录显式指向挂载点（默认 /tmp/backups 在容器重建后丢失）
-      BACKUP_DIR: /app/backups
     depends_on:
       - backend-java
     logging:
