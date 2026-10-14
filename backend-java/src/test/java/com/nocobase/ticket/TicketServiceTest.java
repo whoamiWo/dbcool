@@ -3,6 +3,7 @@ package com.nocobase.ticket;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -81,5 +82,60 @@ class TicketServiceTest {
                 .matches(e -> ((org.springframework.web.server.ResponseStatusException) e).getStatusCode() == FORBIDDEN);
         // Status should remain unchanged (default OPEN)
         assertThat(t.getStatus()).isEqualTo(TicketEntity.Status.OPEN);
+    }
+
+    @Test
+    void createTicket_persistAndReturn() {
+        when(ticketRepository.save(any(TicketEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TicketEntity out = service.createTicket("t1", "sess1", "Alice", "alice@example.com", "Bug report");
+        assertThat(out.getTenantId()).isEqualTo("t1");
+        assertThat(out.getSessionId()).isEqualTo("sess1");
+        assertThat(out.getCustomerName()).isEqualTo("Alice");
+        assertThat(out.getCustomerEmail()).isEqualTo("alice@example.com");
+        assertThat(out.getMessage()).isEqualTo("Bug report");
+        assertThat(out.getStatus()).isEqualTo(TicketEntity.Status.OPEN);
+    }
+
+    @Test
+    void saveMessage_newSession_createsTicket() {
+        when(ticketRepository.findBySessionIdAndTenantId("sessX", "tX")).thenReturn(List.of());
+        when(ticketRepository.save(any(TicketEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TicketEntity out = service.saveMessage("sessX", "tX", UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), "Hi", "u@x.com");
+        assertThat(out.getTenantId()).isEqualTo("tX");
+        assertThat(out.getSessionId()).isEqualTo("sessX");
+        assertThat(out.getCustomerEmail()).isEqualTo("u@x.com");
+        assertThat(out.getMessage()).isEqualTo("Hi");
+        assertThat(out.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    void saveMessage_existingSession_updatesMessagePreservesEmail() {
+        TicketEntity existing = new TicketEntity();
+        existing.setTenantId("tY");
+        existing.setSessionId("sessY");
+        existing.setCustomerEmail("old@email.com");
+        existing.setCustomerName("OldUser");
+        when(ticketRepository.findBySessionIdAndTenantId("sessY", "tY")).thenReturn(List.of(existing));
+        when(ticketRepository.save(any(TicketEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TicketEntity out = service.saveMessage("sessY", "tY", null, "New message", "new@email.com");
+        assertThat(out.getCustomerEmail()).isEqualTo("old@email.com"); // preserved
+        assertThat(out.getCustomerName()).isEqualTo("OldUser"); // preserved
+        assertThat(out.getMessage()).isEqualTo("New message");
+    }
+
+    @Test
+    void findTicketById_found() {
+        TicketEntity t = ticketOf("tZ");
+        when(ticketRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        TicketEntity found = service.findTicketById(t.getId());
+        assertThat(found).isSameAs(t);
+    }
+
+    @Test
+    void findTicketById_notFound_throws() {
+        when(ticketRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.findTicketById(UUID.randomUUID()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Ticket not found");
     }
 }
