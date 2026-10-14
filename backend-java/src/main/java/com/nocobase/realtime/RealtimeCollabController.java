@@ -115,7 +115,7 @@ public class RealtimeCollabController {
         return null;
     }
 
-    private static String str(Object v) {
+    static String str(Object v) {
         if (v == null) return null;
         String s = String.valueOf(v);
         return s.isBlank() ? null : s;

@@ -50,14 +50,14 @@ public class StompHandshakeInterceptor implements HandshakeInterceptor {
             return false;
         }
 
-        Claims claims = jwtService.parseAccessToken(token);
-        if (claims == null) {
-            log.warn("[ws] 握手拒绝:token 无效或已过期");
-            response.setStatusCode(HttpStatus.UNAUTHORIZED);
-            return false;
-        }
-
         try {
+            Claims claims = jwtService.parseAccessToken(token);
+            if (claims == null) {
+                log.warn("[ws] 握手拒绝:token 无效或已过期");
+                response.setStatusCode(HttpStatus.UNAUTHORIZED);
+                return false;
+            }
+
             UUID userId = UUID.fromString(claims.getSubject());
             String username = claims.get("username", String.class);
             String tenantId = claims.get("tid", String.class);
