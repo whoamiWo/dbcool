@@ -11,7 +11,11 @@ from nocobase_py.services.alert_store import get_store
 
 logger = logging.getLogger("nocobase_py.alerts")
 
-router = APIRouter(prefix="/alerts", tags=["alerts"])
+# PHASE104 审计修正：前缀必须带 /api，与项目其他路由一致
+# （ai=/api/ai、health=/api、backup=/api/admin/backup、tasks=/api/tasks）。
+# 此前写成 /alerts，导致 AlertManager 配置的 http://backend-python:8000/api/alerts/webhook
+# 实际 404 —— 告警永远送不到（该缺陷只有真跑才会暴露）。
+router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
 
 class AlertPayload(BaseModel):

@@ -92,6 +92,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/events").permitAll()
                         // Actuator: 生产 profile 下仅 health 匿名，其他需要认证
                         .requestMatchers("/actuator/health").permitAll()
+                        // PHASE104 审计修正：Prometheus 的 scrape 是匿名 HTTP GET，无法携带 JWT。
+                        // 实测 /actuator/prometheus 返回 401 → Prometheus 抓取目标永远 down，
+                        // 5xx / P99 告警规则取不到数据，整个监控链路空转。
+                        // 此处**仅**放行 metrics 端点；/actuator/env、/actuator/heapdump 等
+                        // 敏感端点仍由下一行 /actuator/** 要求认证。
+                        .requestMatchers("/actuator/prometheus").permitAll()
                         .requestMatchers("/actuator/**").authenticated()
                         // 统一实时消息总线:WS 握手无法携带 Authorization 头,
                         // 鉴权交由 StompHandshakeInterceptor 在握手阶段完成。

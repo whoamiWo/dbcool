@@ -78,6 +78,14 @@ RUN mkdir -p /app/.cache/huggingface && chown -R 1000:1000 /app/.cache
 
 # 非 root
 RUN useradd -m -u 1000 nocobase
+
+# PHASE104 审计修正：命名卷挂载点必须先由 root 建好并赋权。
+# 容器以 uid=1000 运行，若镜像内不存在这些目录，Docker 会在首次挂载时
+# 以 root 创建，导致应用无写权限 —— 实测表现为
+#   "告警持久化初始化失败: unable to open database file"（/data/alerts.db）
+# 目录属主会被命名卷继承，故此处 chown 后挂载即可写。
+RUN mkdir -p /data /app/backups && chown -R 1000:1000 /data /app/backups
+
 USER nocobase
 
 EXPOSE 8000

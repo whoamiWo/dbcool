@@ -81,10 +81,13 @@ deploy_prod() {
     log "启动全栈(包含前端 nginx)..."
     docker_cmd compose up -d --build
 
-    # PHASE104 T7.4: 启动可观测性栈（AlertManager + Grafana）
+    # PHASE104 审计修正：prometheus 必须一并启动。
+    # Grafana 数据源 url 为 http://prometheus:9090，而 prometheus 只定义在
+    # docker-compose.observability.yml（主 compose 无此服务），且三服务间无
+    # depends_on，故不显式拉起则数据源不可达、面板无数据。
     log "启动可观测性栈 (Prometheus + AlertManager + Grafana)..."
     if [ -f docker-compose.observability.yml ]; then
-        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d alertmanager grafana
+        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d prometheus alertmanager grafana
         ok "可观测性栈已启动"
         echo ""
         echo -e "${CYAN}监控访问:${RESET}"
@@ -96,20 +99,6 @@ deploy_prod() {
     fi
 
     echo ""
-
-    # PHASE104 T7.4: 演示模式也拉起可观测性栈
-    log "启动可观测性栈 (Prometheus + AlertManager + Grafana)..."
-    if [ -f docker-compose.observability.yml ]; then
-        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d alertmanager grafana
-        ok "可观测性栈已启动"
-        echo ""
-        echo -e "${CYAN}监控访问:${RESET}"
-        echo "  Grafana:    http://localhost:${GRAFANA_PORT:-3000}"
-        echo "  Prometheus: http://localhost:${PROMETHEUS_PORT:-9090}"
-        echo "  AlertMgr:   http://localhost:${ALERTMANAGER_PORT:-9093}"
-    else
-        warn "docker-compose.observability.yml 不存在，跳过可观测性栈"
-    fi
     ok "生产部署完成! (tag=$IMAGE_TAG)"
     echo ""
     echo -e "${CYAN}访问:${RESET}"
@@ -166,6 +155,22 @@ deploy_demo() {
 
     log "启动全栈(暴露所有端口便于调试)..."
     docker_cmd compose up -d --build
+
+    # PHASE104 审计修正：deploy_demo 此前完全没有可观测性块
+    # （原 deploy_prod 内那段重复代码的注释写着"演示模式"，但其实一直留在 prod 里）。
+    # 此处补上，并显式拉起 prometheus 以保证 Grafana 数据源可达。
+    log "启动可观测性栈 (Prometheus + AlertManager + Grafana)..."
+    if [ -f docker-compose.observability.yml ]; then
+        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d prometheus alertmanager grafana
+        ok "可观测性栈已启动"
+        echo ""
+        echo -e "${CYAN}监控访问:${RESET}"
+        echo "  Grafana:    http://localhost:${GRAFANA_PORT:-3000}"
+        echo "  Prometheus: http://localhost:${PROMETHEUS_PORT:-9090}"
+        echo "  AlertMgr:   http://localhost:${ALERTMANAGER_PORT:-9093}"
+    else
+        warn "docker-compose.observability.yml 不存在，跳过可观测性栈"
+    fi
 
     echo ""
 

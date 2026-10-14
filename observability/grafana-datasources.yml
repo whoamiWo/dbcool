@@ -1,9 +1,13 @@
 # ============================================================
-#  Grafana 配置（PHASE104 T7.3）—— 数据源 + 初始化面板
+#  Grafana 数据源配置（PHASE104 T7.3 / PHASE104 审计修正）
 #
-#  默认账号：admin / admin（首次登录后强制修改）
-#  数据源：Prometheus（自动创建）
+#  ⚠️ 本文件只含 datasources —— 挂载到 provisioning/datasources/。
+#     dashboards / dashboardProviders 属于 dashboard provider schema，
+#     Grafana **不会**从本路径读取这两个字段（此前误放在此导致面板不导入）。
+#     面板 provider 已移至同目录 dashboards/dashboards.yml。
 # ============================================================
+
+apiVersion: 1
 
 datasources:
   - name: Prometheus
@@ -14,20 +18,3 @@ datasources:
     editable: true
     jsonData:
       timeInterval: '30s'
-
-# Dashboard 导入（JSON 文件放在 grafana/dashboards/）
-dashboards:
-  - name: 'NocoBase Overview'
-    orgId: 1
-    folder: 'NocoBase'
-    type: file
-    file: /etc/grafana/provisioning/dashboards/nocobase-overview.json
-    allowUiUpdates: true
-
-dashboardProviders:
-  - name: 'default'
-    orgId: 1
-    folder: ''
-    type: file
-    options:
-      path: /etc/grafana/provisioning/dashboards

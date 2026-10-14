@@ -11,7 +11,14 @@ license = { text = "MIT" }
 
 dependencies = [
     # Web 框架
-    "fastapi>=0.115.0",
+    # PHASE104 审计修正：此前误判"fastapi 0.141 存在路由注册 bug"并声称降级，
+    # 实则 (1) 误用了 app.routes[].path —— fastapi >=0.142 起路由嵌套在
+    # _IncludedRouter 内，该属性不再平铺可取；(2) 当时本地是 fastapi 0.141.1
+    # 与 starlette 1.7.0 的不兼容组合。功能测试（TestClient 真调用）证明
+    # 0.115.12 与 0.142.2 下 /alerts/webhook、/alerts/list 均正常返回 200。
+    # 项目无 uv.lock，故在此加**上限约束**保证可复现：锁定已验证的 0.142.x，
+    # 排除未经本项目验证的未来版本。
+    "fastapi>=0.115.0,<0.143.0",
     "uvicorn[standard]>=0.32.0",
     # 数据校验
     "pydantic>=2.9.0",
@@ -24,7 +31,9 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "asyncpg>=0.30.0",
     # CORS
-    "starlette>=0.41.0",
+    # 与 fastapi 版本配套：1.7.0 已随 fastapi 0.142.2 验证（容器内实测 healthy），
+    # 上限排除未验证的未来大版本。见上方 fastapi 注释（PHASE104 审计修正）。
+    "starlette>=0.41.0,<2.0.0",
     # Redis (R11 多副本一致性必需)
     "redis[hiredis]>=5.2.0",
     # Form data 解析 (Mattermost outgoing webhook 走 form-urlencoded)

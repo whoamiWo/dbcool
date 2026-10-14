@@ -54,6 +54,8 @@ services:
     ports:
       # 仅监听 127.0.0.1
       - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    # 注意：Alertmanager 不对配置文件做环境变量展开（实测），SMTP 相关值
+    # 直接写死在 observability/alertmanager.yml 中，勿再依赖 environment 注入。
     volumes:
       - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanagerdata:/alertmanager

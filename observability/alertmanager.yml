@@ -39,9 +39,14 @@ receivers:
       - url: 'http://backend-python:8000/api/alerts/webhook'
         send_resolved: true
     email_configs:
-      - to: '${ALERT_EMAIL_TO:-devops@nocobase.local}'
-        from: '${ALERT_EMAIL_FROM:-nocobase-alerts@nocobase.local}'
-        smarthost: '${SMTP_HOST:-localhost:25}'
+      # PHASE104 审计修正（实测复现两次）：
+      #   1) shell 风格 ${VAR:-default} → 报 "too many colons in address"
+      #   2) 纯 ${VAR} 引用 → Alertmanager 不做环境变量展开，报 "missing port"
+      # 故此处必须写死值。当前栈内没有 SMTP 中继，localhost:25 实际不可用，
+      # 仅保留结构；若需真实邮件告警，请直接改本文件（或引入 entrypoint 模板化）。
+      - to: 'devops@nocobase.local'
+        from: 'nocobase-alerts@nocobase.local'
+        smarthost: 'localhost:25'
         require_tls: false
 
   - name: 'warning-webhook'
