@@ -209,6 +209,14 @@ def install_pusher(pusher: WebhookPusher) -> None:
     get_collector().emit = wrapped_emit  # type: ignore[assignment]
 
 
+def get_pusher() -> WebhookPusher | None:
+    """获取已安装的 pusher（未安装返回 None）。
+
+    PHASE104 T9: 供 /api/alerts/webhook 做二次推送时查询。
+    """
+    return _pusher
+
+
 def uninstall_pusher() -> None:
     """卸载 pusher(测试用)."""
     global _pusher

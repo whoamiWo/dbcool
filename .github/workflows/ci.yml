@@ -47,6 +47,22 @@ jobs:
         working-directory: backend-java
         run: mvn verify -B -Dspring.profiles.active=test
 
+      # PHASE104 T9: Java 依赖漏洞扫描（OWASP Dependency-Check / Trivy 的离线替代）
+      # Trivy 需额外二进制，CI 环境也离线；改用 mvn dependency:tree + 已知漏洞库比对。
+      # 脚本内部会 cd 到 backend-java 执行 mvn，故此处从仓库根运行。
+      - name: Java dependency audit
+        run: python3 scripts/java-dependency-audit.py --json target/java-audit-report.json --sbom target/java-sbom.json
+
+      - name: Upload Java audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-dependency-audit
+          path: |
+            backend-java/target/java-audit-report.json
+            backend-java/target/java-sbom.json
+          retention-days: 7
+
       - name: Upload Java coverage
         if: always()
         uses: actions/upload-artifact@v4
