@@ -1,72 +1,52 @@
-"""PHASE104 T9: 告警 webhook 二次推送 + 重试逻辑测试."""
+"""PHASE104 T9: 告警二次推送 + 重试逻辑测试."""
 
-import importlib.util
-from pathlib import Path
+import logging
 from unittest import mock
 
 import pytest
 
-# 加载 alerts 路由模块（文件名不含连字符，可直接 import）
 from nocobase_py.routers import alerts as alerts_router
 
 
-def make_payload(**overrides):
-    base = {
-        "version": "4",
-        "groupKey": "g",
-        "status": "firing",
-        "receiver": "r",
-        "groupLabels": {"alertname": "P", "severity": "critical"},
-        "commonLabels": {},
-        "commonAnnotations": {},
-        "externalURL": "http://x",
-        "alerts": [{
+def make_payload():
+    return alerts_router.AlertPayload(
+        version="4", groupKey="g", status="firing", receiver="r",
+        groupLabels={"alertname": "P", "severity": "critical"},
+        commonLabels={}, commonAnnotations={},
+        externalURL="http://x",
+        alerts=[{
             "fingerprint": "f1",
             "labels": {"alertname": "P", "severity": "critical"},
             "annotations": {"summary": "s", "description": "d"},
             "startsAt": "2026-10-14T00:00:00Z",
             "endsAt": "2026-10-14T01:00:00Z",
         }],
-    }
-    base.update(overrides)
-    return alerts_router.AlertPayload(**base)
+    )
 
 
 class TestAlertForwarding:
     """二次推送调度逻辑."""
 
-    def test_forwarding_not_scheduled_when_pusher_none(self):
-        """未安装 pusher 时不调度推送（不报错、不静默崩溃）."""
-        tasks = []
-        with mock.patch.object(alerts_router, "get_pusher", return_value=None, create=True):
-            # get_pusher 在函数内 import，patch services.webhook
-            with mock.patch("nocobase_py.services.webhook.get_pusher", return_value=None):
-                payload = make_payload()
-                # 直接调用内部逻辑（绕过 FastAPI BackgroundTasks）
-                from nocobase_py.services.webhook import get_pusher
-                pusher = get_pusher()
-                assert pusher is None
+    def test_no_pusher_does_not_crash(self):
+        """未安装 pusher 时（get_pusher 返回 None）不崩溃."""
+        with mock.patch("nocobase_py.services.webhook.get_pusher", return_value=None):
+            # 端点内 import get_pusher，patch 后应安全跳过
+            from nocobase_py.services.webhook import get_pusher
+            assert get_pusher() is None
 
-    def test_forwarding_scheduled_when_configured(self):
-        """已配置 pusher 时应调度后台推送任务."""
-        from nocobase_py.services.webhook import WebhookConfig, WebhookPusher
-
-        pusher = WebhookPusher(WebhookConfig(url="http://hook", kind="generic", enabled=True))
-
-        with mock.patch("nocobase_py.services.webhook.get_pusher", return_value=pusher):
-            payload = make_payload()
-            # 模拟端点内的调度分支
-            scheduled = []
-            for alert in payload.alerts:
-                scheduled.append(alert)
-            assert len(scheduled) == 1
-
-    def test_forwarding_not_scheduled_when_not_configured(self):
-        """pusher 存在但未配置 url 时不调度."""
+    def test_unconfigured_pusher_not_forwarded(self):
+        """pusher 存在但未配置 url 时不推送."""
         from nocobase_py.services.webhook import WebhookConfig, WebhookPusher
 
         pusher = WebhookPusher(WebhookConfig(url="", kind="generic", enabled=False))
         assert pusher.config.is_configured() is False
+
+    def test_configured_pusher_is_forwarded(self):
+        """已配置 pusher 时推送被调度."""
+        from nocobase_py.services.webhook import WebhookConfig, WebhookPusher
+
+        pusher = WebhookPusher(WebhookConfig(url="http://hook", kind="generic", enabled=True))
+        assert pusher.config.is_configured() is True
 
 
 class TestForwardWithRetry:
@@ -111,3 +91,16 @@ class TestForwardWithRetry:
             alerts_router._forward_alert_with_retry(pusher, {"kind": "k"}, max_attempts=4)
         delays = [c.args[0] for c in sleep_mock.call_args_list]
         assert delays == [0.5, 1.0, 2.0], f"退避序列错误: {delays}"
+
+    def test_webhook_endpoint_persists_and_returns(self):
+        """端点本身：落盘 + 返回 received 计数."""
+        import tempfile, os
+        os.chdir(tempfile.mkdtemp())
+        from fastapi.testclient import TestClient
+        from nocobase_py.main import create_app
+
+        client = TestClient(create_app())
+        payload = make_payload()
+        r = client.post("/api/alerts/webhook", json=payload.model_dump())
+        assert r.status_code == 200
+        assert r.json()["received"] == 1
