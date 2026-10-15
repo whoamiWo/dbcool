@@ -199,4 +199,79 @@ class LdapSyncServiceTest {
         verify(mappingRepository).save(captor.capture());
         assertThat(captor.getValue().getSyncStatus()).isEqualTo("ERROR");
     }
+
+    /** toggleConfig: 启用/禁用配置并保存。 */
+    @Test
+    void toggleConfig_enabledAndDisabled() {
+        LdapConfigEntity cfg = config("t1", "cfg");
+        when(configRepository.findByIdAndTenantId(cfg.getId(), "t1")).thenReturn(Optional.of(cfg));
+        when(configRepository.save(any(LdapConfigEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LdapConfigEntity out1 = service.toggleConfig(cfg.getId(), true, "t1");
+        assertThat(out1.getEnabled()).isTrue();
+
+        LdapConfigEntity out2 = service.toggleConfig(cfg.getId(), false, "t1");
+        assertThat(out2.getEnabled()).isFalse();
+    }
+
+    /** syncUsers: 成功路径 — LDAP 返回用户，同步完成。 */
+    @Test
+    void syncUsers_success() {
+        UUID cfgId = UUID.randomUUID();
+        LdapConfigEntity cfg = config("t1", "cfg");
+        cfg.setId(cfgId);
+        cfg.setBaseDn("dc=x");
+        cfg.setUserSearchFilter("(uid=*)");
+        when(configRepository.findByIdAndTenantId(cfgId, "t1")).thenReturn(Optional.of(cfg));
+        when(configRepository.save(any(LdapConfigEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Mock LdapTemplate.search 返回 2 个用户
+        when(ldapTemplate.search(eq("dc=x"), eq("(uid=*)"), (org.springframework.ldap.core.ContextMapper<Map<String,Object>>) any()))
+                .thenReturn(List.of(
+                        Map.of("uid", "u1", "dn", "cn=u1", "displayName", "U1", "email", "u1@x.com"),
+                        Map.of("uid", "u2", "dn", "cn=u2", "displayName", "U2", "email", "u2@x.com")
+                ));
+        when(mappingRepository.findByLdapUidAndTenantId(any(), eq("t1"))).thenReturn(Optional.empty());
+        when(userRepository.findByUsername(any())).thenReturn(Optional.empty());
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> res = service.syncUsers(cfgId, "t1");
+
+        assertThat(res.get("synced")).isEqualTo(2);
+        assertThat(res.get("errors")).isEqualTo(0);
+        assertThat(res.get("status")).isEqualTo("SUCCESS");
+    }
+
+    /** syncUsers: 配置未启用 → 抛异常。 */
+    @Test
+    void syncUsers_configDisabled_throws() {
+        UUID cfgId = UUID.randomUUID();
+        LdapConfigEntity cfg = config("t1", "cfg");
+        cfg.setId(cfgId);
+        cfg.setEnabled(false);
+        when(configRepository.findByIdAndTenantId(cfgId, "t1")).thenReturn(Optional.of(cfg));
+
+        assertThatThrownBy(() -> service.syncUsers(cfgId, "t1"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("未启用");
+    }
+
+    /** syncUsers: LDAP 查询异常 → 捕获并记录 ERROR 状态。 */
+    @Test
+    void syncUsers_ldapError_setsErrorStatus() {
+        UUID cfgId = UUID.randomUUID();
+        LdapConfigEntity cfg = config("t1", "cfg");
+        cfg.setId(cfgId);
+        cfg.setBaseDn("dc=x");
+        cfg.setUserSearchFilter("(uid=*)");
+        when(configRepository.findByIdAndTenantId(cfgId, "t1")).thenReturn(Optional.of(cfg));
+        when(configRepository.save(any(LdapConfigEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        when(ldapTemplate.search(any(String.class), any(String.class), (org.springframework.ldap.core.ContextMapper<Map<String,Object>>) any())).thenThrow(new RuntimeException("ldap down"));
+
+        assertThatThrownBy(() -> service.syncUsers(cfgId, "t1"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("LDAP 同步失败");
+    }
 }
