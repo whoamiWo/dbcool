@@ -130,7 +130,7 @@ export function AclEditorPage() {
               <th style={{ padding: 8, textAlign: 'left' }}>对象</th>
               <th style={{ padding: 8, textAlign: 'left' }}>Action</th>
               <th style={{ padding: 8, textAlign: 'left' }}>配置</th>
-              <th style={{ padding: 8, textAlign: 'right' }}></th>
+              <th style={{ padding: 8, textAlign: 'right' }} aria-label="操作"></th>
             </tr>
           </thead>
           <tbody>

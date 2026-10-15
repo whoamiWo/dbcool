@@ -140,7 +140,7 @@ export function AuditLogsPage() {
               <th style={{ padding: 8 }}>用户</th>
               <th style={{ padding: 8 }}>IP</th>
               <th style={{ padding: 8 }}>Detail</th>
-              <th style={{ padding: 8, width: 40 }}></th>
+              <th style={{ padding: 8, width: 40 }} aria-label="操作"></th>
             </tr>
           </thead>
           <tbody>

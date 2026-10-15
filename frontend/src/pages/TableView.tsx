@@ -485,7 +485,7 @@ export function TableViewPage() {
                       </tr>
                       {expandedGroups.has(g._groupKey) && g._children.map((r) => (
                         <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)', background: 'rgba(0,0,0,0.02)' }}>
-                          <td style={{ padding: 8 }}></td>
+                          <td style={{ padding: 8 }} aria-hidden="true"></td>
                           {columns.map((c) => {
                             const f = fieldMap.get(c.field);
                             const val = r[c.field];
@@ -524,7 +524,7 @@ export function TableViewPage() {
                               </td>
                             );
                           })}
-                          <td style={{ padding: 8 }}></td>
+                          <td style={{ padding: 8 }} aria-hidden="true"></td>
                         </tr>
                       ))}
                     </React.Fragment>

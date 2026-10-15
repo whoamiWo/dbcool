@@ -331,6 +331,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
           >
             {peer.id === 'self' ? (
               <video
+                aria-label="本地视频画面"
                 ref={localVideoRef}
                 autoPlay
                 playsInline
@@ -339,6 +340,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
               />
             ) : (
               <video
+                aria-label="远端参会者视频画面"
                 ref={(el) => { if (el) peerVideoRefs.current.set(peer.id, el); }}
                 autoPlay
                 playsInline

@@ -62,6 +62,9 @@ const SlashPanel = ({
           <div
             key={cmd.name}
             role="option"
+            // PHASE98 R4: role="option" 必须有 aria-selected；该列表无键盘选中态，故恒为 false
+            aria-selected={false}
+            aria-label={cmd.name}
             tabIndex={0}
             onClick={() => onSelect(cmd)}
             onKeyDown={(e) => { if (e.key === 'Enter') onSelect(cmd); }}

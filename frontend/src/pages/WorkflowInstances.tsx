@@ -99,7 +99,7 @@ function InstancesInner() {
               <tr style={{ background: 'var(--color-bg-secondary)' }}>
                 <th style={th}>工作流</th><th style={th}>状态</th>
                 <th style={th}>关联记录</th><th style={th}>触发时间</th>
-                <th style={th}>结束时间</th><th style={th}></th>
+                <th style={th}>结束时间</th><th style={th} aria-label="操作"></th>
               </tr>
             </thead>
             <tbody>

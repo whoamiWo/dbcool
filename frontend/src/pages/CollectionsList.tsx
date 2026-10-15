@@ -76,7 +76,7 @@ export function CollectionsListPage() {
                 <th style={{ padding: 12, textAlign: 'left' }}>标题</th>
                 <th style={{ padding: 12, textAlign: 'left' }}>字段数</th>
                 <th style={{ padding: 12, textAlign: 'left' }}>创建时间</th>
-                <th style={{ padding: 12 }}></th>
+                <th style={{ padding: 12 }} aria-label="操作"></th>
               </tr>
             </thead>
             <tbody>

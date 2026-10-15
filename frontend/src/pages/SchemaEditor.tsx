@@ -244,7 +244,7 @@ export function SchemaEditorPage() {
               <th style={{ padding: 8, textAlign: 'left' }}>字段名</th>
               <th style={{ padding: 8, textAlign: 'left' }}>类型</th>
               <th style={{ padding: 8, textAlign: 'left' }}>必填</th>
-              <th style={{ padding: 8 }}></th>
+              <th style={{ padding: 8 }} aria-label="操作"></th>
             </tr>
           </thead>
           <tbody>
@@ -258,6 +258,7 @@ export function SchemaEditorPage() {
               <tr style={{ borderTop: '1px solid var(--color-border-light)' }}>
                 <td style={{ padding: 8 }}>
                   <input
+                    aria-label="字段名"
                     value={f.name}
                     onChange={(e) => handleRenameField(i, e.target.value)}
                     style={{ padding: 4, fontFamily: 'monospace', width: '100%' }}
@@ -287,6 +288,7 @@ export function SchemaEditorPage() {
                 <td style={{ padding: 8 }}>
                   <input
                     type="checkbox"
+                    aria-label="是否必填"
                     checked={f.required}
                     onChange={(e) => {
                       const updated = [...fields];
