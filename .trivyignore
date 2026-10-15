@@ -1,0 +1,37 @@
+# PHASE99 Trivy 扫描排除清单（保守起步）
+# 说明：.trivyignore 命中路径后不再扫描；命中是相对路径。
+# 原则：只排除明确不需要扫描的目录，绝不用 * 通配排除全部（红线 1）。
+
+# === 构建产物（会被 trivy fs 重新解析为依赖，重复扫描）===
+target/
+node_modules/
+dist/
+build/
+
+# === 测试夹具（故意带漏洞的 fixture，不应被门禁判 HIGH）===
+**/target/test-classes/*
+**/src/test/resources/fixtures/*
+**/e2e/fixtures/*
+
+# === vendor / vendored 依赖（已由上游 SBOM 覆盖）===
+vendor/
+
+# === 第三方工具链（非本项目代码）===
+.m2/repository/
+
+# === 文档 / 演示材料（常含示例 CVE 数字）===
+docs/demo-vuln-*.md
+docs/*/vuln-example.*
+
+# === 本地开发密钥（不入仓，但防止误传）===
+.env
+.env.local
+.env.*.local
+*.pem
+id_rsa
+id_ed25519
+
+# === 日志 / 缓存 ===
+logs/
+.cache/
+__pycache__/

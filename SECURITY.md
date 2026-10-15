@@ -110,5 +110,50 @@ npm audit --json > target/npm-audit.json
 - 用户输入在 Service 层已做 SQL 参数化 + XSS 转义，Controller 不做字符串拼接 SQL。
 - 审计日志 `audit_log` 对 `user_agent` / `ip` 字段做了 45/250 字符截断防日志注入。
 
+## 7. PHASE99 官方安全门禁（Trivy + ZAP）
+
+### 7.1 统一入口脚本
+
+新增 `scripts/security-gates.py`（PHASE99），提供三合一命令：
+
+```bash
+# 扫描 4 个 Dockerfile 的镜像（需 docker + trivy）
+python3 scripts/security-gates.py scan-images --fail-on HIGH,CRITICAL
+
+# 扫描 Java / Python / Node 依赖（需 trivy）
+python3 scripts/security-gates.py scan-deps --fail-on HIGH,CRITICAL
+
+# 对运行中的服务跑 ZAP 基线扫描（需 zap + 后端已起）
+python3 scripts/security-gates.py zap-baseline --url http://localhost:8080 --fail-on HIGH
+```
+
+退出码约定（红线 1）：
+- `0` = 无 HIGH/CRITICAL 命中
+- `1` = 有 HIGH/CRITICAL 命中（阻断构建）
+- `2` = 执行错误（二进制缺失 / 服务未起 / 报告解析失败）
+
+**可失败性验证**：运行 `scripts/security-gates-selfcheck.py`，用合成报告证明
+HIGH/CRITICAL 必阻断、损坏报告必报错（不得静默 PASS）。
+
+### 7.2 CI 集成
+
+`.github/workflows/ci.yml` 新增两个 job：
+
+- `security-trivy`: 在 `java-test` / `python-test` / `frontend-test` 之后运行
+  - 先安装 trivy + docker
+  - 依次跑 `scan-images`（4 个镜像）和 `scan-deps`（3 种依赖）
+  - 上传 `target/trivy-*.json` 作为工件
+
+- `security-zap`: 在 `security-trivy` 之后运行
+  - 启动 PostgreSQL 服务
+  - 构建并启动 Java 后端
+  - 安装 OWASP ZAP，跑 `zap-baseline`
+  - 上传 `target/zap-baseline-report.*` 作为工件
+
+### 7.3 排除清单
+
+`.trivyignore` 列出排除路径（构建产物、测试夹具、第三方缓存、密钥类文件）。
+**红线**：不得用 `*` 通配排除全部目录，仅排除明确不需要扫描的目标。
+
 ---
-*维护者：安全 Owner（PHASE106 起）；扫描器变更需同步更新 CI `ci.yml`。*
+*维护者：安全 Owner（PHASE99 起）；扫描器变更需同步更新 CI `ci.yml`。*

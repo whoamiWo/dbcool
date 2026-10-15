@@ -72,6 +72,144 @@ jobs:
           retention-days: 7
 
   # ============================================================
+  #  PHASE99 安全门禁：Trivy 镜像/依赖扫描 + ZAP 基线
+  # ============================================================
+  security-trivy:
+    name: 🛡️ Security (Trivy)
+    runs-on: ubuntu-latest
+    needs: [java-test, python-test, frontend-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update && sudo apt-get install -y wget
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update && sudo apt-get install -y trivy
+
+      - name: Install Docker (for image scanning)
+        run: |
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo usermod -aG docker $USER
+          newgrp docker
+
+      - name: Run Trivy image scans
+        run: |
+          python3 scripts/security-gates.py scan-images \
+            --fail-on HIGH,CRITICAL \
+            --skip-build
+
+      - name: Run Trivy dependency scans
+        run: |
+          python3 scripts/security-gates.py scan-deps \
+            --fail-on HIGH,CRITICAL
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: |
+            target/trivy-*.json
+          retention-days: 7
+
+  security-zap:
+    name: 🛡️ Security (ZAP Baseline)
+    runs-on: ubuntu-latest
+    needs: [security-trivy]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: nocobase
+          POSTGRES_USER: nocobase
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build Java jar
+        working-directory: backend-java
+        run: mvn clean package -DskipTests
+
+      - name: Start Java backend
+        working-directory: backend-java
+        run: |
+          SPRING_PROFILES_ACTIVE=dev \
+          POSTGRES_HOST=localhost \
+          POSTGRES_PORT=5432 \
+          POSTGRES_DB=nocobase \
+          POSTGRES_USER=nocobase \
+          POSTGRES_PASSWORD=test_password \
+          JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
+          echo $! > /tmp/java.pid
+
+      - name: Wait for Java to be ready
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:8080/api/health > /dev/null; then
+              echo "Java ready after ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Java failed to start"
+          cat /tmp/java.log
+          exit 1
+
+      - name: Install OWASP ZAP
+        run: |
+          sudo apt-get update && sudo apt-get install -y openjdk-11-jre-headless
+          wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
+          tar -xzf ZAP_2.14.0_Linux.tar.gz
+          sudo mv ZAP_2.14.0 /opt/zap
+          echo "/opt/zap" >> $GITHUB_PATH
+
+      - name: Run ZAP baseline scan
+        run: |
+          python3 scripts/security-gates.py zap-baseline \
+            --url http://localhost:8080 \
+            --fail-on HIGH
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            target/zap-baseline-report.*
+          retention-days: 7
+
+      - name: Cleanup Java process
+        if: always()
+        run: |
+          if [ -f /tmp/java.pid ]; then
+            kill $(cat /tmp/java.pid) 2>/dev/null || true
+          fi
+
+  # ============================================================
   #  Python 后端测试
   # ============================================================
   python-test:
