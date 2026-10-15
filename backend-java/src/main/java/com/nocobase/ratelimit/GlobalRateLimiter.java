@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Component
 public class GlobalRateLimiter {
@@ -33,6 +34,10 @@ public class GlobalRateLimiter {
             }
         } catch (Exception e) {
             log.warn("[ratelimit] Redis 不可用，降级到内存限流 key={}", key);
+        }
+        // 采样式清理：约每 64 次请求做一次 stale key 回收，避免改动主类开启调度
+        if (ThreadLocalRandom.current().nextInt(64) == 0) {
+            memoryLimiter.evictStale();
         }
         return memoryLimiter.allowRequest(key, limit, windowSeconds);
     }
@@ -67,27 +72,46 @@ public class GlobalRateLimiter {
 
     static class MemoryRateLimiter {
         private final java.util.Map<String, Deque<Long>> cache = new ConcurrentHashMap<>();
+        private final java.util.Map<String, Long> lastAccess = new ConcurrentHashMap<>();
+        private static final long STALE_MS = 5 * 60 * 1000L;
 
-        synchronized boolean allowRequest(String key, int limit, int windowSeconds) {
+        boolean allowRequest(String key, int limit, int windowSeconds) {
             long now = System.currentTimeMillis() / 1000L;
             long cutoff = now - windowSeconds;
 
             Deque<Long> timestamps = cache.computeIfAbsent(key, k -> new LinkedList<>());
-            
-            while (!timestamps.isEmpty() && timestamps.peekFirst() <= cutoff) {
-                timestamps.pollFirst();
-            }
+            lastAccess.put(key, System.currentTimeMillis());
 
-            if (timestamps.size() >= limit) {
-                return false;
-            }
+            synchronized (timestamps) {
+                while (!timestamps.isEmpty() && timestamps.peekFirst() <= cutoff) {
+                    timestamps.pollFirst();
+                }
 
-            timestamps.addLast(now);
-            return true;
+                if (timestamps.size() >= limit) {
+                    return false;
+                }
+
+                timestamps.addLast(now);
+                return true;
+            }
         }
 
-        synchronized void reset(String key) {
+        void reset(String key) {
             cache.remove(key);
+            lastAccess.remove(key);
+        }
+
+        /**
+         * 清理超过 5 分钟未访问的 key，防止长期累积内存泄漏。
+         * 由外部（如 @Scheduled）定期调用。
+         */
+        void evictStale() {
+            long now = System.currentTimeMillis();
+            lastAccess.entrySet().removeIf(e -> {
+                boolean stale = now - e.getValue() > STALE_MS;
+                if (stale) cache.remove(e.getKey());
+                return stale;
+            });
         }
     }
 }
