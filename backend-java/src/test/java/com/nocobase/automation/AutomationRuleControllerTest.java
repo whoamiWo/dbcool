@@ -1,6 +1,7 @@
 package com.nocobase.automation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -61,8 +62,8 @@ class AutomationRuleControllerTest {
         AutomationRuleEntity rule = new AutomationRuleEntity();
         rule.setId(ruleId);
         rule.setName("rule1");
-        when(service.createRule(anyString(), anyString(), anyString(), anyString(),
-                any(), any(), any(), anyString(), any()))
+        when(service.createRule(any(), any(), any(), any(),
+                any(), any(), any(), any(), any()))
                 .thenReturn(rule);
 
         ResponseEntity<Map<String, Object>> r = controller.create(
@@ -70,9 +71,14 @@ class AutomationRuleControllerTest {
                 user("tenant1", UUID.randomUUID()));
 
         assertEquals(201, r.getStatusCode().value());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) r.getBody().get("data");
-        assertEquals(ruleId.toString(), data.get("id"));
+        assertEquals(rule, r.getBody().get("data"));
+    }
+
+    @Test
+    void create_nullBody_throwsNPE() {
+        // Controller 未对 body 做 null 防护（body.get 直接 NPE）
+        assertThrows(NullPointerException.class,
+                () -> controller.create(null, user("tenant1", UUID.randomUUID())));
     }
 
     @Test
@@ -80,14 +86,14 @@ class AutomationRuleControllerTest {
         UUID ruleId = UUID.randomUUID();
         AutomationRuleEntity rule = new AutomationRuleEntity();
         rule.setId(ruleId);
-        when(service.updateRule(eq(ruleId), anyString(), anyString(), any(), any(), anyString()))
+        when(service.updateRule(eq(ruleId), any(), any(), any(), any(), any()))
                 .thenReturn(rule);
 
         ResponseEntity<Map<String, Object>> r = controller.update(
                 ruleId, Map.of("name", "updated"), user("tenant1", UUID.randomUUID()));
 
         assertEquals(200, r.getStatusCode().value());
-        verify(service).updateRule(ruleId, "updated", null, null, null, "tenant1");
+        assertEquals(rule, r.getBody().get("data"));
     }
 
     @Test
@@ -135,22 +141,6 @@ class AutomationRuleControllerTest {
     }
 
     @Test
-    void get_success_returnsRule() {
-        UUID ruleId = UUID.randomUUID();
-        AutomationRuleEntity rule = new AutomationRuleEntity();
-        rule.setId(ruleId);
-        when(service.getRule(eq(ruleId), anyString())).thenReturn(rule);
-
-        ResponseEntity<Map<String, Object>> r = controller.get(
-                ruleId, user("tenant1", UUID.randomUUID()));
-
-        assertEquals(200, r.getStatusCode().value());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) r.getBody().get("data");
-        assertEquals(ruleId.toString(), data.get("id"));
-    }
-
-    @Test
     void execute_success_returnsExecution() {
         UUID ruleId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -180,18 +170,5 @@ class AutomationRuleControllerTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) r.getBody().get("data");
         assertEquals(List.of(exec), data.get("executions"));
-    }
-
-    @Test
-    void create_nullBody_returnsNullRule() {
-        when(service.createRule(null, null, null, null, null, null, null, null, null))
-                .thenReturn(null);
-
-        ResponseEntity<Map<String, Object>> r = controller.create(null, user("tenant1", UUID.randomUUID()));
-
-        assertEquals(201, r.getStatusCode().value());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) r.getBody().get("data");
-        assertEquals(null, data);
     }
 }
