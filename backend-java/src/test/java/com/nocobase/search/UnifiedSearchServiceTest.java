@@ -231,4 +231,52 @@ class UnifiedSearchServiceTest {
         verify(indexRepo, org.mockito.Mockito.times(2))
                 .deleteByEntityTypeAndEntityIdAndTenantId("wiki", wikiId.toString(), tenantId);
     }
+
+    // ==================== PHASE105 补充分支 ====================
+
+    @Test
+    void search_searchRecord_indexQueryThrows_returnsEmpty() {
+        // record 索引查询抛异常 → 走 catch 返回空列表，不阻断整体检索
+        when(indexRepo.searchByKeywordAndType(anyString(), anyString(), eq(tenantId), anyInt()))
+                .thenAnswer(inv -> {
+                    if ("record".equals(inv.getArgument(0))) {
+                        throw new RuntimeException("index down");
+                    }
+                    return List.of();
+                });
+
+        Map<String, Object> result = service.search("kw", tenantId, null, List.of("record"), 10);
+        assertThat(result.get("total")).isEqualTo(0);
+    }
+
+    @Test
+    void search_searchProject_taskNotFound_filteredOut() {
+        UUID taskId = UUID.randomUUID();
+        when(indexRepo.searchByKeywordAndType(eq("project"), eq("kw"), eq(tenantId), eq(2)))
+                .thenReturn(List.of(idx("project", taskId.toString(), "任务", "snippet")));
+        when(projectService.get(eq(taskId), eq(tenantId))).thenReturn(null);
+
+        Map<String, Object> result = service.search("kw", tenantId, null, List.of("project"), 10);
+
+        assertThat(results(result)).isEmpty();
+    }
+
+    @Test
+    void search_searchProject_taskFound_included() {
+        UUID taskId = UUID.randomUUID();
+        when(indexRepo.searchByKeywordAndType(eq("project"), eq("kw"), eq(tenantId), eq(2)))
+                .thenReturn(List.of(idx("project", taskId.toString(), "任务", "snippet")));
+        ProjectTaskEntity task = new ProjectTaskEntity();
+        task.setId(taskId);
+        task.setTitle("任务A");
+        task.setCreatedAt(Instant.now());
+        when(projectService.get(eq(taskId), eq(tenantId))).thenReturn(task);
+
+        Map<String, Object> result = service.search("kw", tenantId, null, List.of("project"), 10);
+
+        List<Map<String, Object>> rows = results(result);
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).get("id")).isEqualTo(taskId);
+        assertThat(rows.get(0).get("title")).isEqualTo("任务A");
+    }
 }
