@@ -1,4 +1,21 @@
 import { expect, test } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+
+/**
+ * 复用 global-setup 已登录取得的 token（PHASE108）。
+ *
+ * 原先每个 project 各登录一次 → 3 次真实登录撞 login 限流 5/300s。
+ * 现在登录由 globalSetup 统一做 1 次并 fail-fast；此处只读 token，
+ * 4 条 storageKey 安全断言保持真实后端校验不变。
+ */
+function adminToken(): string {
+  const file = path.resolve(process.cwd(), 'e2e/.auth/token.json');
+  const raw = fs.readFileSync(file, 'utf-8');
+  const token = JSON.parse(raw).token as string;
+  if (!token) throw new Error('global setup 未写入有效 token');
+  return token;
+}
 
 /**
  * PHASE70 协同/存储安全 E2E。
@@ -14,13 +31,9 @@ import { expect, test } from '@playwright/test';
  */
 test.describe('Storage key 安全（PHASE69 R2 回归）', () => {
   test('非法 storageKey 一律拒绝', async ({ request, baseURL }) => {
-    // 自行登录，避免依赖外部环境变量；失败即 fail，不 skip
-    const login = await request.post(`${baseURL}/api/auth/login`, {
-      data: { username: 'admin', password: 'admin123' },
-    });
-    expect(login.status(), '登录必须成功').toBe(200);
-    const token = (await login.json()).data.access_token as string;
-    expect(token).toBeTruthy();
+    // 登录由 globalSetup 统一完成一次（失败即 fail-fast，不 skip、不重试洗绿）
+    const token = adminToken();
+    expect(token, 'global setup 必须已取得有效 token').toBeTruthy();
 
     const auth = { headers: { Authorization: `Bearer ${token}` } };
 

@@ -74,6 +74,8 @@ frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
 frontend/blob-report/
+# E2E global setup 登录落盘的 token（运行时生成，禁止入库）
+frontend/e2e/.auth/
 backend-java/alerts.db
 
 # IM 联调遗留:本地 SQLite 产物 + 调试脚本(一次性,不入库)

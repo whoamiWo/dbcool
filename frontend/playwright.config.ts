@@ -15,6 +15,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
+  // PHASE108：真实登录收敛为全局 1 次（collab-crdt 是唯一真实打后端的 spec），
+  // token 落盘供 3 个 project 复用，避免同 IP 300s 内累计登录超 5 次触发 429。
+  globalSetup: './e2e/global-setup.ts',
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',
