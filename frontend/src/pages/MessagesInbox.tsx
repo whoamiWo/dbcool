@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import EmptyState from '@/components/EmptyState';
 
 interface Message {
   id: string;
@@ -77,7 +78,10 @@ export function MessagesInboxPage() {
       </div>
       {isLoading && stack.messages.length === 0 ? <p>加载中…</p> : null}
       {merged.length === 0 && !isLoading ? (
-        <p style={{ color: 'var(--color-text-disabled)' }}>暂无消息</p>
+        <EmptyState
+          title="暂无消息"
+          description="消息由系统通知或他人发送后显示在这里；收到后会实时出现在本列表"
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {merged.map((m) => (

@@ -1,12 +1,14 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { } from '@/types/collection';
 import type { ViewMeta } from '@/types/view';
+import EmptyState from '@/components/EmptyState';
 
 /** 视图列表 — Week 9 */
 export function ViewsListPage() {
   const { collection } = useParams<{ collection?: string }>();
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ['views', collection ?? 'all'],
     queryFn: async () => {
@@ -45,18 +47,16 @@ export function ViewsListPage() {
       </div>
 
       {views.length === 0 ? (
-        <div
-          style={{
-            marginTop: 24,
-            padding: 32,
-            background: 'var(--color-text-primary)',
-            borderRadius: 8,
-            textAlign: 'center',
-            color: 'var(--color-text-disabled)',
-          }}
-        >
-          还没有视图
-        </div>
+        <EmptyState
+          title="还没有视图"
+          description={
+            collection
+              ? '为当前 Collection 创建第一个视图，自定义表格/看板/画廊展示'
+              : '先选择一个 Collection，再创建视图'
+          }
+          actionLabel={collection ? '+ 新建视图' : undefined}
+          onAction={collection ? () => navigate(`/designer/views/${collection}/new`) : undefined}
+        />
       ) : (
         <div
           style={{

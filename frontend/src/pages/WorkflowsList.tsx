@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '@/api/client';
+import EmptyState from '@/components/EmptyState';
 
 interface WorkflowMeta {
   id: string;
@@ -23,7 +24,9 @@ export function WorkflowsListPage() {
       return r.data ?? [];  // 真后端 envelope
     },
   });
-  if (isLoading) return <p>加载中…</p>;;
+  const navigate = useNavigate();
+  // PHASE98 R3: 顺手修掉双分号 `</p>;;`
+  if (isLoading) return <p>加载中…</p>;
   const workflows = data ?? [];
   return (
     <div>
@@ -32,7 +35,12 @@ export function WorkflowsListPage() {
         <Link to="/designer/workflows/new" style={{ padding: '8px 16px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', textDecoration: 'none', borderRadius: 4 }}>+ 新建工作流</Link>
       </div>
       {workflows.length === 0 ? (
-        <p style={{ color: 'var(--color-text-disabled)' }}>暂无工作流</p>
+        <EmptyState
+          title="暂无工作流"
+          description="创建第一个工作流，自动化审批、通知与数据流转"
+          actionLabel="+ 新建工作流"
+          onAction={() => navigate('/designer/workflows/new')}
+        />
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden', marginTop: 16 }}>
           <thead><tr style={{ background: 'var(--color-bg-secondary)' }}>

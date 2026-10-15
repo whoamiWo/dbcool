@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import EmptyState from '@/components/EmptyState';
 
 interface Task {
   id: string;
@@ -64,9 +65,10 @@ export function MyTasksPage() {
       <TaskTable tasks={pending} showActions act={act} />
 
       {pending.length === 0 && (
-        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted)', background: 'var(--color-text-primary)', borderRadius: 8 }}>
-          🎉 当前没有待办任务
-        </div>
+        <EmptyState
+          title="🎉 当前没有待办任务"
+          description="有新的审批任务分配给你时，会显示在这里"
+        />
       )}
     </div>
   );
