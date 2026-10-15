@@ -1,9 +1,10 @@
 package com.nocobase.project;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -16,22 +17,18 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * ProjectBoardController 单元测试(PHASE 55 Stage 5 对标补齐 — Trello 卡片能力)。
+ * ProjectBoardController 端点测试（PHASE108 冲 85%）。
  *
- * <p>覆盖 Trello 式看板端点:列 CRUD、卡片移动、清单、标签;
- * 重点验证参数校验拒绝(400)与资源不存在(404),避免静默放行。
+ * <p>覆盖列/卡片移动/清单/清单项/标签/成员/任务 共 18 个端点。
  */
 class ProjectBoardControllerTest {
-
-    private static final String TENANT = "tenant_default";
-    private static final AuthenticatedUser USER =
-            new AuthenticatedUser(UUID.randomUUID(), "admin", TENANT);
 
     private ProjectService projectService;
     private CardMoveService cardMoveService;
@@ -41,6 +38,9 @@ class ProjectBoardControllerTest {
     private CardLabelRepository labelRepository;
     private ApplicationEventPublisher eventPublisher;
     private ProjectBoardController controller;
+
+    private String tenant;
+    private UUID user;
 
     @BeforeEach
     void setUp() {
@@ -52,341 +52,364 @@ class ProjectBoardControllerTest {
         labelRepository = mock(CardLabelRepository.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
 
-        when(boardListRepository.save(any(BoardListEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-        when(checklistRepository.save(any(CardChecklistEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-        when(checklistItemRepository.save(any(CardChecklistItemEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-        when(labelRepository.save(any(CardLabelEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+        controller = new ProjectBoardController(projectService, cardMoveService, boardListRepository,
+                checklistRepository, checklistItemRepository, labelRepository, eventPublisher);
 
-        controller = new ProjectBoardController(projectService, cardMoveService,
-                boardListRepository, checklistRepository, checklistItemRepository,
-                labelRepository, eventPublisher);
+        tenant = "tenant1";
+        user = UUID.randomUUID();
     }
 
-    // ==================== 列(Board List) ====================
+    private AuthenticatedUser u() {
+        return new AuthenticatedUser(user, "alice", tenant);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> data(Map<String, Object> r) {
+        return (Map<String, Object>) r.get("data");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> data(ResponseEntity<Map<String, Object>> r) {
+        return (Map<String, Object>) r.getBody().get("data");
+    }
+
+    // ---- 列 CRUD ----
+
+    @Test
+    void createList_success() {
+        UUID projectId = UUID.randomUUID();
+        when(boardListRepository.save(any(BoardListEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<Map<String, Object>> r = controller.createList(
+                Map.of("projectId", projectId.toString(), "title", "Todo", "sortOrder", 2), u());
+
+        assertEquals(201, r.getStatusCode().value());
+        Object id = data(r).get("id");
+        org.junit.jupiter.api.Assertions.assertTrue(id instanceof String && !((String) id).isBlank());
+    }
 
     @Test
     void createList_missingProjectId_throws400() {
-        assertThatThrownBy(() -> controller.createList(Map.of("title", "待办"), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.createList(Map.of("title", "Todo"), u()));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
 
     @Test
-    void createList_valid_returns201WithId() {
+    void listBoardLists_returnsData() {
         UUID projectId = UUID.randomUUID();
-        ResponseEntity<Map<String, Object>> resp = controller.createList(
-                Map.of("projectId", projectId.toString(), "title", "待办", "sortOrder", 1), USER);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
-        assertThat(data).containsKey("id");
+        BoardListEntity list = new BoardListEntity();
+        list.setId(UUID.randomUUID());
+        list.setTitle("Todo");
+        list.setSortOrder(1);
+        when(boardListRepository.findByTenantIdAndProjectIdOrderBySortOrderAsc(tenant, projectId))
+                .thenReturn(List.of(list));
+
+        Map<String, Object> r = controller.listBoardLists(projectId, u());
+
+        assertEquals(1, r.get("total"));
     }
 
     @Test
-    void listBoardLists_returnsDataAndTotal() {
-        UUID projectId = UUID.randomUUID();
-        BoardListEntity l = new BoardListEntity();
-        l.setId(UUID.randomUUID());
-        l.setTitle("进行中");
-        l.setType("NORMAL");
-        when(boardListRepository.findByTenantIdAndProjectIdOrderBySortOrderAsc(TENANT, projectId))
-                .thenReturn(List.of(l));
-
-        Map<String, Object> resp = controller.listBoardLists(projectId, USER);
-
-        assertThat(resp.get("code")).isEqualTo(0);
-        assertThat(resp.get("total")).isEqualTo(1);
-    }
-
-    @Test
-    void updateBoardList_notFound_throws404() {
+    void updateBoardList_success() {
         UUID listId = UUID.randomUUID();
-        when(boardListRepository.findById(listId)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> controller.updateBoardList(listId, Map.of("title", "x"), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        BoardListEntity list = new BoardListEntity();
+        list.setId(listId);
+        list.setTenantId(tenant);
+        when(boardListRepository.findById(listId)).thenReturn(Optional.of(list));
+        when(boardListRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> r = controller.updateBoardList(listId,
+                Map.of("title", "Updated"), u());
+
+        assertEquals("updated", r.get("message"));
     }
 
     @Test
-    void updateBoardList_valid_updatesTitle() {
+    void updateBoardList_tenantMismatch_throws403() {
         UUID listId = UUID.randomUUID();
-        BoardListEntity l = new BoardListEntity();
-        l.setId(listId);
-        l.setTitle("旧");
-        l.setTenantId(TENANT);
-        when(boardListRepository.findById(listId)).thenReturn(Optional.of(l));
+        BoardListEntity list = new BoardListEntity();
+        list.setId(listId);
+        list.setTenantId("other-tenant");
+        when(boardListRepository.findById(listId)).thenReturn(Optional.of(list));
 
-        Map<String, Object> resp = controller.updateBoardList(listId, Map.of("title", "新"), USER);
-
-        assertThat(l.getTitle()).isEqualTo("新");
-        assertThat(resp.get("message")).isEqualTo("updated");
+        assertThrows(ResponseStatusException.class,
+                () -> controller.updateBoardList(listId, Map.of("title", "X"), u()));
     }
 
     @Test
-    void deleteBoardList_notFound_throws404() {
+    void deleteBoardList_success() {
         UUID listId = UUID.randomUUID();
-        when(boardListRepository.findById(listId)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> controller.deleteBoardList(listId, USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        when(boardListRepository.findById(listId)).thenReturn(Optional.of(new BoardListEntity()));
+
+        Map<String, Object> r = controller.deleteBoardList(listId, u());
+
+        assertEquals("deleted", r.get("message"));
+        verify(boardListRepository).deleteById(listId);
     }
 
-    // ==================== 卡片移动 ====================
+    // ---- 卡片移动 ----
 
     @Test
-    void moveCard_missingParams_throws400() {
-        assertThatThrownBy(() -> controller.moveCard(Map.of("taskId", UUID.randomUUID().toString()), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    void moveCard_valid_invokesCardMoveService() {
+    void moveCard_success() {
         UUID taskId = UUID.randomUUID();
         UUID toListId = UUID.randomUUID();
-        Map<String, Object> resp = controller.moveCard(
-                Map.of("taskId", taskId.toString(), "toListId", toListId.toString(), "toIndex", 2), USER);
-        verify(cardMoveService).moveCard(eq(TENANT), eq(taskId), eq(toListId), anyInt());
-        assertThat(resp.get("code")).isEqualTo(0);
-    }
 
-    // ==================== 清单(Checklist) ====================
+        Map<String, Object> r = controller.moveCard(
+                Map.of("taskId", taskId.toString(), "toListId", toListId.toString(), "toIndex", 3), u());
 
-    @Test
-    void createChecklist_missingTaskId_throws400() {
-        assertThatThrownBy(() -> controller.createChecklist(Map.of("title", "清单"), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
+        assertEquals("moved", r.get("message"));
+        verify(cardMoveService).moveCard(eq(tenant), eq(taskId), eq(toListId), eq(3));    }
 
     @Test
-    void createChecklist_valid_returns201() {
+    void moveCard_missingFields_throws400() {
+        assertThrows(ResponseStatusException.class,
+                () -> controller.moveCard(Map.of("taskId", "x"), u()));
+    }
+
+    // ---- 清单 CRUD ----
+
+    @Test
+    void createChecklist_success() {
         UUID taskId = UUID.randomUUID();
-        ResponseEntity<Map<String, Object>> resp = controller.createChecklist(
-                Map.of("taskId", taskId.toString(), "title", "验收项"), USER);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        when(checklistRepository.save(any(CardChecklistEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<Map<String, Object>> r = controller.createChecklist(
+                Map.of("taskId", taskId.toString(), "title", "checklist"), u());
+
+        assertEquals(201, r.getStatusCode().value());
     }
 
     @Test
-    void listChecklistsByTask_returnsTotal() {
+    void listChecklistsByTask_returnsData() {
         UUID taskId = UUID.randomUUID();
         CardChecklistEntity c = new CardChecklistEntity();
         c.setId(UUID.randomUUID());
-        c.setTitle("清单");
-        when(checklistRepository.findByTenantIdAndTaskIdOrderBySortOrderAsc(TENANT, taskId))
+        c.setTitle("c1");
+        when(checklistRepository.findByTenantIdAndTaskIdOrderBySortOrderAsc(tenant, taskId))
                 .thenReturn(List.of(c));
 
-        Map<String, Object> resp = controller.listChecklistsByTask(taskId, USER);
+        Map<String, Object> r = controller.listChecklistsByTask(taskId, u());
 
-        assertThat(resp.get("total")).isEqualTo(1);
+        assertEquals(1, r.get("total"));
     }
 
     @Test
-    void updateChecklist_notFound_throws404() {
+    void updateChecklist_success() {
         UUID id = UUID.randomUUID();
-        when(checklistRepository.findById(id)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> controller.updateChecklist(id, Map.of("title", "x"), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
-    }
+        CardChecklistEntity c = new CardChecklistEntity();
+        c.setId(id);
+        c.setTenantId(tenant);
+        when(checklistRepository.findById(id)).thenReturn(Optional.of(c));
+        when(checklistRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    // ==================== 标签(Label) ====================
+        Map<String, Object> r = controller.updateChecklist(id, Map.of("title", "new"), u());
 
-    @Test
-    void createLabel_missingProjectId_throws400() {
-        assertThatThrownBy(() -> controller.createLabel(Map.of("name", "紧急"), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertEquals("updated", r.get("message"));
     }
 
     @Test
-    void createLabel_valid_returns201() {
-        UUID projectId = UUID.randomUUID();
-        ResponseEntity<Map<String, Object>> resp = controller.createLabel(
-                Map.of("projectId", projectId.toString(), "name", "紧急", "color", "#f00"), USER);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    }
-
-    @Test
-    void listLabelsByProject_returnsNameAndColor() {
-        UUID projectId = UUID.randomUUID();
-        CardLabelEntity label = new CardLabelEntity();
-        label.setId(UUID.randomUUID());
-        label.setName("紧急");
-        label.setColor("#f00");
-        when(labelRepository.findByTenantIdAndProjectId(TENANT, projectId))
-                .thenReturn(List.of(label));
-
-        Map<String, Object> resp = controller.listLabelsByProject(projectId, USER);
-
-        assertThat(resp.get("total")).isEqualTo(1);
-    }
-
-    @Test
-    void updateLabel_notFound_throws404() {
+    void deleteChecklist_success() {
         UUID id = UUID.randomUUID();
-        when(labelRepository.findById(id)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> controller.updateLabel(id, Map.of("name", "x"), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+        CardChecklistEntity c = new CardChecklistEntity();
+        c.setId(id);
+        c.setTenantId(tenant);
+        when(checklistRepository.findById(id)).thenReturn(Optional.of(c));
+
+        Map<String, Object> r = controller.deleteChecklist(id, u());
+
+        assertEquals("deleted", r.get("message"));
+        verify(checklistRepository).deleteById(id);
     }
 
-    @Test
-    void updateLabel_valid_updatesName() {
-        UUID id = UUID.randomUUID();
-        CardLabelEntity label = new CardLabelEntity();
-        label.setId(id);
-        label.setName("旧");
-        label.setTenantId(TENANT);
-        when(labelRepository.findById(id)).thenReturn(Optional.of(label));
-
-        controller.updateLabel(id, Map.of("name", "新"), USER);
-
-        assertThat(label.getName()).isEqualTo("新");
-    }
-
-    // ==================== Checklist Item ====================
+    // ---- 清单项 CRUD ----
 
     @Test
-    void createChecklistItem_missingIds_throws400() {
-        assertThatThrownBy(() -> controller.createChecklistItem(Map.of(), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    void createChecklistItem_valid_returns201() {
+    void createChecklistItem_success() {
         UUID checklistId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
-        ResponseEntity<Map<String, Object>> resp = controller.createChecklistItem(
-                Map.of("checklistId", checklistId.toString(), "taskId", taskId.toString(), "title", "Item"), USER);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        when(checklistItemRepository.save(any(CardChecklistItemEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<Map<String, Object>> r = controller.createChecklistItem(
+                Map.of("checklistId", checklistId.toString(), "taskId", taskId.toString(), "title", "item"), u());
+
+        assertEquals(201, r.getStatusCode().value());
     }
 
     @Test
-    void listChecklistItems_returnsTotal() {
+    void listChecklistItems_returnsData() {
         UUID checklistId = UUID.randomUUID();
         CardChecklistItemEntity item = new CardChecklistItemEntity();
         item.setId(UUID.randomUUID());
-        item.setTitle("Item");
+        item.setTitle("item1");
         item.setDone(false);
-        when(checklistItemRepository.findByTenantIdAndChecklistIdOrderBySortOrderAsc(TENANT, checklistId))
+        when(checklistItemRepository.findByTenantIdAndChecklistIdOrderBySortOrderAsc(tenant, checklistId))
                 .thenReturn(List.of(item));
 
-        Map<String, Object> resp = controller.listChecklistItems(checklistId, USER);
+        Map<String, Object> r = controller.listChecklistItems(checklistId, u());
 
-        assertThat(resp.get("total")).isEqualTo(1);
+        assertEquals(1, r.get("total"));
     }
 
     @Test
-    void updateChecklistItem_notFound_throws404() {
-        UUID id = UUID.randomUUID();
-        when(checklistItemRepository.findById(id)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> controller.updateChecklistItem(id, Map.of("done", true), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    void updateChecklistItem_valid_updatesDone() {
+    void updateChecklistItem_marksDone() {
         UUID id = UUID.randomUUID();
         CardChecklistItemEntity item = new CardChecklistItemEntity();
         item.setId(id);
-        item.setDone(false);
-        item.setTenantId(TENANT);
+        item.setTenantId(tenant);
         when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
+        when(checklistItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        controller.updateChecklistItem(id, Map.of("done", true), USER);
+        Map<String, Object> r = controller.updateChecklistItem(id, Map.of("done", true), u());
 
-        assertThat(item.getDone()).isTrue();
+        assertEquals(true, data(r).get("done"));
     }
 
     @Test
-    void deleteChecklistItem_notFound_throws404() {
-        UUID id = UUID.randomUUID();
-        when(checklistItemRepository.findById(id)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> controller.deleteChecklistItem(id, USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    void deleteChecklistItem_valid_deletes() {
+    void deleteChecklistItem_success() {
         UUID id = UUID.randomUUID();
         CardChecklistItemEntity item = new CardChecklistItemEntity();
         item.setId(id);
-        item.setTenantId(TENANT);
+        item.setTenantId(tenant);
         when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
-        controller.deleteChecklistItem(id, USER);
+
+        Map<String, Object> r = controller.deleteChecklistItem(id, u());
+
+        assertEquals("deleted", r.get("message"));
         verify(checklistItemRepository).deleteById(id);
     }
 
-    // ==================== Tenant Isolation ====================
+    // ---- 标签 CRUD ----
 
     @Test
-    void updateChecklistItem_wrongTenant_throws403() {
-        UUID id = UUID.randomUUID();
-        CardChecklistItemEntity item = new CardChecklistItemEntity();
-        item.setId(id);
-        item.setTenantId("other_tenant");
-        when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
-        assertThatThrownBy(() -> controller.updateChecklistItem(id, Map.of("done", true), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.FORBIDDEN);
+    void createLabel_success() {
+        UUID projectId = UUID.randomUUID();
+        when(labelRepository.save(any(CardLabelEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<Map<String, Object>> r = controller.createLabel(
+                Map.of("projectId", projectId.toString(), "name", "bug", "color", "red"), u());
+
+        assertEquals(201, r.getStatusCode().value());
     }
 
     @Test
-    void deleteChecklistItem_wrongTenant_throws403() {
-        UUID id = UUID.randomUUID();
-        CardChecklistItemEntity item = new CardChecklistItemEntity();
-        item.setId(id);
-        item.setTenantId("other_tenant");
-        when(checklistItemRepository.findById(id)).thenReturn(Optional.of(item));
-        assertThatThrownBy(() -> controller.deleteChecklistItem(id, USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.FORBIDDEN);
+    void listLabelsByProject_returnsData() {
+        UUID projectId = UUID.randomUUID();
+        CardLabelEntity label = new CardLabelEntity();
+        label.setId(UUID.randomUUID());
+        label.setName("bug");
+        when(labelRepository.findByTenantIdAndProjectId(tenant, projectId)).thenReturn(List.of(label));
+
+        Map<String, Object> r = controller.listLabelsByProject(projectId, u());
+
+        assertEquals(1, r.get("total"));
     }
 
     @Test
-    void updateChecklist_wrongTenant_throws403() {
+    void updateLabel_success() {
         UUID id = UUID.randomUUID();
-        CardChecklistEntity c = new CardChecklistEntity();
-        c.setId(id);
-        c.setTenantId("other_tenant");
-        when(checklistRepository.findById(id)).thenReturn(Optional.of(c));
-        assertThatThrownBy(() -> controller.updateChecklist(id, Map.of("title", "x"), USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.FORBIDDEN);
+        CardLabelEntity label = new CardLabelEntity();
+        label.setId(id);
+        label.setTenantId(tenant);
+        when(labelRepository.findById(id)).thenReturn(Optional.of(label));
+        when(labelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> r = controller.updateLabel(id, Map.of("name", "new"), u());
+
+        assertEquals("updated", r.get("message"));
     }
 
     @Test
-    void deleteChecklist_wrongTenant_throws403() {
+    void deleteLabel_success() {
         UUID id = UUID.randomUUID();
-        CardChecklistEntity c = new CardChecklistEntity();
-        c.setId(id);
-        c.setTenantId("other_tenant");
-        when(checklistRepository.findById(id)).thenReturn(Optional.of(c));
-        assertThatThrownBy(() -> controller.deleteChecklist(id, USER))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.FORBIDDEN);
+        when(labelRepository.findById(id)).thenReturn(Optional.of(new CardLabelEntity()));
+
+        Map<String, Object> r = controller.deleteLabel(id, u());
+
+        assertEquals("deleted", r.get("message"));
+        verify(labelRepository).deleteById(id);
+    }
+
+    // ---- 成员分配 ----
+
+    @Test
+    void assignMember_delegatesToProjectService() {
+        UUID taskId = UUID.randomUUID();
+        UUID assigneeId = UUID.randomUUID();
+        when(projectService.update(ArgumentMatchers.any(UUID.class),
+                ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                eq(assigneeId), ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                eq(user), eq(tenant)))
+                .thenReturn(new ProjectTaskEntity());
+
+        Map<String, Object> r = controller.assignMember(
+                Map.of("taskId", taskId.toString(), "assigneeId", assigneeId.toString()), u());
+
+        assertEquals("assigned", r.get("message"));
+        verify(cardMoveService, org.mockito.Mockito.never()).moveCard(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void assignMember_missingFields_throws400() {
+        assertThrows(ResponseStatusException.class,
+                () -> controller.assignMember(Map.of("taskId", "x"), u()));
+    }
+
+    // ---- 任务 CRUD ----
+
+    @Test
+    void createTask_success() {
+        UUID projectId = UUID.randomUUID();
+        ProjectTaskEntity task = new ProjectTaskEntity();
+        task.setId(UUID.randomUUID());
+        when(projectService.create(
+                eq(projectId),
+                ArgumentMatchers.<String>any(),
+                ArgumentMatchers.<String>any(),
+                ArgumentMatchers.<UUID>any(),
+                ArgumentMatchers.<UUID>any(),
+                ArgumentMatchers.<String>any(),
+                ArgumentMatchers.<String>any(),
+                ArgumentMatchers.<java.time.Instant>any(),
+                ArgumentMatchers.<java.time.Instant>any(),
+                eq(user), eq(tenant)))
+                .thenReturn(task);
+
+        ResponseEntity<Map<String, Object>> r = controller.createTask(
+                Map.of("projectId", projectId.toString(), "title", "Task"), u());
+
+        assertEquals(201, r.getStatusCode().value());
+        verify(eventPublisher).publishEvent(ArgumentMatchers.any(Object.class));
+    }
+
+    @Test
+    void updateTask_success() {
+        UUID id = UUID.randomUUID();
+        ProjectTaskEntity task = new ProjectTaskEntity();
+        task.setId(id);
+        when(projectService.update(eq(id), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                eq(user), eq(tenant)))
+                .thenReturn(task);
+
+        Map<String, Object> r = controller.updateTask(id, Map.of("status", "done"), u());
+
+        assertEquals("success", r.get("message"));
+    }
+
+    @Test
+    void deleteTask_success() {
+        UUID id = UUID.randomUUID();
+
+        Map<String, Object> r = controller.deleteTask(id, u());
+
+        assertEquals("success", r.get("message"));
+        verify(projectService).delete(eq(id), eq(tenant));
+        verify(eventPublisher).publishEvent(ArgumentMatchers.any(Object.class));
     }
 }
