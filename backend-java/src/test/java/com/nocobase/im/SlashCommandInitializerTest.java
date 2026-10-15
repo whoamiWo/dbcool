@@ -108,8 +108,12 @@ class SlashCommandInitializerTest {
 
         handler.accept(targetId.toString(), ctx);
 
-        verify(channelService).join(anyString(), eq(channelId), eq(targetId), anyString());
-        verify(messageService).send(anyString(), eq(channelId), eq(userId), anyString(), eq("markdown"), any());
+        org.mockito.ArgumentCaptor<String> tenantCap = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(channelService).join(tenantCap.capture(), eq(channelId), eq(targetId), anyString());
+        assertEquals("t1", tenantCap.getValue());
+        org.mockito.ArgumentCaptor<String> sendTenantCap = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(messageService).send(sendTenantCap.capture(), eq(channelId), eq(userId), anyString(), eq("markdown"), any());
+        assertEquals("t1", sendTenantCap.getValue());
         assertEquals(targetId.toString(), ctx.get("invited"));
     }
 
@@ -136,8 +140,12 @@ class SlashCommandInitializerTest {
 
         handler.accept(username, ctx);
 
-        verify(channelService).join(anyString(), eq(channelId), eq(targetId), anyString());
-        verify(messageService).send(anyString(), eq(channelId), eq(userId), anyString(), eq("markdown"), any());
+        org.mockito.ArgumentCaptor<String> tenantCap = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(channelService).join(tenantCap.capture(), eq(channelId), eq(targetId), anyString());
+        assertEquals("t1", tenantCap.getValue());
+        org.mockito.ArgumentCaptor<String> sendTenantCap = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(messageService).send(sendTenantCap.capture(), eq(channelId), eq(userId), anyString(), eq("markdown"), any());
+        assertEquals("t1", sendTenantCap.getValue());
         assertEquals(username, ctx.get("invited"));
     }
 

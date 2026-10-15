@@ -272,10 +272,4 @@ class DingTalkControllerAuthTest {
                 eq("dingtalk.approval.failed"), any(), eq("unknown"), any());
     }
 
-    @Test
-    void getUserInfo_nullResponse_returnsSuccessWithEmpty() {
-        // RestTemplate 内联 new 无法 mock，这里仅验证方法可调用且结构正确
-        // (真实网络调用在离线环境会走 catch → 502，不断言具体码，避免 flaky)
-        assertNotNull(controller);
-    }
 }

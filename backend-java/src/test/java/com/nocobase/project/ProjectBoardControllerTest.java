@@ -84,9 +84,10 @@ class ProjectBoardControllerTest {
         ResponseEntity<Map<String, Object>> r = controller.createList(
                 Map.of("projectId", projectId.toString(), "title", "Todo", "sortOrder", 2), u());
 
+        org.mockito.ArgumentCaptor<BoardListEntity> cap = org.mockito.ArgumentCaptor.forClass(BoardListEntity.class);
+        verify(boardListRepository).save(cap.capture());
         assertEquals(201, r.getStatusCode().value());
-        Object id = data(r).get("id");
-        org.junit.jupiter.api.Assertions.assertTrue(id instanceof String && !((String) id).isBlank());
+        assertEquals(cap.getValue().getId().toString(), data(r).get("id"));
     }
 
     @Test
