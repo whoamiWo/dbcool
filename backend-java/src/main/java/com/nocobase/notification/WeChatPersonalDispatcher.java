@@ -37,7 +37,11 @@ public class WeChatPersonalDispatcher implements NotificationDispatcher {
     private final WebClient webClient;
 
     public WeChatPersonalDispatcher() {
-        this.webClient = WebClient.builder().build();
+        this(WebClient.builder());
+    }
+
+    public WeChatPersonalDispatcher(WebClient.Builder builder) {
+        this.webClient = builder.build();
     }
 
     @Override

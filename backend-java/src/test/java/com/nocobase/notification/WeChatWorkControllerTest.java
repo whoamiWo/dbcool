@@ -81,4 +81,39 @@ class WeChatWorkControllerTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("message")).isEqualTo("unreachable");
     }
+
+    @Test
+    void send_blankRecipient_passesNullRecipient() {
+        // recipient 为空 → 传给 testSend 的 recipient 应为 null
+        UUID channelId = UUID.randomUUID();
+        when(notificationService.testSend(eq(channelId), eq(null), any(), eq(USER.tenantId())))
+                .thenReturn(new NotificationDispatcher.SendResult(true, "ok"));
+
+        ResponseEntity<Map<String, Object>> resp = controller.send(Map.of(
+                "channelId", channelId.toString(), "body", "hi"
+        ), USER);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void send_defaultsAppliedWhenOptionalKeysAbsent() {
+        // 仅提供 channelId → 其余走默认值 (title=通知, msgType=markdown)
+        UUID channelId = UUID.randomUUID();
+        when(notificationService.testSend(eq(channelId), eq(null), any(), eq(USER.tenantId())))
+                .thenReturn(new NotificationDispatcher.SendResult(false, "webhook down"));
+
+        ResponseEntity<Map<String, Object>> resp = controller.send(Map.of(
+                "channelId", channelId.toString()
+        ), USER);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.valueOf(502));
+        // 验证 payload 使用默认 msgType=markdown
+        org.mockito.ArgumentCaptor<Map<String, Object>> cap =
+                org.mockito.ArgumentCaptor.forClass(Map.class);
+        org.mockito.Mockito.verify(notificationService)
+                .testSend(eq(channelId), eq(null), cap.capture(), eq(USER.tenantId()));
+        assertThat(cap.getValue().get("msgType")).isEqualTo("markdown");
+        assertThat(cap.getValue().get("title")).isEqualTo("通知");
+    }
 }

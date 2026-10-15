@@ -36,7 +36,11 @@ public class FeishuPersonalDispatcher implements NotificationDispatcher {
     private final WebClient webClient;
 
     public FeishuPersonalDispatcher() {
-        this.webClient = WebClient.builder().build();
+        this(WebClient.builder());
+    }
+
+    public FeishuPersonalDispatcher(WebClient.Builder builder) {
+        this.webClient = builder.build();
     }
 
     @Override

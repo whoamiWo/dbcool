@@ -158,4 +158,21 @@ class TriggerRateLimiterTest {
 
         org.mockito.Mockito.verify(redisTemplate, org.mockito.Mockito.never()).delete(any(Set.class));
     }
+
+    @Test
+    void countFor_redisException_fallsBackToMemory() {
+        // 先走内存积累计数（无 factory）
+        when(redisTemplate.getConnectionFactory()).thenReturn(null);
+        limiter.allowTrigger("wf-x", "rec-x");
+        limiter.allowTrigger("wf-x", "rec-x");
+
+        // 切到 Redis 但 zCard 抛异常 → 回退内存计数
+        RedisConnectionFactory factory = mock(RedisConnectionFactory.class);
+        when(redisTemplate.getConnectionFactory()).thenReturn(factory);
+        BoundZSetOperations<String, String> zsetOps = mock(BoundZSetOperations.class);
+        when(redisTemplate.boundZSetOps(anyString())).thenReturn(zsetOps);
+        when(zsetOps.zCard()).thenThrow(new RuntimeException("redis down"));
+
+        assertEquals(2, limiter.countFor("wf-x", "rec-x"));
+    }
 }

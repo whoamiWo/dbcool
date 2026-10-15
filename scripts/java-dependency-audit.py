@@ -43,6 +43,129 @@ JAR_VERSION_SCOPE_RE = re.compile(r":jar:([\w.\-]+):(\w+)$")
 SEVERITY_ORDER = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1, "UNKNOWN": 0}
 BLOCK_LEVELS = {"CRITICAL", "HIGH"}
 
+# 官方工具调用超时（秒）
+OFFICIAL_TIMEOUT = 600
+
+
+def which_binary(name: str) -> bool:
+    """探测系统 PATH 中是否存在指定二进制。"""
+    import shutil
+    return shutil.which(name) is not None
+
+
+def detect_backend(backend: str) -> str:
+    """PHASE106 T1: 后端选择。
+
+    - auto: 依次探测 trivy / dependency-check，命中即用对应官方后端；
+            均未命中则回落 offline 并打印 WARN（不静默）。
+    - trivy / owasp: 显式指定官方后端，且要求二进制存在（缺失由调用方报错）。
+    - offline: 显式强制离线比对。
+    返回实际使用的后端名。
+    """
+    if backend != "auto":
+        return backend
+    if which_binary("trivy"):
+        print("⚙️  [auto] 检测到 trivy，使用官方 Trivy 后端")
+        return "trivy"
+    if which_binary("dependency-check") or which_binary("dependency-check.sh"):
+        print("⚙️  [auto] 检测到 OWASP dependency-check，使用官方 OWASP 后端")
+        return "owasp"
+    print("⚠️  [auto] 未检测到官方二进制 (trivy / dependency-check)，"
+          "回落 offline 离线比对模式", file=sys.stderr)
+    return "offline"
+
+
+def run_official_backend(backend: str) -> int:
+    """PHASE106 T1: 调用官方工具产真实 CVE 报告，映射 exit 码。
+
+    - trivy:  trivy fs --format json --output <out> <pom>
+    - owasp:  dependency-check --scan <pom> --format JSON --out <dir>
+    官方工具调用失败(rc!=0 / 超时 / 二进制缺失) → ERROR + exit 2；
+    解析后按命中 CRITICAL/HIGH 决定 exit 0/1。
+    """
+    if backend == "trivy":
+        return _run_trivy()
+    elif backend == "owasp":
+        return _run_owasp()
+    else:
+        print(f"❌ 未知官方后端: {backend}", file=sys.stderr)
+        return 2
+
+
+def _run_trivy() -> int:
+    out = POM_DIR / "target" / "trivy-report.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["trivy", "fs", "--format", "json", "--output", str(out),
+           "--skip-dirs", "target", str(POM_DIR)]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=OFFICIAL_TIMEOUT)
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"❌ trivy 调用失败: {e}", file=sys.stderr)
+        return 2
+    if proc.returncode != 0:
+        print(f"❌ trivy 扫描失败 (rc={proc.returncode})", file=sys.stderr)
+        print((proc.stderr or proc.stdout)[-2000:], file=sys.stderr)
+        return 2
+    return _report_from_official(out, "trivy")
+
+
+def _run_owasp() -> int:
+    out_dir = POM_DIR / "target" / "owasp-output"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    bin_name = "dependency-check"
+    if not which_binary(bin_name) and which_binary("dependency-check.sh"):
+        bin_name = "dependency-check.sh"
+    cmd = [bin_name, "--scan", str(POM_DIR / "pom.xml"),
+           "--format", "JSON", "--out", str(out_dir)]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=OFFICIAL_TIMEOUT)
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"❌ OWASP dependency-check 调用失败: {e}", file=sys.stderr)
+        return 2
+    if proc.returncode != 0:
+        print(f"❌ OWASP 扫描失败 (rc={proc.returncode})", file=sys.stderr)
+        print((proc.stderr or proc.stdout)[-2000:], file=sys.stderr)
+        return 2
+    # OWASP 输出名固定为 dependency-check-report.json
+    report_file = out_dir / "dependency-check-report.json"
+    if not report_file.exists():
+        print(f"❌ OWASP 报告缺失: {report_file}", file=sys.stderr)
+        return 2
+    return _report_from_official(report_file, "owasp")
+
+
+def _report_from_official(report_file: Path, backend: str) -> int:
+    """解析官方工具 JSON，按命中 CRITICAL/HIGH 决定 exit 码。
+
+    trivy: 结果结构 {"Results":[{"Vulnerabilities":[{"VulnerabilityID","Severity"}]}]}
+    owasp: 结果结构 {"vulnerabilities":[{"cve","severity"}]}
+    """
+    try:
+        data = json.loads(report_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"❌ 解析 {backend} 报告失败: {e}", file=sys.stderr)
+        return 2
+
+    findings: list[tuple[str, str]] = []  # (id, severity)
+    if backend == "trivy":
+        for res in data.get("Results", []):
+            for vuln in res.get("Vulnerabilities", []):
+                findings.append((vuln.get("VulnerabilityID", "UNKNOWN"),
+                                 vuln.get("Severity", "UNKNOWN").upper()))
+    elif backend == "owasp":
+        for vuln in data.get("vulnerabilities", []):
+            findings.append((vuln.get("cve", "UNKNOWN"),
+                            (vuln.get("severity") or "UNKNOWN").upper()))
+
+    blocking = [f for f in findings if f[1] in BLOCK_LEVELS]
+    print(f"[{backend}] 命中 {len(findings)} 条漏洞，阻断级 {len(blocking)} 条")
+    for cid, sev in sorted(blocking, key=lambda f: -SEVERITY_ORDER.get(f[1], 0)):
+        print(f"  [{sev:8}] {cid}")
+    print("=" * 62)
+    return 1 if blocking else 0
+
 
 def run_dependency_tree() -> list[dict]:
     """离线跑 mvn dependency:tree 并解析依赖清单。
@@ -150,7 +273,35 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", help="输出 JSON 报告路径")
     ap.add_argument("--sbom", help="额外输出 SBOM 清单路径")
+    ap.add_argument("--backend", choices=["auto", "trivy", "owasp", "offline"],
+                    default="auto",
+                    help="漏洞扫描后端: auto(默认，自动探测官方工具，回落离线)/"
+                         "trivy/owasp(强制官方工具，缺失则报错)/offline(强制离线比对)")
     args = ap.parse_args()
+
+    # PHASE106 T1: 双轨后端 —— 显式指定官方后端时，缺失即报错，不静默回落
+    resolved = detect_backend(args.backend)
+    if resolved in ("trivy", "owasp"):
+        # 显式指定官方后端必须保证二进制存在，否则 exit 2（红线：不得静默）
+        required = "trivy" if resolved == "trivy" else "dependency-check"
+        if not which_binary(required) and not (resolved == "owasp" and which_binary("dependency-check.sh")):
+            print(f"❌ 指定 --backend {resolved} 但未找到 '{required}' 二进制，"
+                  f"请安装或使用 --backend auto/offline", file=sys.stderr)
+            return 2
+        print("=" * 62)
+        print(f"Java 依赖漏洞扫描（官方 {resolved} 后端）")
+        print("=" * 62)
+        rc = run_official_backend(resolved)
+        if args.json:
+            out = Path(args.json)
+            if not out.is_absolute():
+                out = POM_DIR / "target" / out.name
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(
+                {"backend": resolved, "exit_code": rc},
+                ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"JSON 报告: {out}")
+        return rc
 
     print("=" * 62)
     print("Java 依赖漏洞扫描（离线替代方案）")
@@ -196,6 +347,7 @@ def main() -> int:
     print(f"阻断级（CRITICAL/HIGH）: {len(blocking)} 条")
 
     report = {
+        "backend": "offline",
         "total_dependencies": len(deps),
         "vuln_db_entries": len(vulns),
         "findings": findings,

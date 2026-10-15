@@ -163,4 +163,46 @@ class WorkflowTriggerListenerTest {
     private static int anyInt() {
         return org.mockito.ArgumentMatchers.anyInt();
     }
+
+    @Test
+    void onRecordChange_nestedTrigger_blockedSkipsEngine() {
+        // 同一 recordId 已在执行栈中 → NestedTriggerGuard.tryPush 返回 false → 阻断
+        WorkflowEntity w = workflow();
+        when(matcher.findMatching(any())).thenReturn(List.of(w));
+
+        // 预先 push 相同 recordId，模拟嵌套执行
+        String recordId = UUID.randomUUID().toString();
+        NestedTriggerGuard.clear();
+        NestedTriggerGuard.tryPush(recordId); // 已入栈
+
+        listener.onRecordChange(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.CREATE, "orders", recordId,
+                Map.of(), "tenant_default", UUID.randomUUID()));
+
+        // 因嵌套被阻断，引擎未调用
+        verify(engine, never()).executeFrom(any(), anyList(), anyInt(), any());
+        verify(engine, never()).executeGraphFrom(any(), anyList(), anyList(), anyString(), any());
+        NestedTriggerGuard.clear();
+    }
+
+    @Test
+    void toJson_nullData_defaultsToEmptyMap() {
+        // event.data == null → toJson 走 data==null 分支（Map.of()）
+        WorkflowEntity w = workflow();
+        when(matcher.findMatching(any())).thenReturn(List.of(w));
+        when(engine.executeFrom(any(), anyList(), anyInt(), any()))
+                .thenReturn(WorkflowEngine.NodeResult.CONTINUE);
+
+        RecordChangeEvent e = new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.UPDATE, "orders",
+                UUID.randomUUID().toString(), null, "tenant_default", UUID.randomUUID());
+
+        listener.onRecordChange(e);
+
+        org.mockito.ArgumentCaptor<WorkflowInstanceEntity> captor =
+                org.mockito.ArgumentCaptor.forClass(WorkflowInstanceEntity.class);
+        verify(engine).executeFrom(captor.capture(), anyList(), anyInt(), any());
+        // data 为 null 时被替换为空 Map（不出现 NPE）
+        assertThat(captor.getValue().getTriggerDataJson()).contains("\"data\"");
+    }
 }

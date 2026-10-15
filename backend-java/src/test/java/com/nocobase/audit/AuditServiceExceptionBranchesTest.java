@@ -121,6 +121,19 @@ class AuditServiceExceptionBranchesTest {
     }
 
     @Test
+    void log_requestContextGetRequestThrows_logsError() {
+        // 设置一个 getRequest() 抛异常的 ServletRequestAttributes
+        ServletRequestAttributes badAttrs = mock(ServletRequestAttributes.class);
+        when(badAttrs.getRequest()).thenThrow(new RuntimeException("boom"));
+        RequestContextHolder.setRequestAttributes(badAttrs);
+
+        service.log("t1", UUID.randomUUID(), "u1", "action", "res", "rid", Map.of("k", "v"));
+
+        verify(repo).save(any(AuditLogEntity.class));
+        // 62-66 行已执行（catch 块）
+    }
+
+    @Test
     void count_delegatesToRepo() {
         when(repo.countByTenantId("t1")).thenReturn(42L);
         assertThat(service.count("t1")).isEqualTo(42L);

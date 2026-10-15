@@ -1,5 +1,6 @@
 package com.nocobase.view;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -183,5 +184,49 @@ class ViewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.message").value("deleted"));
+    }
+
+    /* === GET /api/views/{id}/timeline-records === */
+
+    @Test
+    void timelineRecords_notTimelineType_returns400() throws Exception {
+        login("00000000-0000-0000-0000-000000000001", "alice", "tenant_default");
+        ViewEntity v = makeView("00000000-0000-0000-0000-000000000010");
+        v.setType(ViewEntity.Type.TABLE);
+        when(service.get(eq(v.getId()), eq("tenant_default"))).thenReturn(v);
+
+        mockMvc.perform(get("/api/views/{id}/timeline-records", v.getId()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void timelineRecords_timelineType_returnsRecords() throws Exception {
+        login("00000000-0000-0000-0000-000000000001", "alice", "tenant_default");
+        ViewEntity v = makeView("00000000-0000-0000-0000-000000000010");
+        v.setType(ViewEntity.Type.TIMELINE);
+        when(service.get(eq(v.getId()), eq("tenant_default"))).thenReturn(v);
+        when(service.listTimelineRecords(eq(v), eq(200), any(), any()))
+                .thenReturn(List.of(Map.of("due_date", "2024-01-01")));
+
+        mockMvc.perform(get("/api/views/{id}/timeline-records", v.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    void get_withNullTitleAndUpdatedAt_dtoUsesFallbacks() throws Exception {
+        login("00000000-0000-0000-0000-000000000001", "alice", "tenant_default");
+        ViewEntity v = makeView("00000000-0000-0000-0000-000000000010");
+        v.setTitle(null);
+        v.setUpdatedAt(null);
+        when(service.get(eq(v.getId()), eq("tenant_default"))).thenReturn(v);
+
+        mockMvc.perform(get("/api/views/{id}", v.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("my_view")) // title 为 null → 用 name
+                .andExpect(jsonPath("$.data.updated_at").value(nullValue()))
+                .andExpect(jsonPath("$.data.created_by").value(nullValue()));
     }
 }

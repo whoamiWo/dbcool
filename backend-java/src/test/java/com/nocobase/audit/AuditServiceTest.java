@@ -2,6 +2,7 @@ package com.nocobase.audit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,9 +11,13 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * PHASE105: AuditService 覆盖（正常日志、payload 序列化、异常分支）。
@@ -28,6 +33,11 @@ public class AuditServiceTest {
         repo = mock(AuditLogRepository.class);
         mapper = new ObjectMapper();
         service = new AuditService(repo, mapper);
+    }
+
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -57,6 +67,39 @@ public class AuditServiceTest {
         };
         service.log("tenant1", "u1", "alice", "op", "r", "rid", badPayload);
         verify(repo).save(any(AuditLogEntity.class));
+    }
+
+    @Test
+    void log_saveFailed_logsErrorDoesNotThrow() {
+        when(repo.save(any(AuditLogEntity.class))).thenThrow(new RuntimeException("save failed"));
+        assertDoesNotThrow(() -> service.log("tenant1", "u1", "alice", "op", "r", "rid", Map.of()));
+    }
+
+    @Test
+    void log_withXForwardedFor_setsIpFromXFF() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.addHeader("X-Forwarded-For", "1.2.3.4, 5.6.7.8");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        service.log("t1", "u1", "alice", "op", "r", "rid", null);
+        verify(repo).save(argThat((AuditLogEntity e) -> "1.2.3.4".equals(e.getIp())));
+    }
+
+    @Test
+    void log_withoutXForwardedFor_setsIpFromRemoteAddr() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setRemoteAddr("192.168.0.1");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        service.log("t1", "u1", "alice", "op", "r", "rid", null);
+        verify(repo).save(argThat((AuditLogEntity e) -> "192.168.0.1".equals(e.getIp())));
+    }
+
+    @Test
+    void log_withLongUserAgent_truncatesTo250Chars() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.addHeader("User-Agent", "x".repeat(300));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+        service.log("t1", "u1", "alice", "op", "r", "rid", null);
+        verify(repo).save(argThat((AuditLogEntity e) -> e.getUserAgent() != null && e.getUserAgent().length() == 250));
     }
 
     @Test

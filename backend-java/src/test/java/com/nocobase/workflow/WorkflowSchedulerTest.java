@@ -218,6 +218,50 @@ class WorkflowSchedulerTest {
         verify(redisTemplate).delete(eq("workflow:schedule:lock:" + wfId));
     }
 
+    @Test
+    void poll_cronExpressionNonString_skipped() {
+        // expression 不是字符串 → parseCron 内 !(v instanceof String expr) 返回 null
+        WorkflowEntity w = workflow(true, "{\"type\":\"cron\",\"expression\":123}", null);
+        when(workflowRepository.findAll()).thenReturn(List.of(w));
+        when(valueOps.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(true);
+
+        scheduler.pollScheduledWorkflows();
+        verify(engine, never()).executeFrom(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void poll_cronTypeMismatch_skipped() {
+        // type 不是 cron → parseCron 返回 null
+        WorkflowEntity w = workflow(true, "{\"type\":\"interval\",\"expression\":\"* * * * * *\"}", null);
+        when(workflowRepository.findAll()).thenReturn(List.of(w));
+        when(valueOps.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(true);
+
+        scheduler.pollScheduledWorkflows();
+        verify(engine, never()).executeFrom(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void poll_scheduleIntervalZero_skipped() {
+        // intervalMinutes 为 0 → parseIntervalMinutes 返回 null
+        WorkflowEntity w = workflow(true, "{\"type\":\"schedule\",\"intervalMinutes\":0}", null);
+        when(workflowRepository.findAll()).thenReturn(List.of(w));
+        when(valueOps.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(true);
+
+        scheduler.pollScheduledWorkflows();
+        verify(engine, never()).executeFrom(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void poll_scheduleIntervalNegative_skipped() {
+        // intervalMinutes 为负数 → 不满足 n.intValue() > 0 → 返回 null
+        WorkflowEntity w = workflow(true, "{\"type\":\"schedule\",\"intervalMinutes\":-5}", null);
+        when(workflowRepository.findAll()).thenReturn(List.of(w));
+        when(valueOps.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(true);
+
+        scheduler.pollScheduledWorkflows();
+        verify(engine, never()).executeFrom(any(), any(), anyInt(), any());
+    }
+
     private WorkflowEntity workflow(boolean enabled, String triggerJson, Instant lastTriggeredAt) {
         WorkflowEntity w = new WorkflowEntity();
         w.setId(UUID.randomUUID());

@@ -127,4 +127,21 @@ class WorkflowGraphValidatorTest {
                 edge("n2", "n4"), edge("n3", "n4"));
         assertThatCode(() -> validator.validate(nodes, edges)).doesNotThrowAnyException();
     }
+
+    @Test
+    void nullNodeElement_isSkipped() {
+        // 节点列表含 null 元素 → n==null 分支,不抛 NPE
+        assertThatCode(() -> validator.validate(
+                java.util.Arrays.asList(node("n1"), null), List.of()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void nullEdgeElement_isSkipped() {
+        // 边列表含 null 元素或缺 source/target → 跳过该边
+        List<Map<String, Object>> nodes = List.of(node("n1"), node("n2"));
+        List<Map<String, Object>> edges = java.util.Arrays.asList(
+                null, edge("n1", "n2"), Map.of("source", "n1"));
+        assertThatCode(() -> validator.validate(nodes, edges)).doesNotThrowAnyException();
+    }
 }

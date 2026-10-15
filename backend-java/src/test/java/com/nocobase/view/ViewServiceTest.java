@@ -195,4 +195,45 @@ class ViewServiceTest {
                 org.mockito.ArgumentMatchers.isNull()
         );
     }
+
+    @Test
+    void listTimelineRecords_filterStartEnd_appliesIntervalFilter() {
+        ViewEntity v = makeView("tl2");
+        v.setType(ViewEntity.Type.TIMELINE);
+        v.setConfigJson("{\"dateField\":\"due_date\"}");
+        when(collSvc.listRecords(any(), any(), anyInt(), any(), any()))
+                .thenReturn(List.of(
+                        Map.of("due_date", "2024-01-05"),
+                        Map.of("due_date", "2024-03-10"),
+                        Map.of() // 缺字段 → 被过滤
+                ));
+
+        List<Map<String, Object>> res = service.listTimelineRecords(v, 50, "2024-01-01", "2024-02-28");
+
+        // 区间 [01-01, 02-28] 仅保留 due_date=2024-01-05
+        assertEquals(List.of("2024-01-05"),
+                res.stream().map(m -> m.get("due_date")).toList());
+    }
+
+    @Test
+    void listTimelineRecords_descSort_addsMinusPrefix() {
+        ViewEntity v = makeView("tl3");
+        v.setType(ViewEntity.Type.TIMELINE);
+        // 注意: ViewService:117 当前实现仅在 sortDirection=="-" 时加前缀，
+        // 文档写 desc 但实际匹配 "-"。此处按实际行为断言（疑似缺陷，已在 PHASE106 登记）。
+        v.setConfigJson("{\"dateField\":\"due_date\",\"sortDirection\":\"-\"}");
+        when(collSvc.listRecords(any(), any(), anyInt(), any(), any()))
+                .thenReturn(List.of(Map.of("due_date", "2024-05-01")));
+
+        service.listTimelineRecords(v, 50, null, null);
+
+        // desc → sortExpr 带 "-" 前缀（ViewService:117）
+        org.mockito.Mockito.verify(collSvc).listRecords(
+                org.mockito.ArgumentMatchers.eq("posts"),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(50),
+                org.mockito.ArgumentMatchers.eq("-due_date"),
+                org.mockito.ArgumentMatchers.isNull()
+        );
+    }
 }
