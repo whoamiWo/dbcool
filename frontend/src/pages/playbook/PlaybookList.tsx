@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import apiClient from '@/api/client';
+import EmptyState from '@/components/EmptyState';
 
 export interface Playbook {
   id: string;
@@ -111,9 +112,12 @@ export function PlaybookListPage() {
           ))}
           {list.length === 0 && (
             <Grid size={{ xs: 12 }}>
-              <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>
-                暂无剧本,点击右上角「新建剧本」开始
-              </Typography>
+              <EmptyState
+                title="还没有剧本"
+                description="创建第一个剧本,将多步骤操作编排为可复用的自动化流程"
+                actionLabel="新建剧本"
+                onAction={() => setCreateOpen(true)}
+              />
             </Grid>
           )}
         </Grid>

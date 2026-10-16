@@ -10,6 +10,7 @@ import DoneIcon from '@mui/icons-material/DoneAll';
 import EventIcon from '@mui/icons-material/Bolt';
 import apiClient from '@/api/client';
 import type { Playbook } from './PlaybookList';
+import EmptyState from '@/components/EmptyState';
 
 export interface PlaybookRun {
   id: string;
@@ -235,9 +236,12 @@ export function PlaybookRunPage() {
                   )}
                 </Box>
               ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  尚未运行,点击右上角「运行」发起第一次执行
-                </Typography>
+                <EmptyState
+                  title="还没有运行"
+                  description="点击右上角「运行」发起第一次执行，启动你的剧本"
+                  actionLabel="运行"
+                  onAction={() => runMutation.mutate()}
+                />
               )}
 
               <Divider sx={{ my: 1.5 }} />

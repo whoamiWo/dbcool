@@ -31,11 +31,11 @@ test.describe('Wiki Phase 1 E2E', () => {
     // 进入文档列表（点击刚创建的知识库"查看"按钮）
     await page.getByRole('button', { name: '查看' }).first().click();
     await page.waitForLoadState('networkidle');
-    // 等待文档列表加载（新建文档按钮可见）
-    await expect(page.getByRole('button', { name: '新建文档' })).toBeVisible();
+    // 等待文档列表加载（新建文档按钮可见；顶部工具栏与空态 CTA 可能同名）
+    await expect(page.getByRole('button', { name: '新建文档' }).first()).toBeVisible();
 
     // 创建文档
-    await page.getByRole('button', { name: '新建文档' }).click();
+    await page.getByRole('button', { name: '新建文档' }).first().click();
     await page.getByLabel('标题').fill('测试文档');
     await page.getByLabel('Slug').fill('test-doc');
     await page.getByLabel('内容').fill('# 测试内容\n\nHello Wiki');

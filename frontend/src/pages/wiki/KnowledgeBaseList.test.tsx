@@ -35,10 +35,13 @@ describe('KnowledgeBaseListPage', () => {
       </QueryClientProvider>,
     );
 
-  it('空列表显示"暂无知识库"', async () => {
+  it('空列表显示带 CTA 的空态', async () => {
     vi.mocked(wikiApi.listKb).mockResolvedValue([] as any);
     renderPage();
-    expect(await screen.findByText(/暂无知识库/)).toBeInTheDocument();
+    expect(await screen.findByText(/还没有知识库/)).toBeInTheDocument();
+    // 空态必须提供可执行的下一步，而非仅文字引导
+    // 顶部工具栏与空态 CTA 各有一个"新建知识库"按钮，断言至少存在
+    expect(screen.getAllByRole('button', { name: '新建知识库' }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('有数据:渲染知识库卡片', async () => {

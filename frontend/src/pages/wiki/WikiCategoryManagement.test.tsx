@@ -35,10 +35,12 @@ describe('WikiCategoryManagementPage', () => {
       </QueryClientProvider>,
     );
 
-  it('空树显示"暂无分类"', async () => {
+  it('空树显示带 CTA 的空态', async () => {
     vi.mocked(wikiApi.listCategories).mockResolvedValue([] as any);
     renderPage();
-    expect(await screen.findByText(/暂无分类/)).toBeInTheDocument();
+    expect(await screen.findByText(/还没有分类/)).toBeInTheDocument();
+    // 顶部工具栏与空态 CTA 各有一个"新建分类"按钮，断言至少存在
+    expect(screen.getAllByRole('button', { name: '新建分类' }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('渲染分类树节点', async () => {

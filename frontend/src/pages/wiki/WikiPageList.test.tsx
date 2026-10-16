@@ -39,11 +39,13 @@ describe('WikiPageListPage', () => {
       </QueryClientProvider>,
     );
 
-  it('空列表显示"暂无文档"', async () => {
+  it('空列表显示带 CTA 的空态', async () => {
     vi.mocked(wikiApi.getKb).mockResolvedValue({ data: { id: 'kb1', name: 'KB' } } as any);
     vi.mocked(wikiApi.listPages).mockResolvedValue([] as any);
     renderPage();
-    expect(await screen.findByText(/暂无文档/)).toBeInTheDocument();
+    expect(await screen.findByText(/还没有文档/)).toBeInTheDocument();
+    // 顶部工具栏与空态 CTA 各有一个"新建文档"按钮，断言至少存在
+    expect(screen.getAllByRole('button', { name: '新建文档' }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('有数据:渲染页面表格', async () => {

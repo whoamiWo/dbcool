@@ -20,6 +20,7 @@ import {
 import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { wikiApi } from '@/api/wiki';
 import type { KnowledgeBase } from '@/types/wiki';
+import EmptyState from '@/components/EmptyState';
 
 export function KnowledgeBaseListPage() {
   const navigate = useNavigate();
@@ -92,11 +93,12 @@ export function KnowledgeBaseListPage() {
       {isLoading ? (
         <Typography>加载中...</Typography>
       ) : kbList.length === 0 ? (
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary">暂无知识库，点击上方按钮创建</Typography>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="还没有知识库"
+          description="创建第一个知识库，开始沉淀组织内的文档与知识"
+          actionLabel="新建知识库"
+          onAction={() => setOpen(true)}
+        />
       ) : (
         <Grid container spacing={2}>
           {kbList.map((kb: KnowledgeBase) => (

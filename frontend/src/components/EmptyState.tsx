@@ -24,6 +24,8 @@ export interface EmptyStateProps {
   actionLabel?: string;
   /** CTA 回调 */
   onAction?: () => void;
+  /** CTA 禁用（如异步操作进行中） */
+  actionDisabled?: boolean;
   /** 自定义高度占位 */
   minHeight?: number | string;
 }
@@ -33,6 +35,7 @@ export function EmptyState({
   description,
   actionLabel,
   onAction,
+  actionDisabled = false,
   minHeight = 200,
 }: EmptyStateProps) {
   return (
@@ -57,7 +60,13 @@ export function EmptyState({
         </Typography>
       )}
       {actionLabel && onAction && (
-        <Button variant="contained" size="small" onClick={onAction} sx={{ mt: 1 }}>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={onAction}
+          disabled={actionDisabled}
+          sx={{ mt: 1 }}
+        >
           {actionLabel}
         </Button>
       )}

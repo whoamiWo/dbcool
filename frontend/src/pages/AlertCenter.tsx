@@ -4,6 +4,7 @@ import apiClient from '@/api/client';
 import { subscribeToAlerts } from '@/lib/stompClient';
 import { useAuthStore } from '@/stores/auth';
 import { ErrorState } from '@/components/ErrorState';
+import EmptyState from '@/components/EmptyState';
 
 /**
  * R11 / R15 告警监控中心 — 运维可观测性页面.
@@ -588,9 +589,13 @@ export function AlertCenterPage() {
           </div>
         </div>
         {events.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            ✅ 当前无告警。可点击右上角"触发一次 LLM 调用"产生新事件。
-          </div>
+          <EmptyState
+            title="当前无告警"
+            description="系统运行正常。可手动触发一次 LLM 调用，验证告警链路是否通畅"
+            actionLabel="触发一次 LLM 调用"
+            onAction={() => simulateMutation.mutate()}
+            actionDisabled={simulateMutation.isPending}
+          />
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

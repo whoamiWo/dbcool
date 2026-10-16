@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useParams } from 'react-router-dom';
 import { wikiApi } from '@/api/wiki';
+import EmptyState from '@/components/EmptyState';
 import type { WikiCategory } from '@/types/wiki';
 
 export function WikiCategoryManagementPage() {
@@ -227,9 +228,12 @@ export function WikiCategoryManagementPage() {
           <CircularProgress />
         </Box>
       ) : categories.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="textSecondary">暂无分类，点击上方按钮创建</Typography>
-        </Paper>
+        <EmptyState
+          title="还没有分类"
+          description="创建第一个分类，组织知识库的层级结构"
+          actionLabel="新建分类"
+          onAction={handleAdd}
+        />
       ) : (
         <Paper sx={{ p: 3 }}>
           <CategoryTree items={treeData} />

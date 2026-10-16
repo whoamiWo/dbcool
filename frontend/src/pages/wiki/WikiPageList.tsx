@@ -24,6 +24,7 @@ import {
   Alert,
 } from '@mui/material';
 import { IconButtonA11y } from '@/components/IconButtonA11y';
+import EmptyState from '@/components/EmptyState';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -175,11 +176,12 @@ export function WikiPageListPage() {
           <CircularProgress />
         </Box>
       ) : pages.length === 0 ? (
-        <Paper>
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography color="textSecondary">暂无文档，点击上方按钮创建</Typography>
-          </Box>
-        </Paper>
+        <EmptyState
+          title="还没有文档"
+          description="创建第一篇文档，沉淀你的知识与经验"
+          actionLabel="新建文档"
+          onAction={handleCreate}
+        />
       ) : isMobile ? (
         <Box className="wiki-page-list" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {pages.map((page: WikiPage) => (
