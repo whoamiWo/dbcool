@@ -19,10 +19,6 @@ export default function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadIntegrations();
-  }, []);
-
   const loadIntegrations = async () => {
     try {
       setLoading(true);
@@ -39,6 +35,10 @@ export default function IntegrationsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadIntegrations();
+  }, []);
 
   const handleInstall = async (id: string) => {
     try {

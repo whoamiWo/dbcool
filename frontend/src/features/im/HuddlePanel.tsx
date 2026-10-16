@@ -339,9 +339,9 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             ) : (
+              // eslint-disable-next-line jsx-a11y/media-has-caption -- WebRTC 实时流无字幕轨道，无法提供 captions
               <video
                 aria-label="远端参会者视频画面"
-                // eslint-disable-next-line jsx-a11y/media-has-caption -- WebRTC 实时流无字幕轨道，无法提供 captions
                 ref={(el) => { if (el) peerVideoRefs.current.set(peer.id, el); }}
                 autoPlay
                 playsInline
