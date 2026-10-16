@@ -12,6 +12,7 @@ PHASE92 收尾：存储配额 / 席位配额的**端到端**验证（真实 HTTP
 判定：两个场景都必须出现 403，否则退出码非 0。
 """
 
+import base64
 import json
 import os
 import sys
@@ -24,6 +25,21 @@ USERNAME = os.environ.get("USERNAME", "admin")
 PASSWORD = os.environ.get("PASSWORD", "admin123")
 
 results = []
+
+
+def token_tenant(token: str) -> str | None:
+    """从 access_token 的 JWT payload 解析 tid（当前登录用户所属租户）。
+
+    上传附件归属的是「登录用户的租户」，而对某个 admin 租户设配额不会影响它。
+    此前场景一给 tenants[0]（tenant_c）设 storageLimit，但上传落到 tenant_default，
+    导致配额根本没被测到（返回 200）并被误判为"存储配额失效"。
+    """
+    try:
+        seg = token.split(".")[1]
+        seg += "=" * (-len(seg) % 4)
+        return json.loads(base64.urlsafe_b64decode(seg)).get("tid")
+    except Exception:
+        return None
 
 
 def request(method, path, token=None, body=None, headers=None, timeout=20):
@@ -70,8 +86,11 @@ def main():
     if not tenants:
         print("无租户数据，无法验证")
         return 1
-    tid = tenants[0].get("id")
-    print("目标租户: %s\n" % tid)
+    # 配额校验作用于 body 里的 tenantId，而 /api/tenant/quota 返回的是「当前登录用户
+    # 所属租户」的用量。此前 tid 取 tenants[0]（tenant_c）与 quota API 的租户不一致，
+    # 导致"已用量"与"被设上限的租户"错配，把后端的正确放行(201)误判为配额失效。
+    tid = token_tenant(token) or tenants[0].get("id")
+    print("目标租户(配额设置与用户关联均作用于此): %s\n" % tid)
 
     # 3) 记录原始配额（便于恢复）
     st, body = request("GET", "/api/tenant/quota", token=token)
@@ -83,22 +102,36 @@ def main():
 
     # ============ 场景一：存储配额 ============
     print("=== 场景一：存储配额超限须 403 ===")
+    # 上传归属「登录用户的租户」，因此必须对那个租户设配额，
+    # 否则测的是别的租户、配额实际从未被触达（曾误判为存储配额失效）。
+    storage_tid = token_tenant(token) or tid
+    print("（存储配额作用于租户: %s）" % storage_tid)
     tiny = 1024  # 1 KB
-    st, _ = request("PUT", "/api/admin/tenants/%s/quota" % tid, token=token,
+    st, _ = request("PUT", "/api/admin/tenants/%s/quota" % storage_tid, token=token,
                     body={"storageLimit": tiny})
     check("设置 storageLimit=%d 成功" % tiny, st == 200, "HTTP %s" % st)
 
     # 上传 ~8KB（远超 1KB 上限）
+    # 后端 AttachmentController#upload 用 @RequestPart("file") MultipartFile，
+    # 必须是 multipart/form-data；此前用 octet-stream 会导致后端 500
+    # "Current request is not a multipart request"，把脚本 bug 伪装成配额缺陷。
+    # 后端有文件类型白名单（image/png、image/jpeg 等），用 png 才能触达配额校验，
+    # 否则先被 400「不允许的文件类型」拦下，测不到存储配额本身。
     payload = os.urandom(8 * 1024)
-    st, body = request("POST", "/api/attachments/upload", token=token, body=payload,
-                       headers={"Content-Type": "application/octet-stream",
-                                "X-File-Name": "quota-probe.bin"})
+    boundary = "----quotaProbeBoundary"
+    body_bytes = (
+        '--%s\r\n'
+        'Content-Disposition: form-data; name="file"; filename="quota-probe.png"\r\n'
+        'Content-Type: image/png\r\n\r\n' % boundary
+    ).encode() + payload + ('\r\n--%s--\r\n' % boundary).encode()
+    st, body = request("POST", "/api/attachments/upload", token=token, body=body_bytes,
+                       headers={"Content-Type": "multipart/form-data; boundary=%s" % boundary})
     check("上传 8KB（上限 1KB）须被拒 403", st == 403,
           "HTTP %s %s" % (st, body[:120].decode("utf-8", "ignore")))
 
     # 恢复
     if orig_storage is not None:
-        request("PUT", "/api/admin/tenants/%s/quota" % tid, token=token,
+        request("PUT", "/api/admin/tenants/%s/quota" % storage_tid, token=token,
                 body={"storageLimit": orig_storage})
 
     # ============ 场景二：席位配额 ============

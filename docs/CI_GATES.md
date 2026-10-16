@@ -22,6 +22,11 @@
 | SaaS 就绪 | `python3 scripts/saas-readiness-verify.py` | 11 / 11 | 检查 T1/T2/T3 三项 |
 | 冒烟 | `python3 scripts/smoke.py` | 11 / 11 | 检查服务是否全部 healthy |
 | 生产检查 | `python3 scripts/startup-checklist.py` | 全 PASS | 按清单逐项修 |
+| 依赖漏洞扫描（离线替代） | `python3 scripts/java-dependency-audit.py` | 0 高危 | 补 `config/known-vulnerabilities.json` 或升级依赖 |
+| 密钥轮换验证 | `python3 scripts/key-rotation-verify.py` | 3/3 断言 | 见 `docs/key-rotation-runbook.md` |
+| 配额端到端 | `python3 scripts/quota-e2e-verify.py` | 5/5 | 检查存储/席位配额链路 |
+| 证书生命周期 | `./scripts/cert-lifecycle.sh check` | exit 0 | 见 `PHASE100_DEPLOY_GUIDE.md` §4.1 |
+| 上线终验编排 | `python3 scripts/launch-final-verify.py` | 8/8 | 看失败项输出 |
 
 ---
 

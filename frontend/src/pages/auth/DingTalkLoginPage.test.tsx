@@ -7,10 +7,18 @@ import * as integrations from '@/api/integrations';
 
 vi.mock('@/api/integrations', () => ({
   dingtalkApi: {
-    getAuthUrl: vi.fn(() => ({ data: { url: '/auth-url' } })),
+    getAuthUrl: vi.fn(() => Promise.resolve({
+      code: 0,
+      message: 'success',
+      data: { authUrl: '/auth-url' },
+    })),
   },
   wecomApi: {
-    getAuthUrl: vi.fn(() => ({ data: { url: '/auth-url' } })),
+    getAuthUrl: vi.fn(() => Promise.resolve({
+      code: 0,
+      message: 'success',
+      data: { authUrl: '/auth-url' },
+    })),
   },
 }));
 
@@ -38,8 +46,9 @@ describe('DingTalkLoginPage', () => {
     expect(screen.getByText(/钉钉登录/i)).toBeInTheDocument();
   });
 
-  it('GET /api/dingtalk/auth-url 与后端 @GetMapping 一致（回归测试防 405）', () => {
-    expect(integrations.dingtalkApi.getAuthUrl).toBeDefined();
+  it('GET /api/dingtalk/auth-url 与后端 @GetMapping 一致（回归测试防 405）', async () => {
+    const result = await integrations.dingtalkApi.getAuthUrl()!;
+    expect(result.data?.authUrl).toBe('/auth-url');
   });
 
   it('点击登录按钮时发起 GET 请求而非 POST（防回归）', async () => {
@@ -65,7 +74,8 @@ describe('DingTalkLoginPage', () => {
     mockFetch.mockRestore();
   });
 
-  it('企微 API 也使用 GET 方法（对称性检查）', () => {
-    expect(integrations.wecomApi.getAuthUrl).toBeDefined();
+  it('企微 API 也使用 GET 方法（对称性检查）', async () => {
+    const result = await integrations.wecomApi.getAuthUrl()!;
+    expect(result.data?.authUrl).toBe('/auth-url');
   });
 });

@@ -130,18 +130,38 @@ rollback() {
     PREV_TAG=$(cat .last-deployed-tag)
     log "回滚目标 tag: $PREV_TAG"
 
+    # 验证回滚目标不是空值
+    if [ -z "$PREV_TAG" ]; then
+        err ".last-deployed-tag 为空,无法回滚"
+    fi
+
+    # 记录当前正在运行的 tag,便于回滚失败时对比
+    CURRENT_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    log "当前运行 tag: $CURRENT_TAG → 回滚到: $PREV_TAG"
+
     # 用上一个 tag 重新拉起(镜像已在本机则秒起)
     IMAGE_TAG="$PREV_TAG" docker_cmd compose up -d
 
+    # 等待回滚完成并做带重试的健康检查(首次 10s 可能仍在拉镜像/启动中)
+    local max_attempts=6 attempt=1 health_ok=false
     echo ""
-    ok "已回滚到 tag=$PREV_TAG"
-    echo ""
-    echo -e "${CYAN}健康检查:${RESET}"
-    sleep 10
-    if curl -sf -m 5 http://localhost/api/health >/dev/null 2>&1; then
-        ok "  /api/health 通"
+    echo -e "${CYAN}健康检查(最多重试 ${max_attempts} 次,每次间隔 10s):${RESET}"
+    while [ $attempt -le $max_attempts ]; do
+        if curl -sf -m 5 http://localhost/api/health >/dev/null 2>&1 \
+           || curl -sf -m 5 https://localhost/api/health -k >/dev/null 2>&1; then
+            health_ok=true
+            break
+        fi
+        log "  第 ${attempt}/${max_attempts} 次健康检查未通过,10s 后重试..."
+        sleep 10
+        attempt=$((attempt + 1))
+    done
+
+    if [ "$health_ok" = true ]; then
+        ok "回滚成功: tag=$PREV_TAG, /api/health 通"
     else
-        err "  回滚后 /api/health 仍不通,请人工介入"
+        # 回滚失败:尝试再拉起,但保持 PREV_TAG 不变
+        err "回滚后 /api/health 仍未通,请人工介入"
     fi
 }
 

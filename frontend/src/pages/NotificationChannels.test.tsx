@@ -117,7 +117,8 @@ describe('NotificationChannelsPage', () => {
     await waitFor(() => {
       const calls = fetchMock.mock.calls;
       const postCall = calls.find(c => c[1]?.method === 'POST');
-      expect(postCall).toBeDefined();
+      expect(postCall).not.toBeUndefined();
+      expect(postCall?.[0]).toContain('/api/admin/notification-channels');
     });
   });
 
@@ -142,7 +143,8 @@ describe('NotificationChannelsPage', () => {
     await waitFor(() => {
       const calls = fetchMock.mock.calls;
       const deleteCall = calls.find(c => c[1]?.method === 'DELETE');
-      expect(deleteCall).toBeDefined();
+      expect(deleteCall).not.toBeUndefined();
+      expect(deleteCall?.[0]).toContain('/api/admin/notification-channels/');
     });
   });
 

@@ -58,6 +58,30 @@ volumes:
 
 `/health` 已改为**真实探活**（代理到 `backend-java:8080/api/health`），后端挂掉返回 502。
 
+### 4.1 证书自动化（PHASE110）
+
+用 `scripts/cert-lifecycle.sh` 代替手工 certbot 调用：
+
+```bash
+# 首次签发（ACME，需 80 端口可达）
+./scripts/cert-lifecycle.sh issue 你的域名
+
+# 手动续期
+./scripts/cert-lifecycle.sh renew 你的域名
+
+# 到期检查（供 cron 每日执行 / 部署前校验；剩余 ≤30 天告警，过期则非 0 退出）
+./scripts/cert-lifecycle.sh check
+```
+
+退出码：`0` 有效 / `1` 失败或已过期 / `2` 即将过期（≤30 天）。
+**前置条件**：certbot 已安装、域名已解析、80 端口可达（ACME HTTP-01）、nginx 容器已运行。
+`issue` / `renew` 需真实域名环境，**本地无法实测**（PHASE110 已如实登记）。
+
+建议加每日 cron：
+```cron
+0 3 * * * /path/to/multistack-project/scripts/cert-lifecycle.sh check
+```
+
 ## 5. 可观测性最小集
 
 ```bash
@@ -123,3 +147,18 @@ docker compose logs backend-python 2>&1 | grep <traceId>
 | SaaS 就绪 | `python3 scripts/saas-readiness-verify.py` | 11/11 |
 | 冒烟 | `python3 scripts/smoke.py` | 11/11 |
 | 生产检查 | `python3 scripts/startup-checklist.py` | 全 PASS |
+| 依赖漏洞扫描（离线替代） | `python3 scripts/java-dependency-audit.py` | 0 高危 |
+| 密钥轮换验证 | `python3 scripts/key-rotation-verify.py` | 3/3 断言 |
+| 配额端到端 | `python3 scripts/quota-e2e-verify.py` | 5/5 |
+
+## 11. 运维闭环（PHASE110）
+
+| 主题 | 入口 |
+|---|---|
+| 证书签发/续期/到期 | `scripts/cert-lifecycle.sh`（§4.1） |
+| 密钥轮换（JWT/DB/MinIO/MQ/集成主密钥） | `docs/key-rotation-runbook.md` + `scripts/key-rotation-verify.py` |
+| 灰度放量 + 快速回滚 | `docs/release-rollout-runbook.md` + `./deploy.sh rollback` |
+| 上线前全量门禁 | `scripts/launch-final-verify.py`（8 项串行） |
+
+**当前上线结论**：对外 SaaS **仍不可上线**，唯一阻断项为 P0-3
+（AI 会话删除假实现，见 `docs/PHASE110_UPGRADE_REPORT.md` §5）。其余 P0 均已实测修复。

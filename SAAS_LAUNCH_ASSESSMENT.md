@@ -4,6 +4,12 @@
 > 基线：`origin/main` = `e1a4241`。
 > 全部结论均由本次当场 grep / read 得出，标注 `文件:行号`；**未实测的项已明确标注**。
 > 本文档只做评估，**不改任何产品代码**。修复动作落在 `PHASE95_103_INDEX.md` 及 9 批任务书。
+>
+> **2026-10-17 重评（PHASE110 终验 + 独立审计）**：9 批整改已收口，P0-1/P0-2/P0-4/P0-5/P0-6/P0-7
+> 经实测复验**均已修复**；**P0-3 仍存在唯一阻断项** —— `UserDataErasureService.java:169-175`
+> 的 `eraseAiConversations()` 仍是假实现（仅 `log.warn` + 计数 0）却 `setSuccess(true)`，
+> 属静默成功 + GDPR 合规缺口。因此**对外 SaaS 上线结论维持 ❌**，阻断项由 7 项收窄为 1 项。
+> 详见 `docs/PHASE110_UPGRADE_REPORT.md` §5。
 
 ---
 
@@ -12,8 +18,8 @@
 | 场景 | 结论 | 依据 |
 |---|---|---|
 | 内部 POC / 演示 | ✅ 可上线 | 门禁全绿、7 容器 healthy、核心链路可用 |
-| 内部 200 人自用 | ⚠️ 有条件 —— 需先清 P0-1 ~ P0-4 | 授权与假实现是"能进就能改"级别缺口 |
-| **对外多租户 SaaS** | ❌ **当前不可上线** | 授权层近乎为零、租户隔离事实上未生效、备份不可恢复、默认密钥全量暴露 |
+| 内部 200 人自用 | ✅ 可上线（2026-10-17 重评） | P0-1~P0-4 已清（授权/隔离/假实现残余见下/契约 0 漂移） |
+| **对外多租户 SaaS** | ❌ **仍不可上线**（2026-10-17 重评） | **唯一阻断：P0-3 假实现 `eraseAiConversations()` 未真删除 AI 会话却返回成功**（GDPR 合规缺口）；其余 6 项 P0 均已实测修复 |
 
 **必须完成的 9 批**：`PHASE95`（授权与租户隔离）→ `PHASE96`（假实现清零）→ `PHASE97`（前后端契约）→ `PHASE98`（错误态与好用）→ `PHASE99`（SaaS 必补三项）→ `PHASE100`（Compose 加固）→ `PHASE101`（备份可恢复）→ `PHASE102`（遗留 P0 与容量基线）→ `PHASE103`（CI 硬化）。
 
@@ -122,6 +128,13 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer <TENANT_A_TOK
 
 **可失败验收**：全仓 grep `TODO|FIXME|mock-sent|占位|placeholder` 命中数必须归零或显式登记为"已知未实现并在文档中标注"；新增"禁止静默成功"契约测试（未配置时抛异常而非返回 ok）。
 **对应批次**：PHASE96
+
+**2026-10-17 重评（PHASE110 终验实测）**：本条 8 项证据中，**仅 `UserDataErasureService` 一项仍未闭环**：
+`eraseAiConversations()`（`:169-175`）依旧 `log.warn` + `incrementConversationsErased(0)`，
+而 `:154` `result.setSuccess(true)` → AI 会话实际未删除却返回成功 = 静默成功（红线 2）。
+这是**当前对外 SaaS 的唯一 P0 阻断项**（GDPR/个人数据删除权合规缺口），转 PHASE111 修复：
+需补 `AiConversationEntityRepository` 按 `userId` 的查询并真正匿名化，且成功前不得置 `success=true`。
+其余 P0-3 证据项（入站映射/邮件/BI/SlashCommand/LDAP/钉钉事件）经 PHASE96 整改后已无残留。
 
 ### 3.4 🔴 P0-4　前后端契约系统性漂移 —— "看着有按钮，点了没反应"
 
