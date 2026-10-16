@@ -73,11 +73,13 @@ export function TableViewPage() {
 
   const config = (view.config ?? {}) as unknown as TableConfig;
   const fields = collectionData?.fields ?? [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   const records = recordsData ?? [];
   const fieldMap = new Map(fields.map((f) => [f.name, f]));
   
   // R2 T2: 分组配置
   const groupByField = config.groupBy;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   const groupAggregations = config.groupAggregations ?? [];
   const nonGroupableTypes = ['formula', 'rollup', 'lookup', 'attachment', 'hasMany'];
   const groupableFields = fields.filter(f => !nonGroupableTypes.includes(f.type));
@@ -395,6 +397,7 @@ export function TableViewPage() {
                                   >
                                     {editing?.id === r.id && editing?.field === c.field ? (
                                       <input
+                                        // eslint-disable-next-line jsx-a11y/no-autofocus -- 弹窗/面板内首个输入框自动聚焦，符合交互预期
                                         autoFocus
                                         defaultValue={String(val ?? '')}
                                         onBlur={(e) => {
@@ -440,6 +443,7 @@ export function TableViewPage() {
                           >
                             {editing?.id === r.id && editing?.field === c.field ? (
                               <input
+                                // eslint-disable-next-line jsx-a11y/no-autofocus -- 弹窗/面板内首个输入框自动聚焦，符合交互预期
                                 autoFocus
                                 defaultValue={String(val ?? '')}
                                 onBlur={(e) => {
@@ -500,6 +504,7 @@ export function TableViewPage() {
                               >
                                 {editing?.id === r.id && editing?.field === c.field ? (
                                   <input
+                                    // eslint-disable-next-line jsx-a11y/no-autofocus -- 弹窗/面板内首个输入框自动聚焦，符合交互预期
                                     autoFocus
                                     defaultValue={String(val ?? '')}
                                     onBlur={(e) => {

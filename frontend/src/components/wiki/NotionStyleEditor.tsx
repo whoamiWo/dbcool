@@ -246,14 +246,17 @@ export function NotionStyleEditor({
   }, [blocks, content, onContentChange]);
 
   // 外部 content 变化时同步（数据载入：把 markdown 解析为 blocks 并渲染）
+   
   useEffect(() => {
     lastExternalContentRef.current = content;
     const newBlocks = markdownToBlocks(content);
     // 归一化比较（忽略每次解析生成的随机 block id），避免无谓重渲染
     const stripIds = (bs: Block[]) => JSON.stringify(bs.map(({ id: _id, ...rest }) => rest));
     if (stripIds(newBlocks) !== stripIds(blocks)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setBlocks(newBlocks);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, [content]);
 
   // ============================================================
@@ -365,8 +368,10 @@ export function NotionStyleEditor({
   }, [kbId]);
 
   // 初始加载反向链接和模板
+   
   useEffect(() => {
     if (_page?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       loadBacklinks();
     }
     loadTemplates();
@@ -827,6 +832,7 @@ export function NotionStyleEditor({
       >
         <Box sx={{ p: 1 }}>
           <TextField
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- 弹窗/面板内首个输入框自动聚焦，符合交互预期
             autoFocus
             size="small"
             placeholder="搜索块类型..."

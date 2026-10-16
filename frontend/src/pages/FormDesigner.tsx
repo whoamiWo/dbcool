@@ -67,9 +67,11 @@ export function FormDesignerPage() {
     enabled: !!id,
   });
 
+   
   useEffect(() => {
     if (formData) {
       const f = formData;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setTitle(f.title);
       setDescription(f.description);
       setLayout(f.layout);
@@ -78,8 +80,10 @@ export function FormDesignerPage() {
   }, [formData]);
 
   /** 当 collectionData 字段变化时同步到可编辑状态。 */
+   
   useEffect(() => {
     if (collectionData?.fields) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setFields(collectionData.fields);
     }
   }, [collectionData?.fields]);

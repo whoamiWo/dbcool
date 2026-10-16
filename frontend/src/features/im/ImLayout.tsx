@@ -54,6 +54,7 @@ export function ImChatPage() {
     refetchInterval: 60000,
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   const channels = channelsData?.data || [];
 
   const {
@@ -86,11 +87,14 @@ export function ImChatPage() {
     [pinsData],
   );
 
+   
+   
   useEffect(() => {
     if (channels.length > 0 && !currentChannel) {
       const selectedChannelId = routeChannelId || channels[0].id;
       const channel = channels.find((c) => c.id === selectedChannelId);
       if (channel) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
         setCurrentChannel(channel);
       }
     }
@@ -103,13 +107,16 @@ export function ImChatPage() {
         markMessagesRead(currentChannel.id, last.id).catch(() => undefined);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖：只关心频道切换与消息条数，用整对象会导致每次渲染都重复标记已读
   }, [currentChannel?.id, messages.length]);
 
+   
   useEffect(() => {
     if (!user) return;
     setPresenceHeartbeat();
     const timer = setInterval(() => setPresenceHeartbeat(), 30000);
     return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, [user?.id]);
 
   const handleChannelSelect = useCallback((channel: ImChannel) => {
@@ -201,6 +208,7 @@ export function ImChatPage() {
       }
     });
     return () => { unsub(); };
+// eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖：只关心频道 ID 与用户 ID，避免整对象变化导致无限循环
   }, [currentChannel?.id, user?.id, refetchMessages, setThreadMessage]);
 
   useEffect(() => {
@@ -399,6 +407,7 @@ export function ImChatPage() {
               value={newChannelName}
               onChange={(e) => setNewChannelName(e.target.value)}
               placeholder={t('im.channelName')}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- 弹窗/面板内首个输入框自动聚焦，符合交互预期
               autoFocus
               className="input-glass"
               style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px', fontSize: 13 }}

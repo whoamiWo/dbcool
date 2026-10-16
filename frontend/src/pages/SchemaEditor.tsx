@@ -27,8 +27,10 @@ export function SchemaEditorPage() {
     enabled: !!name,
   });
 
+   
   useEffect(() => {
     if (metaData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setTitle(metaData.title);
       setDescription(metaData.description);
       setFields(metaData.fields ?? []);
@@ -61,9 +63,11 @@ export function SchemaEditorPage() {
     },
   });
 
+   
   useEffect(() => {
     if (jobQuery.data?.status === 'COMPLETED') {
       queryClient.invalidateQueries({ queryKey: ['collection', name] });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setPollingJob(null);
     }
   }, [jobQuery, name, queryClient]);

@@ -74,6 +74,7 @@ export function AuditLogsPage() {
     }
   }, [actionFilter, resourceFilter, limit]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：fetch 为异步回调，setState 在 promise resolve 后调用
   useEffect(() => { fetch(); }, [fetch]);
 
   const byAction = logs.reduce<Record<string, number>>((acc, l) => {

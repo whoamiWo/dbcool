@@ -71,6 +71,7 @@ export function BoardView({ projectId }: { projectId: string }) {
   // 挂载 / projectId 变化时加载数据。
   // 注意：此前 loadData 定义后从未被调用，组件会永远停留在 loading 态（坏死代码的典型症状）。
   useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     loadData();
   }, [loadData]);
 

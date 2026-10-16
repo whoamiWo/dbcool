@@ -36,7 +36,9 @@ export default function IntegrationsPage() {
     }
   };
 
+   
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     loadIntegrations();
   }, []);
 

@@ -164,6 +164,7 @@ function CreatePlaybookDialog({
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
           fullWidth
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- 弹窗/面板内首个输入框自动聚焦，符合交互预期
           autoFocus
         />
         <TextField

@@ -25,6 +25,7 @@ export function ViewDesignerPage() {
     queryFn: () => apiClient.get<CollectionMeta>(`/collections/${collection}`),
     enabled: !!collection,
   });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   const fields: FieldDef[] = collectionData?.fields ?? [];
 
   const { data: viewData } = useQuery({
@@ -39,9 +40,11 @@ export function ViewDesignerPage() {
     [fields]
   );
 
+   
   useEffect(() => {
     if (viewData) {
       const v = viewData;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setName(v.name);
       setTitle(v.title);
       setType(v.type);
@@ -64,8 +67,10 @@ export function ViewDesignerPage() {
   }, [viewData, defaultColumns, fields]);
 
   // 新建/字段集变化时同步默认列
+   
   useEffect(() => {
     if (!id && type === 'table' && columns.length === 0 && fields.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setColumns(defaultColumns);
     }
     if (!id && type === 'detail' && detailFields.length === 0 && fields.length > 0) {

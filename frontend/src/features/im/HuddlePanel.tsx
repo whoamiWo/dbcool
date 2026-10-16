@@ -61,6 +61,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
       console.warn('[Huddle] 无法获取媒体流:', e);
       setError(t('im.micError'));
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, [isVideoOff, localStream]);
 
   /** 创建或获取指定 peerId 的 RTCPeerConnection */
@@ -200,6 +201,7 @@ export function HuddlePanel({ roomId, onLeave, peers }: HuddlePanelProps) {
       ws.close();
       wsRef.current = null;
       peerConnections.current.forEach(pc => pc.close());
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
       peerConnections.current.clear();
     };
   // 仅初始化一次

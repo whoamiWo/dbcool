@@ -195,8 +195,10 @@ export function AlertCenterPage() {
   const wsRef = useRef<WebSocket | null>(null);
 
   // 登录态恢复后（异步）同步一次，避免首渲染时 user 尚未加载
+   
   useEffect(() => {
     const username = currentUser?.username;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     if (username) setAckBy(username);
   }, [currentUser?.username]);
 

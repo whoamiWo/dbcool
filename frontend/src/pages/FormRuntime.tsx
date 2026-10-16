@@ -40,7 +40,7 @@ export function FormRuntimePage() {
       await apiClient.post(`/workflows/${workflowId}/trigger`, payload);
     } catch (err) {
       // 记录已提交成功但工作流触发失败,不阻断用户(数据已入库)
-      // eslint-disable-next-line no-console
+       
       console.error('触发工作流失败:', err);
     }
   };
@@ -64,7 +64,7 @@ export function FormRuntimePage() {
       try {
         rule = JSON.parse(formData?.rules_json ?? '{}');
       } catch (e) {
-        // eslint-disable-next-line no-console
+         
         console.error('rules_json parse failed', e);
       }
       if (rule.submit?.action === 'redirect') return;

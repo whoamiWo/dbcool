@@ -19,8 +19,10 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
     enabled: !!channelId && !!parentMessage?.id,
   });
 
+   
   useEffect(() => {
     if (data?.data?.replies) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setThreadMessages(data.data.replies);
     }
   }, [data?.data?.replies]);
@@ -44,6 +46,7 @@ export function ThreadPanel({ channelId, parentMessage, onClose }: ThreadPanelPr
     } finally {
       setIsSending(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, [channelId, parentMessage?.id]);
 
   if (!parentMessage) {

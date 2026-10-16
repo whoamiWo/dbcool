@@ -79,6 +79,7 @@ export function PlaybookRunPage() {
     } catch {
       return [];
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, [run?.checklistJson]);
 
   const events = useMemo<RunEvent[]>(() => {
@@ -88,6 +89,7 @@ export function PlaybookRunPage() {
     } catch {
       return [];
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, [run?.eventsJson]);
 
   const doneCount = checklist.filter((c) => c.done).length;

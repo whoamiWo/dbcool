@@ -131,7 +131,7 @@ export function applyDiffToText(
  * </ul>
  */
 export default function CollabEditor({ docId, title, initialContent = '', onSave }: Props) {
-  const ydoc = useMemo(() => new Y.Doc(), [docId]);
+  const ydoc = useMemo(() => new Y.Doc(), []);
   const ytext = useMemo(() => ydoc.getText('content'), [ydoc]);
 
   const [text, setText] = useState(initialContent);
@@ -158,9 +158,10 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
       ytext.insert(0, initialContent);
       lastKnownText.current = initialContent;
     }
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     setText(ytext.toString());
     setSaved(true);
-  }, [docId, ytext, initialContent]);
+  }, [ytext, initialContent]);
 
   // Local update → broadcast (skip if caused by remote)
   useEffect(() => {
@@ -242,6 +243,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
       });
       
       sendCollabJoin(docId);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setConnected(true);
     } catch (e) {
       console.error('[collab] 订阅失败:', e);

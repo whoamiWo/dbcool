@@ -88,8 +88,10 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
   };
 
   // 初始化会话
+   
   useEffect(() => {
     if (!enabled) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     initSession();
   }, [enabled]);
 

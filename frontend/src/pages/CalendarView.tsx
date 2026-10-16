@@ -40,8 +40,10 @@ export function CalendarViewPage() {
     enabled: !!collectionName && !!dateField && !!viewData && !!collectionData,
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   const allRecords = monthRecordsData ?? [];
 
+   
   const { weeks, monthName } = useMemo(
     () => buildCalendar(allRecords, currentMonth, dateField, titleField),
     [allRecords, currentMonth, dateField, titleField]

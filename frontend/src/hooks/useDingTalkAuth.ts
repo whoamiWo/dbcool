@@ -38,9 +38,11 @@ export function useDingTalkAuth(): UseDingTalkAuthReturn {
   }, [searchParams]);
 
   // 检查 URL 中是否有钉钉回调 code
+   
   useEffect(() => {
     const code = searchParams.get('code');
     if (code && inDingTalk) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       handleCallback();
     }
   }, [searchParams, inDingTalk, handleCallback]);

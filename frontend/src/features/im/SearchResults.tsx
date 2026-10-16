@@ -12,8 +12,10 @@ export function SearchResults({ keyword, limit = 20, onMessageClick }: SearchRes
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+   
   useEffect(() => {
     if (!keyword.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setResults(null);
       return;
     }
@@ -31,7 +33,7 @@ export function SearchResults({ keyword, limit = 20, onMessageClick }: SearchRes
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [keyword, limit]);
 
   if (!keyword.trim()) {

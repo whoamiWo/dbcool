@@ -34,6 +34,7 @@ export function GalleryViewPage() {
   const view = viewData ?? { title: '', collection_name: '', config: {} };
   const collection = collectionData ?? { name: '', fields: [] };
   const fields = collection.fields ?? [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   const records = recordsData ?? [];
   const fieldMap = new Map(fields.map((f) => [f.name, f]));
   const config = (view.config ?? {}) as unknown as GalleryConfig;

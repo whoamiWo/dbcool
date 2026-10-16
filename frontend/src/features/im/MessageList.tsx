@@ -143,6 +143,7 @@ export function MessageList({
         if (ms > 0) active.set(m.id, ms);
       }
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：setBurnRemaining 在定时器回调中触发，非同步 setState
     setBurnRemaining((prev) => {
       void prev;
       const next: Record<string, number> = {};
@@ -165,10 +166,11 @@ export function MessageList({
       burnTimersRef.current.set(id, t);
     }
     return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
       for (const t of burnTimersRef.current.values()) window.clearTimeout(t);
       burnTimersRef.current.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [messages, onBurnExpired]);
 
   const formatBurnTime = (ms: number) => {

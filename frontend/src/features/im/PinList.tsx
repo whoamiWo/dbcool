@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { listPins, pinMessage, unpinMessage, type ImPin } from './api';
 import { ImChannel } from './api';
 
@@ -13,7 +13,7 @@ export function PinList({ channelId, channel, onChanged }: PinListProps) {
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(false);
 
-  const load = async () => {
+  const refresh = useCallback(async () => {
     if (!channelId) return;
     setLoading(true);
     try {
@@ -24,14 +24,14 @@ export function PinList({ channelId, channel, onChanged }: PinListProps) {
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  };
+  }, [channelId]);
 
   useEffect(() => {
     mountedRef.current = true;
-    load();
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
+    refresh();
     return () => { mountedRef.current = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId]);
+  }, [refresh]);
 
   const handlePin = async (messageId: string, alreadyPinned?: boolean) => {
     try {
@@ -40,7 +40,7 @@ export function PinList({ channelId, channel, onChanged }: PinListProps) {
       } else {
         await pinMessage(messageId);
       }
-      await load();
+      await refresh();
       onChanged?.();
     } catch (err) {
       console.error('置顶操作失败', err);
@@ -56,50 +56,47 @@ export function PinList({ channelId, channel, onChanged }: PinListProps) {
   }
 
   return (
-    <div style={{ padding: 12 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--color-text-primary)' }}>
-        📌 置顶消息 ({pins.length})
-      </div>
-      {loading ? (
-        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>加载中...</div>
-      ) : pins.length === 0 ? (
-        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>暂无置顶消息</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {pins.map((pin) => (
-            <div
-              key={pin.id}
-              className="glass-light"
-              style={{ padding: '8px 10px', borderRadius: 'var(--radius-md)', fontSize: 12 }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--color-warning)', fontWeight: 500 }}>消息 #{pin.messageId.slice(-6)}</span>
-                <button
-                  onClick={() => handlePin(pin.messageId, pin.pinned)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: 11,
-                    color: 'var(--color-error)',
-                    padding: '2px 6px',
-                    borderRadius: 'var(--radius-sm)',
-                    transition: 'all var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.1)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                  title="取消置顶"
-                >
-                  ✕
-                </button>
-              </div>
-              <div style={{ color: 'var(--color-text-muted)', fontSize: 11, marginTop: 4 }}>
-                {new Date(pin.pinnedAt).toLocaleString('zh-CN')}
-              </div>
-            </div>
-          ))}
-        </div>
+    <div style={{ padding: 8 }}>
+      {loading && <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>加载中...</div>}
+      {!loading && pins.length === 0 && (
+        <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>暂无置顶消息</div>
       )}
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {pins.map((pin) => (
+          <li
+            key={pin.id}
+            style={{
+              padding: '6px 8px',
+              borderRadius: 6,
+              marginBottom: 6,
+              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13 }}>消息 ID: {pin.messageId}</span>
+              <button
+                onClick={() => handlePin(pin.id, true)}
+                style={{
+                  marginLeft: 8,
+                  padding: '2px 8px',
+                  fontSize: 12,
+                  borderRadius: 4,
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  color: 'inherit',
+                }}
+              >
+                取消置顶
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+              by {pin.pinnedBy} · {new Date(pin.pinnedAt).toLocaleString()}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -58,7 +58,9 @@ export function NotificationChannelsPage() {
     } catch { /* ignore */ }
   }
 
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- 安全：loadTypes/loadChannels 为异步回调，setState 在 promise resolve 后调用；空依赖仅在挂载时拉取一次 */
   useEffect(() => { loadTypes(); loadChannels(); }, []);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   async function save() {
     if (!editing) return;

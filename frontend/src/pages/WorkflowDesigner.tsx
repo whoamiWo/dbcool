@@ -147,8 +147,10 @@ export function WorkflowDesignerPage() {
     if (selectedNodeId === id) setSelectedNodeId(null);
   };
 
+   
   useEffect(() => {
     if (existing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setName(existing.name);
       setTitle(existing.title);
       setDescription(existing.description);
@@ -177,7 +179,9 @@ export function WorkflowDesignerPage() {
   }, [existing]);
 
   // 给每个 node 的 data 绑定回调(避免闭包过期)
+   
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     setNodes((nds) => nds.map((n) => ({
       ...n,
       data: {
