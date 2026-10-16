@@ -191,6 +191,18 @@ def main():
     log("PHASE99: 对外 SaaS 必补三项验收")
     log("=" * 70)
 
+    # 清理自己产生的限流 key，避免与其他脚本互扰（PHASE109）
+    import subprocess as _sp
+    try:
+        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
+                 "ratelimit:ip:127.0.0.1:/api/auth/login"],
+                check=False, capture_output=True)
+        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
+                 "ratelimit:ip:172.18.0.1:/api/auth/login"],
+                check=False, capture_output=True)
+    except Exception:
+        pass
+
     # 登录拿 admin token
     admin_token = login("admin", "admin123")
     if not admin_token:

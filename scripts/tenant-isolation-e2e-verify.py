@@ -208,6 +208,18 @@ def main():
         log("FATAL: Server not ready")
         sys.exit(1)
 
+    # 清理自己产生的限流 key，避免与其他脚本互扰（PHASE109）
+    import subprocess as _sp
+    try:
+        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
+                 "ratelimit:ip:127.0.0.1:/api/auth/login"],
+                check=False, capture_output=True)
+        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
+                 "ratelimit:ip:172.18.0.1:/api/auth/login"],
+                check=False, capture_output=True)
+    except Exception:
+        pass
+
     # Admin login (tenant A)
     admin_token, admin_roles, admin_tid = login("admin", "admin123")
     if not admin_token:
