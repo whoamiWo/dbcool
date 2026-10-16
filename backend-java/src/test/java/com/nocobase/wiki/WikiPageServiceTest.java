@@ -176,4 +176,123 @@ class WikiPageServiceTest {
                 () -> pageService.createFromTemplate(template.getId(), kbId, null, "New Page", "new-page", userId, tenantId),
                 "租户 A 无法从租户 B 的模板创建页面");
     }
+
+    // ---- Notion 剩余能力（Week 46）----
+
+    @Test
+    void parseBacklinks_extractsSlugs() {
+        List<String> slugs = pageService.parseBacklinks("Hello [[page-one]] and [[page-two]]");
+        assertEquals(List.of("page-one", "page-two"), slugs);
+    }
+
+    @Test
+    void parseBacklinks_null_returnsEmpty() {
+        assertTrue(pageService.parseBacklinks(null).isEmpty());
+    }
+
+    @Test
+    void syncBacklinks_createsBacklinkEntries() {
+        WikiPageEntity target = pageService.create(kbId, null, "Target", "target-slug", "C", userId, tenantId);
+        WikiPageEntity source = pageService.create(kbId, null, "Source", "source-slug",
+                "Link to [[target-slug]] here", userId, tenantId);
+
+        // syncBacklinks 在 create 时已触发, 验证反向链接表有记录
+        List<WikiPageEntity> backlinks = pageService.listBacklinks("target-slug", tenantId);
+        assertFalse(backlinks.isEmpty(), "反向链接表应有记录");
+        assertEquals("source-slug", backlinks.get(0).getSlug());
+    }
+
+    @Test
+    void listByParent_returnsChildPages() {
+        WikiPageEntity parent = pageService.create(kbId, null, "Parent", "parent-slug", "C", userId, tenantId);
+        pageService.create(kbId, parent.getId(), "Child", "child-slug", "C", userId, tenantId);
+
+        List<WikiPageEntity> children = pageService.listByParent(parent.getId());
+        assertEquals(1, children.size());
+        assertEquals("child-slug", children.get(0).getSlug());
+    }
+
+    @Test
+    void listTrash_returnsSoftDeletedPages() {
+        WikiPageEntity page = pageService.create(kbId, null, "Trash Me", "trash-me", "C", userId, tenantId);
+        pageService.softDelete(page.getId(), tenantId);
+
+        List<WikiPageEntity> trash = pageService.listTrash(tenantId);
+        assertEquals(1, trash.size());
+        assertEquals("trash-me", trash.get(0).getSlug());
+        assertNotNull(trash.get(0).getDeletedAt());
+    }
+
+    @Test
+    void share_regeneratesToken_whenRequested() {
+        WikiPageEntity page = pageService.create(kbId, null, "Shareable", "shareable", "C", userId, tenantId);
+        WikiPageEntity shared = pageService.share(page.getId(), true, tenantId);
+        assertNotNull(shared.getShareToken());
+        assertFalse(shared.getShareToken().isBlank());
+    }
+
+    @Test
+    void share_reusesExistingToken_whenNotRegenerate() {
+        WikiPageEntity page = pageService.create(kbId, null, "Shareable", "shareable-2", "C", userId, tenantId);
+        WikiPageEntity first = pageService.share(page.getId(), true, tenantId);
+        WikiPageEntity second = pageService.share(page.getId(), false, tenantId);
+        assertEquals(first.getShareToken(), second.getShareToken());
+    }
+
+    @Test
+    void unshare_clearsToken() {
+        WikiPageEntity page = pageService.create(kbId, null, "Unshareable", "unshareable", "C", userId, tenantId);
+        pageService.share(page.getId(), true, tenantId);
+        WikiPageEntity unshared = pageService.unshare(page.getId(), tenantId);
+        assertNull(unshared.getShareToken());
+    }
+
+    @Test
+    void softDelete_thenRestore_roundtrip() {
+        WikiPageEntity page = pageService.create(kbId, null, "Restoreable", "restoreable", "C", userId, tenantId);
+        pageService.softDelete(page.getId(), tenantId);
+        assertEquals("TRASH", pageService.get(page.getId()).getStatus());
+
+        WikiPageEntity restored = pageService.restore(page.getId(), tenantId);
+        assertEquals("DRAFT", restored.getStatus());
+        assertNull(restored.getDeletedAt());
+    }
+
+    @Test
+    void listTemplates_returnsOnlyTemplates() {
+        WikiPageEntity normal = pageService.create(kbId, null, "Normal", "normal-tpl", "C", userId, tenantId);
+        WikiPageEntity template = pageService.create(kbId, null, "Template", "template-tpl", "C", userId, tenantId);
+        pageService.markTemplate(template.getId(), true, tenantId);
+
+        List<WikiPageEntity> templates = pageService.listTemplates(tenantId);
+        assertEquals(1, templates.size());
+        assertEquals("template-tpl", templates.get(0).getSlug());
+        assertTrue(templates.get(0).getIsTemplate());
+    }
+
+    @Test
+    void delete_hardDelete_removesPage() {
+        WikiPageEntity page = pageService.create(kbId, null, "Deletable", "deletable", "C", userId, tenantId);
+        UUID id = page.getId();
+        pageService.delete(id, tenantId);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pageService.get(id));
+    }
+
+    @Test
+    void getVersion_returnsSpecificVersion() {
+        WikiPageEntity page = pageService.create(kbId, null, "Versioned", "versioned", "v1", userId, tenantId);
+        pageService.update(page.getId(), "Versioned", "v2", "versioned", userId, tenantId);
+
+        WikiVersionEntity v1 = pageService.getVersion(page.getId(), 1);
+        assertEquals("v1", v1.getContent());
+    }
+
+    @Test
+    void getVersion_unknownVersion_throws404() {
+        WikiPageEntity page = pageService.create(kbId, null, "V", "v-slug", "C", userId, tenantId);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> pageService.getVersion(page.getId(), 999));
+    }
 }
