@@ -652,6 +652,7 @@ export function NotionStyleEditor({
       >
         <ReactMarkdown
           components={{
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- node 是 ReactMarkdown code 组件 API，此处仅用 className 区分内联/块级
             code({ node, className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '');
               const isInline = !match && !className;

@@ -138,7 +138,7 @@ export function WorkflowDesignerPage() {
       try {
         const t = JSON.parse(existing.trigger_json || '{}');
         if (t.type) setTriggerType(t.type);
-      } catch (e) {}
+      } catch {}
       try {
         const ns = JSON.parse(existing.nodes_json) as WorkflowNodeDef[];
         setNodes(ns.map((n, i) => ({
@@ -153,7 +153,7 @@ export function WorkflowDesignerPage() {
           },
         })));
         setEdges(buildEdgesFromSequence(ns.map((n, i) => n.id || `n${i}`)));
-      } catch (e) {}
+      } catch {}
     }
   }, [existing]);
 

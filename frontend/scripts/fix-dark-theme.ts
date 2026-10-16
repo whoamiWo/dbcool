@@ -72,7 +72,7 @@ async function main() {
         processFile(filePath);
         fixed++;
       }
-    } catch (e) {
+    } catch {
       // skip
     }
   }
