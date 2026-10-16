@@ -23,22 +23,21 @@ export function CalendarViewPage() {
     enabled: !!collectionName,
   });
 
-  if (!viewData || !collectionData) return <p>加载中…</p>;
-
-  const fields = collectionData.fields ?? [];
-  const config = (viewData.config ?? {}) as { dateField?: string; titleField?: string };
+  // 派生值空安全计算（Hook 必须在 early return 之前，故不用 viewData! 断言）
+  const fields = collectionData?.fields ?? [];
+  const config = (viewData?.config ?? {}) as { dateField?: string; titleField?: string };
   const dateField = config.dateField ?? fields.find((f) => f.type === 'date' || f.type === 'datetime')?.name;
   const titleField = config.titleField ?? fields.find((f) => f.type === 'text')?.name ?? 'id';
 
   const { data: monthRecordsData } = useQuery({
-    queryKey: ['records', collectionName, currentMonth.toISOString().slice(0, 7)],
+    queryKey: ['records', collectionName, currentMonth.toISOString().slice(0, 7), dateField],
     queryFn: () => {
       // R5 T3: Query by month to avoid limit=500 truncation
       const year = currentMonth.getFullYear();
       const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
-      return apiClient.get<any[]>(`/collections/${collectionName}/records?limit=5000&filter=${encodeURIComponent(dateField + '_gte=' + year + '-' + month + '-01')}&filter=${encodeURIComponent(dateField + '_lte=' + year + '-' + month + '-31')}`);
+      return apiClient.get<any[]>(`/collections/${collectionName}/records?limit=5000&filter=${encodeURIComponent(String(dateField) + '_gte=' + year + '-' + month + '-01')}&filter=${encodeURIComponent(String(dateField) + '_lte=' + year + '-' + month + '-31')}`);
     },
-    enabled: !!collectionName && !!dateField,
+    enabled: !!collectionName && !!dateField && !!viewData && !!collectionData,
   });
 
   const allRecords = monthRecordsData ?? [];
@@ -47,6 +46,8 @@ export function CalendarViewPage() {
     () => buildCalendar(allRecords, currentMonth, dateField, titleField),
     [allRecords, currentMonth, dateField, titleField]
   );
+
+  if (!viewData || !collectionData) return <p>加载中…</p>;
 
   const goToPrevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));

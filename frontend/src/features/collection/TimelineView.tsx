@@ -112,24 +112,9 @@ export function TimelineViewPage() {
     refetchOnWindowFocus: false,
   });
 
-  if (loadingView || loadingRecords) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress size={32} />
-      </Box>
-    );
-  }
-
-  if (!recordsResp?.length) {
-    return (
-      <Alert severity="info" sx={{ mt: 2 }}>
-        该集合暂无记录，请先添加数据。
-      </Alert>
-    );
-  }
-
-  // 按时间字段排序
+  // 按时间字段排序（top-level useMemo，避免 rules-of-hooks：Hook 不可在 early return 之后）
   const sorted = useMemo(() => {
+    if (!recordsResp?.length) return [] as Record<string, unknown>[];
     const cfg = (viewData?.config ?? {}) as unknown as TimelineConfig;
     const dateField = cfg.dateField || inferDateField(viewData!, 'created_at');
     const direction = cfg.sortDirection === 'desc' ? -1 : 1;
@@ -139,6 +124,22 @@ export function TimelineViewPage() {
       return direction * da.localeCompare(db);
     });
   }, [recordsResp, viewData]);
+
+  if (loadingView || loadingRecords) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress size={32} />
+      </Box>
+    );
+  }
+
+  if (!sorted.length) {
+    return (
+      <Alert severity="info" sx={{ mt: 2 }}>
+        该集合暂无记录，请先添加数据。
+      </Alert>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 720, mx: 'auto', py: 3 }}>
