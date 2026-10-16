@@ -259,6 +259,7 @@ export function NotionStyleEditor({
   // ============================================================
   //  Block API 自动保存（防抖）
   // ============================================================
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- 刻意依赖 _page?.id 而非 _page 对象本身，避免不必要的重渲染
   const saveBlocksToBackend = useCallback(async () => {
     if (!blocks.length || !_page?.id) return;
     setSaving(true);
@@ -300,6 +301,7 @@ export function NotionStyleEditor({
   }, [saveBlocksToBackend]);
 
   // 加载反向链接
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- 别名同上，仅依赖 _page?.id
   const loadBacklinks = useCallback(async () => {
     if (!_page?.id) return;
     setBacklinksLoading(true);

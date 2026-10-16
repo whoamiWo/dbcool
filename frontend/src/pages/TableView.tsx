@@ -186,6 +186,7 @@ export function TableViewPage() {
   const VIRTUAL_THRESHOLD = 100; // Enable virtualization when rows >= this
   const shouldVirtualize = !groupByField && sorted.length >= VIRTUAL_THRESHOLD;
   
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual 官方说明 useVirtualizer 返回的函数无法安全 memo，React Compiler 只能跳过
   const virtualizer = useVirtualizer({
     count: sorted.length,
     getScrollElement: () => parentRef.current,

@@ -128,6 +128,25 @@ export function WorkflowDesignerPage() {
     enabled: isEdit,
   });
 
+  // 以下三个工具函数必须定义在依赖它们的 useEffect 之前，否则 React Compiler 会因 TDZ 报 immutability
+  const buildEdgesFromSequence = (ids: string[]): Edge[] => {
+    const es: Edge[] = [];
+    for (let i = 0; i < ids.length - 1; i++) {
+      es.push({ id: `e${i}`, source: ids[i], target: ids[i + 1] });
+    }
+    return es;
+  };
+
+  const updateNodeData = (id: string, patch: Partial<WorkflowNodeData>) => {
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, ...patch } } : n));
+  };
+
+  const deleteNode = (id: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== id));
+    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+    if (selectedNodeId === id) setSelectedNodeId(null);
+  };
+
   useEffect(() => {
     if (existing) {
       setName(existing.name);
@@ -170,14 +189,6 @@ export function WorkflowDesignerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes.length, edges.length]);
 
-  const buildEdgesFromSequence = (ids: string[]): Edge[] => {
-    const es: Edge[] = [];
-    for (let i = 0; i < ids.length - 1; i++) {
-      es.push({ id: `e${i}`, source: ids[i], target: ids[i + 1] });
-    }
-    return es;
-  };
-
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nds) => applyNodeChanges(changes, nds) as Node<WorkflowNodeData>[]);
   }, []);
@@ -187,16 +198,6 @@ export function WorkflowDesignerPage() {
   const onConnect = useCallback((conn: Connection) => {
     setEdges((eds) => addEdge({ ...conn, id: `e${Date.now()}` }, eds));
   }, []);
-
-  const updateNodeData = (id: string, patch: Partial<WorkflowNodeData>) => {
-    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, ...patch } } : n));
-  };
-
-  const deleteNode = (id: string) => {
-    setNodes((nds) => nds.filter((n) => n.id !== id));
-    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
-    if (selectedNodeId === id) setSelectedNodeId(null);
-  };
 
   const onDragStart = (event: React.DragEvent, kind: NodeKind) => {
     event.dataTransfer.setData('application/reactflow', kind);
