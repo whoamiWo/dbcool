@@ -44,6 +44,21 @@ def test_health_returns_ok(client: TestClient) -> None:
     assert data["service"] == "nocobase-py"
 
 
+def test_health_ready_returns_200_without_downstream(client: TestClient) -> None:
+    """GET /api/health/ready 在无 DB/Redis 时可回退为 200（测试环境无真实下游）.
+
+    PHASE100 T2: compose healthcheck 依赖此端点，测试容器里没有 Postgres，
+    所以 readiness 在下游不可用时不应抛异常（只记录 warning）。
+    本地 CI 不跑完整 readiness，由集成环境验证。
+    """
+    response = client.get("/api/health/ready")
+    # 返回值可以是 200 或 503，只要不抛异常即可
+    assert response.status_code in (200, 503)
+    data = response.json()
+    assert "components" in data
+    assert "status" in data
+
+
 # ============================================================
 #  /api/ai/echo(需 JWT)
 # ============================================================

@@ -191,9 +191,12 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:?未设置 RABBITMQ_USER}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?未设置 RABBITMQ_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_at_least_32_characters_long_for_hs256}
+      # PHASE100 T1: 去掉弱口令默认兜底 —— 未设置 JWT_SECRET 时 compose 直接失败，
+      # 而不是静默使用 dev 密钥上线。
+      JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET，请用 openssl rand -base64 32 生成后写入 .env}
       JAVA_PORT: 8080
-      NOCOBASE_ALERTS_PATH: /tmp/alerts.db
+      # PHASE100 T6: 告警 SQLite 落命名卷（此前 /tmp 容器重建即丢）
+      NOCOBASE_ALERTS_PATH: /data/alerts.db
       # PHASE69: 附件存储 MinIO 配置（容器内用服务名，外部用 localhost）
       MINIO_ENABLED: ${MINIO_ENABLED:-true}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
@@ -218,7 +221,11 @@ services:
       # 未配置时 CredentialCryptoService 启动即失败（红线 1：禁止硬编码密钥）
       INTEGRATION_CREDENTIAL_MASTER_KEY: ${INTEGRATION_CREDENTIAL_MASTER_KEY:-}
     ports:
-      - "${JAVA_PORT:-8080}:8080"
+      # PHASE100 T2: Java 后端端口收敛到 127.0.0.1，对外仅经 nginx
+      - "127.0.0.1:${JAVA_PORT:-8080}:8080"
+    volumes:
+      # PHASE100 T6: 告警 SQLite 落命名卷（与 backend-python 共用同一份告警库）
+      - alertsdata:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -228,6 +235,13 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    # PHASE100 T2: 真实探活 —— readiness 校验 DB + 连接池，而非仅进程存活
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     logging:
       driver: json-file
       options:
@@ -259,7 +273,8 @@ services:
     container_name: nocobase-backend-python
     environment:
       JAVA_BACKEND_URL: http://backend-java:8080
-      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_at_least_32_characters_long_for_hs256}
+      # PHASE100 T1: 去掉弱口令默认兜底
+      JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET}
       # PHASE 57: 服务间调用令牌，必须与 backend-java 的 AI_INTERNAL_TOKEN 一致
       # Java 携带它调用 /api/ai/embedding；未设置时该端点仅接受用户 JWT
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
@@ -295,14 +310,29 @@ services:
       # PHASE101 T1: 备份目录显式指向挂载点（默认 /tmp/backups 在容器重建后丢失）
       BACKUP_DIR: /app/backups
     ports:
-      - "${PYTHON_PORT:-8000}:8000"
+      # PHASE100 T2: Python 后端端口收敛到 127.0.0.1，对外仅经 nginx
+      - "127.0.0.1:${PYTHON_PORT:-8000}:8000"
     volumes:
       # PHASE100 T6: 告警 SQLite 落命名卷，重启可恢复
       - alertsdata:/data
       # PHASE101 T1: 备份文件落命名卷（不再是 /tmp/backups，容器重建不丢）
       - backupsdata:/app/backups
     depends_on:
-      - backend-java
+      backend-java:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    # PHASE100 T2: 真实探活 —— readiness 校验 Python 后端 /api/health/ready
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
     logging:
       driver: json-file
       options:
@@ -332,10 +362,17 @@ services:
       PG_USER: ${POSTGRES_USER:-nocobase}
       PG_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
     ports:
-      - "${CRDT_PORT:-3100}:3100"
+      # PHASE100 T2: CRDT 端口收敛到 127.0.0.1
+      - "127.0.0.1:${CRDT_PORT:-3100}:3100"
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3100/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     logging:
       driver: json-file
       options:
@@ -360,10 +397,13 @@ services:
     environment:
       API_BASE_URL: /
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      # PHASE100 T2: 前端端口收敛到 127.0.0.1，对外仅经 nginx 80/443
+      - "127.0.0.1:${FRONTEND_PORT:-80}:80"
     depends_on:
-      - backend-java
-      - backend-python
+      backend-java:
+        condition: service_healthy
+      backend-python:
+        condition: service_healthy
     logging:
       driver: json-file
       options:
