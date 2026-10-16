@@ -164,10 +164,10 @@ export function SchemaDesignerPage() {
         )}
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }} htmlFor="s-lbl-1">
             Collection 名称 <span style={{ color: 'var(--color-error)' }}>*</span>
           </label>
-          <input
+          <input id="s-lbl-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="customer"
@@ -179,10 +179,10 @@ export function SchemaDesignerPage() {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }} htmlFor="s-lbl-2">
             显示标题
           </label>
-          <input
+          <input id="s-lbl-2"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="客户"

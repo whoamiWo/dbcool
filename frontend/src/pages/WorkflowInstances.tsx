@@ -88,8 +88,8 @@ function InstancesInner() {
       {!id && (
         <>
           <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <label>筛选工作流:</label>
-            <select value={wfFilter} onChange={(e) => setWfFilter(e.target.value)} style={{ padding: 4 }}>
+            <label htmlFor="w-lbl-1">筛选工作流:</label>
+            <select id="w-lbl-1" value={wfFilter} onChange={(e) => setWfFilter(e.target.value)} style={{ padding: 4 }}>
               <option value="">全部</option>
               {workflows?.map((w) => <option key={w.id} value={w.id}>{w.title || w.name}</option>)}
             </select>

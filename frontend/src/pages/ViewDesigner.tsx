@@ -137,24 +137,24 @@ export function ViewDesignerPage() {
         }}
       >
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontWeight: 500 }}>技术名称</label>
-          <input
+          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-1">技术名称</label>
+          <input id="v-lbl-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
             style={{ padding: 8, width: '100%', fontFamily: 'monospace' }}
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontWeight: 500 }}>显示标题</label>
-          <input
+          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-2">显示标题</label>
+          <input id="v-lbl-2"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={{ padding: 8, width: '100%' }}
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontWeight: 500 }}>类型</label>
-          <select value={type} onChange={(e) => setType(e.target.value as ViewType)} style={{ padding: 8, width: '100%' }}>
+          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-3">类型</label>
+          <select id="v-lbl-3" value={type} onChange={(e) => setType(e.target.value as ViewType)} style={{ padding: 8, width: '100%' }}>
             <option value="table">表格视图</option>
             <option value="kanban">看板视图</option>
             <option value="detail">详情视图</option>
@@ -164,8 +164,8 @@ export function ViewDesignerPage() {
 
         {type === 'kanban' && (
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontWeight: 500 }}>按哪个字段分组</label>
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ padding: 8, width: '100%' }}>
+            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-4">按哪个字段分组</label>
+            <select id="v-lbl-4" value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ padding: 8, width: '100%' }}>
               <option value="">-- 选择字段 --</option>
               {fields.map((f) => (
                 <option key={f.name} value={f.name}>
@@ -179,8 +179,8 @@ export function ViewDesignerPage() {
         {type === 'table' && (
           <>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontWeight: 500 }}>每页条数</label>
-              <input
+              <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-5">每页条数</label>
+              <input id="v-lbl-5"
                 type="number"
                 value={pageSize}
                 onChange={(e) => setPageSize(Number(e.target.value))}

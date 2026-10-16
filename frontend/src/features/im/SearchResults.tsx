@@ -70,7 +70,7 @@ export function SearchResults({ keyword, limit = 20, onMessageClick }: SearchRes
               ? msg.content.replace(new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), (m) => `<mark style="background:var(--color-warning);color:var(--color-warning)">${m}</mark>`)
               : msg.content;
             return (
-              <div
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                 key={msg.id}
                 className="glass-light"
                 style={{

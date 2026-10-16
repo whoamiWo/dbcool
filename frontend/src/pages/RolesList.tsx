@@ -62,12 +62,12 @@ export function RolesListPage() {
       {showCreate && (
         <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ marginBottom: 8 }}>
-            <label>名称(英文,小写) *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="editor" style={{ padding: 6, width: '100%', fontFamily: 'monospace' }} />
+            <label htmlFor="r-lbl-1">名称(英文,小写) *</label>
+            <input id="r-lbl-1" value={name} onChange={(e) => setName(e.target.value)} placeholder="editor" style={{ padding: 6, width: '100%', fontFamily: 'monospace' }} />
           </div>
           <div style={{ marginBottom: 8 }}>
-            <label>描述</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} style={{ padding: 6, width: '100%' }} />
+            <label htmlFor="r-lbl-2">描述</label>
+            <input id="r-lbl-2" value={description} onChange={(e) => setDescription(e.target.value)} style={{ padding: 6, width: '100%' }} />
           </div>
           <button
             onClick={() => createMutation.mutate()}

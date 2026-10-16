@@ -375,7 +375,7 @@ export function ImChatPage() {
 
       {showCreateDialog && (
         <div
-          role="dialog"
+          role="presentation"
           style={{
             position: 'fixed',
             inset: 0,
@@ -389,6 +389,7 @@ export function ImChatPage() {
           onClick={() => setShowCreateDialog(false)}
         >
           <div
+            role="presentation"
             onClick={(e) => e.stopPropagation()}
             className="glass-strong"
             style={{ padding: 20, width: 320 }}

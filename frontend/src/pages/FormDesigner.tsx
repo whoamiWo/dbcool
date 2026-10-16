@@ -255,6 +255,7 @@ export function FormDesignerPage() {
               {fields.map((f) => {
                 const added = layout.some((l) => l.field === f.name);
                 return (
+                  // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- 拖拽手柄用 HTML5 DnD，非点击交互，不赋 button 语义以免误导 AT
                   <div
                     key={f.name}
                     draggable
@@ -284,23 +285,23 @@ export function FormDesignerPage() {
         </div>
 
         {/* 画布 */}
-        <div
+        <div role="presentation"
           style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8 }}
           onDragOver={(e) => handleDragOver(e, layout.length)}
           onDrop={(e) => handleDrop(e, 'end')}
         >
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontWeight: 500 }}>表单标题</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: 8, width: '100%', fontSize: 16 }} />
+            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="f-lbl-1">表单标题</label>
+            <input id="f-lbl-1" value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: 8, width: '100%', fontSize: 16 }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontWeight: 500 }}>描述</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} style={{ padding: 8, width: '100%' }} />
+            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="f-lbl-2">描述</label>
+            <input id="f-lbl-2" value={description} onChange={(e) => setDescription(e.target.value)} style={{ padding: 8, width: '100%' }} />
           </div>
 
           <h3>布局</h3>
           {layout.length === 0 ? (
-            <div
+            <div role="presentation"
               onDragOver={(e) => handleDragOver(e, 0)}
               onDrop={(e) => handleDrop(e, 0)}
               style={{
@@ -322,7 +323,7 @@ export function FormDesignerPage() {
                 return (
                   <div key={item.field}>
                     {/* 拖入占位符 */}
-                    <div
+                    <div role="presentation"
                       onDragOver={(e) => { e.stopPropagation(); handleDragOver(e, idx); }}
                       onDrop={(e) => { e.stopPropagation(); handleDrop(e, idx); }}
                       style={{
@@ -333,7 +334,7 @@ export function FormDesignerPage() {
                         transition: 'all 0.1s',
                       }}
                     />
-                    <div
+                    <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                       draggable
                       onDragStart={(e) => handleDragStart(e, item.field, 'layout')}
                       onDragEnd={handleDragLeaveRow}
@@ -379,8 +380,8 @@ export function FormDesignerPage() {
                   </div>
                 );
               })}
-              {/* 末尾占位符 */}
-              <div
+              {/* 末尾占位符（HTML5 DnD 拖放区，纯装饰性容器 → presentation） */}
+              <div role="presentation"
                 onDragOver={(e) => { e.stopPropagation(); handleDragOver(e, layout.length); }}
                 onDrop={(e) => { e.stopPropagation(); handleDrop(e, layout.length); }}
                 style={{
@@ -511,8 +512,8 @@ export function FormDesignerPage() {
                 唯一
               </label>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>默认值</label>
-                <input
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-3">默认值</label>
+                <input id="f-lbl-3"
                   type="text"
                   value={fields.find((f) => f.name === activeField)?.defaultValue ?? ''}
                   onChange={(e) => toggleFieldProp(activeField, 'defaultValue', e.target.value)}
@@ -521,8 +522,8 @@ export function FormDesignerPage() {
               </div>
               {/* US-102: 标签 / 占位符 / 帮助文本 */}
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>标签(label)</label>
-                <input
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-4">标签(label)</label>
+                <input id="f-lbl-4"
                   type="text"
                   value={fields.find((f) => f.name === activeField)?.label ?? ''}
                   onChange={(e) => toggleFieldProp(activeField, 'label', e.target.value)}
@@ -530,8 +531,8 @@ export function FormDesignerPage() {
                 />
               </div>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>占位符(placeholder)</label>
-                <input
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-5">占位符(placeholder)</label>
+                <input id="f-lbl-5"
                   type="text"
                   value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.placeholder ?? '')}
                   onChange={(e) => toggleOptionProp(activeField, 'placeholder', e.target.value)}
@@ -539,8 +540,8 @@ export function FormDesignerPage() {
                 />
               </div>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }}>帮助文本(helpText)</label>
-                <input
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-6">帮助文本(helpText)</label>
+                <input id="f-lbl-6"
                   type="text"
                   value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.helpText ?? '')}
                   onChange={(e) => toggleOptionProp(activeField, 'helpText', e.target.value)}

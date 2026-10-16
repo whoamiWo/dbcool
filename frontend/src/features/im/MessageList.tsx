@@ -268,7 +268,7 @@ export function MessageList({
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 {!showAvatar && <div style={{ height: isMobile ? 16 : 20 }} />}
-                <div
+                <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                   onClick={() => onMessageClick?.(msg)}
                   className={`message-bubble ${isSelf ? 'message-bubble-self' : ''} ${isReply ? 'message-bubble-replied' : ''}`}
                   style={{

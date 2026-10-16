@@ -85,7 +85,7 @@ export function MessagesInboxPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {merged.map((m) => (
-            <div
+            <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
               key={m.id}
               onClick={() => !m.read && markRead.mutate(m.id)}
               style={{

@@ -88,16 +88,16 @@ export function UsersListPage() {
       {showCreate && (
         <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
           <div style={{ marginBottom: 8 }}>
-            <label>用户名 *</label>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} style={{ padding: 6, width: '100%' }} />
+            <label htmlFor="u-lbl-1">用户名 *</label>
+            <input id="u-lbl-1" value={username} onChange={(e) => setUsername(e.target.value)} style={{ padding: 6, width: '100%' }} />
           </div>
           <div style={{ marginBottom: 8 }}>
-            <label>密码 *</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: 6, width: '100%' }} />
+            <label htmlFor="u-lbl-2">密码 *</label>
+            <input id="u-lbl-2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: 6, width: '100%' }} />
           </div>
           <div style={{ marginBottom: 8 }}>
-            <label>显示名</label>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ padding: 6, width: '100%' }} />
+            <label htmlFor="u-lbl-3">显示名</label>
+            <input id="u-lbl-3" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ padding: 6, width: '100%' }} />
           </div>
           <button
             onClick={() => createMutation.mutate()}

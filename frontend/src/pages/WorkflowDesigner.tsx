@@ -299,17 +299,17 @@ export function WorkflowDesignerPage() {
         </button>
         <h3 style={{ marginTop: 0 }}>{isEdit ? '编辑' : '新建'}工作流</h3>
         {error && <div style={{ padding: 4, marginBottom: 8, background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 11 }}>{error}</div>}
-        <label style={lbl}>技术名 *</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
-        <label style={lbl}>标题</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
-        <label style={lbl}>Collection</label>
-        <input value={collectionName} onChange={(e) => setCollectionName(e.target.value)} style={inp} />
+        <label style={lbl} htmlFor="w-lbl-1">技术名 *</label>
+        <input id="w-lbl-1" value={name} onChange={(e) => setName(e.target.value)} style={inp} />
+        <label style={lbl} htmlFor="w-lbl-2">标题</label>
+        <input id="w-lbl-2" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
+        <label style={lbl} htmlFor="w-lbl-3">Collection</label>
+        <input id="w-lbl-3" value={collectionName} onChange={(e) => setCollectionName(e.target.value)} style={inp} />
         <label style={lbl}>
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> 启用
         </label>
-        <label style={lbl}>触发器</label>
-        <select value={triggerType} onChange={(e) => setTriggerType(e.target.value)} style={inp}>
+        <label style={lbl} htmlFor="w-lbl-4">触发器</label>
+        <select id="w-lbl-4" value={triggerType} onChange={(e) => setTriggerType(e.target.value)} style={inp}>
           <option value="manual">⚡ 手动触发</option>
           <option value="on_create">📥 数据创建时</option>
           <option value="on_update">✏️ 数据更新时</option>
@@ -319,6 +319,7 @@ export function WorkflowDesignerPage() {
         {(Object.keys(nodeKindMeta) as NodeKind[]).map((k) => {
           const m = nodeKindMeta[k];
           return (
+            // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- 拖拽手柄用 HTML5 DnD，非点击交互
             <div key={k}
                  draggable
                  onDragStart={(e) => onDragStart(e, k)}
@@ -343,7 +344,7 @@ export function WorkflowDesignerPage() {
       </aside>
 
       {/* 中:画布 */}
-      <div ref={reactFlowWrapper} style={{ flex: 1, background: 'var(--color-text-primary)', borderRadius: 8 }} onDrop={onDrop} onDragOver={onDragOver}>
+      <div ref={reactFlowWrapper} role="presentation" style={{ flex: 1, background: 'var(--color-text-primary)', borderRadius: 8 }} onDrop={onDrop} onDragOver={onDragOver}>
         <ReactFlow
           nodes={nodes} edges={edges}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
@@ -383,10 +384,10 @@ export function WorkflowDesignerPage() {
               输入模拟的 triggerData,系统将创建一个工作流实例并跳转到详情页。
               {!id && <strong style={{ color: 'var(--color-error)' }}>(会先自动保存当前编辑)</strong>}
             </p>
-            <label style={{ display: 'block', fontWeight: 500, fontSize: 13, marginBottom: 4 }}>
+            <label style={{ display: 'block', fontWeight: 500, fontSize: 13, marginBottom: 4 }} htmlFor="w-lbl-triggerdata">
               triggerData (JSON)
             </label>
-            <textarea value={simulateData} onChange={(e) => setSimulateData(e.target.value)}
+            <textarea id="w-lbl-triggerdata" value={simulateData} onChange={(e) => setSimulateData(e.target.value)}
                       style={{ width: '100%', height: 160, fontFamily: 'monospace', fontSize: 12,
                                padding: 8, border: '1px solid var(--color-border-medium)', borderRadius: 4 }}
                       placeholder='{"record_id":"test-001","name":"测试"}' />
@@ -441,46 +442,46 @@ function NodeConfigEditor({ node, onChange }: { node: Node<WorkflowNodeData>; on
       </div>
       {node.data.kind === 'NOTIFICATION' && (
         <>
-          <label style={lbl}>标题</label>
-          <input value={cfg.title || ''} onChange={(e) => setCfg('title', e.target.value)} style={inp} />
-          <label style={lbl}>消息内容</label>
-          <textarea value={cfg.message || ''} onChange={(e) => setCfg('message', e.target.value)} style={{ ...inp, height: 60 }} />
+          <label style={lbl} htmlFor="w-lbl-6">标题</label>
+          <input id="w-lbl-6" value={cfg.title || ''} onChange={(e) => setCfg('title', e.target.value)} style={inp} />
+          <label style={lbl} htmlFor="w-lbl-7">消息内容</label>
+          <textarea id="w-lbl-7" value={cfg.message || ''} onChange={(e) => setCfg('message', e.target.value)} style={{ ...inp, height: 60 }} />
         </>
       )}
       {node.data.kind === 'HTTP' && (
         <>
-          <label style={lbl}>Method</label>
-          <select value={cfg.method || 'GET'} onChange={(e) => setCfg('method', e.target.value)} style={inp}>
+          <label style={lbl} htmlFor="w-lbl-8">Method</label>
+          <select id="w-lbl-8" value={cfg.method || 'GET'} onChange={(e) => setCfg('method', e.target.value)} style={inp}>
             <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
           </select>
-          <label style={lbl}>URL</label>
-          <input value={cfg.url || ''} onChange={(e) => setCfg('url', e.target.value)} style={inp} />
+          <label style={lbl} htmlFor="w-lbl-9">URL</label>
+          <input id="w-lbl-9" value={cfg.url || ''} onChange={(e) => setCfg('url', e.target.value)} style={inp} />
         </>
       )}
       {node.data.kind === 'CONDITION' && (
         <>
-          <label style={lbl}>字段名(来自 triggerData)</label>
-          <input value={cfg.field || ''} onChange={(e) => setCfg('field', e.target.value)} style={inp} />
-          <label style={lbl}>操作符</label>
-          <select value={cfg.op || 'eq'} onChange={(e) => setCfg('op', e.target.value)} style={inp}>
+          <label style={lbl} htmlFor="w-lbl-10">字段名(来自 triggerData)</label>
+          <input id="w-lbl-10" value={cfg.field || ''} onChange={(e) => setCfg('field', e.target.value)} style={inp} />
+          <label style={lbl} htmlFor="w-lbl-11">操作符</label>
+          <select id="w-lbl-11" value={cfg.op || 'eq'} onChange={(e) => setCfg('op', e.target.value)} style={inp}>
             <option value="eq">等于 eq</option>
             <option value="neq">不等于 neq</option>
             <option value="contains">包含 contains</option>
             <option value="gt">大于 gt</option>
             <option value="lt">小于 lt</option>
           </select>
-          <label style={lbl}>比较值</label>
-          <input value={cfg.value || ''} onChange={(e) => setCfg('value', e.target.value)} style={inp} />
+          <label style={lbl} htmlFor="w-lbl-12">比较值</label>
+          <input id="w-lbl-12" value={cfg.value || ''} onChange={(e) => setCfg('value', e.target.value)} style={inp} />
         </>
       )}
       {node.data.kind === 'DATA_UPDATE' && (
         <>
-          <label style={lbl}>Collection</label>
-          <input value={cfg.collection || ''} onChange={(e) => setCfg('collection', e.target.value)} style={inp} />
-          <label style={lbl}>recordId(留空=触发事件的 recordId)</label>
-          <input value={cfg.recordId || ''} onChange={(e) => setCfg('recordId', e.target.value)} style={inp} />
-          <label style={lbl}>data(JSON —— 要写入/合并的字段)</label>
-          <textarea
+          <label style={lbl} htmlFor="w-lbl-13">Collection</label>
+          <input id="w-lbl-13" value={cfg.collection || ''} onChange={(e) => setCfg('collection', e.target.value)} style={inp} />
+          <label style={lbl} htmlFor="w-lbl-14">recordId(留空=触发事件的 recordId)</label>
+          <input id="w-lbl-14" value={cfg.recordId || ''} onChange={(e) => setCfg('recordId', e.target.value)} style={inp} />
+          <label style={lbl} htmlFor="w-lbl-15">data(JSON —— 要写入/合并的字段)</label>
+          <textarea id="w-lbl-15"
             value={cfg.data || ''}
             onChange={(e) => setCfg('data', e.target.value)}
             style={{ ...inp, height: 80, fontFamily: 'monospace', fontSize: 12 }}

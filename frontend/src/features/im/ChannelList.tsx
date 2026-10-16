@@ -72,7 +72,7 @@ export function ChannelList({
     const display = channel.name || channel.topic || t('im.unnamedChannel');
     const unread = unreadMap[channel.id] ?? 0;
     return (
-      <div
+      <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
         key={channel.id}
         onClick={() => onSelect(channel)}
         className={`channel-item ${active ? 'channel-item-active' : ''}`}

@@ -79,12 +79,12 @@ export function ProfilePage() {
         {error && <div style={{ padding: 8, marginBottom: 12, background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4 }}>{error}</div>}
         {success && <div style={{ padding: 8, marginBottom: 12, background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)', borderRadius: 4 }}>{success}</div>}
         <div style={{ marginBottom: 8 }}>
-          <label>旧密码</label>
-          <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} style={inputStyle} />
+          <label htmlFor="p-lbl-1">旧密码</label>
+          <input id="p-lbl-1" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} style={inputStyle} />
         </div>
         <div style={{ marginBottom: 8 }}>
-          <label>新密码</label>
-          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={inputStyle} />
+          <label htmlFor="p-lbl-2">新密码</label>
+          <input id="p-lbl-2" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={inputStyle} />
         </div>
         <button onClick={() => changeMutation.mutate()} disabled={changeMutation.isPending || !oldPassword || !newPassword} style={btnStyle}>
           {changeMutation.isPending ? '修改中…' : '修改密码'}

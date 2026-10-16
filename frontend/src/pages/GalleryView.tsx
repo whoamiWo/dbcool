@@ -126,7 +126,7 @@ export function GalleryViewPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {groupedData?.map((group) => (
             <div key={group._groupKey}>
-              <div
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.currentTarget.click(); } }}
                 style={{
                   padding: 12,
                   background: 'rgba(99, 102, 241, 0.1)',

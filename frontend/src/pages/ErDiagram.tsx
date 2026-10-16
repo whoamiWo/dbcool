@@ -155,7 +155,7 @@ export function ErDiagramPage() {
         <span style={{ color: 'var(--color-text-muted)' }}>🟢 系统表 · 🔵 业务表 · 🟠 ER demo</span>
       </div>
 
-      <div
+      <div role="presentation"
         style={{
           border: '1px solid var(--color-border-light)',
           borderRadius: 8,

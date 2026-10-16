@@ -208,6 +208,7 @@ export function NotificationChannelsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <span>暂无通知 channel，点击下方按钮创建第一个渠道</span>
                   <button
+                    aria-label="创建 Webhook 渠道"
                     onClick={() => setEditing({
                       type: 'WEBHOOK',
                       name: '',
@@ -235,8 +236,8 @@ export function NotificationChannelsPage() {
       </table>
 
       {editing && (
-        <div style={modalOverlay} onClick={() => setEditing(null)}>
-          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+        <div role="presentation" style={modalOverlay} onClick={() => setEditing(null)}>
+          <div role="presentation" style={modalCard} onClick={(e) => e.stopPropagation()}>
             <h3>{editing.id ? '编辑 channel' : '新建 channel'}</h3>
 
             <Field label="类型">

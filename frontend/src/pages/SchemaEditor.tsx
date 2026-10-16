@@ -221,16 +221,16 @@ export function SchemaEditorPage() {
         }}
       >
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>标题</label>
-          <input
+          <label style={{ display: 'block', marginBottom: 4 }} htmlFor="s-lbl-1">标题</label>
+          <input id="s-lbl-1"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={{ padding: 8, width: 300 }}
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>描述</label>
-          <input
+          <label style={{ display: 'block', marginBottom: 4 }} htmlFor="s-lbl-2">描述</label>
+          <input id="s-lbl-2"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             style={{ padding: 8, width: '100%', maxWidth: 500 }}

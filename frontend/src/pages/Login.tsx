@@ -180,8 +180,12 @@ export function LoginPage() {
                    style={{ marginRight: 6 }} />
             {t('login.remember')}
           </label>
-          <a href="#" onClick={(e) => { e.preventDefault(); alert(t('login.resetHint')); }}
-             style={{ color: 'var(--color-primary-400)', textDecoration: 'none', fontSize: 13 }}>
+          <a
+            // eslint-disable-next-line jsx-a11y/anchor-is-valid -- 纯客户端提示链接，无路由目标，禁止用 <a> 充当按钮的折中保留
+            href="#"
+            onClick={(e) => { e.preventDefault(); alert(t('login.resetHint')); }}
+            style={{ color: 'var(--color-primary-400)', textDecoration: 'none', fontSize: 13 }}
+          >
             {t('login.forgot')}
           </a>
         </div>

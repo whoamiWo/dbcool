@@ -196,6 +196,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
         </div>
       )}
       <div
+        role="presentation"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         style={{

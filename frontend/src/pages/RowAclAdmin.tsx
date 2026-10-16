@@ -153,8 +153,8 @@ export function RowAclAdminPage() {
       </div>
 
       <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <label>按 collection 过滤:</label>
-        <select
+        <label htmlFor="r-lbl-1">按 collection 过滤:</label>
+        <select id="r-lbl-1"
           value={filterCollection}
           onChange={(e) => setFilterCollection(e.target.value)}
           style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
@@ -225,6 +225,7 @@ export function RowAclAdminPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <span>暂无策略，点击下方按钮创建第一条行级权限规则</span>
                   <button
+                    aria-label="创建行级权限策略"
                     onClick={() => setEditing({
                       collection: collections[0]?.name || '',
                       principal_type: 'role',
@@ -254,8 +255,8 @@ export function RowAclAdminPage() {
       </table>
 
       {editing && (
-        <div style={modalOverlay} onClick={() => setEditing(null)}>
-          <div style={modalCard} onClick={(e) => e.stopPropagation()}>
+        <div role="presentation" style={modalOverlay} onClick={() => setEditing(null)}>
+          <div role="presentation" style={modalCard} onClick={(e) => e.stopPropagation()}>
             <h3>{editing.id ? '编辑策略' : '新建策略'}</h3>
             <Field label="Collection">
               <select value={editing.collection || ''} onChange={(e) => setEditing({ ...editing, collection: e.target.value })} style={input}>
