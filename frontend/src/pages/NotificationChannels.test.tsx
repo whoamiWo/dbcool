@@ -86,7 +86,8 @@ describe('NotificationChannelsPage', () => {
       expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /新建|\+/ }));
+    // 工具栏按钮与空态 CTA 同名,取第一个(工具栏)
+    fireEvent.click(screen.getAllByRole('button', { name: /新建|\+/ })[0]);
 
     // 表单显示
     expect(screen.getByRole('button', { name: /保存/ })).toBeInTheDocument();
@@ -107,7 +108,7 @@ describe('NotificationChannelsPage', () => {
     wrap();
     await screen.findByText('运营邮件');
 
-    fireEvent.click(screen.getByRole('button', { name: /新建|\+/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: /新建|\+/ })[0]);
     // 直接通过 name 找 input(label 是"名称")
     const nameInput = document.querySelector('input') as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: 'New Channel' } });

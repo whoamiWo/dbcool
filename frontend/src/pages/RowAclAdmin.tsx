@@ -220,9 +220,35 @@ export function RowAclAdminPage() {
             </tr>
           ))}
           {!loading && policies.length === 0 && (
-            <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              暂无策略 — 点击「+ 新建策略」开始
-            </td></tr>
+            <tr>
+              <td colSpan={8} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)', padding: 24 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <span>暂无策略，点击下方按钮创建第一条行级权限规则</span>
+                  <button
+                    onClick={() => setEditing({
+                      collection: collections[0]?.name || '',
+                      principal_type: 'role',
+                      principal_id: 'user',
+                      action: 'read',
+                      expression: { field: 'owner_id', op: 'eq', value: '$currentUser' },
+                      priority: 0,
+                      enabled: true,
+                      description: '',
+                    })}
+                    style={{
+                      padding: '6px 14px',
+                      background: 'var(--color-info)',
+                      color: 'var(--color-text-primary)',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + 新建策略
+                  </button>
+                </div>
+              </td>
+            </tr>
           )}
         </tbody>
       </table>

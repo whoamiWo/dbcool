@@ -203,9 +203,33 @@ export function NotificationChannelsPage() {
             </tr>
           ))}
           {!loading && channels.length === 0 && (
-            <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              暂无通知 channel — 点击「+ 新建 channel」开始
-            </td></tr>
+            <tr>
+              <td colSpan={7} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)', padding: 24 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <span>暂无通知 channel，点击下方按钮创建第一个渠道</span>
+                  <button
+                    onClick={() => setEditing({
+                      type: 'WEBHOOK',
+                      name: '',
+                      config: { url: '', method: 'POST', timeout_seconds: 5 },
+                      events: '',
+                      enabled: true,
+                      description: '',
+                    })}
+                    style={{
+                      padding: '6px 14px',
+                      background: 'var(--color-accent, #2563eb)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + 新建 channel
+                  </button>
+                </div>
+              </td>
+            </tr>
           )}
         </tbody>
       </table>
