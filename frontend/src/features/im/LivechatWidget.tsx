@@ -62,12 +62,6 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 初始化会话
-  useEffect(() => {
-    if (!enabled) return;
-    initSession();
-  }, [enabled]);
-
   const initSession = async () => {
     try {
       setError(null);
@@ -92,6 +86,12 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
       setError('客服会话初始化失败，请检查网络后重试');
     }
   };
+
+  // 初始化会话
+  useEffect(() => {
+    if (!enabled) return;
+    initSession();
+  }, [enabled]);
 
   // 自动滚动到底部
   useEffect(() => {

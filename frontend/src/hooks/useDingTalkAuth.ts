@@ -21,27 +21,6 @@ export function useDingTalkAuth(): UseDingTalkAuthReturn {
 
   const inDingTalk = isInDingTalk();
 
-  // 检查 URL 中是否有钉钉回调 code
-  useEffect(() => {
-    const code = searchParams.get('code');
-    if (code && inDingTalk) {
-      handleCallback();
-    }
-  }, [searchParams, inDingTalk]);
-
-  const login = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await handleDingTalkLogin();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '钉钉登录失败';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const handleCallback = useCallback(async () => {
     const code = searchParams.get('code');
     if (!code) return;
@@ -57,6 +36,27 @@ export function useDingTalkAuth(): UseDingTalkAuthReturn {
       setLoading(false);
     }
   }, [searchParams]);
+
+  // 检查 URL 中是否有钉钉回调 code
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code && inDingTalk) {
+      handleCallback();
+    }
+  }, [searchParams, inDingTalk, handleCallback]);
+
+  const login = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await handleDingTalkLogin();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '钉钉登录失败';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
     loading,

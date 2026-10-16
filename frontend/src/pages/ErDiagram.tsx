@@ -51,7 +51,6 @@ export function ErDiagramPage() {
   const [error, setError] = useState<string>('');
   const [hoverEdge, setHoverEdge] = useState<number | null>(null);
   const [hoverNode, setHoverNode] = useState<string | null>(null);
-  const [, force] = useState(0);
   const dragRef = useRef<{ i: number; dx: number; dy: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -129,9 +128,15 @@ export function ErDiagramPage() {
     const rect = svgRef.current!.getBoundingClientRect();
     const sx = (e.clientX - rect.left) * (VIEW_W / rect.width);
     const sy = (e.clientY - rect.top) * (VIEW_H / rect.height);
-    data.nodes[dragRef.current.i].x = sx + dragRef.current.dx;
-    data.nodes[dragRef.current.i].y = sy + dragRef.current.dy;
-    force((x) => x + 1);
+    const i = dragRef.current.i;
+    const nx = sx + dragRef.current.dx;
+    const ny = sy + dragRef.current.dy;
+    // 不可变更新：替换被拖动节点的坐标，避免直接变异 state（react-hooks/immutability）
+    setData((prev) =>
+      prev
+        ? { ...prev, nodes: prev.nodes.map((n, idx) => (idx === i ? { ...n, x: nx, y: ny } : n)) }
+        : prev
+    );
   };
   const onMouseUp = () => { dragRef.current = null; };
 
