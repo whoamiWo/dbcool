@@ -67,6 +67,9 @@ class UserDataComplianceControllerTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("code")).isEqualTo(0);
         assertThat(resp.getBody().get("data")).isSameAs(result);
+        // PHASE111：确认 Controller 以「目标用户 + 管理员 + 租户」调用 service，
+        // 而不只是断言自己塞进去的对象（避免自设自断言式的空验证）
+        verify(service).erasesUserData(eq("target-user"), eq(USER.userId().toString()), eq(TENANT));
     }
 
     @Test
@@ -99,5 +102,9 @@ class UserDataComplianceControllerTest {
         assertThat(data.get("anonymized")).isEqualTo(true);
         assertThat(data.get("messagesErased")).isEqualTo(5);
         assertThat(data.get("conversationsErased")).isEqualTo(2);
+        // PHASE111：补充 service 调用校验 —— 本人删除应以「本人 userId + 租户」调用，
+        // 否则这条用例只是在验证"自己设置的 2 等于自己断言的 2"，与真实链路无关
+        verify(service).erasesUserData(
+                eq(USER.userId().toString()), eq(USER.userId().toString()), eq(TENANT));
     }
 }

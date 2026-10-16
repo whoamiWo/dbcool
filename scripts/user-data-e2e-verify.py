@@ -17,6 +17,7 @@ PHASE93 收尾：用户数据导出/删除的**端到端**验证（真实 HTTP�
 
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -24,6 +25,8 @@ import urllib.request
 BASE = os.environ.get("BASE_URL", "http://localhost:8080")
 USERNAME = os.environ.get("USERNAME", "admin")
 PASSWORD = os.environ.get("PASSWORD", "admin123")
+PG_USER = os.environ.get("PGUSER", "nocobase")
+PG_DB = os.environ.get("PGDATABASE", "nocobase")
 
 results = []
 
@@ -53,6 +56,19 @@ def request(method, path, token=None, body=None, headers=None, timeout=20):
 def check(name, ok, detail=""):
     results.append((name, ok, detail))
     print(("  ✅ " if ok else "  ❌ ") + name + (("  — " + detail) if detail else ""))
+
+
+def db_sql(sql):
+    """直连 Postgres 准备/校验数据（与 saas-readiness-verify.py 同风格）。
+
+    用于 AI 会话匿名化的端到端验证：fixture 只负责"造一条真实会话"，
+    被测的删除与校验仍走真实 HTTP + 真实库，不 mock。
+    """
+    r = subprocess.run(
+        ["docker", "exec", "nocobase-postgres", "psql",
+         "-U", PG_USER, "-d", PG_DB, "-t", "-A", "-c", sql],
+        text=True, capture_output=True)
+    return r.returncode == 0, (r.stdout or "").strip(), (r.stderr or "").strip()
 
 
 def main():
@@ -142,8 +158,45 @@ def main():
     check("无认证访问被拒绝 401", st == 401, "HTTP %s" % st)
     print()
 
-    # ============ 场景五：用户数据删除 ============
+    # ============ 场景五：用户数据删除（PHASE111：AI 会话真匿名化）============
     print("=== 场景五：管理员删除用户数据 ===")
+
+    # 5.0 准备真实 AI 会话：插入一条含敏感内容的会话行，作为删除的被测对象。
+    #     此前场景五只断言"200 + 有 success 字段"，即便 eraseAiConversations 是假实现
+    #     （log.warn + 计数 0）也照样 PASS —— 这是"假验证"。现改为先造数据、删除后再查内容。
+    # ai_conversation.agent_id 有外键指向 ai_agent，必须先造一个 agent
+    ok_ag, ag_out, ag_err = db_sql(
+        "INSERT INTO ai_agent (tenant_id, name) "
+        "VALUES ('%s', 'PHASE111-fixture-agent') RETURNING id;" % tenant_id)
+    # psql 输出形如 "<uuid>\nINSERT 0 1"，必须只取首行作为 id
+    agent_id = ag_out.splitlines()[0].strip() if (ok_ag and ag_out) else ""
+    if not agent_id:
+        check("准备 AI agent fixture", False, "插入失败: %s" % (ag_err[:150] or agent_id))
+        print()
+        print("=" * 60)
+        print("无法准备 AI agent，后续删除断言不可信，判定失败")
+        print("=" * 60)
+        return 1
+
+    ok_db, _, db_err = db_sql(
+        "INSERT INTO ai_conversation "
+        "(id, tenant_id, agent_id, channel_id, user_id, messages, created_at, updated_at) "
+        "VALUES (gen_random_uuid(), '%s', '%s', NULL, '%s', "
+        "'[{\"role\":\"user\",\"content\":\"PHASE111-待删除的敏感内容\"}]'::jsonb, now(), now());"
+        % (tenant_id, agent_id, target_user_id))
+    if not ok_db:
+        check("准备 AI 会话 fixture", False, "插入失败: %s" % db_err[:150])
+        print()
+        print("=" * 60)
+        print("无法准备 AI 会话，后续删除断言不可信，判定失败")
+        print("=" * 60)
+        return 1
+    _, before_cnt, _ = db_sql(
+        "SELECT count(*) FROM ai_conversation WHERE user_id='%s' AND tenant_id='%s';"
+        % (target_user_id, tenant_id))
+    check("准备 AI 会话 fixture（删除前）", before_cnt.isdigit() and int(before_cnt) >= 1,
+          "会话数=%s" % before_cnt)
+
     st, body = request("DELETE", "/api/admin/users/%s/data-erasure" % target_user_id,
                        token=token)
     erasure_resp = json.loads(body) if st == 200 else {}
@@ -151,6 +204,29 @@ def main():
     check("删除接口返回 200", st == 200, "HTTP %s" % st)
     check("删除结果包含 success 字段", "success" in erasure_data,
           "data: %s" % json.dumps(erasure_data, ensure_ascii=False)[:150])
+
+    # 5.1 PHASE111 核心断言：AI 会话内容必须真的被匿名化（可失败）
+    #     - 残留校验：仍带原始内容（messages <> '[]'）的会话数必须为 0
+    #     - 计数校验：conversationsErased 必须 >= 1（假实现恒为 0）
+    _, residual, _ = db_sql(
+        "SELECT count(*) FROM ai_conversation "
+        "WHERE user_id='%s' AND tenant_id='%s' AND messages <> '[]'::jsonb;"
+        % (target_user_id, tenant_id))
+    check("AI 会话内容已匿名化（无残留原始内容）",
+          residual.isdigit() and int(residual) == 0,
+          "残留=%s（假实现会留下 1 条）" % residual)
+
+    erased_cnt = erasure_data.get("conversationsErased")
+    check("conversationsErased 计数 >= 1（真实处理条数）",
+          isinstance(erased_cnt, int) and erased_cnt >= 1,
+          "conversationsErased=%s（假实现恒为 0）" % erased_cnt)
+
+    _, after_val, _ = db_sql(
+        "SELECT coalesce(min(messages::text), '<none>') FROM ai_conversation "
+        "WHERE user_id='%s' AND tenant_id='%s';" % (target_user_id, tenant_id))
+    check("匿名化后 messages 为合法 JSON 占位 '[]'",
+          after_val == "[]",
+          "实际=%s（必须是合法 JSON，不能是 '[已删除]' 这类文本）" % after_val)
     
     # 删除后再查审计留痕
     st, body = request("GET", "/api/audit/logs?limit=20", token=token)
@@ -165,6 +241,10 @@ def main():
     check("审计日志中存在 user.data.erasure 记录", erasure_audit_found,
           "审计记录数: %d" % len(audit) if audit else "无审计数据")
     print()
+
+    # 清理本次 fixture（只删本次建的 agent 及其会话，不动其他数据）
+    db_sql("DELETE FROM ai_conversation WHERE agent_id='%s';" % agent_id)
+    db_sql("DELETE FROM ai_agent WHERE id='%s';" % agent_id)
 
     # ============ 汇总 ============
     failed = [r for r in results if not r[1]]

@@ -1,8 +1,19 @@
-# PHASE95 → PHASE103 总索引：对外多租户 SaaS 上线
+# PHASE95 → PHASE111 总索引：对外多租户 SaaS 上线
 
-> 配套评估：`SAAS_LAUNCH_ASSESSMENT.md`（结论：当前 ❌ 不可对外上线）
+> 配套评估：`SAAS_LAUNCH_ASSESSMENT.md`（**2026-10-17 PHASE111 复评后结论：✅ 可对外上线**）
 > 目标场景：**对外多租户 SaaS**　部署形态：**Docker Compose 单机**
 > 使用方式：按本索引顺序，把每批的 `PHASE9x_GLM53_*_PROMPT.md` 全文投喂给 Kilo Code + GLM5.3。
+
+---
+
+## 〇、终局状态（2026-10-17）
+
+| 项 | 状态 |
+|---|---|
+| P0 阻断项 | **7 项全部修复**（P0-1/2/4/5/6/7 于 PHASE110 复验；P0-3 于 PHASE111 闭环） |
+| 对外 SaaS 结论 | **✅ 可上线**（`SAAS_LAUNCH_ASSESSMENT.md` 执行摘要） |
+| 终验报告 | `docs/PHASE110_UPGRADE_REPORT.md`（含独立审计修正）、`docs/PHASE111_ERASURE_REPORT.md` |
+| 全量门禁 | mvn **2218**/0F/0E（JaCoCo **85.73%**）/ 前端 **382** / tsc 0 / eslint 0 / E2E **135** / Python **61**+1sk / 备份 **30/30** / 编排 `launch-final-verify.py` **8/8** |
 
 ---
 
@@ -21,7 +32,11 @@
       │
       ├──► PHASE101 备份真正可恢复
       │
-      └──► PHASE102 遗留 P0 与容量基线
+      ├──► PHASE102 遗留 P0 与容量基线
+      │
+      ├──► PHASE110 上线终验 + 独立审计（7 项 P0 复验，运维闭环补齐）
+      │
+      └──► PHASE111 P0-3 收口：AI 会话真匿名化（对外 SaaS 最后阻断项）
 ```
 
 **顺序不可换的理由**：

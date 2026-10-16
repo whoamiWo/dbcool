@@ -10,6 +10,12 @@
 > 的 `eraseAiConversations()` 仍是假实现（仅 `log.warn` + 计数 0）却 `setSuccess(true)`，
 > 属静默成功 + GDPR 合规缺口。因此**对外 SaaS 上线结论维持 ❌**，阻断项由 7 项收窄为 1 项。
 > 详见 `docs/PHASE110_UPGRADE_REPORT.md` §5。
+>
+> **2026-10-17 复评（PHASE111 收口）**：P0-3 唯一阻断项**已闭环**。`eraseAiConversations()` 补齐
+> `AiConversationEntityRepository` 按 `userId+tenantId` 的批量匿名化（`anonymizeMessagesByUserId`）
+> + 残留校验（执行后复查是否仍有原始内容，有则抛 `IllegalStateException` 触发事务回滚），
+> `user-data-e2e-verify.py` 场景五升级为可失败端到端断言（造会话→删除→DB 校验 `messages='[]'` 且
+> `conversationsErased>=1`），实测 15/15。对外 SaaS 上线结论由 ❌ 转 **✅ 可上线**（见下方执行摘要）。
 
 ---
 
@@ -19,7 +25,7 @@
 |---|---|---|
 | 内部 POC / 演示 | ✅ 可上线 | 门禁全绿、7 容器 healthy、核心链路可用 |
 | 内部 200 人自用 | ✅ 可上线（2026-10-17 重评） | P0-1~P0-4 已清（授权/隔离/假实现残余见下/契约 0 漂移） |
-| **对外多租户 SaaS** | ❌ **仍不可上线**（2026-10-17 重评） | **唯一阻断：P0-3 假实现 `eraseAiConversations()` 未真删除 AI 会话却返回成功**（GDPR 合规缺口）；其余 6 项 P0 均已实测修复 |
+| **对外多租户 SaaS** | ✅ **可上线**（2026-10-17 PHASE111 重评） | **P0-3 已闭环**：`eraseAiConversations()` 真实批量匿名化 + 残留校验 + 失败抛异常（不再静默成功），`user-data-e2e-verify.py` 15/15 实测通过；至此 7 项 P0 全部修复。残余风险：非阻断项（见 §五） |
 
 **必须完成的 9 批**：`PHASE95`（授权与租户隔离）→ `PHASE96`（假实现清零）→ `PHASE97`（前后端契约）→ `PHASE98`（错误态与好用）→ `PHASE99`（SaaS 必补三项）→ `PHASE100`（Compose 加固）→ `PHASE101`（备份可恢复）→ `PHASE102`（遗留 P0 与容量基线）→ `PHASE103`（CI 硬化）。
 

@@ -143,14 +143,19 @@ public class UserDataErasureService {
         result.setRequestedAt(Instant.now());
         result.setTenantId(adminTenantId);
 
+        // PHASE111：AI 会话匿名化改为传租户（此前传 anonymousId 且未使用）
         eraseImMessages(userId, anonymousId, result);
-        eraseAiConversations(userId, anonymousId, result);
+        eraseAiConversations(userId, adminTenantId, result);
         anonymizeAuditLogs(userId, anonymousId, result);
 
         auditService.log(adminTenantId, adminUserId, "system",
             "user.data.erasure", "UserDataErasure", userId,
             Map.of("anonymousId", anonymousId));
 
+        // PHASE111：success 语义 —— 仅当三步均真正完成才置 true。
+        // eraseAiConversations 若执行失败或残留未清理会抛 IllegalStateException，
+        // 事务回滚且不会走到这一行；因此"失败却报成功"在语义上不可能发生（红线 2）。
+        // 注意：某一步处理 0 条（用户本就没有该类数据）属正常成功，不代表失败。
         result.setSuccess(true);
         return result;
     }
@@ -166,12 +171,57 @@ public class UserDataErasureService {
         result.incrementMessagesErased(n);
     }
 
-    private void eraseAiConversations(String userId, String anonymousId, UserDataErasureRequest result) {
-        // AI 对话：现有仓储只支持 (agentId, channelId, userId) 组合查询，
-        // 无法仅按 userId 定位 —— 保留计数 0 并在日志中说明，避免静默假装已处理。
-        log.warn("[compliance] AI 对话匿名化未实现：AiConversationEntityRepository "
-                + "缺少按 userId 的查询方法，需补充后再接入（userId={}）", userId);
-        result.incrementConversationsErased(0);
+    /**
+     * PHASE111：真正匿名化该用户在本租户下的 AI 会话内容（GDPR right to be forgotten）。
+     *
+     * <p>契约（禁止静默成功，红线 2）：
+     * <ul>
+     *   <li>成功：把会话 {@code messagesJson} 替换为合法 JSON 占位（保留记录行、清除内容），
+     *       并把<b>真实受影响行数</b>累加到 {@code result.conversationsErased}；</li>
+     *   <li>失败（仓储调用抛异常）或执行后<b>仍残留原始内容</b> → 抛 {@code IllegalStateException}，
+     *       外层 {@code @Transactional} 回滚，{@code result.success} <b>不会被置 true</b>；</li>
+     *   <li>用户本就没有会话（n=0 且复查无残留）属正常成功，不得仅因 0 条判定失败。</li>
+     * </ul>
+     *
+     * <p>占位取 {@code "[]"}：{@code messages} 列是 {@code jsonb NOT NULL}，且
+     * {@code AgentService#parseMessages} 期望 JSON 数组；传非 JSON 文本会导致列写入报错、
+     * 或让下游解析静默降级成"看起来已删"（此前假实现正是靠"计数 0 + 报成功"蒙混）。
+     */
+    private void eraseAiConversations(String userId, String tenantId, UserDataErasureRequest result) {
+        UUID uid;
+        try {
+            uid = UUID.fromString(userId);
+        } catch (IllegalArgumentException e) {
+            // requireUserInTenant 已用 UUID.fromString 校验过，此处理论不可达；真到这儿说明
+            // 入参被改坏，必须失败而不是"跳过 + 报成功"。
+            throw new IllegalStateException(
+                    "[compliance] 无效的用户 ID，无法匿名化 AI 会话: " + userId, e);
+        }
+
+        final String placeholder = "[]";
+        int n;
+        try {
+            n = aiConversationRepo.anonymizeMessagesByUserId(uid, tenantId, placeholder);
+        } catch (RuntimeException e) {
+            log.error("[compliance] AI 会话匿名化失败 userId={} tenant={}: {}",
+                    userId, tenantId, e.getMessage(), e);
+            throw new IllegalStateException("AI 会话匿名化失败，删除请求未生效", e);
+        }
+
+        // 残留校验：防止 UPDATE 静默未生效（条件不匹配 / 绑定异常但没抛错）
+        long remaining = aiConversationRepo.findByUserIdAndTenantId(uid, tenantId).stream()
+                .filter(c -> c.getMessagesJson() != null
+                        && !placeholder.equals(c.getMessagesJson().trim()))
+                .count();
+        if (remaining > 0) {
+            log.error("[compliance] AI 会话匿名化后仍有 {} 条残留 userId={} tenant={}",
+                    remaining, userId, tenantId);
+            throw new IllegalStateException(
+                    "AI 会话匿名化未生效，仍有 " + remaining + " 条会话含原始内容");
+        }
+
+        result.incrementConversationsErased(n);
+        log.info("[compliance] AI 会话匿名化完成 userId={} tenant={} count={}", userId, tenantId, n);
     }
 
     private void anonymizeAuditLogs(String userId, String anonymousId, UserDataErasureRequest result) {

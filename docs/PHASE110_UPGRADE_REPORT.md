@@ -77,7 +77,7 @@
 |----|------|------|------|
 | P0-1 | 授权层 | ✅ 已修复 | `AuthController.java:124` 用真 `roleNames`；`SecurityConfig.java:100-101` 仅放行 `/actuator/prometheus` |
 | P0-2 | 租户隔离 | ✅ 已修复 | `UserAdminService`（租户过滤）；`WikiPageRepository` 带 tenantId；越权回归脚本全 PASS |
-| P0-3 | 假实现/静默成功 | ❌ **仍存在** | `UserDataErasureService.java:169-175` `eraseAiConversations()` 仅 `log.warn` + `incrementConversationsErased(0)`，外层 `setSuccess(true)` |
+| P0-3 | 假实现/静默成功 | ❌ 仍存在 → **PHASE111 已修复** | `UserDataErasureService.java:169-175` `eraseAiConversations()` 仅 `log.warn` + `incrementConversationsErased(0)`，外层 `setSuccess(true)`；PHASE111 补齐仓储匿名化 + 残留校验 + 失败抛异常，`user-data-e2e-verify.py` 15/15 |
 | P0-4 | 前后端契约 | ✅ 已修复 | `api-contract-verify.py` **0 漂移** |
 | P0-5 | 备份可恢复 | ✅ 已修复 | `backup-e2e-verify.py` 30/30；`docker-compose.yml:318-319` backupsdata 命名卷 |
 | P0-6 | 默认密钥/端口/TLS | ✅ 已修复 | compose 全 `${X:?未设置}`；端口 `127.0.0.1`；`nginx.conf:22-36` 443+HSTS |
@@ -87,12 +87,14 @@
 
 ## 5. 上线结论（审计修正后）
 
-### ❌ 对外多租户 SaaS：**仍不可上线**
+### ⚠️ 对外多租户 SaaS：**PHASE110 交付时仍不可上线（阻断项 P0-3 至 PHASE111 才闭环）**
 
-理由（唯一阻断项）：
-- **P0-3 合规缺口未闭环**：`UserDataErasureService.eraseAiConversations()` 仍是假实现，
+唯一阻断项：
+- **P0-3 合规缺口**：`UserDataErasureService.eraseAiConversations()` 在 PHASE110 仍是假实现，
   AI 会话**实际未被删除**却 `setSuccess(true)`（静默成功，违反红线 2）。
   对外 SaaS 涉及 GDPR / 个人数据删除权，此项为**合规阻断**，不能以"其余 6 项已修"冲抵。
+- **后续**：PHASE111 已补齐仓储匿名化 + 残留校验 + 失败抛异常，`user-data-e2e-verify.py` 15/15，
+  阻断项闭环，对外 SaaS 上线结论由 ❌ 转 ✅（详见 `PHASE111_ERASURE_REPORT.md`）。
 
 ### 已达标部分
 
