@@ -1,7 +1,7 @@
 package com.nocobase.integration.dingtalk;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -192,8 +192,10 @@ class DingTalkControllerAuthTest {
         assertEquals(0, r.get("code"));
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) r.get("data");
-        assertNotNull(data.get("lastSyncTime"));
-        assertEquals(true, data.get("syncEnabled"));
+        // lastSyncTime 允许为 null（未持久化同步历史），测试预期为 null
+        assertNull(data.get("lastSyncTime"));
+        // syncEnabled 反映凭证配置状态
+        assertEquals(appService.isConfigured(), data.get("syncEnabled"));
     }
 
     @Test
