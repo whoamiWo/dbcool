@@ -41,6 +41,6 @@ COPY --from=builder /app/index.js ./
 EXPOSE 3100
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:3100/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3100/health || exit 1
 
 CMD ["node", "index.js"]
