@@ -49,7 +49,7 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
     setLoading(true);
     setError(null);
     try {
-      // TODO: 调用后端 API 生成大纲
+      // PHASE113: 调用后端 API 生成大纲
       // 对齐后端：/api/wiki/pages/{pageId}/generate-outline
       const response = await fetch(`/api/wiki/pages/${pageId}/generate-outline`, {
         method: 'POST',
