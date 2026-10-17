@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 import urllib.error
@@ -37,6 +38,45 @@ TIMEOUT = 10
 def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}")
     sys.stdout.flush()
+
+
+def parse_rotation_wait(body: dict) -> float:
+    """从 429 响应体解析还需等待的秒数（轮换间隔保护）。
+
+    响应 message 形如：
+        "轮换速率超限:距上次轮换 1234 ms,需 ≥ 60000 ms"
+    解析出 (需 ≥ 的 ms - 已过 ms)，加 2s 余量；解析失败则退回 62s（间隔 60s + 余量）。
+    """
+    msg = str(body.get("message") or "")
+    try:
+        import re
+        nums = re.findall(r"(\d+)\s*ms", msg)
+        if len(nums) >= 2:
+            elapsed, required = int(nums[0]), int(nums[1])
+            remain = (required - elapsed) / 1000.0 + 2.0
+            return max(1.0, min(remain, 70.0))
+    except Exception:
+        pass
+    return 62.0
+
+
+def clear_rate_limit() -> None:
+    """清理限流 key（best-effort），与 launch-final-verify.py 同款逻辑。
+
+    rotate 接口被限流保护（管理员端点），脚本单独跑或编排串行跑都可能累计触发 429。
+    清理是运维处理，不是放宽断言：清理后 rotate 必须真正返回 200 并执行三条断言。
+    """
+    try:
+        scan = subprocess.run(
+            ["docker", "exec", "nocobase-redis", "redis-cli", "--scan", "--pattern", "ratelimit:*"],
+            capture_output=True, text=True, timeout=20)
+        keys = [k for k in (scan.stdout or "").split() if k.strip()]
+        if keys:
+            subprocess.run(["docker", "exec", "nocobase-redis", "redis-cli", "DEL"] + keys,
+                           capture_output=True, text=True, timeout=20)
+            log(f"  已清理 {len(keys)} 个限流 key")
+    except Exception:
+        pass
 
 
 def ok(msg: str) -> None:
@@ -71,9 +111,15 @@ def request(method: str, path: str, token: str | None = None,
 
 
 def login(user: str, password: str) -> str | None:
-    status, body = request("POST", "/api/auth/login", data={"username": user, "password": password})
-    if status == 200:
-        return (body.get("data") or {}).get("access_token")
+    """登录；登录端点确有 HTTP 限流（ratelimit.login=5/300s，基于 IP 累计），
+    编排串行跑多个脚本时会互相挤兑，故失败先清限流再重试一次。"""
+    for attempt in range(1, 3):
+        status, body = request("POST", "/api/auth/login", data={"username": user, "password": password})
+        if status == 200:
+            return (body.get("data") or {}).get("access_token")
+        if attempt == 1:
+            clear_rate_limit()
+            time.sleep(1)
     return None
 
 
@@ -107,12 +153,35 @@ def main() -> int:
     size_before = (keys_before.get("data") or {}).get("size")
     log(f"轮换前密钥数量：{size_before}")
 
-    # 执行轮换
+    # 执行轮换。
+    # 注意：429 在这里**不是 HTTP 限流**（/api/admin/** 不匹配 GlobalRateLimitFilter
+    # 的任何模式），而是 KeyRingService.rotate() 的"轮换最小间隔"保护：
+    #   ROTATION_MIN_INTERVAL_MS = 60_000（KeyRingService.java:47）
+    #   rotate() 捕获 IllegalStateException → 映射为 429（JwtKeyRotationController.java:68-70）
+    # 因此清 redis 限流 key 无效，正确做法是**等待间隔到期**后重试。
     log("触发 rotate ...")
-    status, rot = request("POST", "/api/admin/jwt-keys/rotate", token=token_old)
+    status, rot = 0, {}
+    for attempt in range(1, 4):
+        status, rot = request("POST", "/api/admin/jwt-keys/rotate", token=token_old)
+        if status == 200:
+            break
+        if status == 429:
+            wait = parse_rotation_wait(rot)
+            log(f"  ⚠️  第 {attempt} 次 rotate 触发轮换间隔保护（429，非限流）："
+                f"需等待 ~{wait:.0f}s（KeyRingService 最小间隔 60s）")
+            if attempt < 3:
+                time.sleep(wait)
+                continue
+        break
     if status == 429:
-        log("  ⚠️  rotate 被限流（429），本次不判定失败，但需人工确认频率限制是否合理")
-        return 0
+        # PHASE113: 原实现在此 `return 0`（静默视为通过）—— 三条核心断言从未执行，
+        # 等于把"未验证"伪装成"通过"，违反"禁止静默成功"红线。改为明确判失败。
+        failures.append(
+            "rotate 连续 3 次触发轮换间隔保护（429，最小间隔 60s），无法执行轮换 —— "
+            "双密钥窗口/新密钥生效/ACTIVE 唯一性三项断言均未执行，不能判定为通过。"
+            "请在距上次轮换 ≥60s 后重跑本脚本")
+        fail(failures[-1])
+        return 1
     if status != 200:
         failures.append(f"rotate 返回 {status}（期望 200）")
         fail(failures[-1])
