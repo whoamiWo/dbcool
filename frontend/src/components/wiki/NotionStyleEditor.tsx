@@ -604,7 +604,11 @@ export function NotionStyleEditor({
         {/* 块操作按钮 */}
         <Box sx={{ display: 'flex', gap: 0.25, opacity: 0, transition: 'opacity 0.15s', '&:hover': { opacity: 1 } }}>
           <Tooltip title="删除块">
-            <IconButton size="small" onClick={() => deleteBlock(block.id)}>
+            <IconButton
+              size="small"
+              onClick={() => deleteBlock(block.id)}
+              aria-label={`删除 ${block.type || '块'}`}
+            >
               <DeleteSweep fontSize="small" />
             </IconButton>
           </Tooltip>

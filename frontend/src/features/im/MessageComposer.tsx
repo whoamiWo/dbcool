@@ -198,6 +198,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
       )}
       <div
         role="presentation"
+        aria-label="消息输入区（支持拖放附件到此处）"
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         style={{

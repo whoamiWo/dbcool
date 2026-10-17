@@ -349,7 +349,14 @@ export function WorkflowDesignerPage() {
       </aside>
 
       {/* 中:画布 */}
-      <div ref={reactFlowWrapper} role="presentation" style={{ flex: 1, background: 'var(--color-text-primary)', borderRadius: 8 }} onDrop={onDrop} onDragOver={onDragOver}>
+      <div
+        ref={reactFlowWrapper}
+        role="presentation"
+        aria-label="工作流画布（支持从节点面板拖放节点到此处）"
+        style={{ flex: 1, background: 'var(--color-text-primary)', borderRadius: 8 }}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+      >
         <ReactFlow
           nodes={nodes} edges={edges}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
