@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import { subscribeToAlerts } from '@/lib/stompClient';
 import { useAuthStore } from '@/stores/auth';
@@ -64,11 +65,14 @@ const KIND_COLORS: Record<string, string> = {
   cache_hit_rate_low: 'var(--color-secondary-500)',
 };
 
-const KIND_LABELS: Record<string, string> = {
-  rate_limit_exceeded: '限流',
-  quota_exceeded: '配额',
-  cache_hit_rate_low: '低命中率',
-};
+function getKindLabel(t: (key: string) => string, kind: string): string {
+  const map: Record<string, string> = {
+    rate_limit_exceeded: t('alertCenter.kindRateLimit'),
+    quota_exceeded: t('alertCenter.kindQuota'),
+    cache_hit_rate_low: t('alertCenter.kindCacheLow'),
+  };
+  return map[kind] ?? kind;
+}
 
 function formatTime(ts: number): string {
   const d = new Date(ts * 1000);
@@ -76,8 +80,9 @@ function formatTime(ts: number): string {
 }
 
 function KindBadge({ kind }: { kind: string }) {
+  const { t } = useTranslation();
   const color = KIND_COLORS[kind] ?? 'var(--color-text-muted)';
-  const label = KIND_LABELS[kind] ?? kind;
+  const label = getKindLabel(t, kind);
   return (
     <span
       style={{
@@ -106,22 +111,23 @@ function AlertRow({
   onResolve: (id: string) => void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const isResolved = ev.resolved;
   const isAcked = ev.acked;
   return (
     <tr style={{ borderBottom: '1px solid var(--color-bg-tertiary)', opacity: isResolved ? 0.5 : 1 }}>
       <td style={td}>
         {isResolved ? (
-          <span style={statusBadgeStyle('var(--color-success)')}>✓ 已解决</span>
+          <span style={statusBadgeStyle('var(--color-success)')}>{t('alertCenter.statusResolved')}</span>
         ) : isAcked ? (
           <span
             style={statusBadgeStyle('var(--color-warning)')}
             title={ev.acked_by ? `by ${ev.acked_by}` : ''}
           >
-            👁 已确认
+            {t('alertCenter.statusAcked')}
           </span>
         ) : (
-          <span style={statusBadgeStyle('var(--color-error)')}>🔥 新</span>
+          <span style={statusBadgeStyle('var(--color-error)')}>{t('alertCenter.statusNew')}</span>
         )}
       </td>
       <td style={td}>{formatTime(ev.timestamp)}</td>
@@ -129,7 +135,7 @@ function AlertRow({
         <KindBadge kind={ev.kind} />
       </td>
       <td style={td}>
-        {ev.user_id ?? <span style={{ color: 'var(--color-text-muted)' }}>(系统)</span>}
+        {ev.user_id ?? <span style={{ color: 'var(--color-text-muted)' }}>{t('alertCenter.systemUser')}</span>}
       </td>
       <td style={{ ...td, fontFamily: 'monospace', fontSize: 12, color: 'var(--color-bg-secondary)' }}>
         {JSON.stringify(ev.detail)}
@@ -141,7 +147,7 @@ function AlertRow({
             disabled={pending}
             style={actionBtnStyle('var(--color-warning)')}
           >
-            确认
+            {t('alertCenter.ack')}
           </button>
         )}
         {!isResolved && (
@@ -150,7 +156,7 @@ function AlertRow({
             disabled={pending}
             style={{ ...actionBtnStyle('var(--color-success)'), marginLeft: 4 }}
           >
-            解决
+            {t('alertCenter.resolve')}
           </button>
         )}
       </td>
@@ -183,6 +189,7 @@ function actionBtnStyle(color: string): React.CSSProperties {
 }
 
 export function AlertCenterPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [refreshSec, setRefreshSec] = useState(5);
   const [showResolved, setShowResolved] = useState(true);
@@ -306,7 +313,7 @@ export function AlertCenterPage() {
 
   // 任一关键数据源失败都要显式告知，而不是静默显示"加载中…"
   const alertsError = alertsQuery.isError
-    ? `告警列表加载失败：${(alertsQuery.error as Error)?.message ?? ''}`
+    ? t('alertCenter.alertsLoadFailed', { msg: (alertsQuery.error as Error)?.message ?? '' })
     : null;
 
   const simulateMutation = useMutation({
@@ -323,7 +330,7 @@ export function AlertCenterPage() {
   const ackMutation = useMutation({
     mutationFn: async (eventId: string) => {
       if (!ackBy.trim()) {
-        throw new Error('登录态失效：无法确定确认人，请重新登录后再确认告警');
+        throw new Error(t('alertCenter.ackAuthFailed'));
       }
       return apiClient.post<{ ok: boolean }>(`/ai/alerts/${eventId}/ack`, { by: ackBy.trim() });
     },
@@ -356,11 +363,11 @@ export function AlertCenterPage() {
           marginBottom: 16,
         }}
       >
-        <h1>🚨 告警监控中心</h1>
+        <h1>{t('alertCenter.title')}</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span
             title={
-              wsConnected ? 'WebSocket 已连接,实时推送' : 'WebSocket 未连接,降级为轮询'
+              wsConnected ? t('alertCenter.wsConnected') : t('alertCenter.wsDisconnected')
             }
             style={{
               display: 'inline-flex',
@@ -382,20 +389,19 @@ export function AlertCenterPage() {
                 background: wsConnected ? 'var(--color-success)' : 'var(--color-error)',
               }}
             />
-            {wsConnected ? 'WS 在线' : 'WS 离线'}
+            {t('alertCenter.ws' + (wsConnected ? 'Online' : 'Offline'))}
           </span>
 
           <label style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-            刷新:
+            {t('alertCenter.refresh')}
             <select
               value={refreshSec}
               onChange={(e) => setRefreshSec(Number(e.target.value))}
               style={{ marginLeft: 6, padding: '4px 8px' }}
             >
-              <option value={2}>2 秒</option>
-              <option value={5}>5 秒</option>
-              <option value={10}>10 秒</option>
-              <option value={30}>30 秒</option>
+              {[2, 5, 10, 30].map((n) => (
+                <option key={n} value={n}>{t('alertCenter.sec', { n })}</option>
+              ))}
             </select>
           </label>
           <button
@@ -410,7 +416,7 @@ export function AlertCenterPage() {
               cursor: simulateMutation.isPending ? 'wait' : 'pointer',
             }}
           >
-            {simulateMutation.isPending ? '发送中…' : '触发一次 LLM 调用'}
+            {simulateMutation.isPending ? t('alertCenter.triggering') : t('alertCenter.triggerLlm')}
           </button>
         </div>
       </div>
@@ -424,11 +430,11 @@ export function AlertCenterPage() {
         }}
       >
         <div style={cardStyle}>
-          <h3 style={cardTitleStyle}>📦 LLM 缓存</h3>
+          <h3 style={cardTitleStyle}>{t('alertCenter.llmCache')}</h3>
           {cache ? (
             <>
               <div style={statLineStyle}>
-                <span>命中率</span>
+                <span>{t('alertCenter.hitRate')}</span>
                 <strong
                   style={{
                     color: cache.hit_rate_warning ? 'var(--color-error)' : 'var(--color-success)',
@@ -440,71 +446,71 @@ export function AlertCenterPage() {
                 </strong>
               </div>
               <div style={statLineStyle}>
-                <span>命中 / 未命中</span>
+                <span>{t('alertCenter.hitsMisses')}</span>
                 <span>
                   {cache.hits} / {cache.misses}
                 </span>
               </div>
               <div style={statLineStyle}>
-                <span>当前 / 上限</span>
+                <span>{t('alertCenter.currentMax')}</span>
                 <span>
                   {cache.size} / {cache.max_size}
                 </span>
               </div>
               <div style={statLineStyle}>
-                <span>TTL</span>
+                <span>{t('alertCenter.ttl')}</span>
                 <span>{cache.ttl_seconds}s</span>
               </div>
             </>
           ) : (
-            <div style={{ color: 'var(--color-text-muted)' }}>加载中…</div>
+            <div style={{ color: 'var(--color-text-muted)' }}>{t('common.loading')}</div>
           )}
         </div>
 
         <div style={cardStyle}>
-          <h3 style={cardTitleStyle}>📊 用户配额</h3>
+          <h3 style={cardTitleStyle}>{t('alertCenter.userQuota')}</h3>
           {quota ? (
             <>
               <div style={statLineStyle}>
-                <span>每日调用剩余</span>
+                <span>{t('alertCenter.dailyCalls')}</span>
                 <strong>{quota.daily_calls_remaining}</strong>
               </div>
               <div style={statLineStyle}>
-                <span>每日 token 剩余</span>
+                <span>{t('alertCenter.dailyTokens')}</span>
                 <strong>{quota.daily_tokens_remaining.toLocaleString()}</strong>
               </div>
               <div style={statLineStyle}>
-                <span>每月调用剩余</span>
+                <span>{t('alertCenter.monthlyCalls')}</span>
                 <strong>{quota.monthly_calls_remaining.toLocaleString()}</strong>
               </div>
               <div style={statLineStyle}>
-                <span>每月 token 剩余</span>
+                <span>{t('alertCenter.monthlyTokens')}</span>
                 <strong>{quota.monthly_tokens_remaining.toLocaleString()}</strong>
               </div>
             </>
           ) : (
-            <div style={{ color: 'var(--color-text-muted)' }}>加载中…</div>
+            <div style={{ color: 'var(--color-text-muted)' }}>{t('common.loading')}</div>
           )}
         </div>
 
         <div style={cardStyle}>
-          <h3 style={cardTitleStyle}>📡 Webhook 推送</h3>
+          <h3 style={cardTitleStyle}>{t('alertCenter.webhook')}</h3>
           {webhook ? (
             <>
               <div style={statLineStyle}>
-                <span>配置</span>
-                <span>{webhook.configured ? '✅ 已配置' : '❌ 未配置'}</span>
+                <span>{t('alertCenter.configured')}</span>
+                <span>{webhook.configured ? t('alertCenter.configuredYes') : t('alertCenter.configuredNo')}</span>
               </div>
               <div style={statLineStyle}>
-                <span>签名</span>
-                <span>{webhook.signing ? '✅ HMAC 启用' : '❌ 明文'}</span>
+                <span>{t('alertCenter.signing')}</span>
+                <span>{webhook.signing ? t('alertCenter.signingHmac') : t('alertCenter.signingPlain')}</span>
               </div>
               <div style={statLineStyle}>
-                <span>推送成功</span>
+                <span>{t('alertCenter.pushSuccess')}</span>
                 <strong style={{ color: 'var(--color-success)' }}>{webhook.success}</strong>
               </div>
               <div style={statLineStyle}>
-                <span>推送失败</span>
+                <span>{t('alertCenter.pushFailure')}</span>
                 <strong
                   style={{ color: webhook.failure > 0 ? 'var(--color-error)' : 'var(--color-text-muted)' }}
                 >
@@ -516,31 +522,31 @@ export function AlertCenterPage() {
             // PHASE98 R3: 原来是 `加载中…` —— 接口挂掉时永远停在这一句，
             // 运维以为只是慢，实际是这个数据源已经坏了。
             <ErrorState
-              message={`Webhook 统计加载失败：${(webhookQuery.error as Error)?.message ?? ''}`}
+              message={t('alertCenter.webhookLoadFailed', { msg: (webhookQuery.error as Error)?.message ?? '' })}
               onRetry={() => void webhookQuery.refetch()}
               minHeight={0}
             />
           ) : (
-            <div style={{ color: 'var(--color-text-muted)' }}>加载中…</div>
+            <div style={{ color: 'var(--color-text-muted)' }}>{t('common.loading')}</div>
           )}
         </div>
 
         <div style={cardStyle}>
-          <h3 style={cardTitleStyle}>🔔 告警计数</h3>
+          <h3 style={cardTitleStyle}>{t('alertCenter.alertCounts')}</h3>
           <div style={statLineStyle}>
-            <span>限流告警</span>
+            <span>{t('alertCenter.rateLimitAlerts')}</span>
             <strong style={{ color: 'var(--color-warning)' }}>{counts.rate_limit_exceeded ?? 0}</strong>
           </div>
           <div style={statLineStyle}>
-            <span>配额告警</span>
+            <span>{t('alertCenter.quotaAlerts')}</span>
             <strong style={{ color: 'var(--color-error)' }}>{counts.quota_exceeded ?? 0}</strong>
           </div>
           <div style={statLineStyle}>
-            <span>低命中率</span>
+            <span>{t('alertCenter.lowHitRate')}</span>
             <strong style={{ color: 'var(--color-secondary-500)' }}>{counts.cache_hit_rate_low ?? 0}</strong>
           </div>
           <div style={statLineStyle}>
-            <span>合计</span>
+            <span>{t('alertCenter.total')}</span>
             <strong>{Object.values(counts).reduce((a, b) => a + b, 0)}</strong>
           </div>
         </div>
@@ -563,16 +569,16 @@ export function AlertCenterPage() {
           }}
         >
           <h2 style={{ margin: 0 }}>
-            📜 最近告警事件({events.length}
+            {t('alertCenter.recentEvents')}({events.length}
             {alertsQuery.data?.unresolved_count !== undefined && (
               <span style={{ color: 'var(--color-text-muted)', fontSize: 14, fontWeight: 'normal' }}>
-                {' '}/ 未解决 {alertsQuery.data.unresolved_count}
+                {' '}/ {t('alertCenter.unresolved')} {alertsQuery.data.unresolved_count}
               </span>
             )})
           </h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
             <label style={{ color: 'var(--color-text-muted)' }}>
-              确认人:
+              {t('alertCenter.ackBy')}
               <input
                 value={ackBy}
                 onChange={(e) => setAckBy(e.target.value)}
@@ -586,15 +592,15 @@ export function AlertCenterPage() {
                 onChange={(e) => setShowResolved(e.target.checked)}
                 style={{ marginRight: 4 }}
               />
-              显示已解决
+              {t('alertCenter.showResolved')}
             </label>
           </div>
         </div>
         {events.length === 0 ? (
           <EmptyState
-            title="当前无告警"
-            description="系统运行正常。可手动触发一次 LLM 调用，验证告警链路是否通畅"
-            actionLabel="触发一次 LLM 调用"
+            title={t('alertCenter.noAlerts')}
+            description={t('alertCenter.noAlertsDesc')}
+            actionLabel={t('alertCenter.triggerLlm')}
             onAction={() => simulateMutation.mutate()}
             actionDisabled={simulateMutation.isPending}
           />
@@ -602,12 +608,12 @@ export function AlertCenterPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--color-bg-tertiary)', borderBottom: '1px solid var(--color-border-medium)' }}>
-                <th style={th}>状态</th>
-                <th style={th}>时间</th>
-                <th style={th}>类型</th>
-                <th style={th}>用户</th>
-                <th style={th}>详情</th>
-                <th style={th}>操作</th>
+                <th style={th}>{t('alertCenter.colStatus')}</th>
+                <th style={th}>{t('alertCenter.colTime')}</th>
+                <th style={th}>{t('alertCenter.colType')}</th>
+                <th style={th}>{t('alertCenter.colUser')}</th>
+                <th style={th}>{t('alertCenter.colDetail')}</th>
+                <th style={th}>{t('alertCenter.colAction')}</th>
               </tr>
             </thead>
             <tbody>
@@ -639,9 +645,7 @@ export function AlertCenterPage() {
           color: 'var(--color-info)',
         }}
       >
-        💡 <strong>Week 43 R11 / R15:</strong>三层防护(限流 + 缓存 + 配额) →
-        告警中心统一收集 → 可选 Webhook 推送(飞书 / Slack / 通用)。
-        缓存命中率 &lt; 40% 时定时巡检任务会自动发出告警。
+        {t('alertCenter.footnote')}
       </div>
 
       <SubscriptionPanel currentUser={ackBy} />
@@ -675,6 +679,7 @@ const ALL_KINDS = [
 ];
 
 function SubscriptionPanel({ currentUser }: { currentUser: string }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [newKind, setNewKind] = useState(ALL_KINDS[0]);
 
@@ -716,9 +721,9 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
         padding: 16,
       }}
     >
-      <h3 style={{ marginTop: 0 }}>📮 我的告警订阅(用户: {currentUser})</h3>
+      <h3 style={{ marginTop: 0 }}>{t('alertCenter.subTitle')}({t('alertCenter.subUser', { name: currentUser })})</h3>
       <p style={{ color: 'var(--color-text-muted)', fontSize: 13, margin: '0 0 12px' }}>
-        订阅后,系统会优先把关心的告警通过 Webhook 推送给你。未订阅的事件仍会写入告警中心,只是不主动推送。
+        {t('alertCenter.subHint')}
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -746,13 +751,13 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
             cursor: subscribeMutation.isPending ? 'wait' : 'pointer',
           }}
         >
-          + 订阅
+          {t('alertCenter.subBtn')}
         </button>
       </div>
 
       {subscribed.length === 0 ? (
         <div style={{ padding: 12, color: 'var(--color-text-muted)', fontSize: 13 }}>
-          暂未订阅任何告警类型。
+          {t('alertCenter.subNone')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -783,7 +788,7 @@ function SubscriptionPanel({ currentUser }: { currentUser: string }) {
                   fontSize: 14,
                   fontWeight: 700,
                 }}
-                title="取消订阅"
+                title={t('alertCenter.subUnsubTitle')}
               >
                 ×
               </button>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import ReactFlow, {
   Background,
   Controls,
@@ -38,9 +39,23 @@ const nodeKindMeta: Record<NodeKind, { label: string; icon: string; color: strin
   DATA_UPDATE:  { label: '数据更新', icon: '✏️', color: 'var(--color-info)' },
 };
 
+// i18n 节点标签
+function getNodeLabel(t: (key: string) => string, kind: NodeKind): string {
+  const map: Record<NodeKind, string> = {
+    APPROVAL: t('workflowDesigner.nodeKindApproval'),
+    NOTIFICATION: t('workflowDesigner.nodeKindNotification'),
+    CONDITION: t('workflowDesigner.nodeKindCondition'),
+    HTTP: t('workflowDesigner.nodeKindHttp'),
+    DATA_UPDATE: t('workflowDesigner.nodeKindDataUpdate'),
+  };
+  return map[kind] ?? kind;
+}
+
 function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolean }) {
+  const { t } = useTranslation();
   const meta = nodeKindMeta[data.kind];
   const isCondition = data.kind === 'CONDITION';
+  const label = getNodeLabel(t, data.kind);
   return (
     <div style={{
       padding: 10, minWidth: 160, position: 'relative',
@@ -50,18 +65,18 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
       boxShadow: '0 2px 6px var(--color-bg-primary)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong>{meta.icon} {meta.label}</strong>
+        <strong>{meta.icon} {label}</strong>
         <button
           onClick={(e) => { e.stopPropagation(); data.onDelete(); }}
           style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontSize: 16 }}
         >×</button>
       </div>
       <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-disabled)' }}>
-        {data.kind === 'NOTIFICATION' && (data.config.message?.slice(0, 40) || '(未设置)')}
+        {data.kind === 'NOTIFICATION' && (data.config.message?.slice(0, 40) || t('workflowDesigner.nodePreviewNotSet'))}
         {data.kind === 'HTTP' && `${data.config.method || 'GET'} ${(data.config.url || '').slice(0, 30)}`}
         {data.kind === 'CONDITION' && `if ${data.config.field || '?'} ${data.config.op || '?'} ${data.config.value || '?'}`}
         {data.kind === 'DATA_UPDATE' && `${data.config.collection || '?'} / ${data.config.recordId || '?'}`}
-        {data.kind === 'APPROVAL' && '(单审批人)'}
+        {data.kind === 'APPROVAL' && t('workflowDesigner.nodePreviewApproval')}
       </div>
       {/* 左边:输入 handle(所有节点) */}
       <Handle type="target" position={Position.Left} style={{ background: meta.color, width: 10, height: 10 }} />
@@ -71,12 +86,12 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
           <Handle id="true" type="source" position={Position.Bottom}
                   style={{ left: '30%', background: 'var(--color-success)', width: 12, height: 12, border: '2px solid var(--color-text-primary)' }} />
           <span style={{ position: 'absolute', bottom: -18, left: '20%', fontSize: 10, color: 'var(--color-success)', fontWeight: 'bold' }}>
-            ✓ then
+            {t('workflowDesigner.then')}
           </span>
           <Handle id="false" type="source" position={Position.Bottom}
                   style={{ left: '70%', background: 'var(--color-error)', width: 12, height: 12, border: '2px solid var(--color-text-primary)' }} />
           <span style={{ position: 'absolute', bottom: -18, right: '10%', fontSize: 10, color: 'var(--color-error)', fontWeight: 'bold' }}>
-            ✗ else
+            {t('workflowDesigner.else')}
           </span>
         </>
       ) : (
@@ -94,6 +109,7 @@ const nodeTypes = { flowNode: FlowNode };
  * 左侧节点面板可拖拽到画布,右侧编辑选中节点的 config.
  */
 export function WorkflowDesignerPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -101,7 +117,7 @@ export function WorkflowDesignerPage() {
 
   const [name, setName] = useState('new_workflow');
   const [triggerType, setTriggerType] = useState('manual');
-  const [title, setTitle] = useState('新工作流');
+  const [title, setTitle] = useState(t('workflowDesigner.createMode'));
   const [description, setDescription] = useState('');
   const [collectionName, setCollectionName] = useState('customer');
   const [enabled, setEnabled] = useState(true);
@@ -258,7 +274,7 @@ export function WorkflowDesignerPage() {
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message ?? '保存失败');
+      setError(e.response?.data?.message ?? t('workflowDesigner.saveFailed'));
     },
   });
 
@@ -275,7 +291,7 @@ export function WorkflowDesignerPage() {
       try {
         parsed = JSON.parse(simulateData || '{}');
       } catch {
-        throw new Error('triggerData 不是合法 JSON');
+        throw new Error(t('workflowDesigner.triggerDataInvalid'));
       }
       const res = await apiClient.post<{ data?: { id?: string } }>(
         `/workflows/${workflowId}/trigger`, parsed);
@@ -287,7 +303,7 @@ export function WorkflowDesignerPage() {
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message
-        : (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? '运行失败';
+        : (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? t('workflowDesigner.runFailed');
       setSimulateResult({ error: msg });
     },
   });
@@ -300,27 +316,27 @@ export function WorkflowDesignerPage() {
       <aside style={{ width: 200, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', overflowY: 'auto' }}>
         <button onClick={() => navigate('/designer/workflows')}
                 style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 8 }}>
-          ← 返回列表
+          {t('workflowDesigner.backToList')}
         </button>
-        <h3 style={{ marginTop: 0 }}>{isEdit ? '编辑' : '新建'}工作流</h3>
+        <h3 style={{ marginTop: 0 }}>{isEdit ? t('workflowDesigner.editMode') : t('workflowDesigner.createMode')} {t('workflowDesigner.title')}</h3>
         {error && <div style={{ padding: 4, marginBottom: 8, background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 11 }}>{error}</div>}
-        <label style={lbl} htmlFor="w-lbl-1">技术名 *</label>
+        <label style={lbl} htmlFor="w-lbl-1">{t('workflowDesigner.technicalName')}</label>
         <input id="w-lbl-1" value={name} onChange={(e) => setName(e.target.value)} style={inp} />
-        <label style={lbl} htmlFor="w-lbl-2">标题</label>
+        <label style={lbl} htmlFor="w-lbl-2">{t('workflowDesigner.displayName')}</label>
         <input id="w-lbl-2" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
-        <label style={lbl} htmlFor="w-lbl-3">Collection</label>
+        <label style={lbl} htmlFor="w-lbl-3">{t('workflowDesigner.collection')}</label>
         <input id="w-lbl-3" value={collectionName} onChange={(e) => setCollectionName(e.target.value)} style={inp} />
         <label style={lbl}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> 启用
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> {t('workflowDesigner.enabled')}
         </label>
-        <label style={lbl} htmlFor="w-lbl-4">触发器</label>
+        <label style={lbl} htmlFor="w-lbl-4">{t('workflowDesigner.trigger')}</label>
         <select id="w-lbl-4" value={triggerType} onChange={(e) => setTriggerType(e.target.value)} style={inp}>
-          <option value="manual">⚡ 手动触发</option>
-          <option value="on_create">📥 数据创建时</option>
-          <option value="on_update">✏️ 数据更新时</option>
-          <option value="schedule">⏰ 定时调度</option>
+          <option value="manual">{t('workflowDesigner.triggerManual')}</option>
+          <option value="on_create">{t('workflowDesigner.triggerOnCreate')}</option>
+          <option value="on_update">{t('workflowDesigner.triggerOnUpdate')}</option>
+          <option value="schedule">{t('workflowDesigner.triggerSchedule')}</option>
         </select>
-        <h4 style={{ marginTop: 12 }}>拖拽节点</h4>
+        <h4 style={{ marginTop: 12 }}>{t('workflowDesigner.dragNodes')}</h4>
         {(Object.keys(nodeKindMeta) as NodeKind[]).map((k) => {
           const m = nodeKindMeta[k];
           return (
@@ -330,21 +346,21 @@ export function WorkflowDesignerPage() {
                  onDragStart={(e) => onDragStart(e, k)}
                  style={{ padding: 8, marginBottom: 6, background: m.color, color: 'var(--color-text-primary)',
                           borderRadius: 4, cursor: 'grab', fontSize: 13 }}>
-              {m.icon} {m.label}
+              {m.icon} {getNodeLabel(t, k)}
             </div>
           );
         })}
         <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
                 style={{ marginTop: 12, width: '100%', padding: 8, background: saveMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-success)',
                          color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-          {saveMutation.isPending ? '保存中…' : '💾 保存'}
+          {saveMutation.isPending ? t('workflowDesigner.saving') : t('workflowDesigner.save')}
         </button>
         {/* US-406: 测试运行 */}
         <button onClick={() => { setSimulateResult(null); setShowSimulate(true); }}
                 style={{ marginTop: 8, width: '100%', padding: 8,
                          background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none',
                          borderRadius: 4, cursor: 'pointer' }}>
-          ▶ 测试运行(模拟数据)
+          {t('workflowDesigner.testRun')}
         </button>
       </aside>
 
@@ -352,7 +368,7 @@ export function WorkflowDesignerPage() {
       <div
         ref={reactFlowWrapper}
         role="presentation"
-        aria-label="工作流画布（支持从节点面板拖放节点到此处）"
+        aria-label={t('workflowDesigner.canvasAria')}
         style={{ flex: 1, background: 'var(--color-text-primary)', borderRadius: 8 }}
         onDrop={onDrop}
         onDragOver={onDragOver}
@@ -373,13 +389,14 @@ export function WorkflowDesignerPage() {
 
       {/* 右:配置面板 */}
       <aside style={{ width: 280, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', overflowY: 'auto' }}>
-        <h3 style={{ marginTop: 0 }}>节点配置</h3>
+        <h3 style={{ marginTop: 0 }}>{t('workflowDesigner.nodeConfig')}</h3>
         {!selectedNode ? (
-          <p style={{ color: 'var(--color-text-disabled)' }}>点选节点以编辑</p>
+          <p style={{ color: 'var(--color-text-disabled)' }}>{t('workflowDesigner.selectNode')}</p>
         ) : (
           <NodeConfigEditor
             node={selectedNode}
             onChange={(patch) => updateNodeData(selectedNode.id, patch)}
+            t={t}
           />
         )}
       </aside>
@@ -391,13 +408,13 @@ export function WorkflowDesignerPage() {
                       display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--color-text-primary)', borderRadius: 8, padding: 24, width: 480,
                         boxShadow: '0 10px 25px var(--color-bg-primary)' }}>
-            <h3 style={{ marginTop: 0 }}>▶ 测试运行工作流</h3>
+            <h3 style={{ marginTop: 0 }}>{t('workflowDesigner.testRunTitle')}</h3>
             <p style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>
-              输入模拟的 triggerData,系统将创建一个工作流实例并跳转到详情页。
-              {!id && <strong style={{ color: 'var(--color-error)' }}>(会先自动保存当前编辑)</strong>}
+              {t('workflowDesigner.testRunHint')}
+              {!id && <strong style={{ color: 'var(--color-error)' }}>({t('workflowDesigner.testRunAutoSave')})</strong>}
             </p>
             <label style={{ display: 'block', fontWeight: 500, fontSize: 13, marginBottom: 4 }} htmlFor="w-lbl-triggerdata">
-              triggerData (JSON)
+              {t('workflowDesigner.triggerDataLabel')}
             </label>
             <textarea id="w-lbl-triggerdata" value={simulateData} onChange={(e) => setSimulateData(e.target.value)}
                       style={{ width: '100%', height: 160, fontFamily: 'monospace', fontSize: 12,
@@ -406,12 +423,12 @@ export function WorkflowDesignerPage() {
             {simulateResult?.instanceId && (
               <div style={{ marginTop: 12, padding: 8, background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)',
                             borderRadius: 4, fontSize: 13 }}>
-                ✅ 实例已创建: <code>{simulateResult.instanceId.slice(0, 8)}…</code>
+                ✅ {t('workflowDesigner.instanceCreated')}: <code>{simulateResult.instanceId.slice(0, 8)}…</code>
                 <div style={{ marginTop: 6 }}>
                   <a href={`/designer/instances/${simulateResult.instanceId}`}
                      onClick={(e) => { e.preventDefault(); navigate(`/designer/instances/${simulateResult.instanceId}`); setShowSimulate(false); }}
                      style={{ color: 'var(--color-info)', textDecoration: 'underline' }}>
-                    查看实例详情 →
+                    {t('workflowDesigner.viewInstance')}
                   </a>
                 </div>
               </div>
@@ -426,14 +443,14 @@ export function WorkflowDesignerPage() {
               <button onClick={() => setShowSimulate(false)}
                       style={{ padding: '6px 14px', background: 'var(--color-border-light)', color: 'var(--color-bg-secondary)',
                                border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                关闭
+                {t('workflowDesigner.close')}
               </button>
               <button onClick={() => simulateMutation.mutate()}
                       disabled={simulateMutation.isPending || saveMutation.isPending}
                       style={{ padding: '6px 14px', background: 'var(--color-info)', color: 'var(--color-text-primary)',
                                border: 'none', borderRadius: 4,
                                cursor: simulateMutation.isPending ? 'not-allowed' : 'pointer' }}>
-                {simulateMutation.isPending ? '运行中…' : '▶ 运行'}
+                {simulateMutation.isPending ? t('workflowDesigner.running') : t('workflowDesigner.run')}
               </button>
             </div>
           </div>
@@ -443,56 +460,57 @@ export function WorkflowDesignerPage() {
   );
 }
 
-function NodeConfigEditor({ node, onChange }: { node: Node<WorkflowNodeData>; onChange: (patch: Partial<WorkflowNodeData>) => void }) {
+function NodeConfigEditor({ node, onChange, t }: { node: Node<WorkflowNodeData>; onChange: (patch: Partial<WorkflowNodeData>) => void; t: (key: string) => string }) {
   const meta = nodeKindMeta[node.data.kind];
   const cfg = node.data.config;
   const setCfg = (k: string, v: string) => onChange({ config: { ...cfg, [k]: v } });
+  const nodeLabel = getNodeLabel(t, node.data.kind);
   return (
     <div>
       <div style={{ padding: 6, marginBottom: 8, background: meta.color, color: 'var(--color-text-primary)', borderRadius: 4 }}>
-        {meta.icon} {meta.label}(id: {node.id})
+        {meta.icon} {nodeLabel}(id: {node.id})
       </div>
       {node.data.kind === 'NOTIFICATION' && (
         <>
-          <label style={lbl} htmlFor="w-lbl-6">标题</label>
+          <label style={lbl} htmlFor="w-lbl-6">{t('workflowDesigner.notificationTitle')}</label>
           <input id="w-lbl-6" value={cfg.title || ''} onChange={(e) => setCfg('title', e.target.value)} style={inp} />
-          <label style={lbl} htmlFor="w-lbl-7">消息内容</label>
+          <label style={lbl} htmlFor="w-lbl-7">{t('workflowDesigner.notificationMessage')}</label>
           <textarea id="w-lbl-7" value={cfg.message || ''} onChange={(e) => setCfg('message', e.target.value)} style={{ ...inp, height: 60 }} />
         </>
       )}
       {node.data.kind === 'HTTP' && (
         <>
-          <label style={lbl} htmlFor="w-lbl-8">Method</label>
+          <label style={lbl} htmlFor="w-lbl-8">{t('workflowDesigner.httpMethod')}</label>
           <select id="w-lbl-8" value={cfg.method || 'GET'} onChange={(e) => setCfg('method', e.target.value)} style={inp}>
             <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
           </select>
-          <label style={lbl} htmlFor="w-lbl-9">URL</label>
+          <label style={lbl} htmlFor="w-lbl-9">{t('workflowDesigner.httpUrl')}</label>
           <input id="w-lbl-9" value={cfg.url || ''} onChange={(e) => setCfg('url', e.target.value)} style={inp} />
         </>
       )}
       {node.data.kind === 'CONDITION' && (
         <>
-          <label style={lbl} htmlFor="w-lbl-10">字段名(来自 triggerData)</label>
+          <label style={lbl} htmlFor="w-lbl-10">{t('workflowDesigner.conditionField')}</label>
           <input id="w-lbl-10" value={cfg.field || ''} onChange={(e) => setCfg('field', e.target.value)} style={inp} />
-          <label style={lbl} htmlFor="w-lbl-11">操作符</label>
+          <label style={lbl} htmlFor="w-lbl-11">{t('workflowDesigner.conditionOp')}</label>
           <select id="w-lbl-11" value={cfg.op || 'eq'} onChange={(e) => setCfg('op', e.target.value)} style={inp}>
-            <option value="eq">等于 eq</option>
-            <option value="neq">不等于 neq</option>
-            <option value="contains">包含 contains</option>
-            <option value="gt">大于 gt</option>
-            <option value="lt">小于 lt</option>
+            <option value="eq">{t('workflowDesigner.opEq')}</option>
+            <option value="neq">{t('workflowDesigner.opNeq')}</option>
+            <option value="contains">{t('workflowDesigner.opContains')}</option>
+            <option value="gt">{t('workflowDesigner.opGt')}</option>
+            <option value="lt">{t('workflowDesigner.opLt')}</option>
           </select>
-          <label style={lbl} htmlFor="w-lbl-12">比较值</label>
+          <label style={lbl} htmlFor="w-lbl-12">{t('workflowDesigner.conditionValue')}</label>
           <input id="w-lbl-12" value={cfg.value || ''} onChange={(e) => setCfg('value', e.target.value)} style={inp} />
         </>
       )}
       {node.data.kind === 'DATA_UPDATE' && (
         <>
-          <label style={lbl} htmlFor="w-lbl-13">Collection</label>
+          <label style={lbl} htmlFor="w-lbl-13">{t('workflowDesigner.dataUpdateCollection')}</label>
           <input id="w-lbl-13" value={cfg.collection || ''} onChange={(e) => setCfg('collection', e.target.value)} style={inp} />
-          <label style={lbl} htmlFor="w-lbl-14">recordId(留空=触发事件的 recordId)</label>
+          <label style={lbl} htmlFor="w-lbl-14">{t('workflowDesigner.dataUpdateRecordId')}</label>
           <input id="w-lbl-14" value={cfg.recordId || ''} onChange={(e) => setCfg('recordId', e.target.value)} style={inp} />
-          <label style={lbl} htmlFor="w-lbl-15">data(JSON —— 要写入/合并的字段)</label>
+          <label style={lbl} htmlFor="w-lbl-15">{t('workflowDesigner.dataUpdateData')}</label>
           <textarea id="w-lbl-15"
             value={cfg.data || ''}
             onChange={(e) => setCfg('data', e.target.value)}
@@ -502,14 +520,14 @@ function NodeConfigEditor({ node, onChange }: { node: Node<WorkflowNodeData>; on
         </>
       )}
       {node.data.kind === 'APPROVAL' && (
-        <p style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>(审批节点使用当前用户作为审批人,无配置项)</p>
+        <p style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>{t('workflowDesigner.approvalHint')}</p>
       )}
     </div>
   );
 }
 
 function defaultConfig(kind: NodeKind): Record<string, string> {
-  if (kind === 'NOTIFICATION') return { title: '通知', message: '' };
+  if (kind === 'NOTIFICATION') return { title: 'Notification', message: '' };
   if (kind === 'HTTP') return { method: 'GET', url: '' };
   if (kind === 'CONDITION') return { field: '', op: 'eq', value: '' };
   if (kind === 'DATA_UPDATE') return { collection: '', recordId: '', data: '' };
