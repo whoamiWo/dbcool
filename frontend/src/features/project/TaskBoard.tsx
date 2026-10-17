@@ -126,7 +126,14 @@ function Column({
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{label}</Typography>
               <Chip label={tasks.length} size="small" sx={{ bgcolor: 'var(--color-border-light)', height: 20, fontSize: '10px' }} />
             </Stack>
-            <Button size="small" onClick={onAddClick} sx={{ color: 'primary.main', minWidth: 28, p: 0.5 }}>+</Button>
+            <Button
+              size="small"
+              onClick={onAddClick}
+              aria-label={`在「${label}」列新建任务`}
+              sx={{ color: 'primary.main', minWidth: 28, p: 0.5 }}
+            >
+              +
+            </Button>
           </Stack>
         </CardContent>
         <CardContent sx={{ pt: 0, flex: 1, overflow: 'auto' }}>

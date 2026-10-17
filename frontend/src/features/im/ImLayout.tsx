@@ -383,7 +383,9 @@ export function ImChatPage() {
 
       {showCreateDialog && (
         <div
-          role="presentation"
+          role="button"
+          tabIndex={0}
+          aria-label="关闭新建频道弹窗"
           style={{
             position: 'fixed',
             inset: 0,
@@ -395,6 +397,12 @@ export function ImChatPage() {
             zIndex: 1000,
           }}
           onClick={() => setShowCreateDialog(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setShowCreateDialog(false);
+            }
+          }}
         >
           <div
             role="presentation"

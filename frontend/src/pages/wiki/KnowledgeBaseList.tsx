@@ -123,7 +123,11 @@ export function KnowledgeBaseListPage() {
                       </Button>
                     </Tooltip>
                     <Tooltip title="编辑">
-                      <IconButton size="small" onClick={() => navigate(`/wiki/kb/${kb.id}/edit`)}>
+                      <IconButton
+                        size="small"
+                        onClick={() => navigate(`/wiki/kb/${kb.id}/edit`)}
+                        aria-label={`编辑知识库 ${kb.name}`}
+                      >
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
@@ -132,6 +136,7 @@ export function KnowledgeBaseListPage() {
                         size="small"
                         color="error"
                         onClick={() => deleteMutation.mutate(kb.id)}
+                        aria-label={`删除知识库 ${kb.name}`}
                       >
                         <DeleteIcon />
                       </IconButton>
