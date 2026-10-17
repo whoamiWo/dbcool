@@ -198,10 +198,12 @@ BUILD FAILURE
 
 ## 6. 残余事项（非阻断，如实登记）
 
-1. **`user_data_erasure_log` 表零引用**：`V52__user_data_erasure.sql` 建了该表
-   （含 `messages_erased/conversations_erased/audit_logs_anonymized` 字段），但全仓 Java 代码
-   **零引用** —— 删除结果只写审计日志、不落这张"请求持久化凭证"表。
-   **非阻断**（审计已有留痕），但对外合规审计若要求查询"删除请求台账"，需补接入。
+1. ~~**`user_data_erasure_log` 表零引用**~~ **已闭环（PHASE112）**：`V52__user_data_erasure.sql`
+   建的表此前全仓 Java 代码零引用（删除结果只写审计日志、不落这张"请求持久化凭证"表）。
+   PHASE112 已补齐：`UserDataErasureLogEntity` + `UserDataErasureLogRepository`，并在
+   `UserDataErasureService.erasesUserData` 的成功路径同事务写入；`user-data-e2e-verify.py`
+   场景五新增断言"删除请求台账已落库（最近 5 分钟内该用户 ≥1 条且 conversations_erased ≥ 1）"。
+   单测 2 例（成功写入精确计数 + 失败不写入）均已覆盖。
 2. **`eraseImMessages` 的 `catch (IllegalArgumentException)`**：因 `requireUserInTenant`
    已做 UUID 校验，该分支实际不可达，属冗余防御，无害。
 3. **索引对存量大表的在线创建**：`V57` 使用普通 `CREATE INDEX`（非 `CONCURRENTLY`），

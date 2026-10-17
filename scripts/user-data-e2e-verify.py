@@ -227,7 +227,23 @@ def main():
     check("匿名化后 messages 为合法 JSON 占位 '[]'",
           after_val == "[]",
           "实际=%s（必须是合法 JSON，不能是 '[已删除]' 这类文本）" % after_val)
-    
+
+    # 5.2 PHASE112 断言：删除请求台账（user_data_erasure_log / V52 表）必须落库，
+    #     且计数与响应一致 —— 若台账接入被回退（零引用），此断言会失败（可失败）。
+    #     断言口径：查询「本次删除请求（requested_at 在本脚本运行后 5 分钟内）」
+    #     是否有台账记录且 conversations_erased >= 1。避免累计值与跨租户串扰。
+    # 删除后：本次删除请求（requested_at 在最近 5 分钟内）必须有台账，且计数 >= 1
+    ok_a, ledger_after, _ = db_sql(
+        "SELECT count(*) FROM user_data_erasure_log "
+        "WHERE user_id='%s' AND tenant_id='%s' "
+        "AND requested_at >= now() - interval '5 minutes' "
+        "AND conversations_erased >= 1;"
+        % (target_user_id, tenant_id))
+    ok_ledger = ok_a and ledger_after.isdigit() and int(ledger_after) >= 1
+    check("删除请求台账已落库（user_data_erasure_log，本次新增 1 条）",
+          ok_ledger,
+          "最近 5 分钟内该用户台账数=%s（未接入台账则为 0）" % ledger_after)
+
     # 删除后再查审计留痕
     st, body = request("GET", "/api/audit/logs?limit=20", token=token)
     audit = json.loads(body).get("data") if st == 200 else []

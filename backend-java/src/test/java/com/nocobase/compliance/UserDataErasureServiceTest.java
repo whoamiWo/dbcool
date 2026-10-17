@@ -40,6 +40,7 @@ public class UserDataErasureServiceTest {
     private com.nocobase.tenant.UserTenantRepository userTenantRepo;
     private ImMessageRepository imMessageRepo;
     private UserRepository userRepo;
+    private UserDataErasureLogRepository erasureLogRepo;
     private UserDataErasureService service;
 
     private static final String TENANT = "tenant_default";
@@ -54,8 +55,9 @@ public class UserDataErasureServiceTest {
         userTenantRepo = mock(com.nocobase.tenant.UserTenantRepository.class);
         imMessageRepo = mock(ImMessageRepository.class);
         userRepo = mock(UserRepository.class);
+        erasureLogRepo = mock(UserDataErasureLogRepository.class);
         service = new UserDataErasureService(auditLogRepository, auditService,
-                aiConversationRepo, userTenantRepo, imMessageRepo, userRepo);
+                aiConversationRepo, userTenantRepo, imMessageRepo, userRepo, erasureLogRepo);
 
         UserEntity user = new UserEntity();
         user.setId(USER_ID);

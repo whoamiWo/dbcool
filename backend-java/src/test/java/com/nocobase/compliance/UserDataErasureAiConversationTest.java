@@ -46,6 +46,7 @@ public class UserDataErasureAiConversationTest {
     private UserTenantRepository userTenantRepo;
     private ImMessageRepository imMessageRepo;
     private UserRepository userRepo;
+    private UserDataErasureLogRepository erasureLogRepo;
     private UserDataErasureService service;
 
     private static final String TENANT = "tenant_default";
@@ -60,8 +61,9 @@ public class UserDataErasureAiConversationTest {
         userTenantRepo = mock(UserTenantRepository.class);
         imMessageRepo = mock(ImMessageRepository.class);
         userRepo = mock(UserRepository.class);
+        erasureLogRepo = mock(UserDataErasureLogRepository.class);
         service = new UserDataErasureService(auditLogRepository, auditService,
-                aiConversationRepo, userTenantRepo, imMessageRepo, userRepo);
+                aiConversationRepo, userTenantRepo, imMessageRepo, userRepo, erasureLogRepo);
 
         // 归属校验放行（requireUserInTenant）
         UserEntity user = new UserEntity();
@@ -164,5 +166,47 @@ public class UserDataErasureAiConversationTest {
 
         assertTrue(result.isSuccess());
         assertEquals(0, result.getConversationsErased());
+    }
+
+    // ── PHASE112：删除请求台账（user_data_erasure_log / V52 表）──
+
+    /** 6) 删除成功路径必须把台账写入 user_data_erasure_log（字段精确、与 result 一致）。 */
+    @Test
+    void erasure_success_writesLedgerWithExactCounts() {
+        when(aiConversationRepo.anonymizeMessagesByUserId(any(UUID.class), anyString(), anyString()))
+                .thenReturn(4);
+        when(aiConversationRepo.findByUserIdAndTenantId(any(UUID.class), anyString()))
+                .thenReturn(List.of());
+
+        UserDataErasureRequest result =
+                service.erasesUserData(String.valueOf(USER_ID), String.valueOf(ADMIN_ID), TENANT);
+
+        verify(erasureLogRepo).save(argThat(ledger -> {
+            assertEquals(String.valueOf(USER_ID), ledger.getUserId());
+            assertEquals(TENANT, ledger.getTenantId());
+            assertEquals(String.valueOf(ADMIN_ID), ledger.getRequesterId());
+            assertNotNull(ledger.getAnonymousId(), "匿名标识必须落台账");
+            assertEquals(4, ledger.getConversationsErased(),
+                    "台账计数必须与 result.conversationsErased 一致（精确）");
+            assertEquals(result.getMessagesErased(), ledger.getMessagesErased());
+            assertEquals(result.getAuditLogsAnonymized(), ledger.getAuditLogsAnonymized());
+            assertNotNull(ledger.getId(), "台账 id 由 @PrePersist 生成");
+            return true;
+        }));
+    }
+
+    /** 7) 删除失败（残留未清理）必须回滚 —— 台账不得写入（同事务回滚）。 */
+    @Test
+    void erasure_failure_doesNotWriteLedger() {
+        when(aiConversationRepo.anonymizeMessagesByUserId(any(UUID.class), anyString(), anyString()))
+                .thenReturn(1);
+        // 复查仍残留原始内容 → 服务抛 IllegalStateException
+        when(aiConversationRepo.findByUserIdAndTenantId(any(UUID.class), anyString()))
+                .thenReturn(List.of(conv("[{\"role\":\"user\",\"content\":\"secret\"}]")));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.erasesUserData(String.valueOf(USER_ID), String.valueOf(ADMIN_ID), TENANT));
+
+        verify(erasureLogRepo, never()).save(any());
     }
 }

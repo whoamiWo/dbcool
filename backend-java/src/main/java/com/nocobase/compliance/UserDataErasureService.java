@@ -39,19 +39,22 @@ public class UserDataErasureService {
     private final com.nocobase.tenant.UserTenantRepository userTenantRepo;
     private final com.nocobase.im.ImMessageRepository imMessageRepo;
     private final com.nocobase.auth.UserRepository userRepo;
+    private final UserDataErasureLogRepository erasureLogRepo;
 
     public UserDataErasureService(AuditLogRepository auditLogRepository,
                                     AuditService auditService,
                                     AiConversationEntityRepository aiConversationRepo,
                                     com.nocobase.tenant.UserTenantRepository userTenantRepo,
                                     com.nocobase.im.ImMessageRepository imMessageRepo,
-                                    com.nocobase.auth.UserRepository userRepo) {
+                                    com.nocobase.auth.UserRepository userRepo,
+                                    UserDataErasureLogRepository erasureLogRepo) {
         this.auditLogRepository = auditLogRepository;
         this.auditService = auditService;
         this.aiConversationRepo = aiConversationRepo;
         this.userTenantRepo = userTenantRepo;
         this.imMessageRepo = imMessageRepo;
         this.userRepo = userRepo;
+        this.erasureLogRepo = erasureLogRepo;
     }
 
     /**
@@ -157,6 +160,24 @@ public class UserDataErasureService {
         // 事务回滚且不会走到这一行；因此"失败却报成功"在语义上不可能发生（红线 2）。
         // 注意：某一步处理 0 条（用户本就没有该类数据）属正常成功，不代表失败。
         result.setSuccess(true);
+
+        // PHASE112：删除请求台账 —— 把本次删除结果持久化到 user_data_erasure_log（V52 表），
+        // 供合规审计直接检索（例如"过去 90 天该租户发起过几次 GDPR 删除"）。
+        // 与 auditService.log（操作留痕）互补：台账字段窄、计数精确，是删除请求的持久凭证。
+        // 同事务内写入：若后续异常回滚，台账一并回滚，不会留下"有台账但没真删"的脏记录。
+        UserDataErasureLogEntity ledger = new UserDataErasureLogEntity();
+        ledger.setId(UUID.randomUUID().toString());
+        ledger.setUserId(userId);
+        ledger.setTenantId(adminTenantId);
+        ledger.setRequesterId(adminUserId);
+        ledger.setAnonymousId(anonymousId);
+        ledger.setMessagesErased(result.getMessagesErased());
+        ledger.setConversationsErased(result.getConversationsErased());
+        ledger.setAuditLogsAnonymized(result.getAuditLogsAnonymized());
+        ledger.setRequestedAt(result.getRequestedAt());
+        erasureLogRepo.save(ledger);
+        log.info("[compliance] 删除请求台账已记录 userId={} tenant={} ledgerId={}",
+                userId, adminTenantId, ledger.getId());
         return result;
     }
 
