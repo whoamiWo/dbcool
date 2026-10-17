@@ -1,3 +1,59 @@
+## Week 42 (2026-10-17) — DBCool v1.0.0 正式发布
+
+> **对外 SaaS 上线全链路闭环**：P0 阻断项清零，GDPR 合规修复，容量基线实测，无障碍合规，钉钉回调假实现清零。
+
+### 1. P0 安全 & 合规
+
+| 项 | 说明 |
+|---|---|
+| **GDPR 数据删除链** | 补齐"删除请求台账"持久化（`DataErasureRequestEntity` + Repository + 迁移），`deleteUserData` 返回前留痕；此前只打日志不留痕，合规审计要求"删除台账可查"不满足 |
+| **AI 会话匿名化假实现清零** | 此前 `eraseAiConversations` 是空壳（未执行匿名化却 `success=true`），PHASE113 落地真实批量 UPDATE + 残留校验 + 失败回滚，杜绝"静默成功" |
+| **钉钉回调语义修复** | `contact_updated` 事件不再谎称 `processed: true`；`/sync-status` 改为返回真实凭证状态 + `lastSyncTime: null`，不伪造时间戳 |
+
+### 2. 容量基线（Docker Compose 单机，k6 0.53）
+
+| VU | P95 | QPS | 失败率 | 结论 |
+|----|-----|-----|--------|------|
+| 50 | 298ms | 372 | 0% | ✅ 安全区（推荐） |
+| 100 | 561ms | 358 | 0% | ⚠️ 接近拐点 |
+| 200 | 1.13s | 363 | 0% | ❌ 延迟翻倍 |
+
+- **k6 脚本修复**：`http.setResponseCallback(http.expectedStatuses(200-399, 429))` —— 此前 429 限流被误计为"失败"（50VU 高达 24.7%），修复后正确测出拐点
+- 文档：`PERF_CAPACITY_BASELINE.md`（含 3 档扩容路线 + 告警阈值 + 压测命令附录）
+
+### 3. 无障碍（a11y）合规
+
+用 `code-explorer` 扫描当前真实违规（旧评估文档里的项大多 PHASE98 已修过），**定位到 6 处**：
+
+| 级别 | 修复 |
+|---|---|
+| **HIGH（4 处）** | `TaskBoard.tsx` `+` 按钮 / `NotionStyleEditor.tsx` DeleteSweep / `KnowledgeBaseList.tsx` EditIcon+DeleteIcon 补 `aria-label` |
+| **MEDIUM（3 处）** | `ImLayout.tsx` 弹窗遮罩改 `role="button"` + `tabIndex` + Escape/Enter/Space 键盘支持；`MessageComposer.tsx` / `WorkflowDesigner.tsx` 拖放区补 `aria-label` |
+| **LOW（1 处）** | `ImLayout.tsx:408` 内层弹窗内容区 `role="presentation"` 保留（普通容器，点击不触发交互） |
+
+验证：`tsc --noEmit` 0 错、ESLint 0 诊断、Playwright 135/135 全绿。
+
+### 4. 发布检查清单
+
+- [x] Java 全量门禁：`BUILD SUCCESS`（2220 tests/0F/0E，覆盖率 85.73% ≥ 82%）
+- [x] 前端 Playwright E2E：135/135 PASS
+- [x] 合规 E2E：16/16 PASS
+- [x] 冒烟测试：11/11 PASS
+- [x] 容器健康：11/11 全部 healthy（运行 10+ 小时稳定）
+- [x] 关键端点可达性：`/api/health`（8080/8000）= 200、HTTPS 前端（5443）= 200
+- [x] Git 标签：`v1.0.0` 已推送至 origin
+
+### 5. 已知限制 & 后续
+
+- **生产环境需配置 80/443 端口**：当前开发态仅映射 5173/5443，`deploy.sh prod` 会走 nginx 反代
+- **钉钉 `contact_updated` 事件未实现**：返回 `not_implemented` 状态，钉钉可重投，未来接入需补用户同步逻辑
+- **i18n 补全**：次要页面仍为中文，对外 SaaS 发布前需补翻译
+- **容量基线基于单机**：200 VU 后 QPS 持平、延迟翻倍，建议生产部署时至少 2 实例 + 负载均衡
+
+**版本标签**：`v1.0.0`（基于 commit `736f8b5`）
+
+---
+
 ## Week 43 (2026-09-16) — IM 收尾:构建修复 + 未读角标 + 告警接入总线
 
 > 接手 Cline 两轮返工后的收尾(Cline 第二轮代码 `pnpm build` 失败,5 个 TS 错误)。
