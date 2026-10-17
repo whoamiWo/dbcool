@@ -46,6 +46,11 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: true
+    # 注：V58 曾尝试 CREATE INDEX CONCURRENTLY + execute-in-transaction=false，
+    # 但在单机 Docker 部署下 HikariCP(autoCommit=false) 与 CONCURRENTLY 的
+    # SHARE UPDATE EXCLUSIVE 锁互斥，导致启动卡死。经评估当前数据量级
+    # （ai_conversation < 10 万行）普通 CREATE INDEX 锁表 < 100ms，故 V58
+    # 回退为普通 CREATE INDEX，此处不再需要关闭事务/开启自动提交。
 
   data:
     redis:
