@@ -217,6 +217,27 @@ public class DingTalkOrgSyncService {
     }
 
     /**
+     * 同步单个钉钉用户到本地并建立映射（通讯录变更事件 contact_updated 入口）。
+     *
+     * <p>PHASE113：此前 {@code contact_updated} 事件未实现，仅打日志 + 返回 processed=false，
+     * 钉钉会重投但本地永远无此用户。现提供此公开方法，把单个用户的查找/创建 + 映射
+     * 封装为可复用能力，事件回调直接调用即可真实同步。
+     *
+     * <p>幂等：{@link UserMappingService#mapUser} 内部走缓存 + 幂等 put，重复事件不会重复建号。
+     *
+     * @return 同步成功的平台用户实体
+     * @throws IllegalArgumentException 入参非法（如 dingtalkUserId 为空）
+     */
+    public UserEntity syncSingleUser(String dingtalkUserId, String name, String tenantId) {
+        if (dingtalkUserId == null || dingtalkUserId.isBlank()) {
+            throw new IllegalArgumentException("dingtalkUserId 不能为空");
+        }
+        UserEntity user = syncUserFromDingTalk(dingtalkUserId, name, tenantId);
+        userMappingService.mapUser(dingtalkUserId, user.getId().toString(), tenantId);
+        return user;
+    }
+
+    /**
      * 获取钉钉访问令牌。
      */
     private String getAccessToken() throws Exception {

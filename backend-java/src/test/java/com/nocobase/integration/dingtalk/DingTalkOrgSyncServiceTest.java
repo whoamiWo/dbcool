@@ -1,9 +1,15 @@
 package com.nocobase.integration.dingtalk;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -88,5 +94,51 @@ class DingTalkOrgSyncServiceTest {
         configureCredentials("key", "secret");
 
         service.scheduledSync();
+    }
+
+    // ---- syncSingleUser（contact_updated 事件入口，PHASE113） ----
+
+    @Test
+    void syncSingleUser_blankUserId_throwsIllegalArgumentException() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> service.syncSingleUser("", "张三", "t1"));
+        org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> service.syncSingleUser(null, "张三", "t1"));
+    }
+
+    @Test
+    void syncSingleUser_existingUser_returnsAndMaps() {
+        com.nocobase.auth.UserRepository userRepo =
+                (com.nocobase.auth.UserRepository) ReflectionTestUtils.getField(service, "userRepository");
+        UserMappingService mappingService =
+                (UserMappingService) ReflectionTestUtils.getField(service, "userMappingService");
+        com.nocobase.auth.UserEntity existing = new com.nocobase.auth.UserEntity();
+        existing.setId(UUID.randomUUID());
+        when(userRepo.findByUsername("dt_u1")).thenReturn(Optional.of(existing));
+
+        com.nocobase.auth.UserEntity result = service.syncSingleUser("u1", "张三", "t1");
+
+        assertThat(result).isSameAs(existing);
+        verify(mappingService).mapUser(eq("u1"), any(), eq("t1"));
+    }
+
+    @Test
+    void syncSingleUser_newUser_createsAndMaps() {
+        com.nocobase.auth.UserRepository userRepo =
+                (com.nocobase.auth.UserRepository) ReflectionTestUtils.getField(service, "userRepository");
+        UserMappingService mappingService =
+                (UserMappingService) ReflectionTestUtils.getField(service, "userMappingService");
+        when(userRepo.findByUsername("dt_u1")).thenReturn(Optional.empty());
+        com.nocobase.auth.UserEntity created = new com.nocobase.auth.UserEntity();
+        created.setId(UUID.randomUUID());
+        when(userRepo.save(any())).thenReturn(created);
+
+        com.nocobase.auth.UserEntity result = service.syncSingleUser("u1", "张三", "t1");
+
+        assertThat(result).isNotNull();
+        verify(userRepo).save(any());
+        verify(mappingService).mapUser(eq("u1"), any(), eq("t1"));
     }
 }

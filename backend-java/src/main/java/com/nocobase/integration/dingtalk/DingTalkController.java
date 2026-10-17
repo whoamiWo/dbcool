@@ -3,6 +3,7 @@ package com.nocobase.integration.dingtalk;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtService;
 import com.nocobase.auth.RefreshTokenService;
+import com.nocobase.auth.UserEntity;
 import com.nocobase.integration.common.ExternalMessageLogEntity;
 import com.nocobase.integration.common.ExternalMessageLogRepository;
 import com.nocobase.integration.dingtalk.DingTalkApprovalService;
@@ -401,20 +402,34 @@ public class DingTalkController {
 
         // 4. 处理事件
         // PHASE96 T7: contact_updated 原实现只打日志 + TODO，外层却返回 processed=true ——
-        // 钉钉认为事件已被消费，实际什么都没做。改为显式返回未实现状态，
-        // 不再对调用方谎称"已处理"。
+        // 钉钉认为事件已被消费，实际什么都没做。PHASE113 已接入真实用户同步，
+        // 现仅在「入参非法 / 同步失败」时如实返回 processed=false + 原因。
         switch (String.valueOf(eventType)) {
             case "approval_status_changed" -> handleApprovalStatusChanged(payload, tenantId);
             case "contact_updated" -> {
                 Object userId = payload.get("user_id");
-                log.warn("[DingTalk] 通讯录变更事件未实现，不对调用方谎称已处理：user={}", userId);
-                return ResponseEntity.ok(Map.of(
-                        "code", 0,
-                        "message", "not_implemented",
-                        "data", Map.of(
-                                "processed", false,
-                                "reason", "contact_updated 事件处理尚未实现："
-                                        + "请在 PHASE96 白名单登记责任人后接入用户同步")));
+                String dingUserId = userId == null ? null : String.valueOf(userId);
+                String userName = payload.get("user_name") == null
+                        ? null : String.valueOf(payload.get("user_name"));
+                if (dingUserId == null || dingUserId.isBlank()) {
+                    log.warn("[DingTalk] contact_updated 缺少 user_id，无法同步");
+                    return ResponseEntity.ok(Map.of(
+                            "code", 0, "message", "contact_updated_missing_user_id",
+                            "data", Map.of("processed", false,
+                                    "reason", "事件缺少 user_id 字段")));
+                }
+                try {
+                    UserEntity synced = orgSyncService.syncSingleUser(dingUserId, userName, tenantId);
+                    log.info("[DingTalk] contact_updated 同步成功: dingUserId={} → 平台 user={}",
+                            dingUserId, synced.getId());
+                } catch (Exception e) {
+                    log.error("[DingTalk] contact_updated 同步失败: user={}, err={}",
+                            dingUserId, e.getMessage(), e);
+                    return ResponseEntity.ok(Map.of(
+                            "code", 0, "message", "contact_updated_sync_failed",
+                            "data", Map.of("processed", false,
+                                    "reason", "用户同步失败：" + e.getMessage())));
+                }
             }
             default -> log.warn("[DingTalk] 未知事件类型: {}", eventType);
         }
