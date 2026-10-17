@@ -199,18 +199,58 @@ class DingTalkControllerCallbackTest {
     }
 
     @Test
-    void eventCallback_contactUpdated_returnsNotImplemented() throws Exception {
+    void eventCallback_contactUpdated_syncsUserAndReturnsProcessed() throws Exception {
+        String ts = nowTs();
+        String sig = sign(SECRET, ts);
+
+        com.nocobase.auth.UserEntity synced = new com.nocobase.auth.UserEntity();
+        synced.setId(UUID.randomUUID());
+        when(orgSyncService.syncSingleUser(eq("u1"), eq("张三"), eq("tenant_default")))
+                .thenReturn(synced);
+
+        ResponseEntity<Map<String, Object>> r = controller.eventCallback(
+                Map.of("eventType", "contact_updated", "eventId", "evt2",
+                        "user_id", "u1", "user_name", "张三"), ts, sig);
+
+        assertEquals(200, r.getStatusCode().value());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) r.getBody().get("data");
+        assertEquals(true, data.get("processed"));
+        verify(orgSyncService).syncSingleUser(eq("u1"), eq("张三"), eq("tenant_default"));
+        // 成功处理后应记录幂等
+        verify(messageLogRepo).save(any(ExternalMessageLogEntity.class));
+    }
+
+    @Test
+    void eventCallback_contactUpdated_missingUserId_returnsNotProcessed() throws Exception {
         String ts = nowTs();
         String sig = sign(SECRET, ts);
 
         ResponseEntity<Map<String, Object>> r = controller.eventCallback(
-                Map.of("eventType", "contact_updated", "eventId", "evt2", "user_id", "u1"), ts, sig);
+                Map.of("eventType", "contact_updated", "eventId", "evt2b"), ts, sig);
 
         assertEquals(200, r.getStatusCode().value());
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) r.getBody().get("data");
         assertEquals(false, data.get("processed"));
-        assertEquals("not_implemented", r.getBody().get("message"));
+        assertEquals("contact_updated_missing_user_id", r.getBody().get("message"));
+    }
+
+    @Test
+    void eventCallback_contactUpdated_syncFailure_returnsNotProcessedWithReason() throws Exception {
+        String ts = nowTs();
+        String sig = sign(SECRET, ts);
+        when(orgSyncService.syncSingleUser(anyString(), any(), anyString()))
+                .thenThrow(new IllegalStateException("db down"));
+
+        ResponseEntity<Map<String, Object>> r = controller.eventCallback(
+                Map.of("eventType", "contact_updated", "eventId", "evt2c", "user_id", "u9"), ts, sig);
+
+        assertEquals(200, r.getStatusCode().value());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) r.getBody().get("data");
+        assertEquals(false, data.get("processed"));
+        assertEquals("contact_updated_sync_failed", r.getBody().get("message"));
     }
 
     @Test
