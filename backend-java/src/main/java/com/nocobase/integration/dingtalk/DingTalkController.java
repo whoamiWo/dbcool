@@ -333,14 +333,26 @@ public class DingTalkController {
 
     /**
      * 获取同步状态。
+     *
+     * <p>PHASE113：此前返回硬编码 {@code lastSyncTime=now} + {@code syncEnabled=true}，
+     * 属于静默谎称"已同步"的假实现。现改为：{@code lastSyncTime} 仅在持久化了同步记录
+     * 时回填（当前未建同步历史表，故始终为 null），{@code syncEnabled} 反映 app-key /
+     * app-secret 实际配置状态；{@code notes} 给出可操作的建议。
+     *
+     * <p>未来如引入 {@code DingTalkSyncHistoryRepository}，在此处查最近一条即可。
      */
     @GetMapping("/sync-status")
     public Map<String, Object> getSyncStatus() {
+        boolean configured = appService.isConfigured();
         return Map.of("code", 0, "message", "success",
                 "data", Map.of(
-                        "lastSyncTime", System.currentTimeMillis(),
-                        "syncEnabled", true,
-                        "cron", "0 0 * * * ?"
+                        "lastSyncTime", null,
+                        "syncEnabled", configured,
+                        "cron", "0 0 * * * ?",
+                        "configured", configured,
+                        "notes", configured
+                                ? "凭证已配置。手动触发: POST /api/dingtalk/sync-org; 定时每小时自动执行。"
+                                : "未配置钉钉凭证 (dingtalk.app-key / app-secret)，定时任务不会真正同步，仅打日志。"
                 ));
     }
 
