@@ -368,7 +368,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:3100/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -399,6 +399,13 @@ services:
     ports:
       # PHASE100 T2: 前端端口收敛到 127.0.0.1，对外仅经 nginx 80/443
       - "127.0.0.1:${FRONTEND_PORT:-80}:80"
+      # PHASE113: https 入口（自签证书挂载在下方 volumes）
+      - "127.0.0.1:${FRONTEND_TLS_PORT:-443}:443"
+    volumes:
+      # PHASE113: 内部 POC 用自签名证书（CN=localhost），
+      # 避免 nginx.conf 引用 /etc/nginx/certs/fullchain.pem 导致启动循环重启
+      - ./certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+      - ./certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
     depends_on:
       backend-java:
         condition: service_healthy
