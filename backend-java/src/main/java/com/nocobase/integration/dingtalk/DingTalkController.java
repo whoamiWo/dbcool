@@ -344,16 +344,16 @@ public class DingTalkController {
     @GetMapping("/sync-status")
     public Map<String, Object> getSyncStatus() {
         boolean configured = appService.isConfigured();
-        return Map.of("code", 0, "message", "success",
-                "data", Map.of(
-                        "lastSyncTime", null,
-                        "syncEnabled", configured,
-                        "cron", "0 0 * * * ?",
-                        "configured", configured,
-                        "notes", configured
-                                ? "凭证已配置。手动触发: POST /api/dingtalk/sync-org; 定时每小时自动执行。"
-                                : "未配置钉钉凭证 (dingtalk.app-key / app-secret)，定时任务不会真正同步，仅打日志。"
-                ));
+        // lastSyncTime 允许为 null（未持久化同步历史），而 Map.of 拒绝 null 值，故用 HashMap。
+        Map<String, Object> data = new java.util.HashMap<>();
+        data.put("lastSyncTime", null);
+        data.put("syncEnabled", configured);
+        data.put("cron", "0 0 * * * ?");
+        data.put("configured", configured);
+        data.put("notes", configured
+                ? "凭证已配置。手动触发: POST /api/dingtalk/sync-org; 定时每小时自动执行。"
+                : "未配置钉钉凭证 (dingtalk.app-key / app-secret)，定时任务不会真正同步，仅打日志。");
+        return Map.of("code", 0, "message", "success", "data", data);
     }
 
     /**
