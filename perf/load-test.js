@@ -27,6 +27,14 @@ const DURATION = __ENV.DURATION || '';
 
 const trendStats = ['avg', 'min', 'med', 'max', 'p(50)', 'p(90)', 'p(95)', 'p(99)'];
 
+// PHASE113：把 429 归为「非失败」。
+// 默认限流保护开启时，高并发下登录/写入会返回 429 —— 这是**限流机制正常工作**，
+// 不是系统容量缺陷。若不标记，k6 的 http_req_failed 会被 429 污染（实测 50VU 下
+// 高达 24.7% "失败"，实为限流），导致阈值永远被"击穿"、无法测出真实容量拐点。
+// 标记后 http_req_failed 只统计真正的 4xx/5xx（排除 429），阈值才有意义。
+// 429 的具体数量仍可从后端日志/响应码分布读取，不影响可观测性。
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 429));
+
 export const options = VUS > 0
   ? {
       vus: VUS,
