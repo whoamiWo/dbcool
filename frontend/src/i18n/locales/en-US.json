@@ -353,5 +353,82 @@
     "opContains": "contains",
     "opGt": "greater than gt",
     "opLt": "less than lt"
+  },
+  "editor": {
+    "block": {
+      "paragraph": "Paragraph",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "bullet": "Bulleted List",
+      "numbered": "Numbered List",
+      "todo": "To-do",
+      "quote": "Quote",
+      "code": "Code Block",
+      "divider": "Divider",
+      "callout": "Callout",
+      "desc": {
+        "paragraph": "Plain text paragraph",
+        "heading1": "Large heading",
+        "heading2": "Medium heading",
+        "heading3": "Small heading",
+        "bullet": "Bulleted list",
+        "numbered": "Numbered list",
+        "todo": "Checkable task item",
+        "quote": "Quote block",
+        "code": "Code snippet",
+        "divider": "Horizontal divider",
+        "callout": "Highlighted callout"
+      }
+    },
+    "ui": {
+      "title": "Title",
+      "blocks": "blocks",
+      "previewMode": "Preview Mode",
+      "editMode": "Edit Mode",
+      "saving": "Saving...",
+      "backlinks": "Backlinks",
+      "backlinksLoading": "Loading...",
+      "noBacklinks": "No pages reference this page yet",
+      "unknownPage": "Unknown page",
+      "templates": "Templates",
+      "templatesLoading": "Loading templates...",
+      "noTemplates": "No templates available. You can mark a page as a template in the page details.",
+      "templatesHint": "Click a template to create a new page from it",
+      "format": "Format:",
+      "bold": "Bold (Ctrl+B)",
+      "italic": "Italic (Ctrl+I)",
+      "strikethrough": "Strikethrough",
+      "code": "Inline code",
+      "link": "Link",
+      "openSlashMenu": "Type / to open the block menu",
+      "slashCommand": "/ Command",
+      "searchBlocks": "Search block types...",
+      "noMatches": "No matching results"
+    },
+    "placeholder": {
+      "bold": "bold text",
+      "italic": "italic text",
+      "code": "code",
+      "link": "link text"
+    },
+    "aria": {
+      "markComplete": "Mark as complete",
+      "markIncomplete": "Mark as incomplete"
+    },
+    "tooltip": {
+      "deleteBlock": "Delete block"
+    },
+    "error": {
+      "saveFailed": "Save failed",
+      "saveFailedWithStatus": "Save failed ({{status}})",
+      "loadBacklinksFailed": "Failed to load backlinks",
+      "loadTemplatesFailed": "Failed to load templates",
+      "loadTemplatesFailedWithStatus": "Failed to load templates ({{status}})",
+      "createPageFailed": "Failed to create page",
+      "createPageFailedWithStatus": "Failed to create page ({{status}})",
+      "selectKbFirst": "Please select a knowledge base first",
+      "promptNewPageTitle": "Enter the new page title:"
+    }
   }
 }

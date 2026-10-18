@@ -37,6 +37,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTranslation } from 'react-i18next';
 import type { WikiPage } from '@/types/wiki';
 
 // ============================================================
@@ -64,21 +65,23 @@ interface Block {
 }
 
 // ============================================================
-//  斜杠命令菜单项
+//  斜杠命令菜单项（t: 翻译函数，由组件内传入）
 // ============================================================
-const SLASH_COMMANDS: { label: string; type: BlockType; icon: React.ReactNode; description: string }[] = [
-  { label: '段落', type: 'paragraph', icon: <Title fontSize="small" />, description: '普通文本段落' },
-  { label: '标题 1', type: 'heading1', icon: <FormatSize fontSize="small" />, description: '大标题' },
-  { label: '标题 2', type: 'heading2', icon: <FormatSize fontSize="small" />, description: '中标题' },
-  { label: '标题 3', type: 'heading3', icon: <FormatSize fontSize="small" />, description: '小标题' },
-  { label: '无序列表', type: 'bullet', icon: <FormatListBulleted fontSize="small" />, description: '项目符号列表' },
-  { label: '有序列表', type: 'numbered', icon: <FormatListNumbered fontSize="small" />, description: '编号列表' },
-  { label: '待办', type: 'todo', icon: <CheckBoxOutlineBlank fontSize="small" />, description: '可勾选的任务项' },
-  { label: '引用', type: 'quote', icon: <FormatQuote fontSize="small" />, description: '引用块' },
-  { label: '代码块', type: 'code', icon: <Code fontSize="small" />, description: '代码片段' },
-  { label: '分割线', type: 'divider', icon: <HorizontalRule fontSize="small" />, description: '水平分割线' },
-  { label: '提示框', type: 'callout', icon: <Lightbulb fontSize="small" />, description: '高亮提示框' },
-];
+function getSlashCommands(t: (key: string) => string): { label: string; type: BlockType; icon: React.ReactNode; description: string }[] {
+  return [
+    { label: t('editor.block.paragraph'), type: 'paragraph', icon: <Title fontSize="small" />, description: t('editor.block.desc.paragraph') },
+    { label: t('editor.block.heading1'), type: 'heading1', icon: <FormatSize fontSize="small" />, description: t('editor.block.desc.heading1') },
+    { label: t('editor.block.heading2'), type: 'heading2', icon: <FormatSize fontSize="small" />, description: t('editor.block.desc.heading2') },
+    { label: t('editor.block.heading3'), type: 'heading3', icon: <FormatSize fontSize="small" />, description: t('editor.block.desc.heading3') },
+    { label: t('editor.block.bullet'), type: 'bullet', icon: <FormatListBulleted fontSize="small" />, description: t('editor.block.desc.bullet') },
+    { label: t('editor.block.numbered'), type: 'numbered', icon: <FormatListNumbered fontSize="small" />, description: t('editor.block.desc.numbered') },
+    { label: t('editor.block.todo'), type: 'todo', icon: <CheckBoxOutlineBlank fontSize="small" />, description: t('editor.block.desc.todo') },
+    { label: t('editor.block.quote'), type: 'quote', icon: <FormatQuote fontSize="small" />, description: t('editor.block.desc.quote') },
+    { label: t('editor.block.code'), type: 'code', icon: <Code fontSize="small" />, description: t('editor.block.desc.code') },
+    { label: t('editor.block.divider'), type: 'divider', icon: <HorizontalRule fontSize="small" />, description: t('editor.block.desc.divider') },
+    { label: t('editor.block.callout'), type: 'callout', icon: <Lightbulb fontSize="small" />, description: t('editor.block.desc.callout') },
+  ];
+}
 
 // ============================================================
 //  工具函数
@@ -213,6 +216,7 @@ export function NotionStyleEditor({
   kbId,
   onNavigateToPage,
 }: NotionStyleEditorProps) {
+  const { t } = useTranslation();
   const [blocks, setBlocks] = useState<Block[]>(() => markdownToBlocks(content));
   const [showPreview, setShowPreview] = useState(false);
   const [slashAnchor, setSlashAnchor] = useState<{ blockId: string; top: number; left: number } | null>(null);
@@ -282,15 +286,15 @@ export function NotionStyleEditor({
           })),
         }),
       });
-      if (!res.ok) throw new Error(`保存失败 (${res.status})`);
+      if (!res.ok) throw new Error(t('editor.error.saveFailedWithStatus', { status: res.status }));
       setSaveError(null);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '保存失败';
+      const msg = err instanceof Error ? err.message : t('editor.error.saveFailed');
       setSaveError(msg);
     } finally {
       setSaving(false);
     }
-  }, [blocks, _page?.id]);
+  }, [blocks, _page?.id, t]);
 
   // 防抖保存
   useEffect(() => {
@@ -310,7 +314,7 @@ export function NotionStyleEditor({
     setBacklinksLoading(true);
     try {
       const res = await fetch(`/api/wiki/pages/${_page.id}/backlinks`);
-      if (!res.ok) throw new Error('加载反向链接失败');
+      if (!res.ok) throw new Error(t('editor.error.loadBacklinksFailed'));
       const data = await res.json();
       // 信封格式 {code:0, data:[...]}，需 unwrap
       const backlinks = data?.data || [];
@@ -320,7 +324,7 @@ export function NotionStyleEditor({
     } finally {
       setBacklinksLoading(false);
     }
-  }, [_page?.id]);
+  }, [_page?.id, t]);
 
   // 加载模板列表
   const loadTemplates = useCallback(async () => {
@@ -328,7 +332,7 @@ export function NotionStyleEditor({
     try {
       setTemplatesLoading(true);
       const res = await fetch(`/api/wiki/kb/${kbId}/templates`);
-      if (!res.ok) throw new Error(`加载模板失败 (${res.status})`);
+      if (!res.ok) throw new Error(t('editor.error.loadTemplatesFailedWithStatus', { status: res.status }));
       const data = await res.json();
       // 信封格式 {code:0, data:[...]}，需 unwrap
       setTemplates(data?.data || []);
@@ -337,15 +341,15 @@ export function NotionStyleEditor({
     } finally {
       setTemplatesLoading(false);
     }
-  }, [kbId]);
+  }, [kbId, t]);
 
   // 应用模板（从模板创建新页面）
   const applyTemplate = useCallback(async (templateId: string) => {
     if (!kbId) {
-      alert('请先选择知识库');
+      alert(t('editor.error.selectKbFirst'));
       return;
     }
-    const title = prompt('请输入新页面标题：');
+    const title = prompt(t('editor.error.promptNewPageTitle'));
     if (!title) return;
     
     try {
@@ -358,14 +362,14 @@ export function NotionStyleEditor({
           slug: title.toLowerCase().replace(/\s+/g, '-'),
         }),
       });
-      if (!res.ok) throw new Error('创建页面失败');
+      if (!res.ok) throw new Error(t('editor.error.createPageFailed'));
       const data = await res.json();
       // 跳转到新创建的页面
       window.location.href = `/wiki/${data.data.slug}`;
     } catch (err) {
       console.error('创建页面失败:', err);
     }
-  }, [kbId]);
+  }, [kbId, t]);
 
   // 初始加载反向链接和模板
    
@@ -440,7 +444,7 @@ export function NotionStyleEditor({
     setSlashFilter(text.replace(/^\/\s*/, ''));
   }, []);
 
-  const filteredCommands = SLASH_COMMANDS.filter(c =>
+  const filteredCommands = getSlashCommands(t).filter(c =>
     c.label.toLowerCase().includes(slashFilter.toLowerCase()) ||
     c.description.toLowerCase().includes(slashFilter.toLowerCase())
   );
@@ -546,7 +550,7 @@ export function NotionStyleEditor({
         {isTodo && (
           <IconButton
             size="small"
-            aria-label={block.checked ? '标记为未完成' : '标记为已完成'}
+            aria-label={block.checked ? t('editor.aria.markIncomplete') : t('editor.aria.markComplete')}
             onClick={() => updateBlock(block.id, { checked: !block.checked })}
             sx={{ mt: 0.25, p: 0.5 }}
           >
@@ -603,11 +607,11 @@ export function NotionStyleEditor({
 
         {/* 块操作按钮 */}
         <Box sx={{ display: 'flex', gap: 0.25, opacity: 0, transition: 'opacity 0.15s', '&:hover': { opacity: 1 } }}>
-          <Tooltip title="删除块">
+          <Tooltip title={t('editor.tooltip.deleteBlock')}>
             <IconButton
               size="small"
               onClick={() => deleteBlock(block.id)}
-              aria-label={`删除 ${block.type || '块'}`}
+              aria-label={t('editor.tooltip.deleteBlock')}
             >
               <DeleteSweep fontSize="small" />
             </IconButton>
@@ -713,7 +717,7 @@ export function NotionStyleEditor({
       }
     } else {
       // 无选中文本 → 在光标位置插入格式标记
-      const placeholder = format === 'bold' ? '粗体文本' : format === 'italic' ? '斜体文本' : format === 'code' ? '代码' : '链接文本';
+      const placeholder = format === 'bold' ? t('editor.placeholder.bold') : format === 'italic' ? t('editor.placeholder.italic') : format === 'code' ? t('editor.placeholder.code') : t('editor.placeholder.link');
       const markers: Record<string, [string, string]> = {
         bold: ['**', '**'],
         italic: ['*', '*'],
@@ -733,7 +737,7 @@ export function NotionStyleEditor({
   return (
     <Box>
       <TextField
-        label="标题"
+        label={t('editor.ui.title')}
         value={title}
         onChange={(e: any) => onTitleChange(e.target.value)}
         fullWidth
@@ -748,11 +752,11 @@ export function NotionStyleEditor({
           size="small"
           onClick={() => setShowPreview(!showPreview)}
         >
-          {showPreview ? '编辑模式' : '预览模式'}
+          {showPreview ? t('editor.ui.editMode') : t('editor.ui.previewMode')}
         </Button>
-        <Chip label={`${blocks.length} 个块`} size="small" variant="outlined" />
+        <Chip label={`${blocks.length} ${t('editor.ui.blocks')}`} size="small" variant="outlined" />
         {saving && (
-          <Chip label="保存中..." size="small" color="info" variant="filled" />
+          <Chip label={t('editor.ui.saving')} size="small" color="info" variant="filled" />
         )}
         {saveError && (
           <Alert severity="error" sx={{ ml: 1 }} onClose={() => setSaveError(null)}>
@@ -771,37 +775,37 @@ export function NotionStyleEditor({
             }}
           >
             <Typography variant="subtitle2" sx={{ mr: 1, alignSelf: 'center' }}>
-              格式:
+              {t('editor.ui.format')}
             </Typography>
-            <Tooltip title="粗体 (Ctrl+B)">
+            <Tooltip title={t('editor.ui.bold')}>
               <IconButton size="small" onClick={() => applyInlineFormat('bold')}>
                 <FormatBold fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="斜体 (Ctrl+I)">
+            <Tooltip title={t('editor.ui.italic')}>
               <IconButton size="small" onClick={() => applyInlineFormat('italic')}>
                 <FormatItalic fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="删除线">
+            <Tooltip title={t('editor.ui.strikethrough')}>
               <IconButton size="small" onClick={() => applyInlineFormat('strikethrough')}>
                 <StrikethroughS fontSize="small" />
               </IconButton>
             </Tooltip>
             <Divider orientation="vertical" flexItem />
-            <Tooltip title="行内代码">
+            <Tooltip title={t('editor.ui.code')}>
               <IconButton size="small" onClick={() => applyInlineFormat('code')}>
                 <Code fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="链接">
+            <Tooltip title={t('editor.ui.link')}>
               <IconButton size="small" onClick={() => applyInlineFormat('link')}>
                 <Link fontSize="small" />
               </IconButton>
             </Tooltip>
             <Divider orientation="vertical" flexItem />
-            <Tooltip title="输入 / 打开块菜单">
-              <Chip label="/ 命令" size="small" onClick={() => {}} />
+            <Tooltip title={t('editor.ui.openSlashMenu')}>
+              <Chip label={t('editor.ui.slashCommand')} size="small" onClick={() => {}} />
             </Tooltip>
           </Box>
         </Paper>
@@ -839,7 +843,7 @@ export function NotionStyleEditor({
             // eslint-disable-next-line jsx-a11y/no-autofocus -- 弹窗/面板内首个输入框自动聚焦，符合交互预期
             autoFocus
             size="small"
-            placeholder="搜索块类型..."
+            placeholder={t('editor.ui.searchBlocks')}
             value={slashFilter}
             onChange={(e) => handleSlashFilterChange(e.target.value)}
             fullWidth
@@ -861,7 +865,7 @@ export function NotionStyleEditor({
             ))}
             {filteredCommands.length === 0 && (
               <Typography variant="body2" sx={{ p: 2, color: 'text.secondary' }}>
-                无匹配结果
+                {t('editor.ui.noMatches')}
               </Typography>
             )}
           </List>
@@ -879,15 +883,15 @@ export function NotionStyleEditor({
         }}
       >
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>
-          🔗 反向链接
+          🔗 {t('editor.ui.backlinks')}
         </Typography>
         {backlinksLoading ? (
           <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
-            加载中...
+            {t('editor.ui.backlinksLoading')}
           </Typography>
         ) : backlinks.length === 0 ? (
           <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
-            暂无页面引用本页
+            {t('editor.ui.noBacklinks')}
           </Typography>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -903,7 +907,7 @@ export function NotionStyleEditor({
                 onClick={() => onNavigateToPage?.(bl.sourcePageId)}
               >
                 <Box>
-                  <Typography variant="body2">{bl.sourceTitle || '未知页面'}</Typography>
+                  <Typography variant="body2">{bl.sourceTitle || t('editor.ui.unknownPage')}</Typography>
                   <Typography variant="caption" sx={{ color: 'text.disabled' }}>
                     {bl.sourceSlug ? `/${bl.sourceSlug}` : ''}
                   </Typography>
@@ -928,20 +932,20 @@ export function NotionStyleEditor({
         }}
       >
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>
-          📄 模板
+          📄 {t('editor.ui.templates')}
         </Typography>
         {templatesLoading ? (
           <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
-            加载模板中...
+            {t('editor.ui.templatesLoading')}
           </Typography>
         ) : templates.length === 0 ? (
           <Typography variant="body2" sx={{ color: 'text.disabled', fontSize: 12 }}>
-            暂无可用模板，可在页面详情中将页面标记为模板
+            {t('editor.ui.noTemplates')}
           </Typography>
         ) : (
           <>
             <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
-              点击模板将从中创建新页面
+              {t('editor.ui.templatesHint')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               {templates.map(tpl => (
