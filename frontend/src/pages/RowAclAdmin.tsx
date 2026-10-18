@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 type PrincipalType = 'user' | 'role';
 type Action = 'read' | 'create' | 'update' | 'delete';
@@ -28,6 +29,7 @@ const ACTIONS: Action[] = ['read', 'create', 'update', 'delete'];
 const PRINCIPAL_TYPES: PrincipalType[] = ['user', 'role'];
 
 export function RowAclAdminPage() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -67,21 +69,17 @@ export function RowAclAdminPage() {
     } catch { /* ignore */ }
   }
 
-   
-   
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     loadCollections();
     loadPolicies();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, []);
 
-   
-   
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     loadPolicies();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
   }, [filterCollection]);
 
   async function save() {
@@ -109,7 +107,7 @@ export function RowAclAdminPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm('确定删除这条策略?')) return;
+    if (!confirm(t('rowAcl.confirmDelete'))) return;
     try {
       await fetch(`/api/admin/row-acl/${id}`, {
         method: 'DELETE', headers: authHeaders,
@@ -133,60 +131,63 @@ export function RowAclAdminPage() {
     }
   }
 
+  function startNewPolicy() {
+    setEditing({
+      collection: collections[0]?.name || '',
+      principal_type: 'role',
+      principal_id: 'user',
+      action: 'read',
+      expression: { field: 'owner_id', op: 'eq', value: '$currentUser' },
+      priority: 0,
+      enabled: true,
+      description: '',
+    });
+  }
+
   return (
     <div style={{ padding: 24, maxWidth: 1200 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>🛡️ 行级 ACL 管理(ROW-level)</h2>
+        <h2 style={{ margin: 0 }}>{t('rowAcl.pageTitle')}</h2>
         <button
-          onClick={() => setEditing({
-            collection: collections[0]?.name || '',
-            principal_type: 'role',
-            principal_id: 'user',
-            action: 'read',
-            expression: { field: 'owner_id', op: 'eq', value: '$currentUser' },
-            priority: 0,
-            enabled: true,
-            description: '',
-          })}
+          onClick={startNewPolicy}
           style={{
             background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none',
             padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
           }}
-        >+ 新建策略</button>
+        >{t('rowAcl.newPolicyBtn')}</button>
       </div>
 
       <div style={{ marginBottom: 12, color: 'var(--color-text-muted)', fontSize: 13 }}>
-        基于表达式的单条记录级访问控制。OR 语义:任一适用策略命中 → 通过;
-        无适用策略 → 放行。<code>value</code> 支持 <code>$currentUser</code> / <code>$currentRoles</code> 占位符。
+        {t('rowAcl.descHint')} <code>{t('rowAcl.valuePlaceholderHint')}</code>
       </div>
 
       <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <label htmlFor="r-lbl-1">按 collection 过滤:</label>
+        <label htmlFor="r-lbl-1">{t('rowAcl.filterLabel')}</label>
         <select id="r-lbl-1"
           value={filterCollection}
           onChange={(e) => setFilterCollection(e.target.value)}
           style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
         >
-          <option value="">(全部)</option>
+          <option value="">{t('rowAcl.filterAll')}</option>
           {collections.map((c) => (
             <option key={c.name} value={c.name}>{c.name}{c.title ? ` — ${c.title}` : ''}</option>
           ))}
         </select>
-        <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{loading ? '加载中…' : `${policies.length} 条`}</span>
+        <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{loading ? t('rowAcl.loading') : t('rowAcl.countItems', { count: policies.length })}</span>
         {error && <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>}
       </div>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <thead style={{ background: 'var(--color-bg-tertiary)' }}>
           <tr>
-            <th style={th}>Collection</th>
-            <th style={th}>Principal</th>
-            <th style={th}>Action</th>
-            <th style={th}>Expression</th>
-            <th style={th}>P</th>
-            <th style={th}>启用</th>
-            <th style={th}>说明</th>
-            <th style={th}>操作</th>
+            <th style={th}>{t('rowAcl.collectionLabel')}</th>
+            <th style={th}>{t('rowAcl.principalLabel')}</th>
+            <th style={th}>{t('rowAcl.actionLabel')}</th>
+            <th style={th}>{t('rowAcl.expressionLabel')}</th>
+            <th style={th}>{t('rowAcl.priorityLabel')}</th>
+            <th style={th}>{t('rowAcl.enabledLabel')}</th>
+            <th style={th}>{t('rowAcl.descLabel')}</th>
+            <th style={th}>{t('rowAcl.actionLabelCol')}</th>
           </tr>
         </thead>
         <tbody>
@@ -216,14 +217,14 @@ export function RowAclAdminPage() {
                     color: 'var(--color-text-primary)', border: 'none', borderRadius: 12,
                     padding: '2px 10px', cursor: 'pointer', fontSize: 12,
                   }}
-                >{p.enabled ? '✓ 启用' : '✗ 禁用'}</button>
+                >{p.enabled ? t('rowAcl.toggleEnabled') : t('rowAcl.toggleDisabled')}</button>
               </td>
               <td style={{ ...td, maxWidth: 200, color: 'var(--color-text-muted)', fontSize: 13 }}>
                 {p.description}
               </td>
               <td style={td}>
-                <button onClick={() => setEditing(p)} style={btnEdit}>编辑</button>
-                <button onClick={() => remove(p.id)} style={btnDelete}>删除</button>
+                <button onClick={() => setEditing(p)} style={btnEdit}>{t('rowAcl.editBtn')}</button>
+                <button onClick={() => remove(p.id)} style={btnDelete}>{t('rowAcl.deleteBtn')}</button>
               </td>
             </tr>
           ))}
@@ -231,19 +232,10 @@ export function RowAclAdminPage() {
             <tr>
               <td colSpan={8} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)', padding: 24 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <span>暂无策略，点击下方按钮创建第一条行级权限规则</span>
+                  <span>{t('rowAcl.emptyHint')}</span>
                   <button
-                    aria-label="创建行级权限策略"
-                    onClick={() => setEditing({
-                      collection: collections[0]?.name || '',
-                      principal_type: 'role',
-                      principal_id: 'user',
-                      action: 'read',
-                      expression: { field: 'owner_id', op: 'eq', value: '$currentUser' },
-                      priority: 0,
-                      enabled: true,
-                      description: '',
-                    })}
+                    aria-label={t('rowAcl.emptyCreateAria')}
+                    onClick={startNewPolicy}
                     style={{
                       padding: '6px 14px',
                       background: 'var(--color-info)',
@@ -253,7 +245,7 @@ export function RowAclAdminPage() {
                       cursor: 'pointer',
                     }}
                   >
-                    + 新建策略
+                    {t('rowAcl.emptyCreateBtn')}
                   </button>
                 </div>
               </td>
@@ -265,42 +257,42 @@ export function RowAclAdminPage() {
       {editing && (
         <div role="presentation" style={modalOverlay} onClick={() => setEditing(null)}>
           <div role="presentation" style={modalCard} onClick={(e) => e.stopPropagation()}>
-            <h3>{editing.id ? '编辑策略' : '新建策略'}</h3>
-            <Field label="Collection">
+            <h3>{editing.id ? t('rowAcl.modalTitleEdit') : t('rowAcl.modalTitleNew')}</h3>
+            <Field label={t('rowAcl.fieldCollection')}>
               <select value={editing.collection || ''} onChange={(e) => setEditing({ ...editing, collection: e.target.value })} style={input}>
                 {collections.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
             </Field>
             <div style={{ display: 'flex', gap: 12 }}>
-              <Field label="Principal 类型">
+              <Field label={t('rowAcl.fieldPrincipalType')}>
                 <select value={editing.principal_type} onChange={(e) => setEditing({ ...editing, principal_type: e.target.value as PrincipalType })} style={input}>
                   {PRINCIPAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </Field>
-              <Field label="Principal ID">
+              <Field label={t('rowAcl.fieldPrincipalId')}>
                 <input
                   value={editing.principal_id || ''}
                   onChange={(e) => setEditing({ ...editing, principal_id: e.target.value })}
-                  placeholder={editing.principal_type === 'user' ? 'user-uuid' : 'role name (如 user/admin)'}
+                  placeholder={editing.principal_type === 'user' ? t('rowAcl.principalIdPlaceholderUser') : t('rowAcl.principalIdPlaceholderRole')}
                   style={input}
                 />
               </Field>
-              <Field label="Action">
+              <Field label={t('rowAcl.fieldAction')}>
                 <select value={editing.action} onChange={(e) => setEditing({ ...editing, action: e.target.value as Action })} style={input}>
                   {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
                 </select>
               </Field>
             </div>
-            <Field label="Expression.field">
+            <Field label={t('rowAcl.fieldExpressionField')}>
               <input
                 value={editing.expression?.field || ''}
                 onChange={(e) => setEditing({ ...editing, expression: { ...editing.expression!, field: e.target.value } })}
-                placeholder="owner_id"
+                placeholder={t('rowAcl.expressionFieldPlaceholder')}
                 style={input}
               />
             </Field>
             <div style={{ display: 'flex', gap: 12 }}>
-              <Field label="op">
+              <Field label={t('rowAcl.fieldOp')}>
                 <select
                   value={editing.expression?.op || 'eq'}
                   onChange={(e) => setEditing({ ...editing, expression: { ...editing.expression!, op: e.target.value } })}
@@ -309,7 +301,7 @@ export function RowAclAdminPage() {
                   {OPS.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </Field>
-              <Field label="value($currentUser / $currentRoles / 字面值)">
+              <Field label={t('rowAcl.fieldValue')}>
                 <input
                   value={String(editing.expression?.value ?? '')}
                   onChange={(e) => setEditing({ ...editing, expression: { ...editing.expression!, value: e.target.value } })}
@@ -318,19 +310,19 @@ export function RowAclAdminPage() {
               </Field>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <Field label="Priority">
+              <Field label={t('rowAcl.fieldPriority')}>
                 <input type="number" value={editing.priority || 0} onChange={(e) => setEditing({ ...editing, priority: parseInt(e.target.value) || 0 })} style={input} />
               </Field>
-              <Field label="启用">
+              <Field label={t('rowAcl.fieldEnabled')}>
                 <input type="checkbox" checked={editing.enabled ?? true} onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })} />
               </Field>
             </div>
-            <Field label="说明">
+            <Field label={t('rowAcl.fieldDescription')}>
               <input value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} style={input} />
             </Field>
             <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditing(null)} style={btnCancel}>取消</button>
-              <button onClick={save} style={btnSave}>保存</button>
+              <button onClick={() => setEditing(null)} style={btnCancel}>{t('rowAcl.cancelBtn')}</button>
+              <button onClick={save} style={btnSave}>{t('rowAcl.saveBtn')}</button>
             </div>
           </div>
         </div>
