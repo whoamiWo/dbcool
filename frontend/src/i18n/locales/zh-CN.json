@@ -353,5 +353,82 @@
     "opContains": "包含 contains",
     "opGt": "大于 gt",
     "opLt": "小于 lt"
+  },
+  "editor": {
+    "block": {
+      "paragraph": "段落",
+      "heading1": "标题 1",
+      "heading2": "标题 2",
+      "heading3": "标题 3",
+      "bullet": "无序列表",
+      "numbered": "有序列表",
+      "todo": "待办",
+      "quote": "引用",
+      "code": "代码块",
+      "divider": "分割线",
+      "callout": "提示框",
+      "desc": {
+        "paragraph": "普通文本段落",
+        "heading1": "大标题",
+        "heading2": "中标题",
+        "heading3": "小标题",
+        "bullet": "项目符号列表",
+        "numbered": "编号列表",
+        "todo": "可勾选的任务项",
+        "quote": "引用块",
+        "code": "代码片段",
+        "divider": "水平分割线",
+        "callout": "高亮提示框"
+      }
+    },
+    "ui": {
+      "title": "标题",
+      "blocks": "块",
+      "previewMode": "预览模式",
+      "editMode": "编辑模式",
+      "saving": "保存中...",
+      "backlinks": "反向链接",
+      "backlinksLoading": "加载中...",
+      "noBacklinks": "暂无页面引用本页",
+      "unknownPage": "未知页面",
+      "templates": "模板",
+      "templatesLoading": "加载模板中...",
+      "noTemplates": "暂无可用模板，可在页面详情中将页面标记为模板",
+      "templatesHint": "点击模板将从中创建新页面",
+      "format": "格式:",
+      "bold": "粗体 (Ctrl+B)",
+      "italic": "斜体 (Ctrl+I)",
+      "strikethrough": "删除线",
+      "code": "行内代码",
+      "link": "链接",
+      "openSlashMenu": "输入 / 打开块菜单",
+      "slashCommand": "/ 命令",
+      "searchBlocks": "搜索块类型...",
+      "noMatches": "无匹配结果"
+    },
+    "placeholder": {
+      "bold": "粗体文本",
+      "italic": "斜体文本",
+      "code": "代码",
+      "link": "链接文本"
+    },
+    "aria": {
+      "markComplete": "标记为已完成",
+      "markIncomplete": "标记为未完成"
+    },
+    "tooltip": {
+      "deleteBlock": "删除块"
+    },
+    "error": {
+      "saveFailed": "保存失败",
+      "saveFailedWithStatus": "保存失败 ({{status}})",
+      "loadBacklinksFailed": "加载反向链接失败",
+      "loadTemplatesFailed": "加载模板失败",
+      "loadTemplatesFailedWithStatus": "加载模板失败 ({{status}})",
+      "createPageFailed": "创建页面失败",
+      "createPageFailedWithStatus": "创建页面失败 ({{status}})",
+      "selectKbFirst": "请先选择知识库",
+      "promptNewPageTitle": "请输入新页面标题："
+    }
   }
 }
