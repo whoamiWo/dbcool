@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Paper,
@@ -34,6 +35,7 @@ interface AiAssistantPanelProps {
  * 3. ✨ 文本润色（选中文字后调用）
  */
 export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistantPanelProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'outline' | 'qa' | 'polish'>('qa');
   const [qaQuestion, setQaQuestion] = useState('');
@@ -57,10 +59,10 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
         body: JSON.stringify({ content: pageContent }),
       });
       
-      if (!response.ok) throw new Error('生成失败');
+      if (!response.ok) throw new Error(t('aiAssistant.outline.failed'));
       
       const data = await response.json();
-      setPolishedResult(data.outline || '未生成内容');
+      setPolishedResult(data.outline || t('aiAssistant.outline.noContent'));
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -85,10 +87,10 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
         }),
       });
       
-      if (!response.ok) throw new Error('问答失败');
+      if (!response.ok) throw new Error(t('aiAssistant.qa.failed'));
       
       const data = await response.json();
-      setQaAnswer(data.answer || '暂无答案');
+      setQaAnswer(data.answer || t('aiAssistant.qa.noAnswer'));
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -110,7 +112,7 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
         body: JSON.stringify({ text: polishText }),
       });
       
-      if (!response.ok) throw new Error('润色失败');
+      if (!response.ok) throw new Error(t('aiAssistant.polish.failed'));
       
       const data = await response.json();
       setPolishedResult(data.polishedText || polishText);
@@ -135,12 +137,12 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
       <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <SmartToyIcon sx={{ color: '#1976d2' }} />
-          <Typography variant="h6">AI 助手</Typography>
+          <Typography variant="h6">{t('aiAssistant.panelTitle')}</Typography>
           <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 130 }}>
             {pageTitle}
           </Typography>
         </Box>
-        <IconButton size="small" onClick={() => setExpanded(!expanded)} aria-label={expanded ? '收起' : '展开'}>
+        <IconButton size="small" onClick={() => setExpanded(!expanded)} aria-label={expanded ? t('aiAssistant.collapse') : t('aiAssistant.expand')}>
           {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>
       </Box>
@@ -149,34 +151,34 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
       <Collapse in={expanded}>
         {/* Tab 切换 */}
         <Box sx={{ display: 'flex', borderBottom: '1px solid #e0e0e0' }}>
-          <Tooltip title="📝 生成大纲">
+          <Tooltip title={t('aiAssistant.tabs.outline')}>
             <Button
               size="small"
               startIcon={<ArticleIcon />}
               onClick={() => setActiveTab('outline')}
               sx={{ flex: 1, borderRadius: 0, bgcolor: activeTab === 'outline' ? '#e3f2fd' : 'transparent' }}
             >
-              大纲
+              {t('aiAssistant.tabs.outline')}
             </Button>
           </Tooltip>
-          <Tooltip title="🔍 智能问答">
+          <Tooltip title={t('aiAssistant.tabs.qa')}>
             <Button
               size="small"
               startIcon={<HelpIcon />}
               onClick={() => setActiveTab('qa')}
               sx={{ flex: 1, borderRadius: 0, bgcolor: activeTab === 'qa' ? '#e3f2fd' : 'transparent' }}
             >
-              问答
+              {t('aiAssistant.tabs.qa')}
             </Button>
           </Tooltip>
-          <Tooltip title="✨ 润色文本">
+          <Tooltip title={t('aiAssistant.tabs.polish')}>
             <Button
               size="small"
               startIcon={<AutoFixHighIcon />}
               onClick={() => setActiveTab('polish')}
               sx={{ flex: 1, borderRadius: 0, bgcolor: activeTab === 'polish' ? '#e3f2fd' : 'transparent' }}
             >
-              润色
+              {t('aiAssistant.tabs.polish')}
             </Button>
           </Tooltip>
         </Box>
@@ -194,7 +196,7 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
         {activeTab === 'outline' && (
           <Box sx={{ p: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              基于当前内容自动生成结构化大纲
+              {t('aiAssistant.outline.hint')}
             </Typography>
             <Button
               variant="contained"
@@ -204,7 +206,7 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
               disabled={loading}
               sx={{ mb: 2 }}
             >
-              {loading ? <CircularProgress size={20} /> : '生成大纲'}
+              {loading ? <CircularProgress size={20} /> : t('aiAssistant.outline.button')}
             </Button>
             {polishedResult && (
               <Paper sx={{ p: 2, bgcolor: '#fff' }}>
@@ -220,13 +222,13 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
         {activeTab === 'qa' && (
           <Box sx={{ p: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              基于知识库的智能问答（RAG）
+              {t('aiAssistant.qa.hint')}
             </Typography>
             <TextField
               fullWidth
               multiline
               rows={3}
-              placeholder="输入您的问题..."
+              placeholder={t('aiAssistant.qa.placeholder')}
               value={qaQuestion}
               onChange={(e) => setQaQuestion(e.target.value)}
               sx={{ mb: 2 }}
@@ -239,7 +241,7 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
               disabled={loading || !qaQuestion.trim()}
               sx={{ mb: 2 }}
             >
-              {loading ? <CircularProgress size={20} /> : '提问'}
+              {loading ? <CircularProgress size={20} /> : t('aiAssistant.qa.button')}
             </Button>
             {qaAnswer && (
               <Paper sx={{ p: 2, bgcolor: '#fff' }}>
@@ -253,13 +255,13 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
         {activeTab === 'polish' && (
           <Box sx={{ p: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              粘贴需要润色的文本
+              {t('aiAssistant.polish.hint')}
             </Typography>
             <TextField
               fullWidth
               multiline
               rows={4}
-              placeholder="输入要润色的文字..."
+              placeholder={t('aiAssistant.polish.placeholder')}
               value={polishText}
               onChange={(e) => setPolishText(e.target.value)}
               sx={{ mb: 2 }}
@@ -272,11 +274,11 @@ export function AiAssistantPanel({ pageId, pageTitle, pageContent }: AiAssistant
               disabled={loading || !polishText.trim()}
               sx={{ mb: 2 }}
             >
-              {loading ? <CircularProgress size={20} /> : '润色'}
+              {loading ? <CircularProgress size={20} /> : t('aiAssistant.polish.button')}
             </Button>
             {polishedResult && (
               <Paper sx={{ p: 2, bgcolor: '#fff' }}>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>润色结果：</Typography>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>{t('aiAssistant.polish.resultLabel')}</Typography>
                 <Typography variant="body2">{polishedResult}</Typography>
               </Paper>
             )}

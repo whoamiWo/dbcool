@@ -6,6 +6,7 @@ import type {
   VisibilityOperator,
   VisibilityRule,
 } from '@/types/form';
+import { useTranslation } from 'react-i18next';
 
 /**
  * 字段规则编辑器 — US-103(显隐规则) + US-104(校验规则)。
@@ -25,25 +26,18 @@ interface FieldRulesEditorProps {
   onChange: (next: FormRules) => void;
 }
 
-const VALIDATION_TYPES: { type: ValidationType; label: string; input: 'number' | 'text' | 'none' }[] = [
-  { type: 'minLength', label: '最小长度', input: 'number' },
-  { type: 'maxLength', label: '最大长度', input: 'number' },
-  { type: 'min', label: '最小值', input: 'number' },
-  { type: 'max', label: '最大值', input: 'number' },
-  { type: 'pattern', label: '正则表达式', input: 'text' },
-  { type: 'email', label: '邮箱格式', input: 'none' },
+/** 校验规则类型列表;labelKey 对应 fieldRules.validationType.<labelKey> */
+const VALIDATION_TYPES: { type: ValidationType; labelKey: string; input: 'number' | 'text' | 'none' }[] = [
+  { type: 'minLength', labelKey: 'minLength', input: 'number' },
+  { type: 'maxLength', labelKey: 'maxLength', input: 'number' },
+  { type: 'min', labelKey: 'min', input: 'number' },
+  { type: 'max', labelKey: 'max', input: 'number' },
+  { type: 'pattern', labelKey: 'pattern', input: 'text' },
+  { type: 'email', labelKey: 'email', input: 'none' },
 ];
 
-const OP_LABELS: Record<VisibilityOperator, string> = {
-  eq: '等于',
-  neq: '不等于',
-  in: '属于',
-  notIn: '不属于',
-  empty: '为空',
-  notEmpty: '不为空',
-  gt: '大于',
-  lt: '小于',
-};
+/** 显隐比较符 key 列表;对应 fieldRules.op.<op> */
+const OP_KEYS: VisibilityOperator[] = ['eq', 'neq', 'in', 'notIn', 'empty', 'notEmpty', 'gt', 'lt'];
 
 /** empty / notEmpty 不需要填写比较值。 */
 const VALUELESS_OPS: VisibilityOperator[] = ['empty', 'notEmpty'];
@@ -57,6 +51,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: FieldRulesEditorProps) {
+  const { t } = useTranslation();
   const list: ValidationRule[] = rules.validation?.[fieldName] ?? [];
   const vis = rules.visibility?.[fieldName];
 
@@ -103,47 +98,50 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
     <div style={{ marginTop: 12 }}>
       {/* ===== US-104: 校验规则 ===== */}
       <div style={{ borderTop: '1px solid var(--color-border-light)', paddingTop: 8 }}>
-        <strong style={{ fontSize: 12 }}>校验规则</strong>
-        {VALIDATION_TYPES.map(({ type, label, input }) => (
-          <div
-            key={type}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}
-          >
-            <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>{label}</span>
-            {input === 'none' ? (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+        <strong style={{ fontSize: 12 }}>{t('fieldRules.validationTitle')}</strong>
+        {VALIDATION_TYPES.map(({ type, labelKey, input }) => {
+          const label = t(`fieldRules.validationType.${labelKey}`);
+          return (
+            <div
+              key={type}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}
+            >
+              <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>{label}</span>
+              {input === 'none' ? (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                  <input
+                    type="checkbox"
+                    checked={has(type)}
+                    onChange={(e) => setValidation(type, undefined, e.target.checked)}
+                    aria-label={label}
+                  />
+                  {t('fieldRules.enable')}
+                </label>
+              ) : (
                 <input
-                  type="checkbox"
-                  checked={has(type)}
-                  onChange={(e) => setValidation(type, undefined, e.target.checked)}
+                  type={input === 'number' ? 'number' : 'text'}
+                  value={getValue(type) === undefined ? '' : String(getValue(type))}
+                  onChange={(e) =>
+                    setValidation(
+                      type,
+                      input === 'number' ? e.target.valueAsNumber : e.target.value,
+                    )
+                  }
+                  placeholder={input === 'number' ? t('fieldRules.numberPlaceholder') : t('fieldRules.patternPlaceholder')}
+                  style={inputStyle}
                   aria-label={label}
                 />
-                启用
-              </label>
-            ) : (
-              <input
-                type={input === 'number' ? 'number' : 'text'}
-                value={getValue(type) === undefined ? '' : String(getValue(type))}
-                onChange={(e) =>
-                  setValidation(
-                    type,
-                    input === 'number' ? e.target.valueAsNumber : e.target.value,
-                  )
-                }
-                placeholder={input === 'number' ? '数值' : '如 ^\\d{4}$'}
-                style={inputStyle}
-                aria-label={label}
-              />
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* ===== US-103: 显隐规则 ===== */}
       <div style={{ borderTop: '1px solid var(--color-border-light)', paddingTop: 8, marginTop: 8 }}>
-        <strong style={{ fontSize: 12 }}>显隐规则</strong>
+        <strong style={{ fontSize: 12 }}>{t('fieldRules.visibilityTitle')}</strong>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>当字段</span>
+          <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>{t('fieldRules.whenField')}</span>
           <select
             value={vis?.when ?? ''}
             onChange={(e) => {
@@ -152,9 +150,9 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
               setVisibility({ when, op: vis?.op ?? 'eq', value: vis?.value });
             }}
             style={inputStyle}
-            aria-label="触发字段"
+            aria-label={t('fieldRules.triggerFieldAria')}
           >
-            <option value="">(不限制显示)</option>
+            <option value="">{t('fieldRules.noRestriction')}</option>
             {others.map((f) => (
               <option key={f.name} value={f.name}>
                 {f.label ?? f.name}
@@ -166,18 +164,18 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
         {vis && (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>条件</span>
+              <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>{t('fieldRules.condition')}</span>
               <select
                 value={vis.op}
                 onChange={(e) =>
                   setVisibility({ ...vis, op: e.target.value as VisibilityOperator })
                 }
                 style={inputStyle}
-                aria-label="比较符"
+                aria-label={t('fieldRules.operatorAria')}
               >
-                {(Object.keys(OP_LABELS) as VisibilityOperator[]).map((op) => (
+                {OP_KEYS.map((op) => (
                   <option key={op} value={op}>
-                    {OP_LABELS[op]}
+                    {t(`fieldRules.op.${op}`)}
                   </option>
                 ))}
               </select>
@@ -185,13 +183,13 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
 
             {needsValue && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>比较值</span>
+                <span style={{ fontSize: 11, width: 68, color: 'var(--color-text-disabled)', flexShrink: 0 }}>{t('fieldRules.compareValue')}</span>
                 <input
                   type="text"
                   value={vis.value === undefined ? '' : String(vis.value)}
                   onChange={(e) => setVisibility({ ...vis, value: e.target.value })}
                   style={inputStyle}
-                  aria-label="比较值"
+                  aria-label={t('fieldRules.compareValue')}
                 />
               </div>
             )}
@@ -210,7 +208,7 @@ export function FieldRulesEditor({ fieldName, allFields, rules, onChange }: Fiel
                 cursor: 'pointer',
               }}
             >
-              清除显隐规则
+              {t('fieldRules.clearVisibility')}
             </button>
           </>
         )}

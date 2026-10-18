@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyState } from '@/components/EmptyState';
@@ -6,10 +7,11 @@ import apiClient from '@/api/client';
 import type { UserMeta } from '@/types/acl';
 
 /**
- * 用户管理(US-301).
+ * 用户管理 (US-301).
  * 平台 Admin 用的简单列表 + 创建 + 启用/禁用.
  */
 export function UsersListPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [username, setUsername] = useState('');
@@ -18,7 +20,7 @@ export function UsersListPage() {
   const [error, setError] = useState<string | null>(null);
 
   // PHASE98 R3: 取 isError/error/refetch。此前只解构 data/isLoading ——
-  // 请求 500 时 data 为 undefined，页面渲染「用户管理(0)」+ 空表头，
+  // 请求 500 时 data 为 undefined，页面渲染「用户管理 (0)」+ 空表头，
   // 与"真的没有用户"完全无法区分。
   const { data, isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ['admin', 'users'],
@@ -41,7 +43,7 @@ export function UsersListPage() {
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message ?? '创建失败');
+      setError(e.response?.data?.message ?? t('usersList.createFailed'));
     },
   });
 
@@ -55,27 +57,27 @@ export function UsersListPage() {
   if (isError) {
     return (
       <div>
-        <h1>👥 用户管理</h1>
+        <h1>{t('usersList.pageTitle')}</h1>
         <ErrorState
-          message={`用户列表加载失败：${(queryError as Error)?.message ?? ''}`}
+          message={t('usersList.loadFailed', { error: (queryError as Error)?.message ?? '' })}
           onRetry={() => void refetch()}
         />
       </div>
     );
   }
 
-  if (isLoading) return <p>加载中…</p>;
+  if (isLoading) return <p>{t('usersList.loading')}</p>;
   const users = data ?? [];
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <h1>👥 用户管理({users.length})</h1>
+        <h1>{t('usersList.pageTitleWithCount', { count: users.length })}</h1>
         <button
           onClick={() => setShowCreate(!showCreate)}
           style={{ padding: '8px 16px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
         >
-          {showCreate ? '取消' : '+ 新建用户'}
+          {showCreate ? t('usersList.cancel') : t('usersList.newUserBtn')}
         </button>
       </div>
 
@@ -88,15 +90,15 @@ export function UsersListPage() {
       {showCreate && (
         <div style={{ padding: 16, background: 'var(--color-text-primary)', borderRadius: 8, marginBottom: 16, boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
           <div style={{ marginBottom: 8 }}>
-            <label htmlFor="u-lbl-1">用户名 *</label>
+            <label htmlFor="u-lbl-1">{t('usersList.usernameLabel')}</label>
             <input id="u-lbl-1" value={username} onChange={(e) => setUsername(e.target.value)} style={{ padding: 6, width: '100%' }} />
           </div>
           <div style={{ marginBottom: 8 }}>
-            <label htmlFor="u-lbl-2">密码 *</label>
+            <label htmlFor="u-lbl-2">{t('usersList.passwordLabel')}</label>
             <input id="u-lbl-2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: 6, width: '100%' }} />
           </div>
           <div style={{ marginBottom: 8 }}>
-            <label htmlFor="u-lbl-3">显示名</label>
+            <label htmlFor="u-lbl-3">{t('usersList.displayNameLabel')}</label>
             <input id="u-lbl-3" value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={{ padding: 6, width: '100%' }} />
           </div>
           <button
@@ -104,7 +106,7 @@ export function UsersListPage() {
             disabled={!username || !password || createMutation.isPending}
             style={{ padding: '8px 16px', background: 'var(--color-success)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
           >
-            {createMutation.isPending ? '创建中…' : '创建'}
+            {createMutation.isPending ? t('usersList.creating') : t('usersList.createBtn')}
           </button>
         </div>
       )}
@@ -113,9 +115,9 @@ export function UsersListPage() {
           注意文案与顶部「+ 新建用户」按钮区分开，避免同一可访问名重复出现。 */}
       {users.length === 0 && (
         <EmptyState
-          title="还没有用户"
-          description="创建第一个用户，或等待管理员分配账号。"
-          actionLabel="创建第一个用户"
+          title={t('usersList.emptyTitle')}
+          description={t('usersList.emptyDesc')}
+          actionLabel={t('usersList.emptyAction')}
           onAction={() => setShowCreate(true)}
         />
       )}
@@ -123,11 +125,11 @@ export function UsersListPage() {
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <thead>
           <tr style={{ background: 'var(--color-bg-secondary)' }}>
-            <th style={{ padding: 12, textAlign: 'left' }}>用户名</th>
-            <th style={{ padding: 12, textAlign: 'left' }}>显示名</th>
-            <th style={{ padding: 12, textAlign: 'left' }}>状态</th>
-            <th style={{ padding: 12, textAlign: 'left' }}>创建时间</th>
-            <th style={{ padding: 12, textAlign: 'right' }}>操作</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('usersList.colUsername')}</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('usersList.colDisplayName')}</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('usersList.colStatus')}</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('usersList.colCreatedAt')}</th>
+            <th style={{ padding: 12, textAlign: 'right' }}>{t('usersList.colAction')}</th>
           </tr>
         </thead>
         <tbody>
@@ -137,9 +139,9 @@ export function UsersListPage() {
               <td style={{ padding: 12 }}>{u.display_name}</td>
               <td style={{ padding: 12 }}>
                 {u.enabled ? (
-                  <span style={{ padding: '2px 8px', background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>启用</span>
+                  <span style={{ padding: '2px 8px', background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>{t('usersList.statusEnabled')}</span>
                 ) : (
-                  <span style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>禁用</span>
+                  <span style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>{t('usersList.statusDisabled')}</span>
                 )}
               </td>
               <td style={{ padding: 12, color: 'var(--color-text-disabled)' }}>{new Date(u.created_at).toLocaleString('zh-CN')}</td>
@@ -148,7 +150,7 @@ export function UsersListPage() {
                   onClick={() => toggleEnabledMutation.mutate({ id: u.id, enabled: !u.enabled })}
                   style={{ padding: '4px 8px', background: u.enabled ? 'var(--color-error)' : 'var(--color-success)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
                 >
-                  {u.enabled ? '禁用' : '启用'}
+                  {u.enabled ? t('usersList.toggleDisable') : t('usersList.toggleEnable')}
                 </button>
               </td>
             </tr>
