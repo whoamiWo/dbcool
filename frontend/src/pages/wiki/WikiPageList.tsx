@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Button,
@@ -38,6 +39,7 @@ import { wikiApi } from '@/api/wiki';
 import type { WikiPage } from '@/types/wiki';
 
 export function WikiPageListPage() {
+  const { t } = useTranslation();
   const { id: kbId } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -71,7 +73,7 @@ export function WikiPageListPage() {
       setError(null);
     },
     onError: (e: any) => {
-      setError(e?.response?.data?.message || '创建失败');
+      setError(e?.response?.data?.message || t('wikiPageList.createFailed'));
     },
   });
 
@@ -98,7 +100,7 @@ export function WikiPageListPage() {
 
   const handleCreate = () => {
     if (!newTitle.trim() || !newSlug.trim()) {
-      setError('标题和 slug 必填');
+      setError(t('wikiPageList.titleAndSlugRequired'));
       return;
     }
     createMutation.mutate({
@@ -123,7 +125,7 @@ export function WikiPageListPage() {
             // 网络超时、500、404 都会显示 403，用户会去申请权限而不是重试，
             // 错误诊断成本被转嫁给客户支持。改为展示真实错误。
             <Alert severity="error" role="alert">
-              知识库加载失败：{(kbError as Error)?.message || '未知错误'}
+              {t('wikiPageList.kbLoadFailed', { error: (kbError as Error)?.message || t('common.loadFailed') })}
             </Alert>
           ) : (
             <Typography variant="h4" component="h1">
@@ -135,7 +137,7 @@ export function WikiPageListPage() {
             sx={{ mt: 1 }}
             onClick={() => (window.location.href = '/wiki/kb')}
           >
-            ← 返回知识库列表
+            {t('wikiPageList.backToKbList')}
           </Button>
         </Box>
         <Button
@@ -144,7 +146,7 @@ export function WikiPageListPage() {
           onClick={() => setOpen(true)}
           fullWidth={isMobile}
         >
-          新建文档
+          {t('wikiPageList.newDoc')}
         </Button>
       </Box>
 
@@ -160,14 +162,14 @@ export function WikiPageListPage() {
           variant="outlined"
           onClick={() => window.location.href = `/wiki/kb/${kbId}/categories`}
         >
-          分类管理
+          {t('wikiPageList.categoryManagement')}
         </Button>
         <Button
           size="small"
           variant="outlined"
           onClick={() => window.location.href = `/wiki/search`}
         >
-          全局搜索
+          {t('wikiPageList.globalSearch')}
         </Button>
       </Box>
 
@@ -177,9 +179,9 @@ export function WikiPageListPage() {
         </Box>
       ) : pages.length === 0 ? (
         <EmptyState
-          title="还没有文档"
-          description="创建第一篇文档，沉淀你的知识与经验"
-          actionLabel="新建文档"
+          title={t('wikiPageList.emptyTitle')}
+          description={t('wikiPageList.emptyDesc')}
+          actionLabel={t('wikiPageList.newDoc')}
           onAction={handleCreate}
         />
       ) : isMobile ? (
@@ -205,14 +207,14 @@ export function WikiPageListPage() {
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <IconButtonA11y
                   size="small"
-                  aria-label={`编辑 ${page.title}`}
+                  aria-label={t('wikiPageList.editDoc', { title: page.title })}
                   onClick={() => (window.location.href = `/wiki/${page.slug}/edit`)}
                 >
                   <EditIcon fontSize="small" />
                 </IconButtonA11y>
                 <IconButtonA11y
                   size="small"
-                  aria-label={`查看 ${page.title} 的版本历史`}
+                  aria-label={t('wikiPageList.viewHistory', { title: page.title })}
                   onClick={() => (window.location.href = `/wiki/${page.slug}/versions`)}
                 >
                   <HistoryIcon fontSize="small" />
@@ -221,7 +223,7 @@ export function WikiPageListPage() {
                   <IconButtonA11y
                     size="small"
                     color="success"
-                    aria-label={`发布 ${page.title}`}
+                    aria-label={t('wikiPageList.publishDoc', { title: page.title })}
                     onClick={() => publishMutation.mutate(page.id)}
                   >
                     <PublishIcon fontSize="small" />
@@ -230,7 +232,7 @@ export function WikiPageListPage() {
                   <IconButtonA11y
                     size="small"
                     color="default"
-                    aria-label={`归档 ${page.title}`}
+                    aria-label={t('wikiPageList.archiveDoc', { title: page.title })}
                     onClick={() => archiveMutation.mutate(page.id)}
                   >
                     <ArchiveIcon fontSize="small" />
@@ -239,9 +241,9 @@ export function WikiPageListPage() {
                 <IconButtonA11y
                   size="small"
                   color="error"
-                  aria-label={`删除 ${page.title}`}
+                  aria-label={t('wikiPageList.deleteDoc', { title: page.title })}
                   onClick={() => {
-                    if (window.confirm(`确定删除《${page.title}》？该操作不可撤销。`)) {
+                    if (window.confirm(t('wikiPageList.deleteConfirm', { title: page.title }))) {
                       deleteMutation.mutate(page.id);
                     }
                   }}
@@ -257,11 +259,11 @@ export function WikiPageListPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>标题</TableCell>
-                <TableCell>状态</TableCell>
-                <TableCell>版本</TableCell>
-                <TableCell>更新时间</TableCell>
-                <TableCell align="right">操作</TableCell>
+                <TableCell>{t('wikiPageList.colTitle')}</TableCell>
+                <TableCell>{t('wikiPageList.colStatus')}</TableCell>
+                <TableCell>{t('wikiPageList.colVersion')}</TableCell>
+                <TableCell>{t('wikiPageList.colUpdatedAt')}</TableCell>
+                <TableCell align="right">{t('wikiPageList.colAction')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -289,36 +291,36 @@ export function WikiPageListPage() {
                       describeChild=false，运行时会把 title 作为 aria-label 注入子元素，
                       静态不可见且依赖 MUI 内部行为。这里补显式 aria-label。
                     */}
-                    <Tooltip title="编辑">
-                      <IconButton size="small" aria-label={`编辑 ${page.title}`} onClick={() => window.location.href = `/wiki/${page.slug}/edit`}>
+                    <Tooltip title={t('wikiPageList.tooltipEdit')}>
+                      <IconButton size="small" aria-label={t('wikiPageList.editDoc', { title: page.title })} onClick={() => window.location.href = `/wiki/${page.slug}/edit`}>
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="版本历史">
-                      <IconButton size="small" aria-label={`查看 ${page.title} 的版本历史`} onClick={() => window.location.href = `/wiki/${page.slug}/versions`}>
+                    <Tooltip title={t('wikiPageList.tooltipHistory')}>
+                      <IconButton size="small" aria-label={t('wikiPageList.viewHistory', { title: page.title })} onClick={() => window.location.href = `/wiki/${page.slug}/versions`}>
                         <HistoryIcon />
                       </IconButton>
                     </Tooltip>
                     {page.status === 'DRAFT' ? (
-                      <Tooltip title="发布">
-                        <IconButton size="small" color="success" aria-label={`发布 ${page.title}`} onClick={() => publishMutation.mutate(page.id)}>
+                      <Tooltip title={t('wikiPageList.tooltipPublish')}>
+                        <IconButton size="small" color="success" aria-label={t('wikiPageList.publishDoc', { title: page.title })} onClick={() => publishMutation.mutate(page.id)}>
                           <PublishIcon />
                         </IconButton>
                       </Tooltip>
                     ) : (
-                      <Tooltip title="归档">
-                        <IconButton size="small" color="default" aria-label={`归档 ${page.title}`} onClick={() => archiveMutation.mutate(page.id)}>
+                      <Tooltip title={t('wikiPageList.tooltipArchive')}>
+                        <IconButton size="small" color="default" aria-label={t('wikiPageList.archiveDoc', { title: page.title })} onClick={() => archiveMutation.mutate(page.id)}>
                           <ArchiveIcon />
                         </IconButton>
                       </Tooltip>
                     )}
-                    <Tooltip title="删除">
+                    <Tooltip title={t('wikiPageList.tooltipDelete')}>
                       <IconButton
                         size="small"
                         color="error"
-                        aria-label={`删除 ${page.title}`}
+                        aria-label={t('wikiPageList.deleteDoc', { title: page.title })}
                         onClick={() => {
-                          if (window.confirm(`确定删除《${page.title}》？该操作不可撤销。`)) {
+                          if (window.confirm(t('wikiPageList.deleteConfirm', { title: page.title }))) {
                             deleteMutation.mutate(page.id);
                           }
                         }}
@@ -335,39 +337,39 @@ export function WikiPageListPage() {
       )}
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>新建文档</DialogTitle>
+        <DialogTitle>{t('wikiPageList.dialogTitle')}</DialogTitle>
         <DialogContent>
           <Box component="form" sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="标题"
+              label={t('wikiPageList.fieldTitle')}
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               fullWidth
               required
             />
             <TextField
-              label="Slug"
+              label={t('wikiPageList.fieldSlug')}
               value={newSlug}
               onChange={(e) => setNewSlug(e.target.value)}
               fullWidth
-              helperText="唯一标识，如：my-doc"
+              helperText={t('wikiPageList.slugHelper')}
               required
             />
             <TextField
-              label="内容"
+              label={t('wikiPageList.fieldContent')}
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
               multiline
               rows={6}
               fullWidth
-              placeholder="支持 Markdown 格式"
+              placeholder={t('wikiPageList.contentPlaceholder')}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>取消</Button>
+          <Button onClick={() => setOpen(false)}>{t('wikiPageList.btnCancel')}</Button>
           <Button variant="contained" onClick={handleCreate} disabled={createMutation.isPending}>
-            创建
+            {t('wikiPageList.btnCreate')}
           </Button>
         </DialogActions>
       </Dialog>
