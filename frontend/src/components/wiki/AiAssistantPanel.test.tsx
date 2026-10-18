@@ -107,8 +107,9 @@ describe('AiAssistantPanel', () => {
     // 输入文本并润色
     const textInput = await screen.findByPlaceholderText('输入要润色的文字...');
     fireEvent.change(textInput, { target: { value: '这个句子不太好' } });
-    const polishBtn = screen.getByRole('button', { name: '润色' });
-    fireEvent.click(polishBtn);
+    // "润色" 同时是 Tab 标签与提交按钮的可访问名，取含输入框的提交按钮（最后一个匹配）
+    const polishBtns = screen.getAllByRole('button', { name: '润色' });
+    fireEvent.click(polishBtns[polishBtns.length - 1]);
     
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/wiki/ai/polish', expect.any(Object));
