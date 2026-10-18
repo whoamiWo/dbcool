@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import apiClient from '@/api/client';
 import { FormulaEditor } from '@/components/views/FormulaEditor';
 import { Screen } from '@/components/Screen';
@@ -48,38 +50,16 @@ const AUTO_FIELD_TYPES: ReadonlySet<string> = new Set([
 /** 派生字段(只读,读取时计算,不落物理列) — T3 渲染只读。 */
 const DERIVED_FIELD_TYPES: ReadonlySet<string> = new Set(['formula', 'rollup', 'lookup']);
 
-
-const FIELD_TYPE_LABELS: Record<string, string> = {
-  text: '文本',
-  email: '邮箱',
-  url: '网址',
-  phone: '电话',
-  number: '数字',
-  currency: '货币',
-  percent: '百分比',
-  duration: '时长',
-  rating: '评分',
-  autonumber: '自动编号',
-  boolean: '布尔',
-  date: '日期',
-  datetime: '日期时间',
-  createdTime: '创建时间',
-  lastModifiedTime: '修改时间',
-  select: '单选',
-  multiSelect: '多选',
-  attachment: '附件',
-  belongsTo: '属于',
-  hasMany: '拥有多个',
-  createdBy: '创建人',
-  lastModifiedBy: '修改人',
-  formula: '公式',
-  rollup: '汇总',
-  lookup: '查找',
-};
+/** 获取字段类型显示标签(带 i18n 支持) */
+function getFieldTypeLabel(t: TFunction, type: string): string {
+  const key = `schemaDesigner.type.${type}`;
+  return t(key);
+}
 
 export function SchemaDesignerPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [fields, setFields] = useState<FieldDef[]>([]);
@@ -101,7 +81,7 @@ export function SchemaDesignerPage() {
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message ?? '创建失败');
+      setError(e.response?.data?.message ?? t('schemaDesigner.createFailed'));
     },
   });
 
@@ -123,11 +103,11 @@ export function SchemaDesignerPage() {
   const handleSubmit = () => {
     setError(null);
     if (!name || !/^[a-z][a-z0-9_]{0,63}$/.test(name)) {
-      setError('Collection 名称必须是小写字母开头的英文/数字/下划线');
+      setError(t('schemaDesigner.nameInvalid'));
       return;
     }
     if (fields.length === 0) {
-      setError('至少添加一个字段');
+      setError(t('schemaDesigner.noFields'));
       return;
     }
     createMutation.mutate();
@@ -135,9 +115,9 @@ export function SchemaDesignerPage() {
 
   return (
     <Screen>
-      <h1>📐 Schema Designer</h1>
+      <h1>{t('schemaDesigner.title')}</h1>
       <p style={{ color: 'var(--color-text-disabled)' }}>
-        定义一个新的数据表,字段将存为 JSONB(支持零锁表扩展).
+        {t('schemaDesigner.subtitle')}
       </p>
 
       <div
@@ -165,39 +145,39 @@ export function SchemaDesignerPage() {
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }} htmlFor="s-lbl-1">
-            Collection 名称 <span style={{ color: 'var(--color-error)' }}>*</span>
+            {t('schemaDesigner.collectionName')} <span style={{ color: 'var(--color-error)' }}>*</span>
           </label>
           <input id="s-lbl-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="customer"
+            placeholder={t('schemaDesigner.collectionNamePlaceholder')}
             style={{ padding: 8, fontSize: 14, width: 300, fontFamily: 'monospace' }}
           />
           <div style={{ fontSize: 12, color: 'var(--color-text-disabled)', marginTop: 4 }}>
-            英文小写字母开头,只允许字母数字下划线
+            {t('schemaDesigner.collectionNameHint')}
           </div>
         </div>
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }} htmlFor="s-lbl-2">
-            显示标题
+            {t('schemaDesigner.displayTitle')}
           </label>
           <input id="s-lbl-2"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="客户"
+            placeholder={t('schemaDesigner.displayTitlePlaceholder')}
             style={{ padding: 8, fontSize: 14, width: 300 }}
           />
         </div>
 
-        <h3 style={{ marginBottom: 8 }}>字段列表</h3>
+        <h3 style={{ marginBottom: 8 }}>{t('schemaDesigner.fields')}</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
           <thead>
             <tr style={{ background: 'var(--color-bg-secondary)' }}>
-              <th style={{ padding: 8, textAlign: 'left' }}>字段名</th>
-              <th style={{ padding: 8, textAlign: 'left' }}>类型</th>
-              <th style={{ padding: 8, textAlign: 'left' }}>必填</th>
-              <th style={{ padding: 8 }} aria-label="操作"></th>
+              <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaDesigner.colFieldName')}</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaDesigner.colType')}</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaDesigner.colRequired')}</th>
+              <th style={{ padding: 8 }} aria-label={t('schemaDesigner.colAction')}></th>
             </tr>
           </thead>
           <tbody>
@@ -205,7 +185,7 @@ export function SchemaDesignerPage() {
               <tr key={i} style={{ borderTop: '1px solid var(--color-border-light)' }}>
                 <td style={{ padding: 8 }}>
                   <input
-                    aria-label="字段名"
+                    aria-label={t('schemaDesigner.fieldAriaFieldName')}
                     value={f.name}
                     onChange={(e) => updateField(i, { name: e.target.value })}
                     style={{ padding: 4, width: '100%', fontFamily: 'monospace' }}
@@ -226,19 +206,19 @@ export function SchemaDesignerPage() {
                     style={{ padding: 4 }}
                     disabled={AUTO_FIELD_TYPES.has(f.type) || DERIVED_FIELD_TYPES.has(f.type)}
                   >
-                    {FIELD_TYPES.map((t) => {
-                      const label = FIELD_TYPE_LABELS[t] || t;
-                      const isAuto = AUTO_FIELD_TYPES.has(t);
-                      const isDerived = DERIVED_FIELD_TYPES.has(t);
-                      const suffix = isAuto ? ' (自动)' : isDerived ? ' (派生)' : '';
-                      return <option key={t} value={t}>{label}{suffix}</option>;
+                    {FIELD_TYPES.map((tType) => {
+                      const label = getFieldTypeLabel(t, tType) || tType;
+                      const isAuto = AUTO_FIELD_TYPES.has(tType);
+                      const isDerived = DERIVED_FIELD_TYPES.has(tType);
+                      const suffix = isAuto ? t('schemaDesigner.autoSuffix') : isDerived ? t('schemaDesigner.derivedSuffix') : '';
+                      return <option key={tType} value={tType}>{label}{suffix}</option>;
                     })}
                   </select>
                   {f.type === 'formula' && (
                     <button
                       onClick={() => setFormulaTarget(i)}
-                      aria-label="编辑公式表达式"
-                      title="编辑公式表达式"
+                      aria-label={t('schemaDesigner.fieldAriaFormula')}
+                      title={t('schemaDesigner.fieldAriaFormula')}
                       style={{
                         marginLeft: 4,
                         padding: '2px 6px',
@@ -256,7 +236,7 @@ export function SchemaDesignerPage() {
                 <td style={{ padding: 8 }}>
                   <input
                     type="checkbox"
-                    aria-label="是否必填"
+                    aria-label={t('schemaDesigner.fieldAriaRequired')}
                     checked={f.required}
                     onChange={(e) => updateField(i, { required: e.target.checked })}
                   />
@@ -273,7 +253,7 @@ export function SchemaDesignerPage() {
                       cursor: 'pointer',
                     }}
                   >
-                    删除
+                    {t('schemaDesigner.removeField')}
                   </button>
                 </td>
               </tr>
@@ -283,7 +263,7 @@ export function SchemaDesignerPage() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={addField} style={{ padding: '8px 16px', cursor: 'pointer' }}>
-            + 添加字段
+            {t('schemaDesigner.addField')}
           </button>
           <button
             onClick={handleSubmit}
@@ -296,7 +276,7 @@ export function SchemaDesignerPage() {
               cursor: createMutation.isPending ? 'not-allowed' : 'pointer',
             }}
           >
-            {createMutation.isPending ? '创建中…' : '保存 Collection'}
+            {createMutation.isPending ? t('schemaDesigner.saving') : t('schemaDesigner.saveCollection')}
           </button>
         </div>
 
