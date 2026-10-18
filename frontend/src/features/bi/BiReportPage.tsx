@@ -9,6 +9,7 @@ import {
   Legend, ResponsiveContainer,
 } from 'recharts';
 import apiClient from '@/api/client';
+import { useTranslation } from 'react-i18next';
 import { biApi, type BiFilter, type BiMeasure } from './api';
 
 interface FieldMeta { name: string; type: string }
@@ -37,6 +38,7 @@ function parseFields(c?: CollectionMeta): FieldMeta[] {
 
 /** BI 报表与数据透视页 — 聚合由后端下推至物理表 SQL 完成。 */
 export default function BiReportPage() {
+  const { t } = useTranslation();
   const [collection, setCollection] = useState('');
   const [rows, setRows] = useState<string[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -118,10 +120,10 @@ export default function BiReportPage() {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-        📊 数据透视与报表
+        {t('biReport.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        选择数据集与维度，聚合在数据库层完成后返回。
+        {t('biReport.subtitle')}
       </Typography>
 
       <Card sx={{ mb: 3 }}>
@@ -129,10 +131,10 @@ export default function BiReportPage() {
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>数据集</InputLabel>
+                <InputLabel>{t('biReport.dataset')}</InputLabel>
                 <Select
                   value={collection}
-                  label="数据集"
+                  label={t('biReport.dataset')}
                   onChange={(e) => {
                     setCollection(e.target.value);
                     setSubmitted(false);
@@ -149,13 +151,13 @@ export default function BiReportPage() {
 
             <Grid size={{ xs: 12, md: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>行维度</InputLabel>
+                <InputLabel>{t('biReport.rowDimension')}</InputLabel>
                 <Select
                   value={rows[0] ?? ''}
-                  label="行维度"
+                  label={t('biReport.rowDimension')}
                   onChange={(e) => setRows(e.target.value ? [e.target.value] : [])}
                 >
-                  <MenuItem value="">无</MenuItem>
+                  <MenuItem value="">{t('biReport.none')}</MenuItem>
                   {fields.map((f) => (
                     <MenuItem key={f.name} value={f.name}>{f.name}</MenuItem>
                   ))}
@@ -165,13 +167,13 @@ export default function BiReportPage() {
 
             <Grid size={{ xs: 12, md: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>列维度（系列）</InputLabel>
+                <InputLabel>{t('biReport.colDimension')}</InputLabel>
                 <Select
                   value={columns[0] ?? ''}
-                  label="列维度（系列）"
+                  label={t('biReport.colDimension')}
                   onChange={(e) => setColumns(e.target.value ? [e.target.value] : [])}
                 >
-                  <MenuItem value="">无</MenuItem>
+                  <MenuItem value="">{t('biReport.none')}</MenuItem>
                   {fields.map((f) => (
                     <MenuItem key={f.name} value={f.name}>{f.name}</MenuItem>
                   ))}
@@ -181,10 +183,10 @@ export default function BiReportPage() {
 
             <Grid size={{ xs: 6, md: 1.5 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>度量</InputLabel>
+                <InputLabel>{t('biReport.measure')}</InputLabel>
                 <Select
                   value={measureField}
-                  label="度量"
+                  label={t('biReport.measure')}
                   onChange={(e) => setMeasureField(e.target.value)}
                 >
                   {(numericFields.length ? numericFields : fields).map((f) => (
@@ -196,8 +198,8 @@ export default function BiReportPage() {
 
             <Grid size={{ xs: 6, md: 1.5 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>聚合</InputLabel>
-                <Select value={agg} label="聚合"
+                <InputLabel>{t('biReport.aggregation')}</InputLabel>
+                <Select value={agg} label={t('biReport.aggregation')}
                   onChange={(e) => setAgg(e.target.value as BiMeasure['agg'])}>
                   {AGGS.map((a) => <MenuItem key={a} value={a}>{a}</MenuItem>)}
                 </Select>
@@ -208,31 +210,31 @@ export default function BiReportPage() {
               <Divider sx={{ my: 1 }} />
               <Stack direction="row" spacing={2}
                 sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                <Typography variant="body2" color="text.secondary">筛选：</Typography>
+                <Typography variant="body2" color="text.secondary">{t('biReport.filterLabel')}</Typography>
                 <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel>字段</InputLabel>
-                  <Select value={filterField} label="字段"
+                  <InputLabel>{t('biReport.field')}</InputLabel>
+                  <Select value={filterField} label={t('biReport.field')}
                     onChange={(e) => setFilterField(e.target.value)}>
-                    <MenuItem value="">无</MenuItem>
+                    <MenuItem value="">{t('biReport.none')}</MenuItem>
                     {fields.map((f) => (
                       <MenuItem key={f.name} value={f.name}>{f.name}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
                 <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>条件</InputLabel>
-                  <Select value={filterOp} label="条件"
+                  <InputLabel>{t('biReport.condition')}</InputLabel>
+                  <Select value={filterOp} label={t('biReport.condition')}
                     onChange={(e) => setFilterOp(e.target.value as BiFilter['op'])}>
                     {['eq', 'neq', 'contains', 'gt', 'lt', 'empty', 'notEmpty'].map((op) => (
                       <MenuItem key={op} value={op}>{op}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-                <TextField size="small" label="值" value={filterValue}
+                <TextField size="small" label={t('biReport.value')} value={filterValue}
                   onChange={(e) => setFilterValue(e.target.value)}
                   disabled={filterOp === 'empty' || filterOp === 'notEmpty'} />
                 <Button variant="contained" onClick={run} disabled={!canQuery}>
-                  查询
+                  {t('biReport.query')}
                 </Button>
               </Stack>
             </Grid>
@@ -242,7 +244,7 @@ export default function BiReportPage() {
 
       {!canQuery && (
         <Alert severity="info">
-          请选择数据集、至少一个维度（行/列）以及度量字段后查询。
+          {t('biReport.selectHint')}
         </Alert>
       )}
 
@@ -254,7 +256,7 @@ export default function BiReportPage() {
 
       {pivotQ.isError && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          透视查询失败：{(pivotQ.error as Error)?.message}
+          {t('biReport.pivotQueryFailed')}: {(pivotQ.error as Error)?.message}
         </Alert>
       )}
 
@@ -263,18 +265,18 @@ export default function BiReportPage() {
           <CardContent>
             <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                透视结果
+                {t('biReport.pivotResult')}
               </Typography>
-              <Chip size="small" label={`${pivotQ.data.totalRows} 行 × ${pivotQ.data.totalCols} 列`} />
+              <Chip size="small" label={t('biReport.pivotSize', { rows: pivotQ.data.totalRows, cols: pivotQ.data.totalCols })} />
             </Stack>
             <Box sx={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 14 }}>
                 <thead>
                   <tr>
-                    <th style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>维度</th>
+                    <th style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>{t('biReport.dimension')}</th>
                     {pivotQ.data.columns.map((c) => (
                       <th key={c} style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>
-                        {c || '（空）'}
+                        {c || t('biReport.empty')}
                       </th>
                     ))}
                   </tr>
@@ -283,7 +285,7 @@ export default function BiReportPage() {
                   {pivotQ.data.data.map((row, i) => (
                     <tr key={i}>
                       <td style={{ border: '1px solid var(--color-border-light)', padding: 8, fontWeight: 500 }}>
-                        {String(row.row ?? '') || '（空）'}
+                        {String(row.row ?? '') || t('biReport.empty')}
                       </td>
                       {pivotQ.data!.columns.map((c) => (
                         <td key={c} style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>
@@ -303,13 +305,13 @@ export default function BiReportPage() {
         <Card>
           <CardContent>
             <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: 'center' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>图表</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{t('biReport.chart')}</Typography>
               <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>类型</InputLabel>
-                <Select value={chartType} label="类型"
+                <InputLabel>{t('biReport.type')}</InputLabel>
+                <Select value={chartType} label={t('biReport.type')}
                   onChange={(e) => setChartType(e.target.value as 'bar' | 'line')}>
-                  {CHART_TYPES.map((t) => (
-                    <MenuItem key={t} value={t}>{t === 'bar' ? '柱状图' : '折线图'}</MenuItem>
+                  {CHART_TYPES.map((ct) => (
+                    <MenuItem key={ct} value={ct}>{ct === 'bar' ? t('biReport.barChart') : t('biReport.lineChart')}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
