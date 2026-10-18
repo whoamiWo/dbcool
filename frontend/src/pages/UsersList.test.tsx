@@ -37,7 +37,7 @@ describe('UsersListPage', () => {
   it('空列表:显示"用户管理(0)" + 新建按钮', async () => {
     vi.mocked(apiClient.get).mockResolvedValue([] as any);
     renderPage();
-    expect(await screen.findByText(/👥 用户管理\(0\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/用户管理 \(0\)/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /新建用户/ })).toBeInTheDocument();
   });
 
@@ -49,7 +49,7 @@ describe('UsersListPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText(/👥 用户管理\(2\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/用户管理 \(2\)/)).toBeInTheDocument();
     expect(screen.getByText('alice')).toBeInTheDocument();
     expect(screen.getByText('bob')).toBeInTheDocument();
     expect(screen.getByText('Alice')).toBeInTheDocument();
