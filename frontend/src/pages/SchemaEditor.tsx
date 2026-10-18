@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import type {
   CollectionMeta,
@@ -13,6 +14,7 @@ export function SchemaEditorPage() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -83,7 +85,7 @@ export function SchemaEditorPage() {
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message ?? '更新失败');
+      setError(e.response?.data?.message ?? t('schemaEditor.updateFailed'));
     },
   });
 
@@ -96,7 +98,7 @@ export function SchemaEditorPage() {
 
   const handleRemoveField = (index: number) => {
     const removed = fields[index];
-    if (window.confirm(`确定删除字段 "${removed.name}"?这会从物理表删除该列。`)) {
+    if (window.confirm(t('schemaEditor.deleteFieldConfirm', { name: removed.name }))) {
       setRemovedFields([...removedFields, removed.name]);
       setFields(fields.filter((_, i) => i !== index));
     }
@@ -156,12 +158,12 @@ export function SchemaEditorPage() {
       queryClient.invalidateQueries({ queryKey: ['collection', name] });
     } catch (e) {
       const err = e as { response?: { data?: { message?: string } } };
-      setError(err.response?.data?.message ?? '保存失败');
+      setError(err.response?.data?.message ?? t('schemaEditor.saveFailed'));
     }
   };
 
-  if (isLoading) return <p>加载中…</p>;
-  if (!metaData) return <p>Collection 不存在</p>;
+  if (isLoading) return <p>{t('schemaEditor.loading')}</p>;
+  if (!metaData) return <p>{t('schemaEditor.collectionNotFound')}</p>;
 
   return (
     <div>
@@ -175,11 +177,11 @@ export function SchemaEditorPage() {
           marginBottom: 16,
         }}
       >
-        ← 返回详情
+        {t('schemaEditor.backToDetail')}
       </button>
 
       <h1>
-        ✏️ 编辑 Schema
+        {t('schemaEditor.editSchema')}
         <span style={{ color: 'var(--color-text-disabled)', fontSize: 14, fontWeight: 'normal' }}>({name})</span>
       </h1>
 
@@ -193,12 +195,12 @@ export function SchemaEditorPage() {
             color: 'var(--color-info)',
           }}
         >
-          ⏳ 异步迁移进行中...Job: <code>{pollingJob}</code>
+          ⏳ {t('schemaEditor.asyncMigrationInProgress')} <code>{pollingJob}</code>
           <br />
-          状态: <strong>{jobQuery.data?.status ?? 'PENDING'}</strong>
-          {jobQuery.data?.status === 'COMPLETED' && ' ✅ 已完成'}
+          {t('schemaEditor.jobStatusLabel')}: <strong>{jobQuery.data?.status ?? 'PENDING'}</strong>
+          {jobQuery.data?.status === 'COMPLETED' && ` ${t('schemaEditor.jobCompleted')}`}
           {jobQuery.data?.status === 'FAILED' &&
-            ` ❌ 失败: ${jobQuery.data?.error}`}
+            ` ${t('schemaEditor.jobFailed', { error: jobQuery.data?.error })}`}
         </div>
       )}
 
@@ -225,7 +227,7 @@ export function SchemaEditorPage() {
         }}
       >
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }} htmlFor="s-lbl-1">标题</label>
+          <label style={{ display: 'block', marginBottom: 4 }} htmlFor="s-lbl-1">{t('schemaEditor.title')}</label>
           <input id="s-lbl-1"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -233,7 +235,7 @@ export function SchemaEditorPage() {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4 }} htmlFor="s-lbl-2">描述</label>
+          <label style={{ display: 'block', marginBottom: 4 }} htmlFor="s-lbl-2">{t('schemaEditor.description')}</label>
           <input id="s-lbl-2"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -241,14 +243,14 @@ export function SchemaEditorPage() {
           />
         </div>
 
-        <h3>字段列表({fields.length})</h3>
+        <h3>{t('schemaEditor.fields', { count: fields.length })}</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
           <thead>
             <tr style={{ background: 'var(--color-bg-secondary)' }}>
-              <th style={{ padding: 8, textAlign: 'left' }}>字段名</th>
-              <th style={{ padding: 8, textAlign: 'left' }}>类型</th>
-              <th style={{ padding: 8, textAlign: 'left' }}>必填</th>
-              <th style={{ padding: 8 }} aria-label="操作"></th>
+              <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaEditor.colFieldName')}</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaEditor.colType')}</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaEditor.colRequired')}</th>
+              <th style={{ padding: 8 }} aria-label={t('schemaEditor.colAction')}></th>
             </tr>
           </thead>
           <tbody>
@@ -262,7 +264,7 @@ export function SchemaEditorPage() {
               <tr style={{ borderTop: '1px solid var(--color-border-light)' }}>
                 <td style={{ padding: 8 }}>
                   <input
-                    aria-label="字段名"
+                    aria-label={t('schemaEditor.fieldAriaFieldName')}
                     value={f.name}
                     onChange={(e) => handleRenameField(i, e.target.value)}
                     style={{ padding: 4, fontFamily: 'monospace', width: '100%' }}
@@ -292,7 +294,7 @@ export function SchemaEditorPage() {
                 <td style={{ padding: 8 }}>
                   <input
                     type="checkbox"
-                    aria-label="是否必填"
+                    aria-label={t('schemaEditor.fieldAriaRequired')}
                     checked={f.required}
                     onChange={(e) => {
                       const updated = [...fields];
@@ -313,7 +315,7 @@ export function SchemaEditorPage() {
                       cursor: 'pointer',
                     }}
                   >
-                    删除
+                    {t('schemaEditor.removeField')}
                   </button>
                 </td>
               </tr>
@@ -322,14 +324,14 @@ export function SchemaEditorPage() {
                 <tr>
                   <td colSpan={4} style={{ padding: '4px 8px 12px', background: 'var(--color-text-primary)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12, color: 'var(--color-bg-elevated)' }}>关联表(target):</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-bg-elevated)' }}>{t('schemaEditor.relationTargetLabel')}</span>
                       <select
                         value={targetName}
                         onChange={(e) => handleOptionChange(i, 'target', e.target.value)}
-                        aria-label={`字段 ${f.name} 关联表`}
+                        aria-label={t('schemaEditor.relationTargetAria', { name: f.name })}
                         style={{ padding: 4, fontSize: 12 }}
                       >
-                        <option value="">-- 选择关联表 --</option>
+                        <option value="">{t('schemaEditor.selectRelationPlaceholder')}</option>
                         {collections
                           .filter((c) => c.name !== name)
                           .map((c) => (
@@ -351,7 +353,7 @@ export function SchemaEditorPage() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={handleAddField} style={{ padding: '8px 16px', cursor: 'pointer' }}>
-            + 添加字段
+            {t('schemaEditor.addField')}
           </button>
           <button
             onClick={handleSubmit}
@@ -364,7 +366,7 @@ export function SchemaEditorPage() {
               cursor: updateMetaMutation.isPending || pollingJob ? 'not-allowed' : 'pointer',
             }}
           >
-            {updateMetaMutation.isPending ? '保存中…' : '保存修改'}
+            {updateMetaMutation.isPending ? t('schemaEditor.saving') : t('schemaEditor.saveChanges')}
           </button>
         </div>
       </div>
@@ -376,6 +378,7 @@ export function SchemaEditorPage() {
  * US-004: 展示关联目标表的字段 —— 验收要求「选关联表时显示对方字段」。
  */
 function TargetFieldsPreview({ collectionName }: { collectionName: string }) {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ['collection', collectionName],
     queryFn: async () => {
@@ -386,15 +389,15 @@ function TargetFieldsPreview({ collectionName }: { collectionName: string }) {
   });
 
   if (!collectionName) return null;
-  if (isLoading) return <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>加载字段…</span>;
+  if (isLoading) return <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{t('schemaEditor.loadingFields')}</span>;
 
   const targetFields = data?.fields ?? [];
   if (targetFields.length === 0) {
-    return <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>该表暂无字段</span>;
+    return <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{t('schemaEditor.tableNoFields')}</span>;
   }
   return (
     <span style={{ fontSize: 11, color: 'var(--color-text-disabled)' }}>
-      对方字段({targetFields.length}):{' '}
+      {t('schemaEditor.targetFieldsLabel', { count: targetFields.length })}{' '}
       {targetFields.map((f) => f.label ?? f.name).join('、')}
     </span>
   );
