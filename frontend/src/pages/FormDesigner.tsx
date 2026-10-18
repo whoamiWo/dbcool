@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 import type { FormFull, FormLayoutItem, FormRules, SubmitAction, ValidationRule } from '@/types/form';
@@ -43,8 +44,9 @@ export function FormDesignerPage() {
   const { collection, id } = useParams<{ collection: string; id?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
-  const [title, setTitle] = useState('新表单');
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [layout, setLayout] = useState<FormLayoutItem[]>([]);
   const [rules, setRules] = useState<FormRules>({});
@@ -67,7 +69,14 @@ export function FormDesignerPage() {
     enabled: !!id,
   });
 
-   
+  /** 新建模式:表单标题默认「新表单」(可 i18n);编辑模式由表单数据回填。 */
+  useEffect(() => {
+    if (!formData && !id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：新建模式默认标题，仅挂载/切 id 时执行
+      setTitle(t('formDesigner.newForm'));
+    }
+  }, [formData, id, t]);
+
   useEffect(() => {
     if (formData) {
       const f = formData;
@@ -114,7 +123,7 @@ export function FormDesignerPage() {
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message ?? '保存失败');
+      setError(e.response?.data?.message ?? t('formDesigner.saveFailed'));
     },
   });
 
@@ -205,7 +214,7 @@ export function FormDesignerPage() {
   };
 
   if (!collection) {
-    return <p>缺少 collection 参数</p>;
+    return <p>{t('formDesigner.missingCollectionParam')}</p>;
   }
 
   const previewForm: FormFull = {
@@ -228,15 +237,15 @@ export function FormDesignerPage() {
         onClick={() => navigate(`/designer/collections/${collection}`)}
         style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}
       >
-        ← 返回 Collection
+        {t('formDesigner.backToCollection')}
       </button>
 
       <h1>
-        📋 {id ? '编辑' : '新建'}表单
+        📋 {id ? t('formDesigner.editForm') : t('formDesigner.newForm')}
         <span style={{ color: 'var(--color-text-disabled)', fontSize: 14, fontWeight: 'normal' }}>({collection})</span>
         {layout.length > 0 && (
           <span style={{ marginLeft: 12, fontSize: 13, color: 'var(--color-success)' }}>
-            🎯 {layout.length} 字段 — 拖拽调整顺序
+            🎯 {t('formDesigner.fieldCountHint', { count: layout.length })}
           </span>
         )}
       </h1>
@@ -250,10 +259,10 @@ export function FormDesignerPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 280px', gap: 16 }}>
         {/* 字段面板(可拖源) */}
         <div style={{ padding: 12, background: 'var(--color-text-primary)', borderRadius: 8 }}>
-          <h3 style={{ marginTop: 0 }}>可用字段</h3>
-          <p style={{ fontSize: 11, color: 'var(--color-text-disabled)', margin: '0 0 8px' }}>拖拽到画布 ↘</p>
+          <h3 style={{ marginTop: 0 }}>{t('formDesigner.availableFields')}</h3>
+          <p style={{ fontSize: 11, color: 'var(--color-text-disabled)', margin: '0 0 8px' }}>{t('formDesigner.dragToCanvas')}</p>
           {fields.length === 0 ? (
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>该 collection 还没有字段</p>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>{t('formDesigner.noFields')}</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {fields.map((f) => {
@@ -277,7 +286,7 @@ export function FormDesignerPage() {
                       userSelect: 'none',
                       opacity: added ? 0.6 : 1,
                     }}
-                    title={added ? '已在画布' : '拖动到画布,或双击追加到末尾'}
+                    title={added ? t('formDesigner.fieldAdded') : t('formDesigner.fieldNotAdded')}
                   >
                     {added ? '✓ ' : ''}{FIELD_ICON[f.type] ?? '🧩'} {f.label ?? f.name}{' '}
                     <span style={{ color: 'var(--color-text-muted)' }}>({f.type})</span>
@@ -295,15 +304,15 @@ export function FormDesignerPage() {
           onDrop={(e) => handleDrop(e, 'end')}
         >
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="f-lbl-1">表单标题</label>
+            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="f-lbl-1">{t('formDesigner.formTitle')}</label>
             <input id="f-lbl-1" value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: 8, width: '100%', fontSize: 16 }} />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="f-lbl-2">描述</label>
+            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="f-lbl-2">{t('formDesigner.description')}</label>
             <input id="f-lbl-2" value={description} onChange={(e) => setDescription(e.target.value)} style={{ padding: 8, width: '100%' }} />
           </div>
 
-          <h3>布局</h3>
+          <h3>{t('formDesigner.layout')}</h3>
           {layout.length === 0 ? (
             <div role="presentation"
               onDragOver={(e) => handleDragOver(e, 0)}
@@ -317,7 +326,7 @@ export function FormDesignerPage() {
                 background: dragOverIdx === 0 ? 'rgba(59,130,246,0.1)' : 'var(--color-text-primary)',
               }}
             >
-              从左侧拖动字段到这里
+              {t('formDesigner.dropFieldsHere')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -362,23 +371,23 @@ export function FormDesignerPage() {
                         onClick={(e) => { e.stopPropagation(); moveField(item.field, 'up'); }}
                         disabled={idx === 0}
                         style={{ padding: '2px 8px', cursor: idx === 0 ? 'not-allowed' : 'pointer' }}
-                        title="上移"
+                        title={t('formDesigner.moveUp')}
                       >↑</button>
                       <button
                         onClick={(e) => { e.stopPropagation(); moveField(item.field, 'down'); }}
                         disabled={idx === layout.length - 1}
                         style={{ padding: '2px 8px', cursor: idx === layout.length - 1 ? 'not-allowed' : 'pointer' }}
-                        title="下移"
+                        title={t('formDesigner.moveDown')}
                       >↓</button>
                       <button
                         onClick={(e) => e.stopPropagation()}
                         style={{ padding: '2px 8px', background: 'var(--color-secondary-500)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, opacity: 0.4 }}
-                        title="复制(预留)"
+                        title={t('formDesigner.duplicate')}
                       >⧉</button>
                       <button
                         onClick={(e) => { e.stopPropagation(); removeFromLayout(item.field); }}
                         style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                        title="删除"
+                        title={t('formDesigner.removeField')}
                       >×</button>
                     </div>
                   </div>
@@ -400,7 +409,7 @@ export function FormDesignerPage() {
 
           {/* US-106: 提交后动作(表单级规则) */}
           <div style={{ marginTop: 16, borderTop: '1px solid var(--color-border-light)', paddingTop: 12 }}>
-            <strong style={{ fontSize: 13 }}>提交后动作</strong>
+            <strong style={{ fontSize: 13 }}>{t('formDesigner.afterSubmit')}</strong>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
               <select
                 value={rules.submit?.action ?? 'stay'}
@@ -411,11 +420,11 @@ export function FormDesignerPage() {
                   })
                 }
                 style={{ padding: 6, fontSize: 12, borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
-                aria-label="提交后动作"
+                aria-label={t('formDesigner.afterSubmit')}
               >
-                <option value="stay">停留并显示提示</option>
-                <option value="redirect">跳转到 URL</option>
-                <option value="workflow">触发工作流</option>
+                <option value="stay">{t('formDesigner.actionStay')}</option>
+                <option value="redirect">{t('formDesigner.actionRedirect')}</option>
+                <option value="workflow">{t('formDesigner.actionWorkflow')}</option>
               </select>
             </div>
 
@@ -424,8 +433,8 @@ export function FormDesignerPage() {
                 type="text"
                 value={rules.submit.url ?? ''}
                 onChange={(e) => setRules({ ...rules, submit: { ...rules.submit!, url: e.target.value } })}
-                placeholder="跳转地址,如 /thanks"
-                aria-label="跳转地址"
+                placeholder={t('formDesigner.redirectPlaceholder')}
+                aria-label={t('formDesigner.redirectUrl')}
                 style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
               />
             )}
@@ -437,8 +446,8 @@ export function FormDesignerPage() {
                 onChange={(e) =>
                   setRules({ ...rules, submit: { ...rules.submit!, workflowId: e.target.value } })
                 }
-                placeholder="工作流 ID"
-                aria-label="工作流 ID"
+                placeholder={t('formDesigner.workflowIdPlaceholder')}
+                aria-label={t('formDesigner.workflowId')}
                 style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
               />
             )}
@@ -450,8 +459,8 @@ export function FormDesignerPage() {
                 onChange={(e) =>
                   setRules({ ...rules, submit: { ...rules.submit!, message: e.target.value } })
                 }
-                placeholder={rules.submit.action === 'workflow' ? '触发后提示(可选)' : '提交后提示文案'}
-                aria-label="提交后提示"
+                placeholder={rules.submit.action === 'workflow' ? t('formDesigner.workflowMessagePlaceholder') : t('formDesigner.stayMessagePlaceholder')}
+                aria-label={t('formDesigner.submitMessage')}
                 style={{ marginTop: 6, padding: 6, fontSize: 12, width: '100%', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}
               />
             )}
@@ -468,19 +477,19 @@ export function FormDesignerPage() {
                 cursor: saveMutation.isPending ? 'not-allowed' : 'pointer',
               }}
             >
-              {saveMutation.isPending ? '保存中…' : '保存表单'}
+              {saveMutation.isPending ? t('formDesigner.saving') : t('formDesigner.saveForm')}
             </button>
             {saveMutation.isSuccess && (
-              <span style={{ alignSelf: 'center', color: 'var(--color-success)', fontSize: 12 }}>✅ 已保存</span>
+              <span style={{ alignSelf: 'center', color: 'var(--color-success)', fontSize: 12 }}>{t('formDesigner.saved')}</span>
             )}
           </div>
         </div>
 
         {/* 属性面板 */}
         <div style={{ padding: 12, background: 'var(--color-text-primary)', borderRadius: 8 }}>
-          <h3 style={{ marginTop: 0 }}>字段属性</h3>
+          <h3 style={{ marginTop: 0 }}>{t('formDesigner.fieldProperties')}</h3>
           {!activeField ? (
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>点击画布中的字段查看属性</p>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>{t('formDesigner.selectFieldHint')}</p>
           ) : (
             <div>
               <p>
@@ -496,7 +505,7 @@ export function FormDesignerPage() {
                   checked={isFieldRequired(activeField)}
                   onChange={(e) => toggleRequiredValidation(activeField, e.target.checked)}
                 />
-                必填
+                {t('formDesigner.required')}
               </label>
               {/* US-003: 主键/唯一/默认值 */}
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -505,7 +514,7 @@ export function FormDesignerPage() {
                   checked={fields.find((f) => f.name === activeField)?.primaryKey ?? false}
                   onChange={(e) => toggleFieldProp(activeField, 'primaryKey', e.target.checked)}
                 />
-                主键
+                {t('formDesigner.primaryKey')}
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <input
@@ -513,10 +522,10 @@ export function FormDesignerPage() {
                   checked={fields.find((f) => f.name === activeField)?.unique ?? false}
                   onChange={(e) => toggleFieldProp(activeField, 'unique', e.target.checked)}
                 />
-                唯一
+                {t('formDesigner.unique')}
               </label>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-3">默认值</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-3">{t('formDesigner.defaultValue')}</label>
                 <input id="f-lbl-3"
                   type="text"
                   value={fields.find((f) => f.name === activeField)?.defaultValue ?? ''}
@@ -526,7 +535,7 @@ export function FormDesignerPage() {
               </div>
               {/* US-102: 标签 / 占位符 / 帮助文本 */}
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-4">标签(label)</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-4">{t('formDesigner.label')}</label>
                 <input id="f-lbl-4"
                   type="text"
                   value={fields.find((f) => f.name === activeField)?.label ?? ''}
@@ -535,7 +544,7 @@ export function FormDesignerPage() {
                 />
               </div>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-5">占位符(placeholder)</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-5">{t('formDesigner.placeholder')}</label>
                 <input id="f-lbl-5"
                   type="text"
                   value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.placeholder ?? '')}
@@ -544,7 +553,7 @@ export function FormDesignerPage() {
                 />
               </div>
               <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-6">帮助文本(helpText)</label>
+                <label style={{ fontSize: 12, color: 'var(--color-text-disabled)' }} htmlFor="f-lbl-6">{t('formDesigner.helpText')}</label>
                 <input id="f-lbl-6"
                   type="text"
                   value={String((fields.find((f) => f.name === activeField)?.options as Record<string, unknown> | undefined)?.helpText ?? '')}
@@ -560,7 +569,7 @@ export function FormDesignerPage() {
                 onChange={setRules}
               />
               <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 12 }}>
-                💡 可拖拽画布字段重排序。规则在下方实时预览中立即生效。
+                {t('formDesigner.previewHint')}
               </p>
             </div>
           )}
@@ -569,7 +578,7 @@ export function FormDesignerPage() {
 
       <div style={{ marginTop: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>👀 实时预览</h2>
+          <h2 style={{ margin: 0 }}>{t('formDesigner.livePreview')}</h2>
           <label
             style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--color-bg-elevated)' }}
           >
@@ -578,7 +587,7 @@ export function FormDesignerPage() {
               checked={previewReadOnly}
               onChange={(e) => setPreviewReadOnly(e.target.checked)}
             />
-            只读模式(US-105:禁用输入并显示完整布局)
+            {t('formDesigner.readOnlyMode')}
           </label>
         </div>
         <div style={{ padding: 24, background: 'var(--color-text-primary)', borderRadius: 8 }}>
@@ -586,12 +595,12 @@ export function FormDesignerPage() {
             <FormRuntime
               form={previewForm}
               fields={fields}
-              onSubmit={() => alert('预览模式,不会真的提交')}
-              submitLabel="预览提交"
+              onSubmit={() => alert(t('formDesigner.previewSubmitAlert'))}
+              submitLabel={t('formDesigner.previewSubmitLabel')}
               readOnly={previewReadOnly}
             />
           ) : (
-            <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>添加字段后看预览</p>
+            <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>{t('formDesigner.previewEmpty')}</p>
           )}
         </div>
       </div>
