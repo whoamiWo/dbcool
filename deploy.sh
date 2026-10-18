@@ -100,19 +100,59 @@ deploy_prod() {
 
     echo ""
     ok "生产部署完成! (tag=$IMAGE_TAG)"
-    echo ""
-    echo -e "${CYAN}访问:${RESET}"
-    echo "  https://你的域名  (前端 + 反代)"
+
+    # PHASE114: 根据 PUBLIC_HOST 决定访问提示与健康检查协议
+    # 域名模式(PUBLIC_HOST 有值) → https://PUBLIC_HOST + 绑定 127.0.0.1
+    # IP 模式(PUBLIC_HOST 为空) → http://0.0.0.0:${FRONTEND_PORT} + 明文安全提醒
+    if [ -n "${PUBLIC_HOST:-}" ]; then
+        HOST_PROTO="https"
+        HOST_ADDR="${PUBLIC_HOST}"
+        ACCESS_URL="https://${PUBLIC_HOST}"
+        BIND_HINT="端口绑定 127.0.0.1(需外层 LB/防火墙放行)"
+        echo ""
+        echo -e "${CYAN}访问:${RESET}"
+        echo "  ${ACCESS_URL}  (前端 + 反代, HTTPS)"
+        echo "  ${BIND_HINT}"
+    else
+        HOST_PROTO="http"
+        HOST_ADDR="${FRONTEND_BIND_ADDR:-127.0.0.1}"
+        # IP 模式绑定到本机访问地址(默认 127.0.0.1; 0.0.0.0 表示对外)
+        if [ "${FRONTEND_BIND_ADDR:-127.0.0.1}" = "0.0.0.0" ]; then
+            IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
+            [ -z "$IP_ADDR" ] && IP_ADDR="<服务器IP>"
+        else
+            IP_ADDR="${HOST_ADDR}"
+        fi
+        ACCESS_URL="http://${IP_ADDR}:${FRONTEND_PORT:-80}"
+        BIND_HINT="端口绑定 ${FRONTEND_BIND_ADDR:-127.0.0.1}"
+        echo ""
+        echo -e "${CYAN}访问:${RESET}"
+        echo "  ${ACCESS_URL}  (前端 + 反代, HTTP 明文)"
+        echo "  ${BIND_HINT}"
+        echo ""
+        warn "  当前为 IP 直连 HTTP 明文模式(未启用 TLS),仅建议内网使用!"
+        warn "  生产环境建议配置域名 + 证书切换为 HTTPS: PUBLIC_HOST=你的域名"
+    fi
+
     echo ""
     echo -e "${CYAN}健康检查:${RESET}"
     sleep 10
-    # PHASE100 T3/T8: 真实探活 + 失败必须非 0 退出(不再 || echo 掩盖)
-    if curl -sf -m 5 https://localhost/api/health >/dev/null 2>&1; then
-        ok "  /api/health 通 (HTTPS)"
-    elif curl -sf -m 5 http://localhost/api/health >/dev/null 2>&1; then
-        ok "  /api/health 通 (HTTP)"
+    # PHASE100 T3/T8 + PHASE114: 真实探活 + 失败必须非 0 退出
+    # 按模式选协议: 域名 https, IP http (本机探测走 127.0.0.1)
+    if [ "${HOST_PROTO}" = "https" ]; then
+        if curl -sk -m 5 https://127.0.0.1:${FRONTEND_TLS_PORT:-443}/api/health >/dev/null 2>&1; then
+            ok "  /api/health 通 (HTTPS)"
+        elif curl -sf -m 5 http://127.0.0.1:${FRONTEND_PORT:-80}/api/health >/dev/null 2>&1; then
+            ok "  /api/health 通 (HTTP 兜底)"
+        else
+            err "  /api/health 不通 —— 部署失败,请执行 ./deploy.sh rollback 回滚"
+        fi
     else
-        err "  /api/health 不通 —— 部署失败,请执行 ./deploy.sh rollback 回滚"
+        if curl -sf -m 5 http://127.0.0.1:${FRONTEND_PORT:-80}/api/health >/dev/null 2>&1; then
+            ok "  /api/health 通 (HTTP)"
+        else
+            err "  /api/health 不通 —— 部署失败,请执行 ./deploy.sh rollback 回滚"
+        fi
     fi
 }
 

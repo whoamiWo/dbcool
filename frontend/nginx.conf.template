@@ -1,0 +1,74 @@
+# ============================================================
+#  NocoBase 前端 — Nginx 配置模板（PHASE114 双模式）
+#  容器启动时由 docker-entrypoint.sh 用 envsubst 渲染为 nginx.conf
+#
+#  模式判定（由 entrypoint 注入）：
+#    ENABLE_TLS=1 → 域名模式：80 跳转 443 + 443 ssl + HSTS
+#    ENABLE_TLS=0 → IP 直连模式：仅 80 HTTP，无 TLS
+#
+#  变量（entrypoint 提供）：
+#    SERVER_NAME        : 域名 或 "_"（IP 模式）
+#    ENABLE_TLS         : "1" 或 "0"
+# ============================================================
+
+# ---------- HTTP 80 server 块 ----------
+# 域名模式：永久 301 跳转 https + HSTS
+# IP 模式：直接服务静态资源 + 反代
+server {
+    listen 80;
+    server_name ${SERVER_NAME};
+__IF_TLS__
+    # PHASE100 T3: 80 → 443 永久跳转
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    return 301 https://$host$request_uri;
+__ELSE__
+    # IP 直连模式：80 直接服务
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # Java 后端
+    location /api/ {
+        proxy_pass http://backend-java:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Python 后端（AI 端点）
+    location /api/ai/ {
+        proxy_pass http://backend-python:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 静态资源
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # PHASE100 T3: 真实探活 —— 后端挂掉时返回 502，不是假 200
+    location /health {
+        proxy_pass http://backend-java:8080/api/health;
+        proxy_set_header Host $host;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 5s;
+        access_log off;
+    }
+__ENDIF__
+}
+
+__TLS_BLOCK__

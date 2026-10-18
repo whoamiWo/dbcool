@@ -22,7 +22,11 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 compose = BASE / "docker-compose.yml"
 env_example = BASE / ".env.example"
-nginx = BASE / "frontend" / "nginx.conf"
+# PHASE114: nginx 配置改为模板（渲染于容器内），门禁检查模板本身
+nginx = BASE / "frontend" / "nginx.conf.template"
+# 兼容旧路径：若模板不存在则回退到静态 nginx.conf（若仍保留）
+nginx_legacy = BASE / "frontend" / "nginx.conf"
+nginx = nginx if nginx.exists() else nginx_legacy
 mdc = BASE / "backend-java" / "src" / "main" / "java" / "com" / "nocobase" / "auth" / "MdcFilter.java"
 deploy = BASE / "deploy.sh"
 prom = BASE / "docker-compose.observability.yml"
@@ -87,20 +91,28 @@ def main() -> int:
     if data_ports:
         ok(f"{len(data_ports)} 个数据端口已绑定 127.0.0.1")
 
-    # 3. nginx TLS（T3）
+    # 3. nginx TLS（T3）+ PHASE114 双模式适配
     print("\n[3] nginx TLS + HSTS")
     if nginx.exists():
         nginx_text = nginx.read_text()
-        if "listen 443 ssl" not in nginx_text:
-            fail("nginx 未配置 443 ssl")
-            issues += 1
+        # PHASE114: PUBLIC_HOST 为空 → IP 直连模式，跳过 443/HSTS 断言
+        public_host_val = re.search(r"^PUBLIC_HOST=(.*)$", env_text, re.M)
+        is_ip_mode = public_host_val and public_host_val.group(1).strip() == ""
+        if is_ip_mode:
+            ok("IP 直连模式：跳过 443/HSTS 检查（仅 80 HTTP）")
         else:
-            ok("nginx 已配置 443 ssl")
-        if "Strict-Transport-Security" not in nginx_text:
-            fail("nginx 未配置 HSTS")
-            issues += 1
-        else:
-            ok("nginx 已配置 HSTS")
+            # 域名模式：必须 443 ssl + HSTS
+            if "listen 443 ssl" not in nginx_text:
+                fail("nginx 未配置 443 ssl")
+                issues += 1
+            else:
+                ok("nginx 已配置 443 ssl")
+            if "Strict-Transport-Security" not in nginx_text:
+                fail("nginx 未配置 HSTS")
+                issues += 1
+            else:
+                ok("nginx 已配置 HSTS")
+        # 无论哪种模式都必须有真实 /health 探活（80 或 443 上均可）
         if "proxy_pass http://backend-java:8080/api/health" not in nginx_text:
             fail("/health 未指向真实后端探活")
             issues += 1
