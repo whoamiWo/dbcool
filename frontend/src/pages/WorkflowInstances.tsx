@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import ReactFlow, { Background, Controls, ReactFlowProvider, Handle, Position, type Node, type Edge } from 'reactflow';
 import apiClient from '@/api/client';
 
@@ -38,21 +39,21 @@ const statusColor: Record<string, string> = {
 };
 
 /* US-407: 把毫秒时长渲染成人性化字符串 */
-function humanDuration(ms: number): string {
+function humanDuration(ms: number, t: (key: string) => string): string {
   if (ms < 1000) return `${ms} ms`;
   const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s} 秒`;
+  if (s < 60) return `${s} ${t('workflowInstances.durationSeconds')}`;
   const m = Math.floor(s / 60);
   const remS = s % 60;
-  if (m < 60) return `${m} 分 ${remS} 秒`;
+  if (m < 60) return `${m} ${t('workflowInstances.durationMinutes')} ${remS} ${t('workflowInstances.durationSeconds')}`;
   const h = Math.floor(m / 60);
   const remM = m % 60;
-  return `${h} 时 ${remM} 分`;
+  return `${h} ${t('workflowInstances.durationHours')} ${remM} ${t('workflowInstances.durationMinutes')}`;
 }
 
 /* US-407: 把后端 JSON 字符串美化展示(失败则原文) */
-function formatJson(s: string | null | undefined): string {
-  if (!s) return '(空)';
+function formatJson(s: string | null | undefined, t: (key: string) => string): string {
+  if (!s) return t('workflowInstances.emptyValue');
   try { return JSON.stringify(JSON.parse(s), null, 2); }
   catch { return s; }
 }
@@ -66,6 +67,7 @@ export function WorkflowInstancesPage() {
 }
 
 function InstancesInner() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id?: string }>();
   const [wfFilter, setWfFilter] = useState('');
 
@@ -84,22 +86,22 @@ function InstancesInner() {
 
   return (
     <div style={{ padding: 16 }}>
-      <h2>工作流实例</h2>
+      <h2>{t('workflowInstances.pageTitle')}</h2>
       {!id && (
         <>
           <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <label htmlFor="w-lbl-1">筛选工作流:</label>
+            <label htmlFor="w-lbl-1">{t('workflowInstances.filterWorkflow')}:</label>
             <select id="w-lbl-1" value={wfFilter} onChange={(e) => setWfFilter(e.target.value)} style={{ padding: 4 }}>
-              <option value="">全部</option>
+              <option value="">{t('workflowInstances.all')}</option>
               {workflows?.map((w) => <option key={w.id} value={w.id}>{w.title || w.name}</option>)}
             </select>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)' }}>
             <thead>
               <tr style={{ background: 'var(--color-bg-secondary)' }}>
-                <th style={th}>工作流</th><th style={th}>状态</th>
-                <th style={th}>关联记录</th><th style={th}>触发时间</th>
-                <th style={th}>结束时间</th><th style={th} aria-label="操作"></th>
+                <th style={th}>{t('workflowInstances.colWorkflow')}</th><th style={th}>{t('workflowInstances.colStatus')}</th>
+                <th style={th}>{t('workflowInstances.colRelatedRecord')}</th><th style={th}>{t('workflowInstances.colTriggerTime')}</th>
+                <th style={th}>{t('workflowInstances.colEndTime')}</th><th style={th} aria-label={t('workflowInstances.colAction')}></th>
               </tr>
             </thead>
             <tbody>
@@ -116,12 +118,12 @@ function InstancesInner() {
                   <td style={td}>{(i.started_at || '').replace('T', ' ').slice(0, 19)}</td>
                   <td style={td}>{(i.finished_at || '').replace('T', ' ').slice(0, 19)}</td>
                   <td style={td}>
-                    <Link to={`/designer/instances/${i.id}`}>查看</Link>
+                    <Link to={`/designer/instances/${i.id}`}>{t('workflowInstances.viewDetails')}</Link>
                   </td>
                 </tr>
               ))}
               {(!list || list.length === 0) && (
-                <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)' }}>暂无实例</td></tr>
+                <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)' }}>{t('workflowInstances.noInstances')}</td></tr>
               )}
             </tbody>
           </table>
@@ -133,6 +135,7 @@ function InstancesInner() {
 }
 
 function InstanceDetail({ id }: { id: string }) {
+  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ['wf-instance', id],
     queryFn: () => apiClient.get<Instance & { tasks: Task[] }>(`/workflows/instances/${id}`),
@@ -143,7 +146,7 @@ function InstanceDetail({ id }: { id: string }) {
     enabled: !!data?.workflow_id,
   });
 
-  if (!data) return <p>加载中...</p>;
+  if (!data) return <p>{t('common.loading')}</p>;
 
   let nodes: NodeDef[] = [];
   let edges: EdgeDef[] = [];
@@ -177,59 +180,59 @@ function InstanceDetail({ id }: { id: string }) {
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <Link to="/designer/instances">← 返回列表</Link>
+        <Link to="/designer/instances">{t('workflowInstances.backToList')}</Link>
       </div>
       <div style={{ background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-        <h3 style={{ marginTop: 0 }}>实例 {data.id.slice(0, 8)}...</h3>
-        <div>状态: <span style={{ padding: '2px 8px', background: statusColor[data.status], color: 'var(--color-text-primary)', borderRadius: 4 }}>
+        <h3 style={{ marginTop: 0 }}>{t('workflowInstances.instancePrefix')} {data.id.slice(0, 8)}...</h3>
+        <div>{t('workflowInstances.colStatus')}: <span style={{ padding: '2px 8px', background: statusColor[data.status], color: 'var(--color-text-primary)', borderRadius: 4 }}>
           {data.status}
         </span></div>
-        <div>工作流: {data.workflow_title} ({data.workflow_name})</div>
-        <div>触发时间: {data.started_at}</div>
-        <div>结束时间: {data.finished_at || '—'}</div>
-        <div>当前节点: #{currentIdx} ({nodes[currentIdx]?.id} - {nodes[currentIdx]?.type})</div>
+        <div>{t('workflowInstances.workflowLabel')}: {data.workflow_title} ({data.workflow_name})</div>
+        <div>{t('workflowInstances.colTriggerTime')}: {data.started_at}</div>
+        <div>{t('workflowInstances.colEndTime')}: {data.finished_at || '—'}</div>
+        <div>{t('workflowInstances.currentNode')}: #{currentIdx} ({nodes[currentIdx]?.id} - {nodes[currentIdx]?.type})</div>
         <details style={{ marginTop: 6 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 13 }}>触发数据 triggerData</summary>
+          <summary style={{ cursor: 'pointer', fontSize: 13 }}>{t('workflowInstances.triggerDataLabel')}</summary>
           <pre style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-border-light)', padding: 8, borderRadius: 4,
                         fontSize: 12, overflow: 'auto', maxHeight: 160, margin: '6px 0 0' }}>
-            {formatJson(data.trigger_data_json)}
+            {formatJson(data.trigger_data_json, t)}
           </pre>
         </details>
       </div>
 
       {data.tasks && data.tasks.length > 0 && (
         <div style={{ background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <h4>审批任务({data.tasks.length})</h4>
+          <h4>{t('workflowInstances.approvalTasks')}({data.tasks.length})</h4>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: 'var(--color-text-primary)', color: 'var(--color-bg-elevated)' }}>
-                <th style={{ ...th, fontSize: 12 }}>节点</th>
-                <th style={{ ...th, fontSize: 12 }}>类型</th>
-                <th style={{ ...th, fontSize: 12 }}>状态</th>
-                <th style={{ ...th, fontSize: 12 }}>指派</th>
-                <th style={{ ...th, fontSize: 12 }}>创建</th>
-                <th style={{ ...th, fontSize: 12 }}>完成</th>
-                <th style={{ ...th, fontSize: 12 }}>耗时</th>
+                <th style={{ ...th, fontSize: 12 }}>{t('workflowInstances.colNode')}</th>
+                <th style={{ ...th, fontSize: 12 }}>{t('workflowInstances.colType')}</th>
+                <th style={{ ...th, fontSize: 12 }}>{t('workflowInstances.colStatus')}</th>
+                <th style={{ ...th, fontSize: 12 }}>{t('workflowInstances.colAssignee')}</th>
+                <th style={{ ...th, fontSize: 12 }}>{t('workflowInstances.colCreatedAt')}</th>
+                <th style={{ ...th, fontSize: 12 }}>{t('workflowInstances.colFinishedAt')}</th>
+                <th style={{ ...th, fontSize: 12 }}>{t('workflowInstances.colDuration')}</th>
               </tr>
             </thead>
             <tbody>
-              {data.tasks.map((t) => {
-                const dur = t.finished_at && t.created_at
-                  ? humanDuration(new Date(t.finished_at).getTime() - new Date(t.created_at).getTime())
-                  : (t.status === 'PENDING' ? '— 进行中' : '—');
+              {data.tasks.map((taskItem) => {
+                const dur = taskItem.finished_at && taskItem.created_at
+                  ? humanDuration(new Date(taskItem.finished_at).getTime() - new Date(taskItem.created_at).getTime(), t)
+                  : (taskItem.status === 'PENDING' ? `— ${t('workflowInstances.inProgress')}` : '—');
                 return (
-                  <tr key={t.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
-                    <td style={td}><code>{t.node_id}</code></td>
-                    <td style={td}>{t.node_type}</td>
+                  <tr key={taskItem.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
+                    <td style={td}><code>{taskItem.node_id}</code></td>
+                    <td style={td}>{taskItem.node_type}</td>
                     <td style={td}>
-                      <span style={{ padding: '1px 6px', background: statusColor[t.status] || 'var(--color-text-muted)',
+                      <span style={{ padding: '1px 6px', background: statusColor[taskItem.status] || 'var(--color-text-muted)',
                                      color: 'var(--color-text-primary)', borderRadius: 3, fontSize: 11 }}>
-                        {t.status}
+                        {taskItem.status}
                       </span>
                     </td>
-                    <td style={td}>{t.assignee?.slice(0, 8) ?? '—'}</td>
-                    <td style={td}>{t.created_at?.replace('T', ' ').slice(0, 19)}</td>
-                    <td style={td}>{t.finished_at?.replace('T', ' ').slice(0, 19) ?? '—'}</td>
+                    <td style={td}>{taskItem.assignee?.slice(0, 8) ?? '—'}</td>
+                    <td style={td}>{taskItem.created_at?.replace('T', ' ').slice(0, 19)}</td>
+                    <td style={td}>{taskItem.finished_at?.replace('T', ' ').slice(0, 19) ?? '—'}</td>
                     <td style={td}>{dur}</td>
                   </tr>
                 );
@@ -247,17 +250,21 @@ function InstanceDetail({ id }: { id: string }) {
       </div>
 
       <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-bg-elevated)' }}>
-        图例: <span style={{ color: 'var(--color-success)' }}>■ 已完成</span>{' '}
-        <span style={{ color: 'var(--color-warning)' }}>■ 当前</span>{' '}
-        <span style={{ color: 'var(--color-text-muted)' }}>■ 未到</span>
+        {t('workflowInstances.legend')}: <span style={{ color: 'var(--color-success)' }}>■ {t('workflowInstances.legendCompleted')}</span>{' '}
+        <span style={{ color: 'var(--color-warning)' }}>■ {t('workflowInstances.legendCurrent')}</span>{' '}
+        <span style={{ color: 'var(--color-text-muted)' }}>■ {t('workflowInstances.legendPending')}</span>
       </div>
     </div>
   );
 }
 
 function FlowNode({ data }: { data: { kind: string; config: Record<string, string>; nodeColor: string; borderColor: string; isCurrent: boolean } }) {
+  const { t } = useTranslation();
   const label: Record<string, string> = {
-    APPROVAL: '📝 审批', NOTIFICATION: '🔔 通知', CONDITION: '🔀 条件', HTTP: '🌐 HTTP',
+    APPROVAL: `📝 ${t('workflowInstances.nodeApproval')}`,
+    NOTIFICATION: `🔔 ${t('workflowInstances.nodeNotification')}`,
+    CONDITION: `🔀 ${t('workflowInstances.nodeCondition')}`,
+    HTTP: `🌐 ${t('workflowInstances.nodeHttp')}`,
   };
   return (
     <div style={{
