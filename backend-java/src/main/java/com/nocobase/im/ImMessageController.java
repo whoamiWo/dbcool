@@ -96,6 +96,7 @@ public class ImMessageController {
     }
 
     /** 游标分页拉取主消息。cursor 传上一页最后一条的 createdAt(ISO-8601)。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(
             @RequestParam UUID channelId,
@@ -121,6 +122,7 @@ public class ImMessageController {
         ));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> send(
             @RequestBody Map<String, Object> body,
@@ -312,6 +314,7 @@ public class ImMessageController {
         return Map.of("code", 0, "message", "success", "data", Map.of("messages", hits));
     }
 
+@PreAuthorize("isAuthenticated()")
 @GetMapping("/unread")
     public Map<String, Object> unread(
             @RequestParam UUID channelId,

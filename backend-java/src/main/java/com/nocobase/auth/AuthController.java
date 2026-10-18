@@ -187,6 +187,7 @@ public class AuthController {
     /**
      * 改密码(US-502). 需登录.
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/password")
     public Map<String, Object> changePassword(
             @RequestBody @Valid ChangePasswordRequest request,
@@ -210,6 +211,7 @@ public class AuthController {
     /**
      * 当前登录用户信息(US-502 个人中心).
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/me")
     public Map<String, Object> me(@AuthenticationPrincipal AuthenticatedUser user) {
         var dbUser = userRepository.findById(user.userId())

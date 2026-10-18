@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 工作流 API(US-401~407) — Week 11 MVP.
@@ -68,6 +69,7 @@ public class WorkflowController {
     //  Workflow CRUD(US-401)
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(@RequestParam(required = false) String collection) {
         // Week 41 D6 G1:从 TenantContext 取当前租户(替代硬编码 "tenant_default")
@@ -79,6 +81,7 @@ public class WorkflowController {
                 "data", ws.stream().map(this::toDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public Map<String, Object> get(@PathVariable UUID id) {
         WorkflowEntity w = mustGet(id);
@@ -95,6 +98,7 @@ public class WorkflowController {
         return Map.of("code", 0, "message", "success", "data", dto);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody @Valid CreateWorkflowRequest req,
@@ -127,6 +131,7 @@ public class WorkflowController {
      * <p>允许修改:name / title / description / collectionName / enabled / trigger / nodes / edges.
      * 不可修改:id / tenantId / createdAt / createdBy(由 createdBy 决定归属).
      */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public Map<String, Object> update(
             @PathVariable UUID id,
@@ -167,6 +172,7 @@ public class WorkflowController {
      * <p>删除策略(报告 3.2):拒绝删除有活跃实例(RUNNING / PENDING)的工作流。
      * 用户需先 disable 工作流,等待所有实例自然走完(COMPLETED / FAILED / CANCELED)后再删。
      */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> delete(
             @PathVariable UUID id,
@@ -192,6 +198,7 @@ public class WorkflowController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{id}/trigger")
     @Transactional
     public ResponseEntity<Map<String, Object>> trigger(
@@ -272,6 +279,7 @@ public class WorkflowController {
     //  Instance + Tasks(US-407, US-408)
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/instances")
     public Map<String, Object> listInstances(@RequestParam(required = false) UUID workflowId) {
         // Week 41 D6 G1:从 TenantContext 取当前租户
@@ -283,6 +291,7 @@ public class WorkflowController {
                 "data", list.stream().map(this::instanceToDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/instances/{id}")
     public Map<String, Object> getInstance(@PathVariable UUID id) {
         WorkflowInstanceEntity i = instanceRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -297,6 +306,7 @@ public class WorkflowController {
     //  Task Approval(US-408 待办 + 审批)
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/tasks/my")
     public Map<String, Object> myTasks(@AuthenticationPrincipal AuthenticatedUser user) {
         // 多租户隔离:必须带当前会话租户,否则用户切换租户后会看到其他租户的待办
@@ -306,6 +316,7 @@ public class WorkflowController {
                 "data", tasks.stream().map(this::taskToDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/tasks/{id}/approve")
     @Transactional
     public Map<String, Object> approve(
@@ -393,6 +404,7 @@ public class WorkflowController {
                 "data", instanceToDto(instance));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/tasks/{id}/reject")
     @Transactional
     public Map<String, Object> reject(

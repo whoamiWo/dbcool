@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Trello 式看板 API — 列/卡片移动/清单/标签/成员端点。
@@ -53,6 +54,7 @@ public class ProjectBoardController {
     // ============================================================
 
     /** 创建列：{projectId, title, type, sortOrder, wipLimit} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/lists")
     public ResponseEntity<Map<String, Object>> createList(
             @RequestBody Map<String, Object> body,
@@ -80,6 +82,7 @@ public class ProjectBoardController {
     }
 
     /** 项目列列表 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{projectId}/lists")
     public Map<String, Object> listBoardLists(
             @PathVariable UUID projectId,
@@ -100,6 +103,7 @@ public class ProjectBoardController {
     }
 
     /** 更新列 */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/lists/{listId}")
     public Map<String, Object> updateBoardList(
             @PathVariable UUID listId,
@@ -121,6 +125,7 @@ public class ProjectBoardController {
     }
 
     /** 删除列 */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/lists/{listId}")
     public Map<String, Object> deleteBoardList(
             @PathVariable UUID listId,
@@ -137,6 +142,7 @@ public class ProjectBoardController {
     // ============================================================
 
     /** 移动卡片：{taskId, toListId, toIndex} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/cards/move")
     public Map<String, Object> moveCard(
             @RequestBody Map<String, Object> body,
@@ -161,6 +167,7 @@ public class ProjectBoardController {
     // ============================================================
 
     /** 创建清单：{taskId, title, sortOrder} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/checklists")
     public ResponseEntity<Map<String, Object>> createChecklist(
             @RequestBody Map<String, Object> body,
@@ -185,6 +192,7 @@ public class ProjectBoardController {
     }
 
     /** 任务清单列表 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/checklists/by-task/{taskId}")
     public Map<String, Object> listChecklistsByTask(
             @PathVariable UUID taskId,
@@ -203,6 +211,7 @@ public class ProjectBoardController {
     }
 
     /** 更新清单 */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/checklists/{checklistId}")
     public Map<String, Object> updateChecklist(
             @PathVariable UUID checklistId,
@@ -220,6 +229,7 @@ public class ProjectBoardController {
     }
 
     /** 删除清单 */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/checklists/{checklistId}")
     public Map<String, Object> deleteChecklist(
             @PathVariable UUID checklistId,
@@ -239,6 +249,7 @@ public class ProjectBoardController {
     // ============================================================
 
     /** 创建清单项：{checklistId, taskId, title, sortOrder} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/checklist-items")
     public ResponseEntity<Map<String, Object>> createChecklistItem(
             @RequestBody Map<String, Object> body,
@@ -266,6 +277,7 @@ public class ProjectBoardController {
     }
 
     /** 清单项列表 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/checklist-items/by-checklist/{checklistId}")
     public Map<String, Object> listChecklistItems(
             @PathVariable UUID checklistId,
@@ -285,6 +297,7 @@ public class ProjectBoardController {
     }
 
     /** 更新清单项（标记完成） */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/checklist-items/{itemId}")
     public Map<String, Object> updateChecklistItem(
             @PathVariable UUID itemId,
@@ -303,6 +316,7 @@ public class ProjectBoardController {
     }
 
     /** 删除清单项 */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/checklist-items/{itemId}")
     public Map<String, Object> deleteChecklistItem(
             @PathVariable UUID itemId,
@@ -322,6 +336,7 @@ public class ProjectBoardController {
     // ============================================================
 
     /** 创建标签：{projectId, name, color} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/labels")
     public ResponseEntity<Map<String, Object>> createLabel(
             @RequestBody Map<String, Object> body,
@@ -346,6 +361,7 @@ public class ProjectBoardController {
     }
 
     /** 项目标签列表 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/labels/by-project/{projectId}")
     public Map<String, Object> listLabelsByProject(
             @PathVariable UUID projectId,
@@ -366,6 +382,7 @@ public class ProjectBoardController {
     }
 
     /** 更新标签 */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/labels/{labelId}")
     public Map<String, Object> updateLabel(
             @PathVariable UUID labelId,
@@ -384,6 +401,7 @@ public class ProjectBoardController {
     }
 
     /** 删除标签 */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/labels/{labelId}")
     public Map<String, Object> deleteLabel(
             @PathVariable UUID labelId,
@@ -400,6 +418,7 @@ public class ProjectBoardController {
     // ============================================================
 
     /** 分配成员到任务：{taskId, assigneeId} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/members/assign")
     public Map<String, Object> assignMember(
             @RequestBody Map<String, Object> body,
@@ -427,6 +446,7 @@ public class ProjectBoardController {
     // ============================================================
 
     /** 创建任务：{projectId, title, description, parentId, assigneeId, status, priority, startDate, endDate} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/tasks")
     public ResponseEntity<Map<String, Object>> createTask(
             @RequestBody Map<String, Object> body,
@@ -461,6 +481,7 @@ public class ProjectBoardController {
     }
 
     /** 更新任务：{id, title?, description?, status?, priority?, assigneeId?, startDate?, endDate?} */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/tasks/{id}")
     public Map<String, Object> updateTask(
             @PathVariable UUID id,
@@ -484,6 +505,7 @@ public class ProjectBoardController {
     }
 
     /** 删除任务 */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/tasks/{id}")
     public Map<String, Object> deleteTask(
             @PathVariable UUID id,

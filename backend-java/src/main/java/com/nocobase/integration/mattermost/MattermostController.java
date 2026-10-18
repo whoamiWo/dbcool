@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Mattermost 集成 REST API。
@@ -32,6 +33,7 @@ public class MattermostController {
     }
 
     /** 获取 Mattermost Incoming Webhook URL */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/webhook-url")
     public ResponseEntity<Map<String, String>> getWebhookUrl() {
         String webhookUrl = mattermostAppService.getIncomingWebhookUrl();
@@ -66,6 +68,7 @@ public class MattermostController {
     }
 
     /** 发送消息到 Mattermost 频道 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message/send")
     public ResponseEntity<Map<String, Object>> sendMessage(
             @RequestBody Map<String, Object> body,
@@ -92,6 +95,7 @@ public class MattermostController {
     }
 
     /** 回复线程消息（Mattermost 支持 root_id） */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message/reply")
     public ResponseEntity<Map<String, Object>> replyMessage(
             @RequestBody Map<String, Object> body,

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 视图 REST API — Week 9 Epic 3.
@@ -35,6 +36,7 @@ public class ViewController {
         this.service = service;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody @Valid CreateViewRequest request,
@@ -62,6 +64,7 @@ public class ViewController {
         ));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(
             @RequestParam(required = false) String collection,
@@ -76,6 +79,7 @@ public class ViewController {
         );
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public Map<String, Object> get(
             @PathVariable UUID id,
@@ -87,6 +91,7 @@ public class ViewController {
         return Map.of("code", 0, "message", "success", "data", dto);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}/timeline-records")
     public Map<String, Object> timelineRecords(
             @PathVariable UUID id,
@@ -104,6 +109,7 @@ public class ViewController {
         return Map.of("code", 0, "message", "success", "data", records);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public Map<String, Object> update(
             @PathVariable UUID id,
@@ -117,6 +123,7 @@ public class ViewController {
         return Map.of("code", 0, "message", "success", "data", toDto(view));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(
             @PathVariable UUID id,

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 跨模块统一搜索 REST API。
@@ -25,6 +26,7 @@ public class UnifiedSearchController {
     }
 
     /** 统一搜索 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<Map<String, Object>> search(
             @RequestParam String keyword,

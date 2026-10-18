@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 飞书集成 REST API。
@@ -38,6 +39,7 @@ public class FeishuController {
     }
 
     /** 获取飞书 OAuth2 授权地址 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/auth-url")
     public ResponseEntity<Map<String, String>> getAuthUrl() {
         String authUrl = feishuAppService.getOAuthUrl();
@@ -45,6 +47,7 @@ public class FeishuController {
     }
 
     /** OAuth2 回调：code 换取 token 并保存配置 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/oauth/callback")
     public ResponseEntity<Map<String, Object>> oauthCallback(
             @RequestParam String code,
@@ -111,6 +114,7 @@ public class FeishuController {
     }
 
     /** 发送消息到飞书用户/群聊 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message/send")
     public ResponseEntity<Map<String, Object>> sendMessage(
             @RequestBody Map<String, Object> body,
@@ -137,6 +141,7 @@ public class FeishuController {
     }
 
     /** 回复线程消息（飞书支持 reply_to_message_id） */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message/reply")
     public ResponseEntity<Map<String, Object>> replyMessage(
             @RequestBody Map<String, Object> body,

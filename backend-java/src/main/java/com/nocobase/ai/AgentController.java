@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * AI Agent REST API。
@@ -25,6 +26,7 @@ public class AgentController {
         this.agentService = agentService;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/execute")
     public ResponseEntity<Map<String, Object>> execute(
             @RequestBody Map<String, Object> body,

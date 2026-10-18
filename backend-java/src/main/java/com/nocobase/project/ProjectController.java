@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 项目任务 REST API — 看板与甘特图数据源。
@@ -25,6 +26,7 @@ public class ProjectController {
     }
 
     /** 项目列表。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> listProjects(@AuthenticationPrincipal AuthenticatedUser user) {
         List<ProjectEntity> projects = projectService.listByTenant(user.tenantId());
@@ -34,6 +36,7 @@ public class ProjectController {
     }
 
     /** 创建项目：body = {name, description}. */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> createProject(
             @RequestBody Map<String, Object> body,
@@ -51,6 +54,7 @@ public class ProjectController {
     }
 
     /** 创建任务:body = {projectId, title, description, parentId, assigneeId, status, priority, startDate, endDate} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/tasks")
     public ResponseEntity<Map<String, Object>> createTask(
             @RequestBody Map<String, Object> body,
@@ -79,6 +83,7 @@ public class ProjectController {
     }
 
     /** 项目任务列表(可传 status 过滤)。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{projectId}/tasks")
     public Map<String, Object> listTasks(
             @PathVariable UUID projectId,
@@ -94,6 +99,7 @@ public class ProjectController {
     }
 
     /** 甘特图数据(含层级)。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{projectId}/gantt")
     public Map<String, Object> gantt(
             @PathVariable UUID projectId,
@@ -104,6 +110,7 @@ public class ProjectController {
     }
 
     /** 我的任务。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/tasks/mine")
     public Map<String, Object> myTasks(@AuthenticationPrincipal AuthenticatedUser user) {
         List<ProjectTaskEntity> tasks = projectService.listMyTasks(user.userId(), user.tenantId());
@@ -113,6 +120,7 @@ public class ProjectController {
     }
 
     /** 更新任务。 */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/tasks/{id}")
     public Map<String, Object> updateTask(
             @PathVariable UUID id,
@@ -136,6 +144,7 @@ public class ProjectController {
     }
 
     /** 删除任务。 */
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/tasks/{id}")
     public Map<String, Object> deleteTask(
             @PathVariable UUID id,

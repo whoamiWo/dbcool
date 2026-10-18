@@ -10,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * ER Diagram 数据 API(Week 14.5 P3-5).
@@ -28,6 +29,7 @@ public class ErDiagramController {
         this.collectionService = collectionService;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public Map<String, Object> diagram(@AuthenticationPrincipal AuthenticatedUser user) {
         List<CollectionMetaEntity> collections = collectionService.list(user.tenantId());

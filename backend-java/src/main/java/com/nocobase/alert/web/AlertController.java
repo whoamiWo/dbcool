@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.nocobase.alert.AlertCollector;
 import com.nocobase.alert.AlertEvent;
 import com.nocobase.alert.AlertStore;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * R11: 告警 REST API(对等 Python /api/ai/alerts/...).
@@ -48,6 +49,7 @@ public class AlertController {
         this.auditService = auditService;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/recent")
     public Map<String, Object> recent(
             @RequestParam(defaultValue = "50") int limit,
@@ -71,6 +73,7 @@ public class AlertController {
         return resp;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{eventId}/ack")
     public ResponseEntity<Map<String, Object>> ack(@PathVariable String eventId,
             @RequestBody(required = false) Map<String, String> body,
@@ -89,6 +92,7 @@ public class AlertController {
         return ResponseEntity.ok(Map.of("ok", ok, "event_id", eventId));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{eventId}/resolve")
     public ResponseEntity<Map<String, Object>> resolve(@PathVariable String eventId, @AuthenticationPrincipal AuthenticatedUser principal) {
         boolean ok = collector.resolve(eventId);
@@ -104,6 +108,7 @@ public class AlertController {
         return ResponseEntity.ok(Map.of("ok", ok, "event_id", eventId));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/subscriptions")
     public Map<String, Object> subscribe(@RequestBody Map<String, String> body,
                                          @AuthenticationPrincipal AuthenticatedUser principal) {
@@ -120,6 +125,7 @@ public class AlertController {
         return Map.of("ok", true, "created", created, "user_id", userId, "kind", kind);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/subscriptions")
     public Map<String, Object> unsubscribe(
             @RequestParam String user_id,
@@ -129,11 +135,13 @@ public class AlertController {
         return Map.of("ok", removed, "user_id", user_id, "kind", kind);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/subscriptions/{userId}")
     public Map<String, Object> listSubscriptions(@PathVariable String userId) {
         return Map.of("user_id", userId, "kinds", store.subscriptionsFor(userId));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/store/stats")
     public Map<String, Object> storeStats() {
         Map<String, Object> resp = new HashMap<>();

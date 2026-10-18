@@ -19,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 企业微信嵌入 REST API。
@@ -53,6 +54,7 @@ public class WeComController {
     }
 
     /** 获取企业微信授权地址（前端跳转） */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/auth-url")
     public ResponseEntity<Map<String, String>> getAuthUrl(
             @RequestParam String redirectUri,
@@ -124,6 +126,7 @@ public class WeComController {
     }
 
     /** 触发通讯录同步（按配置的 syncInterval 定时执行，也可手动触发） */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/sync-contacts")
     public ResponseEntity<Map<String, Object>> syncContacts(
             @AuthenticationPrincipal AuthenticatedUser user
@@ -142,6 +145,7 @@ public class WeComController {
     }
 
     /** 发送应用消息（真实调用企业微信 /cgi-bin/message/send） */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message/send")
     public ResponseEntity<Map<String, Object>> sendMessage(
             @RequestBody Map<String, Object> body,

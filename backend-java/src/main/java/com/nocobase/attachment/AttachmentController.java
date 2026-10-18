@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 附件 API 契约(Week 41 D1.2) + 文件存储(Week 42+ D1.4 MinIO 集成).
@@ -49,6 +50,7 @@ public class AttachmentController {
      * <p>接收 metadata JSON → 校验 → 返回 metadata。
      * 调用方可通过 /upload 端点先上传文件获得真实 storageKey,再注册 metadata。
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/metadata")
     public Map<String, Object> createMetadata(
             @RequestBody Map<String, Object> body,
@@ -89,6 +91,7 @@ public class AttachmentController {
      *
      * <p>PHASE69 T3: 使用 query param 避免路径编码问题。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping(params = "storageKey")
     public ResponseEntity<Map<String, Object>> getMetadata(@RequestParam String storageKey) {
         if (!storage.isEnabled()) {
@@ -113,6 +116,7 @@ public class AttachmentController {
      *
      * <p>未启用对象存储时返 501 —— 与改造前行为一致,不会因缺少 MinIO 而 500。
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/upload")
     public Map<String, Object> upload(
             @RequestPart("file") MultipartFile file,
@@ -155,6 +159,7 @@ public class AttachmentController {
      *
      * <p>PHASE69 T3: 使用 query param 避免路径编码问题。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/download")
     public ResponseEntity<Void> download(@RequestParam String storageKey) {
         if (!storage.isEnabled()) {

@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 用户端点 — Week 4 真接 JWT 解析.
@@ -31,6 +32,7 @@ public class UserController {
     /**
      * 当前用户信息(从 JWT 解析),含真实角色列表.
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/me")
     public Map<String, Object> me(@AuthenticationPrincipal AuthenticatedUser user) {
         if (user == null) {
