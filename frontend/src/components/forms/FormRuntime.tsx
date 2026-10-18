@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { FieldDef, FormFull, FormLayoutItem } from '@/types/form';
 
 interface FormRuntimeProps {
@@ -29,10 +30,12 @@ export function FormRuntime({
   form,
   fields,
   onSubmit,
-  submitLabel = '提交',
+  submitLabel,
   onTriggerWorkflow,
   readOnly = false,
 }: FormRuntimeProps) {
+  const { t } = useTranslation();
+  const resolvedSubmitLabel = submitLabel ?? t('formRuntime.submit');
   const [data, setData] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -69,37 +72,37 @@ export function FormRuntime({
         switch (r.type) {
           case 'required':
             if (val == null || val === '') {
-              newErrors[f.name] = r.message ?? `${f.label ?? f.name} 必填`;
+              newErrors[f.name] = r.message ?? t('formRuntime.required', { label: f.label ?? f.name });
             }
             break;
           case 'minLength':
             if (typeof val === 'string' && val.length < Number(r.value)) {
-              newErrors[f.name] = r.message ?? `至少 ${r.value} 个字符`;
+              newErrors[f.name] = r.message ?? t('formRuntime.minLength', { value: r.value });
             }
             break;
           case 'maxLength':
             if (typeof val === 'string' && val.length > Number(r.value)) {
-              newErrors[f.name] = r.message ?? `最多 ${r.value} 个字符`;
+              newErrors[f.name] = r.message ?? t('formRuntime.maxLength', { value: r.value });
             }
             break;
           case 'min':
             if (Number(val) < Number(r.value)) {
-              newErrors[f.name] = r.message ?? `不能小于 ${r.value}`;
+              newErrors[f.name] = r.message ?? t('formRuntime.min', { value: r.value });
             }
             break;
           case 'max':
             if (Number(val) > Number(r.value)) {
-              newErrors[f.name] = r.message ?? `不能大于 ${r.value}`;
+              newErrors[f.name] = r.message ?? t('formRuntime.max', { value: r.value });
             }
             break;
           case 'pattern':
             if (typeof val === 'string' && r.value && !new RegExp(String(r.value)).test(val)) {
-              newErrors[f.name] = r.message ?? '格式不正确';
+              newErrors[f.name] = r.message ?? t('formRuntime.invalidFormat');
             }
             break;
           case 'email':
             if (typeof val === 'string' && !/^[^@]+@[^@]+\.[^@]+$/.test(val)) {
-              newErrors[f.name] = r.message ?? '邮箱格式不正确';
+              newErrors[f.name] = r.message ?? t('formRuntime.invalidEmail');
             }
             break;
         }
@@ -124,12 +127,12 @@ export function FormRuntime({
     const rule = form.rules.submit;
     if (!rule) return;
     if (rule.action === 'stay') {
-      setSubmitMessage(rule.message ?? '提交成功');
+      setSubmitMessage(rule.message ?? t('formRuntime.submitSuccess'));
     } else if (rule.action === 'redirect' && rule.url) {
       window.location.href = rule.url;
     } else if (rule.action === 'workflow' && rule.workflowId) {
       await onTriggerWorkflow?.(rule.workflowId, payload);
-      setSubmitMessage(rule.message ?? '已触发工作流');
+      setSubmitMessage(rule.message ?? t('formRuntime.workflowTriggered'));
     }
   };
 
@@ -252,7 +255,7 @@ export function FormRuntime({
               value={value}
               onChange={(e) => onChange(e.target.value)}
               style={{ ...inputStyle, width: '100%' }}
-              placeholder="storageKey (Week 42+ 接入 MinIO)"
+              placeholder={t('formRuntime.storageKeyPlaceholder')}
             />
             <button
               type="button"
@@ -266,16 +269,16 @@ export function FormRuntime({
                 cursor: 'not-allowed',
                 fontSize: 12,
               }}
-              title="Week 42+ D1.4 MinIO 集成"
+              title={t('formRuntime.uploadSoon')}
             >
-              上传(Week 42+)
+              {t('formRuntime.uploadButton')}
             </button>
           </div>
         );
       case 'select':
         return (
           <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, width: '100%' }}>
-            <option value="">--请选择--</option>
+            <option value="">{t('formRuntime.selectPlaceholder')}</option>
             {Object.entries((f.options ?? {}) as Record<string, string>).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
@@ -302,9 +305,9 @@ export function FormRuntime({
         const formulaExpr = typeof f.options?.formula === 'string' ? f.options.formula : '';
         return (
           <div style={{ padding: 8, background: 'var(--color-bg-secondary)', borderRadius: 4, fontSize: 13 }}>
-            <code>{formulaExpr || '(未配置公式)'}</code>
+            <code>{formulaExpr || t('formRuntime.formulaNotConfigured')}</code>
             <div style={{ color: 'var(--color-text-muted)', fontSize: 11, marginTop: 2 }}>
-              此字段由公式自动计算
+              {t('formRuntime.formulaAutoCalculated')}
             </div>
           </div>
         );
@@ -314,7 +317,7 @@ export function FormRuntime({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             style={{ ...inputStyle, width: '100%' }}
-            placeholder={`(暂不支持类型 ${f.type})`}
+            placeholder={t('formRuntime.unsupportedType', { type: f.type })}
           />
         );
     }
@@ -356,7 +359,7 @@ export function FormRuntime({
             cursor: submitting ? 'not-allowed' : 'pointer',
           }}
         >
-          {submitting ? '提交中…' : submitLabel}
+          {submitting ? t('formRuntime.submitting') : resolvedSubmitLabel}
         </button>
       )}
       {/* US-106: 提交后动作提示(stay / workflow) */}

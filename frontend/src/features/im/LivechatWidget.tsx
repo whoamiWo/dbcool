@@ -25,6 +25,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Minimize2, Maximize2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 
 interface Message {
@@ -52,6 +53,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
   primaryColor = 'var(--color-primary-500)',
   onTicketCreated,
 }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -74,7 +76,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
         setMessages([
           {
             id: 'welcome',
-            text: '👋 您好！请描述您的问题，我们会转达给客服团队。',
+            text: t('livechat.welcome'),
             // PHASE98 R1: 欢迎语不是真人客服发的，必须标为 bot
             sender: 'bot',
             timestamp: new Date(),
@@ -83,7 +85,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
       }
     } catch {
       // PHASE98 R1: 原来是 `// 会话初始化失败，静默处理` —— 用户零感知
-      setError('客服会话初始化失败，请检查网络后重试');
+      setError(t('livechat.initFailed'));
     }
   };
 
@@ -131,7 +133,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
       setMessages((prev) =>
         prev.map((m) => (m.id === newMessage.id ? { ...m, delivery: 'failed' as const } : m))
       );
-      setError('消息发送失败，请重试');
+      setError(t('livechat.sendFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +153,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
       setError(null);
       const resp = await apiClient.post<{ code: number; data: { ticketId: string } }>(
         '/livechat/close',
-        { sessionId, message: '会话结束，自动转工单' }
+        { sessionId, message: t('livechat.closeTicketMessage') }
       );
 
       if (resp.code === 0 && resp.data?.ticketId) {
@@ -163,7 +165,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
       setIsOpen(false);
     } catch {
       // PHASE98 R1: 原来是 `// 结束会话失败，静默处理` —— 工单其实没建成，用户却以为成功了
-      setError('结束会话失败（工单可能未创建），请重试');
+      setError(t('livechat.endFailed'));
     }
   };
 
@@ -194,7 +196,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: 'spring', damping: 15 }}
             onClick={() => setIsOpen(true)}
-            aria-label="打开在线客服"
+            aria-label={t('livechat.entryAria')}
             style={{
               borderRadius: '50%',
               padding: 16,
@@ -253,12 +255,12 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                     backgroundColor: '#4ade80',
                   }}
                 />
-                <span style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>在线客服</span>
+                <span style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{t('livechat.title')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button
                   onClick={() => setIsMinimized(!isMinimized)}
-                  aria-label={isMinimized ? '展开聊天窗口' : '最小化聊天窗口'}
+                  aria-label={isMinimized ? t('livechat.expandAria') : t('livechat.minimizeAria')}
                   style={{
                     color: 'rgba(255,255,255,0.8)',
                     background: 'transparent',
@@ -273,7 +275,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  aria-label="关闭聊天窗口"
+                  aria-label={t('livechat.closeAria')}
                   style={{
                     color: 'rgba(255,255,255,0.8)',
                     background: 'transparent',
@@ -308,7 +310,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                 <span>{error}</span>
                 <button
                   onClick={() => setError(null)}
-                  aria-label="关闭错误提示"
+                  aria-label={t('livechat.closeErrorAria')}
                   style={{
                     background: 'transparent',
                     border: 'none',
@@ -326,7 +328,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
             {/* 最小化时只显示标题 */}
             {isMinimized ? (
               <div style={{ padding: 16, textAlign: 'center', fontSize: 14 }}>
-                <span style={{ color: 'rgba(255,255,255,0.6)' }}>点击展开聊天窗口</span>
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{t('livechat.minimizedPlaceholder')}</span>
               </div>
             ) : (
               <>
@@ -345,7 +347,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                   {messages.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '32px 0' }}>
                       <p style={{ fontSize: 14, marginBottom: 8, color: 'rgba(255,255,255,0.8)' }}>
-                        👋 您好！请描述您的问题，我们会转达给客服团队。
+                        {t('livechat.welcome')}
                       </p>
                     </div>
                   ) : (
@@ -387,15 +389,15 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                             </span>
                             {/* PHASE98 R1: 真实投递状态，不再伪造客服回复 */}
                             {msg.sender === 'customer' && msg.delivery === 'sending' && (
-                              <span>发送中…</span>
+                              <span>{t('livechat.sending')}</span>
                             )}
                             {msg.sender === 'customer' && msg.delivery === 'sent' && (
-                              <span>· 已送达</span>
+                              <span>{t('livechat.delivered')}</span>
                             )}
                             {msg.sender === 'customer' && msg.delivery === 'failed' && (
                               <button
                                 onClick={() => handleRetry(msg)}
-                                aria-label="重发该消息"
+                                aria-label={t('livechat.retryAria')}
                                 style={{
                                   background: 'transparent',
                                   border: 'none',
@@ -406,7 +408,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                                   textDecoration: 'underline',
                                 }}
                               >
-                                · 发送失败，点击重试
+                                {t('livechat.failedRetry')}
                               </button>
                             )}
                           </p>
@@ -468,8 +470,8 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder="输入消息..."
-                      aria-label="消息输入框"
+                      placeholder={t('livechat.inputPlaceholder')}
+                      aria-label={t('livechat.inputAria')}
                       style={{
                         flex: 1,
                         background: 'transparent',
@@ -487,7 +489,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                     <button
                       onClick={handleSendMessage}
                       disabled={!inputText.trim() || isLoading || !sessionId}
-                      aria-label="发送消息"
+                      aria-label={t('livechat.sendAria')}
                       style={{
                         borderRadius: '50%',
                         padding: 8,
@@ -513,7 +515,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                     }}
                   >
                     <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                      按 Enter 发送
+                      {t('livechat.enterHint')}
                     </span>
                     <button
                       onClick={handleEndChat}
@@ -525,7 +527,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
                         cursor: 'pointer',
                       }}
                     >
-                      结束会话
+                      {t('livechat.endChat')}
                     </button>
                   </div>
                 </div>
