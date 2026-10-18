@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Collection REST API — Week 7 扩展支持修改表(US-005).
@@ -97,6 +98,7 @@ public class CollectionController {
     //  Collection CRUD
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody @Valid CreateCollectionRequest request,
@@ -111,6 +113,7 @@ public class CollectionController {
         ));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(@AuthenticationPrincipal AuthenticatedUser user) {
         return Map.of(
@@ -119,6 +122,7 @@ public class CollectionController {
         );
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{name}")
     public Map<String, Object> get(@PathVariable String name,
                                    @AuthenticationPrincipal AuthenticatedUser user) {
@@ -128,6 +132,7 @@ public class CollectionController {
         return Map.of("code", 0, "message", "success", "data", dto);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PatchMapping("/{name}")
     public Map<String, Object> update(
             @PathVariable String name,
@@ -138,6 +143,7 @@ public class CollectionController {
         return Map.of("code", 0, "message", "success", "data", toDto(meta));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{name}")
     public Map<String, Object> delete(
             @PathVariable String name,
@@ -153,6 +159,7 @@ public class CollectionController {
     //  Fields 管理(US-005 修改表)
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{name}/fields")
     public ResponseEntity<Map<String, Object>> addField(
             @PathVariable String name,
@@ -163,6 +170,7 @@ public class CollectionController {
         return buildMutationResponse("add_field", field.name(), jobId);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{name}/fields/{fieldName}")
     public ResponseEntity<Map<String, Object>> removeField(
             @PathVariable String name,
@@ -173,6 +181,7 @@ public class CollectionController {
         return buildMutationResponse("drop_field", fieldName, jobId);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{name}/fields/{fieldName}")
     public ResponseEntity<Map<String, Object>> renameField(
             @PathVariable String name,
@@ -187,6 +196,7 @@ public class CollectionController {
     /**
      * 查 migration job 状态(异步任务轮询).
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/_jobs/{jobId}")
     public Map<String, Object> getJob(
             @PathVariable UUID jobId,
@@ -242,6 +252,7 @@ public class CollectionController {
     //  Records(Week 5 已实现)
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{name}/records")
     public ResponseEntity<Map<String, Object>> createRecord(
             @PathVariable String name,
@@ -268,6 +279,7 @@ public class CollectionController {
         ));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{name}/records")
     public Map<String, Object> listRecords(
             @PathVariable String name,
@@ -337,6 +349,7 @@ public class CollectionController {
     //  Week 14.5 P3-3 补完:单条 get / update / delete + ROW ACL 拦截
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{name}/records/{id}")
     public Map<String, Object> getRecord(
             @PathVariable String name,
@@ -361,6 +374,7 @@ public class CollectionController {
         );
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{name}/records/{id}")
     public Map<String, Object> updateRecord(
             @PathVariable String name,
@@ -389,6 +403,7 @@ public class CollectionController {
         return Map.of("code", 0, "message", "success", "data", Map.of("id", id, "extra", data));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{name}/records/{id}")
     public Map<String, Object> deleteRecord(
             @PathVariable String name,
@@ -416,6 +431,7 @@ public class CollectionController {
     //  CSV Import / Export (Week 14.5)
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping(value = "/{name}/export", produces = "text/csv;charset=UTF-8")
     public ResponseEntity<String> exportCsv(
             @PathVariable String name,
@@ -466,6 +482,7 @@ public class CollectionController {
                 .body(csv.toString());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping(value = "/{name}/import", consumes = "multipart/form-data")
     public Map<String, Object> importCsv(
             @PathVariable String name,
@@ -593,6 +610,7 @@ public class CollectionController {
     /**
      * R2-B: 聚合查询接口 — 复用 DynamicTableManager.aggregate。
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{name}/aggregate")
     public Map<String, Object> aggregate(
             @PathVariable String name,

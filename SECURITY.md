@@ -110,6 +110,64 @@ npm audit --json > target/npm-audit.json
 - 用户输入在 Service 层已做 SQL 参数化 + XSS 转义，Controller 不做字符串拼接 SQL。
 - 审计日志 `audit_log` 对 `user_agent` / `ip` 字段做了 45/250 字符截断防日志注入。
 
+## 6.1 Controller 方法级鉴权（PHASE114）
+
+### 背景：此前的门禁是"假绿"
+
+`ControllerAuthorizationCoverageTest` 原逻辑只比对**新增**未授权项，存量缺口一经写入
+`backend-java/docs/controller-authorization-baseline.txt` 即被永久豁免。实测输出：
+
+```
+【通过】未授权 215 处，均在基线内（215 条）
+Tests run: 1, Failures: 0 ... BUILD SUCCESS
+```
+
+即 215 个端点确实没有 `@PreAuthorize`，但门禁显示绿灯 —— 文档声称的"鉴权覆盖"
+实为"冻结基线"。这与 `SecurityConfig.java:115` `.anyRequest().authenticated()`
+只保证认证、不做角色判定叠加，意味着**任意已登录租户用户可调用任意写端点**。
+
+### 现状：棘轮门禁 + 分层修复
+
+| 项 | 内容 |
+|---|---|
+| 管理/配置端点 | 34 处补 `@PreAuthorize("hasRole('ADMIN')")` —— 关闭垂直越权 |
+| 业务写端点 | 169 处补 `@PreAuthorize("isAuthenticated()")` —— 声明式加固（真正的水平越权由数据层 `findByTenantId` 派生查询承担） |
+| 合规公开端点 | 14 条入白名单（第三方 HMAC 验签回调、健康探针、OAuth 登录入口） |
+| 门禁 | `docs/authorization-ratchet.txt` 棘轮阈值 = **0**，只降不升 |
+
+### 棘轮机制（防回退）
+
+```bash
+# 常规运行：当前缺口数 > 阈值即失败
+mvn -o test -Dtest=ControllerAuthorizationCoverageTest
+
+# 仅在修复端点后同步基线行号时使用（同时把阈值下调为新的缺口数）
+mvn -o test -Dtest=ControllerAuthorizationCoverageTest -DargLine="-Dauthz.updateBaseline=true"
+```
+
+**红线**：不得直接调高 `authorization-ratchet.txt` 的阈值 —— 那等于回到"冻结基线"假绿状态。
+已实证可失败：阈值设为 204 而实际 205 时，测试 FAIL 且 exit=1。
+
+### 白名单规则（防偷渡）
+
+- 每条必须带非空 `reason`；
+- reason 不得含 `ADMIN` / `需认证` / `需权限` / `TODO` 等掩盖性措辞；
+- 引用的源文件必须存在（曾存在指向不存在文件的失效条目）；
+- 匹配按**文件路径 + 方法名**，不依赖行号（行号漂移曾导致回调白名单静默失效）。
+
+### 第三方回调的回归陷阱
+
+`SecurityConfig` 对 `/api/{slack,feishu,wecom,mattermost,dingtalk}/...` 回调 `permitAll`，
+鉴权靠 Controller 内 HMAC 验签。**这些端点绝不可补 `@PreAuthorize`** —— 回调方无 JWT
+会直接 403，导致集成功能中断。修改鉴权注解后必须复跑 E2E 与 `admin-authz-e2e-verify.py`。
+
+### 已知未处置（见 `TECH_DEBT.md`）
+
+- `application.yml:89` JWT secret 有 dev 默认值回落（compose 路径已挡，dev profile 直跑时生效）
+- `backend-python/.../backup.py:57` MinIO 口令回落 `minio123`
+- WebSocket `setAllowedOriginPatterns("*")` 三处
+- 缺 `X-Frame-Options` / `CSP` / `X-Content-Type-Options` 响应头
+
 ## 7. PHASE99 官方安全门禁（Trivy + ZAP）
 
 ### 7.1 统一入口脚本

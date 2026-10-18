@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Form REST API — Epic 2 表单设计器.
@@ -33,6 +34,7 @@ public class FormController {
         this.service = service;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody @Valid CreateFormRequest request,
@@ -47,6 +49,7 @@ public class FormController {
         ));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(
             @RequestParam(required = false) String collection,
@@ -61,6 +64,7 @@ public class FormController {
         );
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public Map<String, Object> get(
             @PathVariable UUID id,
@@ -73,6 +77,7 @@ public class FormController {
         return Map.of("code", 0, "message", "success", "data", dto);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public Map<String, Object> update(
             @PathVariable UUID id,
@@ -85,6 +90,7 @@ public class FormController {
         return Map.of("code", 0, "message", "success", "data", toDto(form));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(
             @PathVariable UUID id,

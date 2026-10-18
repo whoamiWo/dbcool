@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Webhook 订阅管理 API(Week 41 复核 D5.3)。
@@ -41,6 +42,7 @@ public class WebhookSubscriptionController {
         this.auditService = auditService;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public Map<String, Object> list() {
         String tenant = TenantContext.currentTenantId();
@@ -49,6 +51,7 @@ public class WebhookSubscriptionController {
         return Map.of("code", 0, "message", "success", "data", data);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
         String tenant = TenantContext.currentTenantId();
@@ -87,6 +90,7 @@ public class WebhookSubscriptionController {
     }
 
     /** 启停订阅(避免删除后重建)。 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/enabled")
     public Map<String, Object> setEnabled(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         String tenant = TenantContext.currentTenantId();
@@ -100,6 +104,7 @@ public class WebhookSubscriptionController {
         return Map.of("code", 0, "message", "success", "data", toDto(saved));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id) {
         String tenant = TenantContext.currentTenantId();

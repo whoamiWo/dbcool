@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 角色 + ACL 策略 API(US-302 ~ US-307 + US-308 角色继承).
@@ -36,6 +37,7 @@ public class RoleAclController {
     //  Roles
     // ============================================================
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/roles")
     public Map<String, Object> listRoles() {
         return Map.of("code", 0, "message", "success",
@@ -43,6 +45,7 @@ public class RoleAclController {
                         .stream().map(this::roleDto).toList());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/roles")
     public ResponseEntity<Map<String, Object>> createRole(@RequestBody @Valid CreateRoleRequest req) {
         if (roleRepository.existsByNameAndTenantId(req.name(), TenantContext.currentTenantId())) {
@@ -67,6 +70,7 @@ public class RoleAclController {
                 .body(Map.of("code", 0, "message", "success", "data", roleDto(saved)));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/roles/{id}")
     public Map<String, Object> updateRole(@PathVariable UUID id, @RequestBody UpdateRoleRequest req) {
         RoleEntity r = roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -85,6 +89,7 @@ public class RoleAclController {
         return Map.of("code", 0, "message", "success", "data", roleDto(saved));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/roles/{id}")
     public Map<String, Object> deleteRole(@PathVariable UUID id) {
         Map<String, Object> before = roleDto(roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -108,6 +113,7 @@ public class RoleAclController {
     /**
      * US-308: 返回所有 role 的树形结构(按 parent_role_id 嵌套).
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/roles/tree")
     public Map<String, Object> roleTree() {
         List<RoleEntity> all = roleRepository.findByTenantIdOrderByCreatedAt(TenantContext.currentTenantId());
@@ -124,6 +130,7 @@ public class RoleAclController {
     /**
      * US-308: 查询一个角色的完整继承链(self + ancestors).
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/roles/{id}/inheritance")
     public Map<String, Object> inheritanceChain(@PathVariable UUID id) {
         RoleEntity r = roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -145,6 +152,7 @@ public class RoleAclController {
     //  ACL Policies
     // ============================================================
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/acl")
     public Map<String, Object> listAcl(@RequestParam UUID roleId) {
         return Map.of("code", 0, "message", "success",
@@ -152,6 +160,7 @@ public class RoleAclController {
                         .stream().map(this::aclDto).toList());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/acl")
     public ResponseEntity<Map<String, Object>> createAcl(@RequestBody @Valid CreateAclRequest req) {
         roleRepository.findByIdAndTenantId(req.roleId(), TenantContext.currentTenantId())
@@ -174,6 +183,7 @@ public class RoleAclController {
                 .body(Map.of("code", 0, "message", "success", "data", aclDto(saved)));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/acl/{id}")
     public Map<String, Object> updateAcl(@PathVariable UUID id, @RequestBody UpdateAclRequest req) {
         AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -188,6 +198,7 @@ public class RoleAclController {
         return Map.of("code", 0, "message", "success", "data", aclDto(saved));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/acl/{id}")
     public Map<String, Object> deleteAcl(@PathVariable UUID id) {
         AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())

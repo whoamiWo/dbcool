@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 站内信 API(US-506).
@@ -39,6 +40,7 @@ public class MessageController {
      * @param limit 每页条数(默认 20,上限 100)
      * @param before cursor(ISO instant);返回 created_at < before 的 limit 条;为空则取最新
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(
             @AuthenticationPrincipal AuthenticatedUser user,
@@ -83,6 +85,7 @@ public class MessageController {
         return resp;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{id}/read")
     @Transactional
     public Map<String, Object> markRead(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser user) {

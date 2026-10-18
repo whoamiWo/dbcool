@@ -142,6 +142,7 @@ public class ImHuddleController {
     }
 
     /** 获取活跃会话列表 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<Map<String, Object>> listActive(
             @RequestParam UUID channelId,

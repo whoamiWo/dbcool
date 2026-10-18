@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 集成市场 REST API — P0-5a 接真。
@@ -33,6 +34,7 @@ public class IntegrationMarketController {
     }
 
     /** 列出所有可用集成。 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/market")
     public ResponseEntity<Map<String, Object>> listMarket(
             @AuthenticationPrincipal AuthenticatedUser user
@@ -46,6 +48,7 @@ public class IntegrationMarketController {
     }
 
     /** 安装集成。 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/install/{id}")
     public ResponseEntity<Map<String, Object>> install(
             @PathVariable String id,
@@ -57,6 +60,7 @@ public class IntegrationMarketController {
     }
 
     /** 卸载集成。 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/uninstall/{id}")
     public ResponseEntity<Map<String, Object>> uninstall(
             @PathVariable String id,

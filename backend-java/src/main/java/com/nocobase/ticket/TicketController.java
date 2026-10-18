@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 工单 REST API — Livechat 客服转工单。
@@ -25,6 +26,7 @@ public class TicketController {
         this.auditService = auditService;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/session")
     public Map<String, Object> createSession(@AuthenticationPrincipal AuthenticatedUser user) {
         String sessionId = UUID.randomUUID().toString();
@@ -36,6 +38,7 @@ public class TicketController {
     }
 
     /** 发送消息（记录消息内容）。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message")
     public Map<String, Object> sendMessage(
             @RequestBody Map<String, Object> body,
@@ -51,6 +54,7 @@ public class TicketController {
     }
 
     /** 结束会话并创建工单。 */
+@PreAuthorize("isAuthenticated()")
 @PostMapping("/close")
     public Map<String, Object> closeSession(
             @RequestBody Map<String, Object> body,
@@ -74,6 +78,7 @@ public class TicketController {
     }
 
     /** 查询租户工单列表。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/tickets")
     public Map<String, Object> listTickets(
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -83,6 +88,7 @@ public class TicketController {
     }
 
     /** 添加工单备注（客服操作）。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/tickets/{id}/notes")
     public Map<String, Object> addNote(
             @PathVariable UUID id,

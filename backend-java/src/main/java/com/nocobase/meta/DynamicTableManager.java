@@ -503,6 +503,11 @@ public class DynamicTableManager {
      * 若底层数据库不支持序列，回退到 synchronized 锁 + max 查询。
      */
     public Long getNextAutonumber(String collectionName, String fieldName) {
+        // PHASE114: 本方法为 public，可被绕过 CollectionService.get()（库内白名单）直接调用，
+        // 而 collectionName 与 fieldName 都会拼接进 CREATE SEQUENCE / nextval / extra->>'...'，
+        // 故必须在此自证标识符合法性，否则任何新调用方即变成注入点。
+        validateIdentifier(collectionName);
+        validateIdentifier(fieldName);
         String physicalTable = physicalTableName(collectionName);
         String seqName = "autonumber_" + collectionName + "_" + fieldName;
         try {

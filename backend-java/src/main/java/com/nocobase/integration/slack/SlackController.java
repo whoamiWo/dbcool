@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Slack 集成 REST API。
@@ -47,6 +48,7 @@ public class SlackController {
     }
 
     /** 获取 Slack OAuth2 授权地址 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/auth-url")
     public ResponseEntity<Map<String, String>> getAuthUrl() {
         String authUrl = slackAppService.getOAuthUrl();
@@ -54,6 +56,7 @@ public class SlackController {
     }
 
     /** OAuth2 回调：code 换取 bot token 并保存配置 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/oauth/callback")
     public ResponseEntity<Map<String, Object>> oauthCallback(
             @RequestParam String code,
@@ -158,6 +161,7 @@ public class SlackController {
     }
 
     /** 发送消息到 Slack 频道 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message/send")
     public ResponseEntity<Map<String, Object>> sendMessage(
             @RequestBody Map<String, Object> body,
@@ -218,6 +222,7 @@ public class SlackController {
     }
 
     /** 回复线程消息 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/message/reply")
     public ResponseEntity<Map<String, Object>> replyMessage(
             @RequestBody Map<String, Object> body,

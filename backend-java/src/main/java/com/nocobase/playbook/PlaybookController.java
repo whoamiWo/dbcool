@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Playbook REST API(Phase 48 F2 — 此前 playbook 包无 Controller,前端 /api/playbooks 404)。
@@ -32,6 +33,7 @@ public class PlaybookController {
     }
 
     /** 列出剧本(status 为空或 ALL 时返回全部)。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list(
             @RequestParam(required = false) String status,
@@ -43,6 +45,7 @@ public class PlaybookController {
         return Map.of("code", 0, "message", "success", "data", list);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}")
     public Map<String, Object> get(@PathVariable UUID id,
                                    @AuthenticationPrincipal AuthenticatedUser user) {
@@ -51,6 +54,7 @@ public class PlaybookController {
     }
 
     /** 创建剧本(定义非法直接 400,不静默存入)。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping
     public Map<String, Object> create(
             @RequestBody Map<String, Object> body,
@@ -66,6 +70,7 @@ public class PlaybookController {
         return Map.of("code", 0, "message", "success", "data", p);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/{id}")
     public Map<String, Object> update(@PathVariable UUID id,
                                       @RequestBody Map<String, Object> body,
@@ -76,6 +81,7 @@ public class PlaybookController {
                 body.get("yamlSource") == null ? null : String.valueOf(body.get("yamlSource")));
         return Map.of("code", 0, "message", "success", "data", p);
     }
+@PreAuthorize("isAuthenticated()")
 @PostMapping("/{id}/activate")
     public Map<String, Object> activate(@PathVariable UUID id,
                                        @AuthenticationPrincipal AuthenticatedUser user) {
@@ -83,6 +89,7 @@ public class PlaybookController {
                 "data", playbookService.activate(id, user.tenantId()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{id}/archive")
     public Map<String, Object> archive(@PathVariable UUID id,
                                        @AuthenticationPrincipal AuthenticatedUser user) {
@@ -90,6 +97,7 @@ public class PlaybookController {
                 "data", playbookService.archive(id, user.tenantId()));
     }
     /** 运行一次(body 可带 slaHours,缺省 24h)。 */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{id}/run")
     public Map<String, Object> run(
             @PathVariable UUID id,
@@ -104,24 +112,28 @@ public class PlaybookController {
         return Map.of("code", 0, "message", "success", "data", run);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{id}/runs")
     public Map<String, Object> listRuns(@PathVariable UUID id) {
         return Map.of("code", 0, "message", "success", "data", playbookService.listRuns(id));
     }
 
     /** SLA 已逾期的运行(先做升级标记再返回升级列表)。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/runs/overdue")
     public Map<String, Object> overdue(@AuthenticationPrincipal AuthenticatedUser user) {
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("runs", playbookService.markOverdue(user.tenantId())));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/runs/{runId}")
     public Map<String, Object> getRun(@PathVariable UUID runId) {
         return Map.of("code", 0, "message", "success", "data", playbookService.getRun(runId));
     }
 
     /** 勾选 Checklist 项(body: {index, done})。 */
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/runs/{runId}/checklist")
     public Map<String, Object> updateChecklist(
             @PathVariable UUID runId,
@@ -136,6 +148,7 @@ public class PlaybookController {
                 "data", playbookService.updateChecklist(runId, idx.intValue(), done, user.tenantId()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/runs/{runId}/finish")
     public Map<String, Object> finish(@PathVariable UUID runId,
                                       @AuthenticationPrincipal AuthenticatedUser user) {

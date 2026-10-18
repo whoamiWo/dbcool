@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Wiki REST API — 知识库/文档/分类/搜索/版本。
@@ -98,6 +99,7 @@ public class WikiController {
     //  知识库 CRUD
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/kb")
     public ResponseEntity<Map<String, Object>> createKb(
             @RequestBody Map<String, Object> body,
@@ -123,6 +125,7 @@ public class WikiController {
                 "code", 0, "message", "success", "data", toKbDto(entity)));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/kb")
     public Map<String, Object> listKb(@AuthenticationPrincipal AuthenticatedUser user) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), "knowledge_base",
@@ -132,6 +135,7 @@ public class WikiController {
                 list.stream().map(this::toKbDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/kb/{id}")
     public Map<String, Object> getKb(@PathVariable UUID id,
                                      @AuthenticationPrincipal AuthenticatedUser user) {
@@ -144,6 +148,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "success", "data", toKbDto(entity));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/kb/{id}")
     public Map<String, Object> updateKb(
             @PathVariable UUID id,
@@ -162,6 +167,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "success", "data", toKbDto(entity));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/kb/{id}")
     public Map<String, Object> deleteKb(
             @PathVariable UUID id,
@@ -183,6 +189,7 @@ public class WikiController {
     //  文档页面 CRUD
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages")
     public ResponseEntity<Map<String, Object>> createPage(
             @RequestBody Map<String, Object> body,
@@ -211,6 +218,7 @@ public class WikiController {
                 "code", 0, "message", "success", "data", toPageDto(entity)));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pages")
     public Map<String, Object> listPages(
             @RequestParam(required = false) UUID kbId,
@@ -241,6 +249,7 @@ public class WikiController {
                 "size", size);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pages/{id}")
     public Map<String, Object> getPage(
             @PathVariable UUID id,
@@ -256,6 +265,7 @@ public class WikiController {
      * 按 slug 获取页面（P0 修复：前端 /wiki/:slug 三页面统一入口）。
      * 注意：路径必须在 /pages/{id} 之前，避免 Spring 把 "by-slug" 当成 UUID id。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pages/by-slug/{slug}")
     public Map<String, Object> getPageBySlug(
             @PathVariable String slug,
@@ -267,6 +277,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "success", "data", toPageDto(entity));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/pages/{id}")
     public Map<String, Object> updatePage(
             @PathVariable UUID id,
@@ -288,6 +299,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "success", "data", toPageDto(entity));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/pages/{id}")
     public Map<String, Object> deletePage(
             @PathVariable UUID id,
@@ -312,6 +324,7 @@ public class WikiController {
     //  发布/归档
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{id}/publish")
     public Map<String, Object> publishPage(
             @PathVariable UUID id,
@@ -329,6 +342,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "published", "data", toPageDto(entity));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{id}/archive")
     public Map<String, Object> archivePage(
             @PathVariable UUID id,
@@ -346,6 +360,7 @@ public class WikiController {
     //  版本管理
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pages/{id}/versions")
     public Map<String, Object> listVersions(
             @PathVariable UUID id,
@@ -362,6 +377,7 @@ public class WikiController {
                 "data", versions.stream().map(this::toVersionDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pages/{id}/versions/{version}")
     public Map<String, Object> getVersion(
             @PathVariable UUID id,
@@ -378,6 +394,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "success", "data", toVersionDto(v));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{id}/versions/{version}/restore")
     public Map<String, Object> restoreVersion(
             @PathVariable UUID id,
@@ -396,6 +413,7 @@ public class WikiController {
     //  Block 管理（Notion 式块级内容）
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pages/{id}/blocks")
     public Map<String, Object> listBlocks(
             @PathVariable UUID id,
@@ -408,6 +426,7 @@ public class WikiController {
                 "data", blocks.stream().map(this::toBlockDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{id}/blocks")
     public Map<String, Object> createBlocks(
             @PathVariable UUID id,
@@ -421,6 +440,7 @@ public class WikiController {
                 "data", blocks.stream().map(this::toBlockDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/blocks/{blockId}")
     public Map<String, Object> updateBlock(
             @PathVariable UUID blockId,
@@ -436,6 +456,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "updated", "data", toBlockDto(block));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/blocks/{blockId}")
     public Map<String, Object> deleteBlock(
             @PathVariable UUID blockId,
@@ -447,6 +468,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "deleted");
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/pages/{id}/blocks/reorder")
     public Map<String, Object> reorderBlocks(
             @PathVariable UUID id,
@@ -460,6 +482,7 @@ public class WikiController {
                 "data", blocks.stream().map(this::toBlockDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/blocks/batch-upsert")
     public Map<String, Object> batchUpsertBlocks(
             @RequestBody BatchUpsertRequest req,
@@ -501,6 +524,7 @@ public class WikiController {
     //  分类管理
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/kb/{kbId}/categories")
     public Map<String, Object> listCategories(
             @PathVariable UUID kbId,
@@ -523,6 +547,7 @@ public class WikiController {
                 "data", tree.stream().map(this::toCategoryDto).toList());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/kb/{kbId}/categories")
     public ResponseEntity<Map<String, Object>> createCategory(
             @PathVariable UUID kbId,
@@ -545,6 +570,7 @@ public class WikiController {
                 "code", 0, "message", "success", "data", toCategoryDto(entity)));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping("/categories/{id}")
     public Map<String, Object> updateCategory(
             @PathVariable UUID id,
@@ -563,6 +589,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "success", "data", toCategoryDto(entity));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/categories/{id}")
     public Map<String, Object> deleteCategory(
             @PathVariable UUID id,
@@ -584,6 +611,7 @@ public class WikiController {
     //  全文搜索
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/search")
     public Map<String, Object> search(
             @RequestParam String q,
@@ -608,6 +636,7 @@ public class WikiController {
     /**
      * 混合搜索：结合 FTS 和向量检索（AI 增强）。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/search/hybrid")
     public Map<String, Object> hybridSearch(
             @RequestParam String q,
@@ -635,6 +664,7 @@ public class WikiController {
     //  模板管理
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/kb/{kbId}/templates")
     public Map<String, Object> listTemplates(
             @PathVariable UUID kbId,
@@ -670,6 +700,7 @@ public class WikiController {
                 "total", dtoList.size());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{id}/mark-template")
     public Map<String, Object> markTemplate(
             @PathVariable UUID id,
@@ -684,6 +715,7 @@ public class WikiController {
         return Map.of("code", 0, "message", "success");
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{id}/from-template")
     public Map<String, Object> createFromTemplate(
             @PathVariable UUID id,
@@ -712,6 +744,7 @@ public class WikiController {
     //  反向链接
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/pages/{id}/backlinks")
     public Map<String, Object> listBacklinks(
             @PathVariable UUID id,
@@ -752,6 +785,7 @@ public class WikiController {
     //  AI 助手端点
     // ============================================================
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{pageId}/ask")
     public Map<String, Object> askQuestion(
             @PathVariable UUID pageId,
@@ -816,6 +850,7 @@ public class WikiController {
                 Map.of("answer", answer));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/pages/{pageId}/generate-outline")
     public Map<String, Object> generateOutline(
             @PathVariable UUID pageId,
@@ -852,6 +887,7 @@ public class WikiController {
                 Map.of("outline", outline));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/ai/polish")
     public Map<String, Object> polishText(
             @RequestBody Map<String, Object> body,

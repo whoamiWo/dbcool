@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * LDAP/AD 同步 REST API。
@@ -28,6 +29,7 @@ public class LdapSyncController {
     }
 
     /** 创建 LDAP 配置 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<Map<String, Object>> createConfig(
             @RequestBody Map<String, Object> body,
@@ -55,6 +57,7 @@ public class LdapSyncController {
     }
 
     /** 启用/禁用同步 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{configId}/toggle")
     public ResponseEntity<Map<String, Object>> toggle(
             @PathVariable UUID configId,
@@ -72,6 +75,7 @@ public class LdapSyncController {
     }
 
     /** 手动触发同步 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/{configId}/sync")
     public ResponseEntity<Map<String, Object>> sync(
             @PathVariable UUID configId,
@@ -87,6 +91,7 @@ public class LdapSyncController {
     }
 
     /** 列出 LDAP 配置 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<Map<String, Object>> list(
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -100,6 +105,7 @@ public class LdapSyncController {
     }
 
     /** 获取映射列表 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{configId}/mappings")
     public ResponseEntity<Map<String, Object>> listMappings(
             @PathVariable UUID configId,

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 工作流模板市场 API(US-410).
@@ -46,6 +47,7 @@ public class WorkflowTemplateController {
         this.installer = installer;
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public Map<String, Object> list() {
         List<Map<String, Object>> data = registry.list().stream()
@@ -55,6 +57,7 @@ public class WorkflowTemplateController {
                 "data", Map.of("templates", data, "total", data.size()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{key}")
     public Map<String, Object> get(@PathVariable String key) {
         WorkflowTemplate t = registry.get(key)
@@ -63,6 +66,7 @@ public class WorkflowTemplateController {
         return Map.of("code", 0, "message", "success", "data", t);
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/{key}/install")
     public ResponseEntity<Map<String, Object>> install(
             @PathVariable String key,

@@ -28,6 +28,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 钉钉嵌入 REST API — 授权地址、免密登录、组织架构同步、审批回调。
@@ -152,6 +153,7 @@ public class DingTalkController {
     }
 
     /** 应用配置(运维核对)。 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/config")
     public Map<String, Object> config() {
         return Map.of("code", 0, "message", "success", "data", appService.getAppConfig());
@@ -160,6 +162,7 @@ public class DingTalkController {
     /**
      * 获取钉钉用户信息。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/user-info")
     public Map<String, Object> getUserInfo(@RequestParam String accessToken) {
         try {
@@ -180,6 +183,7 @@ public class DingTalkController {
     /**
      * 钉钉退出登录。
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/logout")
     public Map<String, Object> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         String userId = "anonymous";
@@ -203,6 +207,7 @@ public class DingTalkController {
     /**
      * 查询钉钉审批实例状态。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/approval-status")
     public Map<String, Object> getApprovalStatus(@RequestParam String instanceId) {
         String status = approvalService.getApprovalStatus(instanceId);
@@ -213,6 +218,7 @@ public class DingTalkController {
     /**
      * 提交钉钉 OA 审批表单。
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/approval")
     public Map<String, Object> createApproval(@RequestBody Map<String, Object> body) {
         String processCode = (String) body.get("processCode");
@@ -314,6 +320,7 @@ public class DingTalkController {
     /**
      * 同步钉钉组织架构到本地。
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/sync-org")
     public Map<String, Object> syncOrg(@RequestBody(required = false) Map<String, Object> body) {
         String tenantId = body == null ? "tenant_default"
@@ -324,6 +331,7 @@ public class DingTalkController {
     /**
      * 获取用户映射列表。
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/user-mappings")
     public Map<String, Object> getUserMappings(
             @RequestParam(required = false, defaultValue = "tenant_default") String tenantId
@@ -342,6 +350,7 @@ public class DingTalkController {
      *
      * <p>未来如引入 {@code DingTalkSyncHistoryRepository}，在此处查最近一条即可。
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/sync-status")
     public Map<String, Object> getSyncStatus() {
         boolean configured = appService.isConfigured();

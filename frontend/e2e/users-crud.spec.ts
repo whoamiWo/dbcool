@@ -26,7 +26,8 @@ test.describe('UsersList CRUD E2E', () => {
 
     await page.goto('/admin/users');
     // UsersList 没有专门的空态,空 table + 用户管理(0) 表示无数据
-    await expect(page.getByRole('heading', { name: /用户管理\(0\)/ })).toBeVisible({ timeout: 5000 });
+    // PHASE114: 标题经 i18n 变为「用户管理 (0)」（含空格），正则需兼容空格
+    await expect(page.getByRole('heading', { name: /用户管理\s*\(0\)/ })).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('button', { name: /\+ 新建用户/ })).toBeVisible();
   });
 

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * 插件市场 REST API。
@@ -26,6 +27,7 @@ public class PluginMarketplaceController {
     }
 
     /** 浏览应用列表 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/apps")
     public ResponseEntity<Map<String, Object>> listApps(
             @RequestParam(required = false) String category,
@@ -42,6 +44,7 @@ public class PluginMarketplaceController {
     }
 
     /** 获取应用详情 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/apps/{appKey}")
     public ResponseEntity<Map<String, Object>> getApp(
             @PathVariable String appKey,
@@ -57,6 +60,7 @@ public class PluginMarketplaceController {
     }
 
     /** 安装应用 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/apps/{appKey}/install")
     public ResponseEntity<Map<String, Object>> installApp(
             @PathVariable String appKey,
@@ -77,6 +81,7 @@ public class PluginMarketplaceController {
     }
 
     /** 卸载应用 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/apps/{appKey}/uninstall")
     public ResponseEntity<Map<String, Object>> uninstallApp(
             @PathVariable String appKey,
@@ -91,6 +96,7 @@ public class PluginMarketplaceController {
     }
 
     /** 更新应用配置 */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/apps/{appKey}/config")
     public ResponseEntity<Map<String, Object>> updateConfig(
             @PathVariable String appKey,
@@ -111,6 +117,7 @@ public class PluginMarketplaceController {
     }
 
     /** 检查更新 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/apps/{appKey}/update-check")
     public ResponseEntity<Map<String, Object>> checkUpdate(
             @PathVariable String appKey,
@@ -126,6 +133,7 @@ public class PluginMarketplaceController {
     }
 
     /** 列出租户已安装应用 */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/installed")
     public ResponseEntity<Map<String, Object>> listInstalled(
             @AuthenticationPrincipal AuthenticatedUser user) {

@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * AI 助手 REST API — 文档生成 / 问答 / 代码辅助。
@@ -25,6 +26,7 @@ public class AiController {
     }
 
     /** 生成 Wiki 文档:body = {title, instruction} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/wiki")
     public Map<String, Object> generateWiki(
             @RequestBody Map<String, Object> body,
@@ -40,6 +42,7 @@ public class AiController {
     }
 
     /** AI 问答:body = {question, context} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/ask")
     public Map<String, Object> ask(
             @RequestBody Map<String, Object> body,
@@ -55,6 +58,7 @@ public class AiController {
     }
 
     /** 代码辅助:body = {instruction, language} */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/code")
     public Map<String, Object> code(
             @RequestBody Map<String, Object> body,
@@ -70,6 +74,7 @@ public class AiController {
     }
 
     /** AI 能力状态(供前端判断是否展示入口)。 */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> status() {
         return ResponseEntity.ok(Map.of(
@@ -86,6 +91,7 @@ public class AiController {
      * <p>请求体: {prompt, model?, max_tokens?}
      * <p>响应体: {code, message, data:{result, cached, tokensUsed, quota:{remaining, daily, monthly}}}
      */
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/chat")
     public Map<String, Object> chat(
             @RequestBody Map<String, Object> body,
@@ -107,6 +113,7 @@ public class AiController {
      * 配额查询 — 返回当前用户的剩余调用次数与 token 额度。
      * 未启用时返回明确提示。
      */
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/quota")
     public Map<String, Object> quota(
             @AuthenticationPrincipal AuthenticatedUser user,
