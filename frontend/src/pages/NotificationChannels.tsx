@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 type ChannelType = 'EMAIL' | 'WEBHOOK' | 'DINGTALK' | 'WECHAT_WORK';
 
@@ -29,6 +30,7 @@ const TYPE_COLORS: Record<ChannelType, string> = {
 };
 
 export function NotificationChannelsPage() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [types, setTypes] = useState<TypeSchema[]>([]);
@@ -81,7 +83,7 @@ export function NotificationChannelsPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm('确定删除这个通知 channel?')) return;
+    if (!confirm(t('notificationChannels.confirmDelete'))) return;
     await fetch(`/api/admin/notification-channels/${id}`, { method: 'DELETE', headers: authHeaders });
     loadChannels();
   }
@@ -97,15 +99,15 @@ export function NotificationChannelsPage() {
 
   async function testChannel(c: Channel) {
     setTestResult(null);
-    const recipient = prompt('测试收件人(邮箱 / webhook URL / 钉钉 webhook URL):', '');
+    const recipient = prompt(t('notificationChannels.testRecipientPrompt'), '');
     if (recipient === null) return;
     try {
       const r = await fetch(`/api/admin/notification-channels/${c.id}/test`, {
         method: 'POST',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `[测试] NocoBase ${c.type} 通知`,
-          body: '这是一条测试通知,触发 channel 测试按钮。',
+          title: t('notificationChannels.testNotificationTitle', { type: c.type }),
+          body: t('notificationChannels.testNotificationBody'),
           recipient,
         }),
       });
@@ -116,7 +118,7 @@ export function NotificationChannelsPage() {
 
   function configString(c: Channel) {
     const entries = Object.entries(c.config || {});
-    if (entries.length === 0) return <span style={{ color: 'var(--color-text-muted)' }}>(无配置)</span>;
+    if (entries.length === 0) return <span style={{ color: 'var(--color-text-muted)' }}>{t('notificationChannels.noConfig')}</span>;
     return entries.slice(0, 3).map(([k, v]) => (
       <div key={k} style={{ fontSize: 12, color: 'var(--color-bg-secondary)' }}>
         <code style={{ color: 'var(--color-text-muted)' }}>{k}</code> = <code>{String(v).slice(0, 40)}{String(v).length > 40 ? '…' : ''}</code>
@@ -127,7 +129,7 @@ export function NotificationChannelsPage() {
   return (
     <div style={{ padding: 24, maxWidth: 1200 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>🔔 通知渠道</h2>
+        <h2 style={{ margin: 0 }}>{t('notificationChannels.pageTitle')}</h2>
         <button
           onClick={() => setEditing({
             type: 'WEBHOOK',
@@ -138,16 +140,17 @@ export function NotificationChannelsPage() {
             description: '',
           })}
           style={{ background: 'var(--color-info)', color: 'var(--color-text-primary)', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer' }}
-        >+ 新建 channel</button>
+        >{t('notificationChannels.newChannel')}</button>
       </div>
 
       <div style={{ marginBottom: 12, color: 'var(--color-text-muted)', fontSize: 13 }}>
-        多渠道通知配置。Workflow 触发通知节点时,会 fan-out 到所有启用且 events 匹配的 channel。
-        空 <code>events</code> = 全部事件。
+        {t('notificationChannels.descHint')}
+        <br />
+        {t('notificationChannels.emptyEventsHint')}
       </div>
 
       <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{loading ? '加载中…' : `${channels.length} 条`}</span>
+        <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{loading ? t('notificationChannels.loading') : t('notificationChannels.countItems', { count: channels.length })}</span>
         {error && <span style={{ color: 'var(--color-error)', fontSize: 13 }}>{error}</span>}
         {testResult && (
           <span style={{
@@ -164,13 +167,13 @@ export function NotificationChannelsPage() {
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <thead style={{ background: 'var(--color-bg-tertiary)' }}>
           <tr>
-            <th style={th}>类型</th>
-            <th style={th}>名称</th>
-            <th style={th}>配置</th>
-            <th style={th}>Events</th>
-            <th style={th}>启用</th>
-            <th style={th}>说明</th>
-            <th style={th}>操作</th>
+            <th style={th}>{t('notificationChannels.colType')}</th>
+            <th style={th}>{t('notificationChannels.colName')}</th>
+            <th style={th}>{t('notificationChannels.colConfig')}</th>
+            <th style={th}>{t('notificationChannels.colEvents')}</th>
+            <th style={th}>{t('notificationChannels.colEnabled')}</th>
+            <th style={th}>{t('notificationChannels.colDesc')}</th>
+            <th style={th}>{t('notificationChannels.colAction')}</th>
           </tr>
         </thead>
         <tbody>
@@ -185,7 +188,7 @@ export function NotificationChannelsPage() {
               </td>
               <td style={td}><strong>{c.name}</strong></td>
               <td style={td}>{configString(c)}</td>
-              <td style={td}><code style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{c.events || '(全部)'}</code></td>
+              <td style={td}><code style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{c.events || t('notificationChannels.allEvents')}</code></td>
               <td style={td}>
                 <button
                   onClick={() => toggle(c)}
@@ -194,13 +197,13 @@ export function NotificationChannelsPage() {
                     color: 'var(--color-text-primary)', border: 'none', borderRadius: 12,
                     padding: '2px 10px', cursor: 'pointer', fontSize: 12,
                   }}
-                >{c.enabled ? '✓ 启用' : '✗ 禁用'}</button>
+                >{c.enabled ? t('notificationChannels.enabled') : t('notificationChannels.disabled')}</button>
               </td>
               <td style={{ ...td, maxWidth: 200, color: 'var(--color-text-muted)', fontSize: 13 }}>{c.description}</td>
               <td style={td}>
-                <button onClick={() => testChannel(c)} style={btnTest}>📨 测试</button>
-                <button onClick={() => setEditing(c)} style={btnEdit}>编辑</button>
-                <button onClick={() => remove(c.id)} style={btnDelete}>删除</button>
+                <button onClick={() => testChannel(c)} style={btnTest}>{t('notificationChannels.testBtn')}</button>
+                <button onClick={() => setEditing(c)} style={btnEdit}>{t('notificationChannels.editBtn')}</button>
+                <button onClick={() => remove(c.id)} style={btnDelete}>{t('notificationChannels.deleteBtn')}</button>
               </td>
             </tr>
           ))}
@@ -208,9 +211,9 @@ export function NotificationChannelsPage() {
             <tr>
               <td colSpan={7} style={{ ...td, textAlign: 'center', color: 'var(--color-text-muted)', padding: 24 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <span>暂无通知 channel，点击下方按钮创建第一个渠道</span>
+                  <span>{t('notificationChannels.emptyHint')}</span>
                   <button
-                    aria-label="创建 Webhook 渠道"
+                    aria-label={t('notificationChannels.emptyCreateAria')}
                     onClick={() => setEditing({
                       type: 'WEBHOOK',
                       name: '',
@@ -228,7 +231,7 @@ export function NotificationChannelsPage() {
                       cursor: 'pointer',
                     }}
                   >
-                    + 新建 channel
+                    {t('notificationChannels.newChannel')}
                   </button>
                 </div>
               </td>
@@ -240,36 +243,36 @@ export function NotificationChannelsPage() {
       {editing && (
         <div role="presentation" style={modalOverlay} onClick={() => setEditing(null)}>
           <div role="presentation" style={modalCard} onClick={(e) => e.stopPropagation()}>
-            <h3>{editing.id ? '编辑 channel' : '新建 channel'}</h3>
+            <h3>{editing.id ? t('notificationChannels.editModalEdit') : t('notificationChannels.editModalNew')}</h3>
 
-            <Field label="类型">
+            <Field label={t('notificationChannels.fieldType')}>
               <select
                 value={editing.type}
                 onChange={(e) => {
-                  const t = e.target.value as ChannelType;
-                  const schema = types.find((s) => s.type === t);
-                  setEditing({ ...editing, type: t, config: schema ? { ...schema.config_schema } : {} });
+                  const nextType = e.target.value as ChannelType;
+                  const schema = types.find((s) => s.type === nextType);
+                  setEditing({ ...editing, type: nextType, config: schema ? { ...schema.config_schema } : {} });
                 }}
                 style={input}
               >
-                {types.map((t) => <option key={t.type} value={t.type}>{t.label}({t.type})</option>)}
+                {types.map((tp) => <option key={tp.type} value={tp.type}>{tp.label}({tp.type})</option>)}
               </select>
             </Field>
 
-            <Field label="名称">
+            <Field label={t('notificationChannels.fieldName')}>
               <input value={editing.name || ''} onChange={(e) => setEditing({ ...editing, name: e.target.value })} style={input} />
             </Field>
 
             {editing.type === 'EMAIL' && (
               <div style={{ padding: 8, background: 'var(--color-bg-tertiary)', borderRadius: 4, marginTop: 8 }}>
-                <strong style={{ fontSize: 12 }}>SMTP 配置</strong>
+                <strong style={{ fontSize: 12 }}>{t('notificationChannels.smtpConfig')}</strong>
                 {[
-                  { k: 'host', label: 'SMTP 主机' },
-                  { k: 'port', label: '端口', type: 'number' as const },
-                  { k: 'username', label: '用户名' },
-                  { k: 'password', label: '密码', type: 'password' as const },
-                  { k: 'encryption', label: '加密', type: 'select' as const, options: ['none', 'starttls', 'ssl'] },
-                  { k: 'from', label: '发件人' },
+                  { k: 'host', label: t('notificationChannels.smtpHost') },
+                  { k: 'port', label: t('notificationChannels.smtpPort'), type: 'number' as const },
+                  { k: 'username', label: t('notificationChannels.smtpUsername') },
+                  { k: 'password', label: t('notificationChannels.smtpPassword'), type: 'password' as const },
+                  { k: 'encryption', label: t('notificationChannels.smtpEncryption'), type: 'select' as const, options: ['none', 'starttls', 'ssl'] },
+                  { k: 'from', label: t('notificationChannels.smtpFrom') },
                 ].map(({ k, label, type, options }) => (
                   <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                     <span style={{ fontSize: 11, width: 64, color: 'var(--color-text-disabled)' }}>{label}</span>
@@ -293,7 +296,7 @@ export function NotificationChannelsPage() {
                 ))}
               </div>
             )}
-            <Field label={`Config(JSON / ${editing.type})`}>
+            <Field label={t('notificationChannels.configJsonField', { type: editing.type })}>
               <textarea
                 value={JSON.stringify(editing.config || {}, null, 2)}
                 onChange={(e) => {
@@ -304,26 +307,26 @@ export function NotificationChannelsPage() {
               />
             </Field>
 
-            <Field label="Events(逗号分隔,空 = 全部)">
+            <Field label={t('notificationChannels.eventsField')}>
               <input
                 value={editing.events || ''}
                 onChange={(e) => setEditing({ ...editing, events: e.target.value })}
-                placeholder="workflow.notification,workflow.approve"
+                placeholder={t('notificationChannels.eventsPlaceholder')}
                 style={input}
               />
             </Field>
 
-            <Field label="启用">
+            <Field label={t('notificationChannels.enabledField')}>
               <input type="checkbox" checked={editing.enabled ?? true} onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })} />
             </Field>
 
-            <Field label="说明">
+            <Field label={t('notificationChannels.descField')}>
               <input value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} style={input} />
             </Field>
 
             <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditing(null)} style={btnCancel}>取消</button>
-              <button onClick={save} style={btnSave}>保存</button>
+              <button onClick={() => setEditing(null)} style={btnCancel}>{t('notificationChannels.cancelBtn')}</button>
+              <button onClick={save} style={btnSave}>{t('notificationChannels.saveBtn')}</button>
             </div>
           </div>
         </div>
