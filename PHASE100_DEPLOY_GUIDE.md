@@ -45,7 +45,46 @@ traceId 贯通、告警持久化与 webhook、Prometheus 抓取、部署可回�
 
 ## 4. TLS
 
-`frontend/nginx.conf` 已配 443 + HSTS + 80 跳 443。证书需挂载到容器：
+### 4.1 域名模式（默认）
+
+`frontend/nginx.conf.template` 已配 443 + HSTS + 80 跳 443。证书需挂载到容器：
+
+**启用域名模式**（推荐生产）：
+```bash
+# 在 .env 中配置
+PUBLIC_HOST=app.example.com
+FRONTEND_BIND_ADDR=127.0.0.1  # 端口仅本机绑定，外网通过 LB 访问
+```
+
+证书挂载：
+```yaml
+# docker-compose.yml 的 frontend 服务追加
+volumes:
+  - /etc/letsencrypt/live/你的域名/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+  - /etc/letsencrypt/live/你的域名/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+```
+
+证书申请：`certbot certonly --standalone -d 你的域名`
+
+### 4.2 IP 直连模式（无需域名）
+
+**启用 IP 直连模式**：
+```bash
+# 在 .env 中保持 PUBLIC_HOST 为空
+PUBLIC_HOST=
+FRONTEND_BIND_ADDR=0.0.0.0  # 监听所有网卡，外网可访问
+```
+
+IP 模式下：
+- 前端仅 80 端口 HTTP（**明文传输，仅建议内网使用**）
+- 无需 TLS 证书，容器启动更快
+- 访问地址：`http://<服务器IP>:${FRONTEND_PORT:-80}`
+
+**安全警告**：IP 直连模式使用 HTTP 明文传输，**生产环境请务必**：
+1. 只在内网使用，或
+2. 在前端背后加 HTTPS 终端（如 Cloudflare、阿里云 SLB 等）
+
+`/health` 已改为**真实探活**（代理到 `backend-java:8080/api/health`），后端挂掉返回 502。
 
 ```yaml
 # docker-compose.yml 的 frontend 服务追加
@@ -114,7 +153,9 @@ docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 | MinIO 9000/9001 | `127.0.0.1:9000` / `127.0.0.1:9001` |
 | RabbitMQ 5672/15672 | `127.0.0.1:5672` / `127.0.0.1:15672` |
 | Java 8080 | `${JAVA_PORT:-8080}`（经 nginx 反代，不对公网） |
-| 前端 80/443 | `${FRONTEND_PORT:-80}` |
+| 前端 80/443 | `${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-80}` |
+| 访问模式 | **域名模式**：`PUBLIC_HOST` 有值 → `https://${PUBLIC_HOST}`（需证书）
+|  | **IP 直连模式**：`PUBLIC_HOST` 为空 → `http://${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-80}`（明文，仅内网） |
 
 ## 8. 资源限制与日志轮转
 

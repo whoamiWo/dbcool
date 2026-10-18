@@ -20,15 +20,24 @@ RUN pnpm build
 FROM nginx:1.27-alpine
 WORKDIR /usr/share/nginx/html
 
+# PHASE114: 安装 python3（entrypoint 用于渲染 nginx 模板）
+# alpine 自带 busybox 但无 python，需显式安装
+RUN apk add --no-cache python3
+
 # 复制构建产物
 COPY --from=build /app/dist .
 
-# 复制 nginx 配置
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# PHASE114: 复制 nginx 模板 + render_nginx.py + entrypoint
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY render_nginx.py /render_nginx.py
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-EXPOSE 80
+EXPOSE 80 443
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -q --spider --no-check-certificate https://127.0.0.1/ || exit 1
+# PHASE114: 双协议健康检查兜底（HTTP + HTTPS），兼容 IP 直连模式（仅 80）与域名模式（443）
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget -q --spider --no-check-certificate http://127.0.0.1/health || wget -q --spider --no-check-certificate https://127.0.0.1/health || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+# PHASE114: 渲染模板后启动 nginx（PUBLIC_HOST 决定 80/443 模式）
+ENTRYPOINT ["docker-entrypoint.sh"]
