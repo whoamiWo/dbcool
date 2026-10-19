@@ -11,8 +11,18 @@ import enUS from './locales/en-US.json';
  * - 通过 localStorage 持久化用户选择的语言
  * - 未翻译的 key 回退中文
  */
+/** 安全读取 localStorage 持久化语言（jsdom / SSR 环境可能抛异常，回退 zh-CN） */
+const getStoredLang = (): 'zh-CN' | 'en-US' | undefined => {
+  try {
+    const raw = localStorage.getItem('i18n-lang');
+    return raw === 'zh-CN' || raw === 'en-US' ? raw : undefined;
+  } catch {
+    return undefined; // jsdom 无 localStorage 实现或 SSR
+  }
+};
+
 i18n.use(initReactI18next).init({
-  lng: typeof window !== 'undefined' ? (localStorage.getItem('i18n-lang') || 'zh-CN') : 'zh-CN',
+  lng: getStoredLang() ?? 'zh-CN',
   fallbackLng: 'zh-CN',
   resources: {
     'zh-CN': { translation: zhCN },

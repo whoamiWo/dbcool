@@ -31,12 +31,12 @@ interface WorkflowNodeData {
   onDelete: () => void;
 }
 
-const nodeKindMeta: Record<NodeKind, { label: string; icon: string; color: string }> = {
-  APPROVAL:     { label: '审批',     icon: '📝', color: 'var(--color-info)' },
-  NOTIFICATION: { label: '通知',     icon: '🔔', color: 'var(--color-secondary-500)' },
-  CONDITION:    { label: '条件',     icon: '🔀', color: 'var(--color-warning)' },
-  HTTP:         { label: 'HTTP',    icon: '🌐', color: 'var(--color-success)' },
-  DATA_UPDATE:  { label: '数据更新', icon: '✏️', color: 'var(--color-info)' },
+const nodeKindMeta: Record<NodeKind, { icon: string; color: string }> = {
+  APPROVAL:     { icon: '📝', color: 'var(--color-info)' },
+  NOTIFICATION: { icon: '🔔', color: 'var(--color-secondary-500)' },
+  CONDITION:    { icon: '🔀', color: 'var(--color-warning)' },
+  HTTP:         { icon: '🌐', color: 'var(--color-success)' },
+  DATA_UPDATE:  { icon: '✏️', color: 'var(--color-info)' },
 };
 
 // i18n 节点标签
@@ -52,7 +52,7 @@ function getNodeLabel(t: (key: string) => string, kind: NodeKind): string {
 }
 
 function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolean }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation('workflowDesigner');
   const meta = nodeKindMeta[data.kind];
   const isCondition = data.kind === 'CONDITION';
   const label = getNodeLabel(t, data.kind);
@@ -66,6 +66,7 @@ function FlowNode({ data, selected }: { data: WorkflowNodeData; selected: boolea
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>{meta.icon} {label}</strong>
+        {/* label 已通过 getNodeLabel(t, data.kind) 国际化，nodeKindMeta.label 已移除 —— PHASE117 i18n 补全 */}
         <button
           onClick={(e) => { e.stopPropagation(); data.onDelete(); }}
           style={{ background: 'none', border: 'none', color: 'var(--color-error)', cursor: 'pointer', fontSize: 16 }}
@@ -419,7 +420,7 @@ export function WorkflowDesignerPage() {
             <textarea id="w-lbl-triggerdata" value={simulateData} onChange={(e) => setSimulateData(e.target.value)}
                       style={{ width: '100%', height: 160, fontFamily: 'monospace', fontSize: 12,
                                padding: 8, border: '1px solid var(--color-border-medium)', borderRadius: 4 }}
-                      placeholder='{"record_id":"test-001","name":"测试"}' />
+                      placeholder={t('workflowDesigner.triggerDataPlaceholder')} />
             {simulateResult?.instanceId && (
               <div style={{ marginTop: 12, padding: 8, background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)',
                             borderRadius: 4, fontSize: 13 }}>

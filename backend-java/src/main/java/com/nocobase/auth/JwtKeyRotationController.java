@@ -39,7 +39,7 @@ public class JwtKeyRotationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> snapshot() {
         return Map.of(
                 "code", 0, "message", "success",
@@ -51,7 +51,7 @@ public class JwtKeyRotationController {
     }
 
     @PostMapping("/rotate")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> rotate() {
         try {
             String newKid = keyRing.rotate();

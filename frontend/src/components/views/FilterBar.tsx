@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { FieldDef } from '@/types/collection';
 import type { FilterRule, SortRule } from '@/types/view';
 
@@ -14,6 +15,7 @@ export function FilterBar({
   filters: FilterRule[];
   onChange: (filters: FilterRule[]) => void;
 }) {
+  const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<FilterRule>({ field: fields[0]?.name ?? '', op: 'eq', value: '' });
 
@@ -41,9 +43,21 @@ export function FilterBar({
         flexWrap: 'wrap',
       }}
     >
-      <strong style={{ fontSize: 13 }}>筛选:</strong>
+      <strong style={{ fontSize: 13 }}>{t('filterBar.filterLabel')}</strong>
       {filters.map((f, i) => {
         const field = fields.find((x) => x.name === f.field);
+        const opText = (() => {
+          switch (f.op) {
+            case 'eq': return t('filterBar.eq');
+            case 'neq': return t('filterBar.neq');
+            case 'contains': return t('filterBar.contains');
+            case 'gt': return t('filterBar.gt');
+            case 'lt': return t('filterBar.lt');
+            case 'empty': return t('filterBar.empty');
+            case 'notEmpty': return t('filterBar.notEmpty');
+            default: return '';
+          }
+        })();
         return (
           <span
             key={i}
@@ -59,7 +73,7 @@ export function FilterBar({
             }}
           >
             <strong>{field?.label ?? f.field}</strong>
-            <span style={{ color: 'var(--color-text-disabled)' }}>{opLabel(f.op)}</span>
+            <span style={{ color: 'var(--color-text-disabled)' }}>{opText}</span>
             {f.op !== 'empty' && f.op !== 'notEmpty' && (
               <span style={{ color: 'var(--color-bg-secondary)' }}>{String(f.value ?? '')}</span>
             )}
@@ -99,33 +113,33 @@ export function FilterBar({
             }
             style={{ padding: 4, fontSize: 12 }}
           >
-            <option value="eq">等于</option>
-            <option value="neq">不等于</option>
-            <option value="contains">包含</option>
-            <option value="gt">大于</option>
-            <option value="lt">小于</option>
-            <option value="empty">为空</option>
-            <option value="notEmpty">不为空</option>
+            <option value="eq">{t('filterBar.eq')}</option>
+            <option value="neq">{t('filterBar.neq')}</option>
+            <option value="contains">{t('filterBar.contains')}</option>
+            <option value="gt">{t('filterBar.gt')}</option>
+            <option value="lt">{t('filterBar.lt')}</option>
+            <option value="empty">{t('filterBar.empty')}</option>
+            <option value="notEmpty">{t('filterBar.notEmpty')}</option>
           </select>
           {draft.op !== 'empty' && draft.op !== 'notEmpty' && (
             <input
               value={String(draft.value ?? '')}
               onChange={(e) => setDraft({ ...draft, value: e.target.value })}
               style={{ padding: 4, fontSize: 12, width: 100 }}
-              placeholder="值"
+              placeholder={t('filterBar.valuePlaceholder')}
             />
           )}
           <button
             onClick={add}
             style={{ padding: '4px 8px', fontSize: 12, background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4 }}
           >
-            确定
+            {t('filterBar.confirm')}
           </button>
           <button
             onClick={() => setAdding(false)}
             style={{ padding: '4px 8px', fontSize: 12, background: 'transparent', border: 'none' }}
           >
-            取消
+            {t('filterBar.cancel')}
           </button>
         </div>
       ) : (
@@ -140,23 +154,11 @@ export function FilterBar({
             cursor: 'pointer',
           }}
         >
-          + 加筛选
+          + {t('filterBar.addFilter')}
         </button>
       )}
     </div>
   );
-}
-
-function opLabel(op: FilterRule['op']): string {
-  return {
-    eq: '=',
-    neq: '≠',
-    contains: '包含',
-    gt: '>',
-    lt: '<',
-    empty: '为空',
-    notEmpty: '不为空',
-  }[op];
 }
 
 /** 客户端筛选 */

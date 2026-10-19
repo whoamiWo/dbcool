@@ -28,7 +28,7 @@ public class PluginMarketplaceController {
     }
 
     /** 浏览应用列表 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/apps")
     public ResponseEntity<Map<String, Object>> listApps(
             @RequestParam(required = false) String category,
@@ -45,7 +45,7 @@ public class PluginMarketplaceController {
     }
 
     /** 获取应用详情 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/apps/{appKey}")
     public ResponseEntity<Map<String, Object>> getApp(
             @PathVariable String appKey,
@@ -61,7 +61,7 @@ public class PluginMarketplaceController {
     }
 
     /** 安装应用 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping("/apps/{appKey}/install")
     public ResponseEntity<Map<String, Object>> installApp(
             @PathVariable String appKey,
@@ -82,7 +82,7 @@ public class PluginMarketplaceController {
     }
 
     /** 卸载应用 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping("/apps/{appKey}/uninstall")
     public ResponseEntity<Map<String, Object>> uninstallApp(
             @PathVariable String appKey,
@@ -97,7 +97,7 @@ public class PluginMarketplaceController {
     }
 
     /** 更新应用配置 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PutMapping("/apps/{appKey}/config")
     public ResponseEntity<Map<String, Object>> updateConfig(
             @PathVariable String appKey,
@@ -118,7 +118,7 @@ public class PluginMarketplaceController {
     }
 
     /** 检查更新 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/apps/{appKey}/update-check")
     public ResponseEntity<Map<String, Object>> checkUpdate(
             @PathVariable String appKey,
@@ -134,7 +134,7 @@ public class PluginMarketplaceController {
     }
 
     /** 列出租户已安装应用 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/installed")
     public ResponseEntity<Map<String, Object>> listInstalled(
             @AuthenticationPrincipal AuthenticatedUser user) {

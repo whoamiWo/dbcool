@@ -42,14 +42,14 @@ public class UserAdminController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> list(@AuthenticationPrincipal AuthenticatedUser user) {
         return Map.of("code", 0, "message", "success",
                 "data", userService.listAll(user.tenantId()).stream().map(this::toDto).toList());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> get(@PathVariable UUID id,
                                    @AuthenticationPrincipal AuthenticatedUser user) {
         Map<String, Object> dto = toDto(userService.get(id, user.tenantId()));
@@ -58,7 +58,7 @@ public class UserAdminController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody @Valid CreateUserRequest req,
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -71,7 +71,7 @@ public class UserAdminController {
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> update(
             @PathVariable UUID id,
             @RequestBody UpdateUserRequest req,
@@ -85,7 +85,7 @@ public class UserAdminController {
     }
 
     @PostMapping("/{id}/password")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> resetPassword(
             @PathVariable UUID id,
             @RequestBody Map<String, String> body,
@@ -98,7 +98,7 @@ public class UserAdminController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -112,7 +112,7 @@ public class UserAdminController {
     }
 
     @PostMapping("/{id}/roles/{roleId}")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> assignRole(
             @PathVariable UUID id,
             @PathVariable UUID roleId,
@@ -125,7 +125,7 @@ public class UserAdminController {
     }
 
     @DeleteMapping("/{id}/roles/{roleId}")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> removeRole(
             @PathVariable UUID id,
             @PathVariable UUID roleId,
@@ -138,7 +138,7 @@ public class UserAdminController {
     }
 
     @GetMapping("/{id}/effective-permissions")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> effectivePermissions(@PathVariable UUID id,
                                                     @AuthenticationPrincipal AuthenticatedUser user) {
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),

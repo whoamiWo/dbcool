@@ -30,7 +30,7 @@ public class ErDiagramController {
         this.collectionService = collectionService;
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping
     public Map<String, Object> diagram(@AuthenticationPrincipal AuthenticatedUser user) {
         List<CollectionMetaEntity> collections = collectionService.list(user.tenantId());

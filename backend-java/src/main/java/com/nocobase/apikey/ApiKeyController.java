@@ -36,7 +36,7 @@ public class ApiKeyController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> list() {
         List<Map<String, Object>> data = service.listActive(TenantContext.currentTenantId())
                 .stream()
@@ -46,7 +46,7 @@ public class ApiKeyController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody CreateKeyRequest req,
             @AuthenticationPrincipal AuthenticatedUser user
@@ -80,7 +80,7 @@ public class ApiKeyController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> revoke(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser user) {
         boolean ok = service.revoke(id, TenantContext.currentTenantId());
         if (!ok) {
