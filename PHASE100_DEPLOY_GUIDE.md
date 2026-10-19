@@ -23,7 +23,7 @@ traceId 贯通、告警持久化与 webhook、Prometheus 抓取、部署可回�
 | `POSTGRES_PASSWORD` | `openssl rand -base64 24` | compose 启动失败（`:?` 校验） |
 | `MINIO_ROOT_PASSWORD` | `openssl rand -base64 24` | 同上 |
 | `RABBITMQ_PASSWORD` | `openssl rand -base64 24` | 同上 |
-| `JWT_SECRET` | `openssl rand -base64 32` | 使用默认值，生产不安全 |
+| `JWT_SECRET` | `openssl rand -base64 32` | **后端启动失败**（PHASE114 起 compose + application.yml + Python 配置三处 `:?` / `ValueError` 无兜底，dev 直跑也必须显式注入） |
 | `INTEGRATION_CREDENTIAL_MASTER_KEY` | `openssl rand -base64 32` | **后端启动失败**（PHASE99 红线 1） |
 | `ALERT_WEBHOOK_URL` | 告警接收端 URL | 告警仅落盘不外发，启动日志明确提示 |
 

@@ -125,7 +125,7 @@ src/test/java/com/nocobase/
 | `POSTGRES_PASSWORD` | dev_password | 密码 |
 | `REDIS_HOST` | localhost | Redis 地址 |
 | `REDIS_PORT` | 6379 | Redis 端口 |
-| `JWT_SECRET` | (32+字符) | JWT 密钥 |
+| `JWT_SECRET` | (必填,32+字符) | JWT 密钥。PHASE114 起无默认值 —— 未注入时应用启动即失败(`application.yml` 的 `${JWT_SECRET:?}` 占位符展开报错)。dev 直跑须 `export JWT_SECRET=$(openssl rand -hex 32)`;compose 路径由 `.env` 注入。测试走 `application-test.properties` 的 `ci_jwt_secret` 专用值。 |
 | `JAVA_PORT` | 8080 | 服务端口 |
 | `SPRING_PROFILES_ACTIVE` | dev | profile(dev/test) |
 

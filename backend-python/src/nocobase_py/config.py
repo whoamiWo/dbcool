@@ -1,8 +1,9 @@
 """应用配置."""
 
+import os
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,11 +30,32 @@ class Settings(BaseSettings):
     java_backend_url: str = "http://localhost:8080"
 
     # JWT(与 Java 共享密钥,Week 4 之后接真实校验)
+    # PHASE114: 移除 dev 默认值 —— 未注入 JWT_SECRET 即启动失败(fail fast)，
+    # 与 Java 侧 KeyRingService「dev 占位密钥不得用于生产」对齐。
+    # 测试由 tests/conftest.py 显式注入 CI 专用密钥，不依赖任何公开默认值。
     jwt_secret: str = Field(
-        default="dev_jwt_secret_at_least_32_characters_long_for_hs256",
         min_length=32,
     )
     jwt_algorithm: str = "HS256"  # 保留兼容既有引用
+
+    @model_validator(mode="after")
+    def _guard_jwt_secret(self) -> "Settings":
+        """PHASE114: 生产环境禁止使用开发占位密钥(与 Java KeyRingService 同语义)。
+
+        允许保留 dev 占位值的环境：dev / test / ci profile，或 pytest 运行上下文。
+        其余环境(app_env 未识别为测试)检测到占位密钥即抛错,避免公开密钥上线。
+        """
+        s = self.jwt_secret
+        if "dev_jwt_secret" not in s:
+            return self
+        app_env = os.environ.get("APP_ENV", "").lower()
+        in_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        if app_env in ("dev", "test", "ci") or in_pytest:
+            return self
+        raise ValueError(
+            "JWT_SECRET 为开发占位值('dev_jwt_secret...')，"
+            "生产环境必须由环境变量注入 ≥32 字符的真实密钥"
+        )
     jwt_algorithms: list[str] = ["HS256", "HS384", "HS512"]  # 支持 Java jjwt 自动选择的算法
 
     # CORS

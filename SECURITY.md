@@ -161,10 +161,28 @@ mvn -o test -Dtest=ControllerAuthorizationCoverageTest -DargLine="-Dauthz.update
 鉴权靠 Controller 内 HMAC 验签。**这些端点绝不可补 `@PreAuthorize`** —— 回调方无 JWT
 会直接 403，导致集成功能中断。修改鉴权注解后必须复跑 E2E 与 `admin-authz-e2e-verify.py`。
 
+### 已处置：JWT secret 无兜底默认值（PHASE114 后续加固）
+
+此前 `application.yml:89` 与 `backend-python/config.py` 的 `jwt_secret` 都带
+`dev_jwt_secret_...` 公开默认值：
+
+- Java 侧 `KeyRingService` 已硬阻断**非 dev profile**（生产直跑时抛异常），
+  但 `application.yml` 仍保留默认值，dev profile 直跑时生效
+- Python 侧仅 warn 不阻断，`minio123` 类回落可被外部配置误用
+
+处置（本次）：
+- `application.yml` 改为 `secret: ${JWT_SECRET:?JWT_SECRET 环境变量未设置,参见 DEPLOY.md}`，
+  与 `docker-compose.yml:196/277` 的 `${JWT_SECRET:?}` 对齐，**dev profile 直跑也必须显式注入**
+- `backend-python/config.py` `jwt_secret` 移除默认值 + 新增 `model_validator`
+  生产 profile（非 dev/test/ci 且非 pytest）检测到 `dev_jwt_secret` 即抛 `ValueError`
+- 测试由 `backend-python/tests/conftest.py` 注入 CI 专用密钥
+  `ci_jwt_secret_at_least_32_chars_for_hs256_algorithm`，与 Java 的
+  `application-test.properties:22` 对齐
+- `KeyRingService` 非 dev 阻断语义不变（仍抛异常，非 warn）
+
 ### 已知未处置（见 `TECH_DEBT.md`）
 
-- `application.yml:89` JWT secret 有 dev 默认值回落（compose 路径已挡，dev profile 直跑时生效）
-- `backend-python/.../backup.py:57` MinIO 口令回落 `minio123`
+- `backend-python/.../backup.py:57` MinIO 口令回落 `minio123`（PHASE114 未处置）
 - WebSocket `setAllowedOriginPatterns("*")` 三处
 - 缺 `X-Frame-Options` / `CSP` / `X-Content-Type-Options` 响应头
 
