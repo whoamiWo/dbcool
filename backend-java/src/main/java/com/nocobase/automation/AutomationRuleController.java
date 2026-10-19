@@ -3,6 +3,7 @@ package com.nocobase.automation;
 import com.nocobase.automation.entity.AutomationExecutionEntity;
 import com.nocobase.automation.entity.AutomationRuleEntity;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,7 @@ public class AutomationRuleController {
     }
 
     /** 创建规则 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody Map<String, Object> body,
@@ -55,7 +56,7 @@ public class AutomationRuleController {
     }
 
     /** 更新规则 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PutMapping("/{ruleId}")
     public ResponseEntity<Map<String, Object>> update(
             @PathVariable UUID ruleId,
@@ -79,7 +80,7 @@ public class AutomationRuleController {
     }
 
     /** 启用/禁用规则 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/{ruleId}/toggle")
     public ResponseEntity<Map<String, Object>> toggle(
             @PathVariable UUID ruleId,
@@ -97,7 +98,7 @@ public class AutomationRuleController {
     }
 
     /** 删除规则 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @DeleteMapping("/{ruleId}")
     public ResponseEntity<Map<String, Object>> delete(
             @PathVariable UUID ruleId,
@@ -111,7 +112,7 @@ public class AutomationRuleController {
     }
 
     /** 列出规则 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping
     public ResponseEntity<Map<String, Object>> list(
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -125,7 +126,7 @@ public class AutomationRuleController {
     }
 
     /** 获取规则详情 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/{ruleId}")
     public ResponseEntity<Map<String, Object>> get(
             @PathVariable UUID ruleId,
@@ -140,7 +141,7 @@ public class AutomationRuleController {
     }
 
     /** 手动触发执行 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/{ruleId}/execute")
     public ResponseEntity<Map<String, Object>> execute(
             @PathVariable UUID ruleId,
@@ -158,7 +159,7 @@ public class AutomationRuleController {
     }
 
     /** 获取执行历史 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/{ruleId}/executions")
     public ResponseEntity<Map<String, Object>> listExecutions(
             @PathVariable UUID ruleId,

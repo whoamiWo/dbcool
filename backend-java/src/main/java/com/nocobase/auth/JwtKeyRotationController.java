@@ -1,6 +1,7 @@
 package com.nocobase.auth;
 
 import com.nocobase.audit.AuditService;
+import com.nocobase.auth.RoleName;
 import com.nocobase.auth.keystore.KeyRingService;
 import com.nocobase.tenant.TenantContext;
 import java.util.Map;
@@ -38,7 +39,7 @@ public class JwtKeyRotationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> snapshot() {
         return Map.of(
                 "code", 0, "message", "success",
@@ -50,7 +51,7 @@ public class JwtKeyRotationController {
     }
 
     @PostMapping("/rotate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> rotate() {
         try {
             String newKid = keyRing.rotate();

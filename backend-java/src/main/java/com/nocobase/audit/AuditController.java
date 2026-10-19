@@ -1,6 +1,7 @@
 package com.nocobase.audit;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +25,7 @@ public class AuditController {
     }
 
     @GetMapping("/logs")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> list(
             @RequestParam(required = false) String resource,
             @RequestParam(required = false) String action,

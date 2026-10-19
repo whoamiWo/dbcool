@@ -1,6 +1,7 @@
 package com.nocobase.integration.market;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,7 +35,7 @@ public class IntegrationMarketController {
     }
 
     /** 列出所有可用集成。 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/market")
     public ResponseEntity<Map<String, Object>> listMarket(
             @AuthenticationPrincipal AuthenticatedUser user
@@ -48,7 +49,7 @@ public class IntegrationMarketController {
     }
 
     /** 安装集成。 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/install/{id}")
     public ResponseEntity<Map<String, Object>> install(
             @PathVariable String id,
@@ -60,7 +61,7 @@ public class IntegrationMarketController {
     }
 
     /** 卸载集成。 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/uninstall/{id}")
     public ResponseEntity<Map<String, Object>> uninstall(
             @PathVariable String id,

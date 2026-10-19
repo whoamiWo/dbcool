@@ -2,6 +2,7 @@ package com.nocobase.tenant;
 
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,7 @@ public class UserTenantController {
     }
 
     @GetMapping("/users/{userId}/tenants")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> listByUser(@PathVariable String userId,
                                           @AuthenticationPrincipal AuthenticatedUser user) {
         // 校验：目标用户必须属于当前租户
@@ -71,7 +72,7 @@ public class UserTenantController {
     }
 
     @PostMapping("/users/{userId}/tenants")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public ResponseEntity<Map<String, Object>> link(@PathVariable String userId,
                                                     @RequestBody LinkRequest req) {
         if (userTenantRepo.existsByUserIdAndTenantId(userId, req.tenantId())) {
@@ -89,7 +90,7 @@ public class UserTenantController {
     }
 
     @DeleteMapping("/users/{userId}/tenants/{tenantId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> unlink(@PathVariable String userId, @PathVariable String tenantId,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
         userTenantRepo.deleteByUserIdAndTenantId(userId, tenantId);

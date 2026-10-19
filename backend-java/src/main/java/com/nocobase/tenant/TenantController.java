@@ -2,6 +2,7 @@ package com.nocobase.tenant;
 
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
@@ -44,21 +45,21 @@ public class TenantController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> list() {
         List<TenantEntity> all = service.listAll();
         return Map.of("code", 0, "message", "success", "data", all);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> get(@PathVariable String id) {
         TenantEntity t = service.get(id);
         return Map.of("code", 0, "message", "success", "data", t);
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public ResponseEntity<Map<String, Object>> create(@RequestBody CreateTenantRequest req,
                                                       @AuthenticationPrincipal AuthenticatedUser user) {
         TenantEntity t = service.create(req.id(), req.name(), req.slug());
@@ -70,7 +71,7 @@ public class TenantController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> disable(@PathVariable String id,
                                        @AuthenticationPrincipal AuthenticatedUser user) {
         TenantEntity t = service.disable(id);
