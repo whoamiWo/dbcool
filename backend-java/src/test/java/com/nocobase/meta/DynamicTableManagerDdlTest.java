@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -264,5 +265,129 @@ class DynamicTableManagerDdlTest {
                 .thenReturn(9L);
 
         assertThat(manager.getNextAutonumber("c1", "seq")).isEqualTo(10L);
+    }
+
+    // ── PHASE116 加固: collectionName 白名单拒绝用例 ─────────────────────
+    // 每条测试确保非法 collectionName 在 SQL 执行前抛出，避免绕过 CollectionService 的注入面。
+
+    @Test
+    void createTable_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.createTable("bad name"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void dropTable_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.dropTable("UPPERCASE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void tableExists_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.tableExists("../foo"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void insertRecord_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.insertRecord("bad;drop", "id1", "{}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void listRecords_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.listRecords("bad\ttab", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void listRecordsFourArity_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.listRecords("bad!@#", 10, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void existsByFieldValue_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.existsByFieldValue("bad x", "field", "v", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void aggregate_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.aggregate("a;b", List.of(), List.of(), null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void getRecord_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.getRecord("..", "id-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void updateRecord_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.updateRecord("x'", "id-1", "{}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void deleteRecord_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.deleteRecord("id(1)", "id-1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void addPhysicalColumn_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.addPhysicalColumn("col;", "x", "TEXT"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void dropPhysicalColumn_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.dropPhysicalColumn("col)", "x"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void renamePhysicalColumn_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.renamePhysicalColumn("c]", "old", "new"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void alterPhysicalColumn_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.alterPhysicalColumn("c[", "x", "TEXT"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    @Test
+    void getColumns_invalidCollectionName_throws() {
+        assertThatThrownBy(() -> manager.getColumns("*"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("非法标识符");
+    }
+
+    /** 正常标识符应通过——防止白名单过度收紧。 */
+    @Test
+    void createTable_validCollectionNames_ok() {
+        manager.createTable("ok_table");
+        manager.createTable("_private");
+
+        verify(jdbc, atLeastOnce()).execute(anyString());
     }
 }
