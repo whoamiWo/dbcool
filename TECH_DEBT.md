@@ -25,7 +25,7 @@
 | # | 债务 | 优先级 | 证据 | 影响 | 建议 |
 |---|------|--------|------|------|------|
 | 7 | **JWT 签名密钥有硬编码 dev 默认值** | 🔴 高 | `backend-java/src/main/resources/application.yml:89` `secret: ${JWT_SECRET:dev_jwt_secret_at_least_32_characters_long_for_hs256}`；`KeyRingService.java:80` 仅 warn 不阻断 | compose 路径已被 `${JWT_SECRET:?}` 挡住，但 **dev profile 直跑 Spring Boot 时该公开密钥生效** → 可自签任意 userId/tenantId 的 JWT，击穿租户隔离与鉴权 | 改为无回落（未注入即启动失败），或仅在 test profile 保留 |
-| 8 | **Python 侧 MinIO 弱口令回落** | 🟡 中 | `backend-python/src/nocobase_py/services/backup.py:57` `os.environ.get("MINIO_ROOT_PASSWORD", "minio123")` | 源码内回落，`deploy.sh` 只扫 `.env`，**覆盖不到**；备份服务持有对象存储 root 凭据 | 删除默认值，缺失即报错 |
+| 8 | ~~Python 侧 MinIO 弱口令回落~~ ✅ | ~~🟡 中~~ 已修复 | `backup.py:57` 已移除 `minio123` 默认值，MinIO 分支消费前 fail fast；`conftest.py` 注入 CI 专用密码 | 见 SECURITY.md | 已修复（PHASE114 后续，2026-10-19） |
 | 9 | **WebSocket Origin 全开** | 🟡 中 | `config/WebSocketConfig.java:27`、`HuddleWebSocketConfig.java:42`、`ImWebSocketConfig.java:48` 均 `setAllowedOriginPatterns("*")` | 任意来源可建连；`/ws/alerts` 自身无鉴权（`SecurityConfig.java:104` 注释自承） | 收敛为域名白名单 |
 | 10 | **安全响应头缺失** | 🟡 中 | 全仓无 `X-Frame-Options` / `Content-Security-Policy` / `X-Content-Type-Options` / `Referrer-Policy`（HSTS ✅ 已配 `nginx.conf:36`） | 点击劫持、MIME 嗅探等 | nginx 或 SecurityConfig 补充 |
 | 11 | **CORS 配置漂移** | 🟡 低 | `application.yml:95-96` 定义 `app.cors.allowed-origins`，但 `SecurityConfig.java:150-165` 从未读取（硬编码 localhost） | 配置改了不生效，运维易误解 | 接入配置或删除死配置 |

@@ -12,6 +12,9 @@ _CI_JWT_SECRET = "ci_jwt_secret_at_least_32_chars_for_hs256_algorithm"
 def _set_jwt_secret_for_tests(monkeypatch):
     """为所有测试注入测试专用 JWT_SECRET（生产密钥不得进入测试上下文）。"""
     monkeypatch.setenv("JWT_SECRET", _CI_JWT_SECRET)
+    # PHASE114: 备份服务 MinIO 凭据 —— 即使 MINIO_ENABLED 未开，提前设值可避免
+    # 未来测试意外启用 MinIO 时回落到弱口令（已移除）。
+    monkeypatch.setenv("MINIO_ROOT_PASSWORD", "ci_minio_root_password_for_tests")
     yield
 
 

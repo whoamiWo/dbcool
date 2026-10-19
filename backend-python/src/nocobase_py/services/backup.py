@@ -54,7 +54,9 @@ _MEDIA_DIR = Path(os.environ.get("MEDIA_DIR", "media"))
 _MINIO_ENABLED = os.environ.get("MINIO_ENABLED", "").lower() == "true"
 _MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://minio:9000")
 _MINIO_ACCESS_KEY = os.environ.get("MINIO_ROOT_USER", "minio")
-_MINIO_SECRET_KEY = os.environ.get("MINIO_ROOT_PASSWORD", "minio123")
+# PHASE114 加固: 不提供弱口令兜底（原 "minio123"）。凭据延迟到 MinIO 分支消费时校验，
+# 避免模块导入期 os.environ[...] 让未启用 MinIO 的部署（默认路径）启动崩溃。
+_MINIO_SECRET_KEY = os.environ.get("MINIO_ROOT_PASSWORD")
 _MINIO_BUCKET = os.environ.get("MINIO_BUCKET", "nocobase")
 _MINIO_PREFIX = os.environ.get("MINIO_PREFIX", "")  # 对象前缀，如 "attachments/"
 # Redis 直连参数
@@ -196,11 +198,17 @@ def _backup_media() -> tuple[list[tuple[str, bytes]], list[str]]:
     warnings: list[str] = []
     
     if _MINIO_ENABLED:
+        # PHASE114 加固: 启用 MinIO 但缺对象存储凭据时 fail fast（不再回落到弱口令）。
+        if not _MINIO_SECRET_KEY:
+            raise RuntimeError(
+                "MINIO_ENABLED=true 但 MINIO_ROOT_PASSWORD 未设置；"
+                "对象存储凭据必须显式注入，禁止使用硬编码弱口令兜底"
+            )
         # MinIO 模式：下载所有对象
         try:
             from minio import Minio
             from minio.error import S3Error
-            
+
             client = Minio(
                 _MINIO_ENDPOINT.replace("http://", "").replace("https://", ""),
                 access_key=_MINIO_ACCESS_KEY,
