@@ -1,6 +1,7 @@
 package com.nocobase.meta;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,7 +30,7 @@ public class ErDiagramController {
         this.collectionService = collectionService;
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping
     public Map<String, Object> diagram(@AuthenticationPrincipal AuthenticatedUser user) {
         List<CollectionMetaEntity> collections = collectionService.list(user.tenantId());

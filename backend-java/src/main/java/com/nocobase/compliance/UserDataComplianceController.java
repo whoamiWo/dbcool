@@ -1,6 +1,7 @@
 package com.nocobase.compliance;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import com.nocobase.audit.AuditService;
 import com.nocobase.userdata.UserDataErasureRequest;
 import com.nocobase.userdata.UserDataExport;
@@ -43,7 +44,7 @@ public class UserDataComplianceController {
      */
     @Operation(summary = "导出用户数据（管理员）")
     @GetMapping("/admin/users/{userId}/data-export")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public ResponseEntity<Map<String, Object>> exportUserDataForAdmin(
             @PathVariable String userId,
             @AuthenticationPrincipal AuthenticatedUser adminUser) {
@@ -67,7 +68,7 @@ public class UserDataComplianceController {
      */
     @Operation(summary = "删除用户数据（管理员）")
     @DeleteMapping("/admin/users/{userId}/data-erasure")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public ResponseEntity<Map<String, Object>> eraseUserDataForAdmin(
             @PathVariable String userId,
             @AuthenticationPrincipal AuthenticatedUser adminUser) {

@@ -1,6 +1,7 @@
 package com.nocobase.auth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nocobase.auth.RoleName;
 import com.nocobase.audit.AuditService;
 import com.nocobase.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,7 +38,7 @@ public class RoleAclController {
     //  Roles
     // ============================================================
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/roles")
     public Map<String, Object> listRoles() {
         return Map.of("code", 0, "message", "success",
@@ -45,7 +46,7 @@ public class RoleAclController {
                         .stream().map(this::roleDto).toList());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/roles")
     public ResponseEntity<Map<String, Object>> createRole(@RequestBody @Valid CreateRoleRequest req) {
         if (roleRepository.existsByNameAndTenantId(req.name(), TenantContext.currentTenantId())) {
@@ -70,7 +71,7 @@ public class RoleAclController {
                 .body(Map.of("code", 0, "message", "success", "data", roleDto(saved)));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PutMapping("/roles/{id}")
     public Map<String, Object> updateRole(@PathVariable UUID id, @RequestBody UpdateRoleRequest req) {
         RoleEntity r = roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -89,7 +90,7 @@ public class RoleAclController {
         return Map.of("code", 0, "message", "success", "data", roleDto(saved));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @DeleteMapping("/roles/{id}")
     public Map<String, Object> deleteRole(@PathVariable UUID id) {
         Map<String, Object> before = roleDto(roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -113,7 +114,7 @@ public class RoleAclController {
     /**
      * US-308: 返回所有 role 的树形结构(按 parent_role_id 嵌套).
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/roles/tree")
     public Map<String, Object> roleTree() {
         List<RoleEntity> all = roleRepository.findByTenantIdOrderByCreatedAt(TenantContext.currentTenantId());
@@ -130,7 +131,7 @@ public class RoleAclController {
     /**
      * US-308: 查询一个角色的完整继承链(self + ancestors).
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/roles/{id}/inheritance")
     public Map<String, Object> inheritanceChain(@PathVariable UUID id) {
         RoleEntity r = roleRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -152,7 +153,7 @@ public class RoleAclController {
     //  ACL Policies
     // ============================================================
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/acl")
     public Map<String, Object> listAcl(@RequestParam UUID roleId) {
         return Map.of("code", 0, "message", "success",
@@ -160,7 +161,7 @@ public class RoleAclController {
                         .stream().map(this::aclDto).toList());
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/acl")
     public ResponseEntity<Map<String, Object>> createAcl(@RequestBody @Valid CreateAclRequest req) {
         roleRepository.findByIdAndTenantId(req.roleId(), TenantContext.currentTenantId())
@@ -183,7 +184,7 @@ public class RoleAclController {
                 .body(Map.of("code", 0, "message", "success", "data", aclDto(saved)));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PutMapping("/acl/{id}")
     public Map<String, Object> updateAcl(@PathVariable UUID id, @RequestBody UpdateAclRequest req) {
         AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())
@@ -198,7 +199,7 @@ public class RoleAclController {
         return Map.of("code", 0, "message", "success", "data", aclDto(saved));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @DeleteMapping("/acl/{id}")
     public Map<String, Object> deleteAcl(@PathVariable UUID id) {
         AclPolicyEntity p = aclRepository.findByIdAndTenantId(id, TenantContext.currentTenantId())

@@ -1,6 +1,7 @@
 package com.nocobase.quota;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import com.nocobase.tenant.TenantEntity;
 import com.nocobase.tenant.TenantRepository;
 import com.nocobase.audit.AuditService;
@@ -41,7 +42,7 @@ public class TenantQuotaController {
      * 管理员查询租户配额
      */
     @GetMapping("/admin/tenants/{id}/quota")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public ResponseEntity<Map<String, Object>> getQuotaForAdmin(@PathVariable String id,
                                                                  @AuthenticationPrincipal AuthenticatedUser user) {
         TenantEntity tenant = tenantRepository.findById(id)
@@ -53,7 +54,7 @@ public class TenantQuotaController {
      * 管理员设置租户配额
      */
     @PutMapping("/admin/tenants/{id}/quota")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public ResponseEntity<Map<String, Object>> setQuotaForAdmin(
         @PathVariable String id,
         @RequestBody UpdateQuotaRequest req,

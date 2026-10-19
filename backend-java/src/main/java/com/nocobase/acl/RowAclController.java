@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class RowAclController {
         this.auditService = auditService;
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping
     public Map<String, Object> list(@AuthenticationPrincipal AuthenticatedUser user) {
         List<Map<String, Object>> data = repository.findAll().stream()
@@ -45,7 +46,7 @@ public class RowAclController {
         return Map.of("code", 0, "data", data);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/by-collection/{collection}")
     public Map<String, Object> byCollection(@PathVariable String collection,
                                             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -55,7 +56,7 @@ public class RowAclController {
         return Map.of("code", 0, "data", data);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping
     public Map<String, Object> create(@RequestBody PolicyRequest req,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
@@ -84,7 +85,7 @@ public class RowAclController {
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PutMapping("/{id}")
     public Map<String, Object> update(@PathVariable UUID id,
                                       @RequestBody PolicyRequest req,
@@ -115,7 +116,7 @@ public class RowAclController {
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id,
                                       @AuthenticationPrincipal AuthenticatedUser user) {

@@ -2,6 +2,7 @@ package com.nocobase.apikey;
 
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import com.nocobase.tenant.TenantContext;
 import java.time.Instant;
 import java.util.List;
@@ -35,7 +36,7 @@ public class ApiKeyController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> list() {
         List<Map<String, Object>> data = service.listActive(TenantContext.currentTenantId())
                 .stream()
@@ -45,7 +46,7 @@ public class ApiKeyController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public ResponseEntity<Map<String, Object>> create(
             @RequestBody CreateKeyRequest req,
             @AuthenticationPrincipal AuthenticatedUser user
@@ -79,7 +80,7 @@ public class ApiKeyController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     public Map<String, Object> revoke(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser user) {
         boolean ok = service.revoke(id, TenantContext.currentTenantId());
         if (!ok) {

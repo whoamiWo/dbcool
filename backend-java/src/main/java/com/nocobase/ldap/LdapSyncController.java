@@ -3,6 +3,7 @@ package com.nocobase.ldap;
 import com.nocobase.ldap.entity.LdapConfigEntity;
 import com.nocobase.ldap.entity.LdapUserMappingEntity;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,7 @@ public class LdapSyncController {
     }
 
     /** 创建 LDAP 配置 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping
     public ResponseEntity<Map<String, Object>> createConfig(
             @RequestBody Map<String, Object> body,
@@ -57,7 +58,7 @@ public class LdapSyncController {
     }
 
     /** 启用/禁用同步 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/{configId}/toggle")
     public ResponseEntity<Map<String, Object>> toggle(
             @PathVariable UUID configId,
@@ -75,7 +76,7 @@ public class LdapSyncController {
     }
 
     /** 手动触发同步 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @PostMapping("/{configId}/sync")
     public ResponseEntity<Map<String, Object>> sync(
             @PathVariable UUID configId,
@@ -91,7 +92,7 @@ public class LdapSyncController {
     }
 
     /** 列出 LDAP 配置 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping
     public ResponseEntity<Map<String, Object>> list(
             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -105,7 +106,7 @@ public class LdapSyncController {
     }
 
     /** 获取映射列表 */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole(RoleName.ADMIN)")
     @GetMapping("/{configId}/mappings")
     public ResponseEntity<Map<String, Object>> listMappings(
             @PathVariable UUID configId,
