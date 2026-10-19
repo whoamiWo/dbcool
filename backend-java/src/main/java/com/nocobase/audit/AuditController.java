@@ -25,7 +25,7 @@ public class AuditController {
     }
 
     @GetMapping("/logs")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> list(
             @RequestParam(required = false) String resource,
             @RequestParam(required = false) String action,

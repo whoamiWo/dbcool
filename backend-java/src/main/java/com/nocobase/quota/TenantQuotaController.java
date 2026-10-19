@@ -42,7 +42,7 @@ public class TenantQuotaController {
      * 管理员查询租户配额
      */
     @GetMapping("/admin/tenants/{id}/quota")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public ResponseEntity<Map<String, Object>> getQuotaForAdmin(@PathVariable String id,
                                                                  @AuthenticationPrincipal AuthenticatedUser user) {
         TenantEntity tenant = tenantRepository.findById(id)
@@ -54,7 +54,7 @@ public class TenantQuotaController {
      * 管理员设置租户配额
      */
     @PutMapping("/admin/tenants/{id}/quota")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public ResponseEntity<Map<String, Object>> setQuotaForAdmin(
         @PathVariable String id,
         @RequestBody UpdateQuotaRequest req,

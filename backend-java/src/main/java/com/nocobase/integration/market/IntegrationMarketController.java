@@ -35,7 +35,7 @@ public class IntegrationMarketController {
     }
 
     /** 列出所有可用集成。 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/market")
     public ResponseEntity<Map<String, Object>> listMarket(
             @AuthenticationPrincipal AuthenticatedUser user
@@ -49,7 +49,7 @@ public class IntegrationMarketController {
     }
 
     /** 安装集成。 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping("/install/{id}")
     public ResponseEntity<Map<String, Object>> install(
             @PathVariable String id,
@@ -61,7 +61,7 @@ public class IntegrationMarketController {
     }
 
     /** 卸载集成。 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping("/uninstall/{id}")
     public ResponseEntity<Map<String, Object>> uninstall(
             @PathVariable String id,

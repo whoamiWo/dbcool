@@ -154,7 +154,7 @@ public class DingTalkController {
     }
 
     /** 应用配置(运维核对)。 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/config")
     public Map<String, Object> config() {
         return Map.of("code", 0, "message", "success", "data", appService.getAppConfig());
@@ -321,7 +321,7 @@ public class DingTalkController {
     /**
      * 同步钉钉组织架构到本地。
      */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping("/sync-org")
     public Map<String, Object> syncOrg(@RequestBody(required = false) Map<String, Object> body) {
         String tenantId = body == null ? "tenant_default"
@@ -332,7 +332,7 @@ public class DingTalkController {
     /**
      * 获取用户映射列表。
      */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/user-mappings")
     public Map<String, Object> getUserMappings(
             @RequestParam(required = false, defaultValue = "tenant_default") String tenantId
@@ -351,7 +351,7 @@ public class DingTalkController {
      *
      * <p>未来如引入 {@code DingTalkSyncHistoryRepository}，在此处查最近一条即可。
      */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/sync-status")
     public Map<String, Object> getSyncStatus() {
         boolean configured = appService.isConfigured();

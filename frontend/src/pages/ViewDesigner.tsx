@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { CreateViewRequest, TableColumn, ViewFull, ViewType } from '@/types/view';
 
 /** 视图设计器(Week 9 + Week 15 columns UI) — 创建/编辑视图 */
 export function ViewDesignerPage() {
+  const { t } = useTranslation('viewDesigner');
   const { collection, id } = useParams<{ collection: string; id?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [name, setName] = useState('new_view');
-  const [title, setTitle] = useState('新视图');
+  const [title, setTitle] = useState(t('newView'));
   const [type, setType] = useState<ViewType>('table');
   const [groupBy, setGroupBy] = useState<string>('');
   const [pageSize, setPageSize] = useState(20);
@@ -107,13 +109,13 @@ export function ViewDesignerPage() {
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message ?? '保存失败');
+      setError(e.response?.data?.message ?? t('saveFailed'));
     },
   });
 
-  if (!collection) return <p>缺少 collection 参数</p>;
+  if (!collection) return <p>{t('missingCollection')}</p>;
   if (!/^[a-z][a-z0-9_]{0,63}$/.test(name)) {
-    setError('name 必须是小写字母开头的英文/数字/下划线');
+    setError(t('invalidName'));
   }
 
   return (
@@ -122,9 +124,9 @@ export function ViewDesignerPage() {
         onClick={() => navigate(`/designer/collections/${collection}`)}
         style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}
       >
-        ← 返回 {collection}
+        ← {t('backTo', { collection })}
       </button>
-      <h1>{id ? '编辑' : '新建'}视图</h1>
+      <h1>{id ? t('edit') : t('create')}{t('viewSuffix')}</h1>
 
       {error && (
         <div style={{ padding: 8, marginBottom: 12, background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4 }}>
@@ -142,7 +144,7 @@ export function ViewDesignerPage() {
         }}
       >
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-1">技术名称</label>
+          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-1">{t('techName')}</label>
           <input id="v-lbl-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -150,7 +152,7 @@ export function ViewDesignerPage() {
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-2">显示标题</label>
+          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-2">{t('displayName')}</label>
           <input id="v-lbl-2"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -158,20 +160,20 @@ export function ViewDesignerPage() {
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-3">类型</label>
+          <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-3">{t('type')}</label>
           <select id="v-lbl-3" value={type} onChange={(e) => setType(e.target.value as ViewType)} style={{ padding: 8, width: '100%' }}>
-            <option value="table">表格视图</option>
-            <option value="kanban">看板视图</option>
-            <option value="detail">详情视图</option>
-            <option value="timeline">时间线视图</option>
+            <option value="table">{t('table')}</option>
+            <option value="kanban">{t('kanban')}</option>
+            <option value="detail">{t('detail')}</option>
+            <option value="timeline">{t('timeline')}</option>
           </select>
         </div>
 
         {type === 'kanban' && (
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-4">按哪个字段分组</label>
+            <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-4">{t('groupBy')}</label>
             <select id="v-lbl-4" value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ padding: 8, width: '100%' }}>
-              <option value="">-- 选择字段 --</option>
+              <option value="">{t('selectField')}</option>
               {fields.map((f) => (
                 <option key={f.name} value={f.name}>
                   {f.label ?? f.name}
@@ -184,7 +186,7 @@ export function ViewDesignerPage() {
         {type === 'table' && (
           <>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-5">每页条数</label>
+              <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-5">{t('pageSize')}</label>
               <input id="v-lbl-5"
                 type="number"
                 value={pageSize}
@@ -201,7 +203,7 @@ export function ViewDesignerPage() {
         )}
 
         <div style={{ padding: 8, background: 'var(--color-text-primary)', borderRadius: 4, fontSize: 12, color: 'var(--color-text-disabled)' }}>
-          💡 视图运行后可继续调整筛选/排序(US-202/203);列控制在保存前调整
+          💡 {t('runHint')}
         </div>
 
         <button
@@ -217,7 +219,7 @@ export function ViewDesignerPage() {
             cursor: saveMutation.isPending ? 'not-allowed' : 'pointer',
           }}
         >
-          {saveMutation.isPending ? '保存中…' : '保存并打开'}
+          {saveMutation.isPending ? t('saving') : t('saveAndOpen')}
         </button>
       </div>
     </div>
@@ -232,11 +234,12 @@ function ColumnEditor({
   fields: FieldDef[];
   onChange: (next: TableColumn[]) => void;
 }) {
+  const { t } = useTranslation('viewDesigner');
   const visibleCount = columns.filter((c) => c.visible !== false).length;
   return (
     <div style={{ marginBottom: 12 }}>
       <label style={{ display: 'block', fontWeight: 500, marginBottom: 6 }}>
-        列设置 ({visibleCount}/{columns.length} 可见)
+        {t('columnSettings')} ({visibleCount}/{columns.length} {t('visible')})
       </label>
       <div style={{ border: '1px solid var(--color-border-light)', borderRadius: 4, padding: 4, maxHeight: 240, overflowY: 'auto' }}>
         {columns.map((c, i) => {
@@ -262,7 +265,7 @@ function ColumnEditor({
                        onChange(next);
                      }}
                      style={{ width: 60, padding: 2, fontSize: 12 }}
-                     min={60} max={600} title="列宽(px)" />
+                     min={60} max={600} title={t('colWidth')} />
               <span style={{ fontSize: 11, color: 'var(--color-text-disabled)' }}>px</span>
               <button type="button"
                       onClick={() => { if (i === 0) return; const next = [...columns]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; onChange(next); }}
@@ -277,7 +280,7 @@ function ColumnEditor({
         })}
       </div>
       <div style={{ fontSize: 11, color: 'var(--color-text-disabled)', marginTop: 4 }}>
-        取消勾选可隐藏列;上下箭头调整列顺序
+        {t('colHint')}
       </div>
     </div>
   );
@@ -291,10 +294,11 @@ function DetailFieldEditor({
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
+  const { t } = useTranslation('viewDesigner');
   return (
     <div style={{ marginBottom: 12 }}>
       <label style={{ display: 'block', fontWeight: 500, marginBottom: 6 }}>
-        显示字段 ({selected.length}/{fields.length})
+        {t('detailFields')} ({selected.length}/{fields.length})
       </label>
       <div style={{ border: '1px solid var(--color-border-light)', borderRadius: 4, padding: 4, maxHeight: 240, overflowY: 'auto' }}>
         {fields.map((f) => {

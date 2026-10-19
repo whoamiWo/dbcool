@@ -37,7 +37,7 @@ public class RowAclController {
         this.auditService = auditService;
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping
     public Map<String, Object> list(@AuthenticationPrincipal AuthenticatedUser user) {
         List<Map<String, Object>> data = repository.findAll().stream()
@@ -46,7 +46,7 @@ public class RowAclController {
         return Map.of("code", 0, "data", data);
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/by-collection/{collection}")
     public Map<String, Object> byCollection(@PathVariable String collection,
                                             @AuthenticationPrincipal AuthenticatedUser user) {
@@ -56,7 +56,7 @@ public class RowAclController {
         return Map.of("code", 0, "data", data);
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping
     public Map<String, Object> create(@RequestBody PolicyRequest req,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
@@ -85,7 +85,7 @@ public class RowAclController {
         }
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PutMapping("/{id}")
     public Map<String, Object> update(@PathVariable UUID id,
                                       @RequestBody PolicyRequest req,
@@ -116,7 +116,7 @@ public class RowAclController {
         }
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id,
                                       @AuthenticationPrincipal AuthenticatedUser user) {

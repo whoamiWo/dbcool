@@ -10,6 +10,8 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { I18nextProvider } from 'react-i18next';
+import i18n from '@/i18n';
 import {
   FilterBar,
   applyFilters,
@@ -30,7 +32,11 @@ const wrap = (
   filters: FilterRule[] = [],
   onChange = vi.fn(),
   fieldsArg: FieldDef[] = fields,
-) => render(<FilterBar fields={fieldsArg} filters={filters} onChange={onChange} />);
+) => render(
+  <I18nextProvider i18n={i18n}>
+    <FilterBar fields={fieldsArg} filters={filters} onChange={onChange} />
+  </I18nextProvider>,
+);
 
 describe('FilterBar — UI', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -43,7 +49,8 @@ describe('FilterBar — UI', () => {
   it('渲染现有筛选:字段 label + op label + value', () => {
     wrap([{ field: 'name', op: 'eq', value: 'alice' }]);
     expect(screen.getByText('姓名')).toBeInTheDocument();
-    expect(screen.getByText('=')).toBeInTheDocument();
+    // PHASE115 i18n 后,eq 渲染为 i18n 文案「等于」(原符号「=」已移除)
+    expect(screen.getByText('等于')).toBeInTheDocument();
     expect(screen.getByText('alice')).toBeInTheDocument();
   });
 

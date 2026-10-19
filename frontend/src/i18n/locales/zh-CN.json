@@ -352,7 +352,8 @@
     "opNeq": "不等于 neq",
     "opContains": "包含 contains",
     "opGt": "大于 gt",
-    "opLt": "小于 lt"
+    "opLt": "小于 lt",
+    "triggerDataPlaceholder": "{\"record_id\":\"test-001\",\"name\":\"测试\"}"
   },
   "editor": {
     "block": {
@@ -884,5 +885,62 @@
     "unsupportedType": "(暂不支持类型 {{type}})",
     "submit": "提交",
     "submitting": "提交中…"
+  },
+  "collabEditor": {
+    "me": "我",
+    "connected": "协同已连接",
+    "disconnected": "未连接",
+    "saved": "已保存",
+    "unsaved": "未保存",
+    "save": "保存",
+    "connUnavailable": "协同连接不可用，编辑仅在本地生效。",
+    "subscribeFailed": "无法连接协同服务，请检查网络后重试。",
+    "saveFailed": "保存失败，请稍后重试。",
+    "placeholder": "在此协作编辑文档内容…",
+    "editorAria": "协同编辑区",
+    "footerHint": "多人同时编辑时支持字符级合并;改动会实时广播给同一文档的其他成员。",
+    "cursorPosition": "位置：{{pos}}"
+  },
+  "viewDesigner": {
+    "newView": "新视图",
+    "saveFailed": "保存失败",
+    "missingCollection": "缺少 collection 参数",
+    "invalidName": "name 必须是小写字母开头的英文/数字/下划线",
+    "backTo": "← 返回 {collection}",
+    "edit": "编辑",
+    "create": "新建",
+    "viewSuffix": "视图",
+    "techName": "技术名称",
+    "displayName": "显示标题",
+    "type": "类型",
+    "table": "表格视图",
+    "kanban": "看板视图",
+    "detail": "详情视图",
+    "timeline": "时间线视图",
+    "groupBy": "按哪个字段分组",
+    "selectField": "-- 选择字段 --",
+    "pageSize": "每页条数",
+    "runHint": "视图运行后可继续调整筛选/排序(US-202/203);列控制在保存前调整",
+    "saving": "保存中…",
+    "saveAndOpen": "保存并打开",
+    "columnSettings": "列设置",
+    "visible": "可见",
+    "colWidth": "列宽(px)",
+    "colHint": "取消勾选可隐藏列;上下箭头调整列顺序",
+    "detailFields": "显示字段"
+  },
+  "filterBar": {
+    "filterLabel": "筛选:",
+    "eq": "等于",
+    "neq": "不等于",
+    "contains": "包含",
+    "gt": "大于",
+    "lt": "小于",
+    "empty": "为空",
+    "notEmpty": "不为空",
+    "valuePlaceholder": "值",
+    "confirm": "确定",
+    "cancel": "取消",
+    "addFilter": "加筛选"
   }
 }

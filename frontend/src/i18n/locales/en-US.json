@@ -352,7 +352,8 @@
     "opNeq": "not equals neq",
     "opContains": "contains",
     "opGt": "greater than gt",
-    "opLt": "less than lt"
+    "opLt": "less than lt",
+    "triggerDataPlaceholder": "{\"record_id\":\"test-001\",\"name\":\"Test\"}"
   },
   "editor": {
     "block": {
@@ -884,5 +885,62 @@
     "unsupportedType": "(Unsupported type: {{type}})",
     "submit": "Submit",
     "submitting": "Submitting…"
+  },
+  "collabEditor": {
+    "me": "Me",
+    "connected": "Collaboration connected",
+    "disconnected": "Disconnected",
+    "saved": "Saved",
+    "unsaved": "Unsaved",
+    "save": "Save",
+    "connUnavailable": "Collaboration connection unavailable; edits apply locally only.",
+    "subscribeFailed": "Cannot connect to the collaboration service. Check your network and retry.",
+    "saveFailed": "Save failed. Please retry later.",
+    "placeholder": "Edit the document collaboratively here…",
+    "editorAria": "Collaborative editor",
+    "footerHint": "Character-level merging is supported for concurrent editing; changes are broadcast in real time to other members of the same document.",
+    "cursorPosition": "Position: {{pos}}"
+  },
+  "viewDesigner": {
+    "newView": "New View",
+    "saveFailed": "Save failed",
+    "missingCollection": "Missing collection parameter",
+    "invalidName": "name must start with lowercase letters and contain only letters, digits, and underscores",
+    "backTo": "← Back to {collection}",
+    "edit": "Edit",
+    "create": "Create",
+    "viewSuffix": "View",
+    "techName": "Technical name",
+    "displayName": "Display title",
+    "type": "Type",
+    "table": "Table view",
+    "kanban": "Kanban view",
+    "detail": "Detail view",
+    "timeline": "Timeline view",
+    "groupBy": "Group by field",
+    "selectField": "-- Select field --",
+    "pageSize": "Page size",
+    "runHint": "After running the view, you can adjust filters and sorting; column settings can be modified before saving",
+    "saving": "Saving…",
+    "saveAndOpen": "Save and open",
+    "columnSettings": "Column settings",
+    "visible": "Visible",
+    "colWidth": "Column width (px)",
+    "colHint": "Uncheck to hide columns; use arrows to reorder columns",
+    "detailFields": "Display fields"
+  },
+  "filterBar": {
+    "filterLabel": "Filter:",
+    "eq": "Equals",
+    "neq": "Not equals",
+    "contains": "Contains",
+    "gt": "Greater than",
+    "lt": "Less than",
+    "empty": "Is empty",
+    "notEmpty": "Is not empty",
+    "valuePlaceholder": "Value",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "addFilter": "Add filter"
   }
 }

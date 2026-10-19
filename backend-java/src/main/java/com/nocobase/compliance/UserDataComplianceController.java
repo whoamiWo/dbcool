@@ -44,7 +44,7 @@ public class UserDataComplianceController {
      */
     @Operation(summary = "导出用户数据（管理员）")
     @GetMapping("/admin/users/{userId}/data-export")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public ResponseEntity<Map<String, Object>> exportUserDataForAdmin(
             @PathVariable String userId,
             @AuthenticationPrincipal AuthenticatedUser adminUser) {
@@ -68,7 +68,7 @@ public class UserDataComplianceController {
      */
     @Operation(summary = "删除用户数据（管理员）")
     @DeleteMapping("/admin/users/{userId}/data-erasure")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public ResponseEntity<Map<String, Object>> eraseUserDataForAdmin(
             @PathVariable String userId,
             @AuthenticationPrincipal AuthenticatedUser adminUser) {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as Y from 'yjs';
 import {
   Alert, Avatar, Box, Button, Chip, CircularProgress, Stack, TextField, Typography,
@@ -131,6 +132,7 @@ export function applyDiffToText(
  * </ul>
  */
 export default function CollabEditor({ docId, title, initialContent = '', onSave }: Props) {
+  const { t } = useTranslation('collabEditor');
   const ydoc = useMemo(() => new Y.Doc(), []);
   const ytext = useMemo(() => ydoc.getText('content'), [ydoc]);
 
@@ -143,7 +145,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
 
   const me = useAuthStore((s) => s.user) as unknown as Record<string, unknown> | null;
   const myId = String(me?.id ?? me?.user_id ?? me?.userId ?? '');
-  const myName = String(me?.username ?? me?.name ?? '我');
+  const myName = String(me?.username ?? me?.name ?? t('me'));
 
   const applyingRemote = useRef(false);
   const lastKnownText = useRef(text);
@@ -172,7 +174,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
         setSaved(false);
       } catch (e) {
         console.error('[collab] 广播增量失败:', e);
-        setError('协同连接不可用，编辑仅在本地生效。');
+        setError(t('connUnavailable'));
       }
     };
     ydoc.on('update', handler);
@@ -247,7 +249,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
       setConnected(true);
     } catch (e) {
       console.error('[collab] 订阅失败:', e);
-      setError('无法连接协同服务，请检查网络后重试。');
+      setError(t('subscribeFailed'));
     }
 
     return () => {
@@ -292,7 +294,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
       setSaved(true);
     } catch (e) {
       console.error('[collab] 保存失败:', e);
-      setError('保存失败，请稍后重试。');
+      setError(t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -304,10 +306,10 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
         <Typography variant="h6" sx={{ fontWeight: 600 }}>{title}</Typography>
         <Chip
           size="small"
-          label={connected ? '协同已连接' : '未连接'}
+          label={connected ? t('connected') : t('disconnected')}
           color={connected ? 'success' : 'default'}
         />
-        <Chip size="small" label={saved ? '已保存' : '未保存'} color={saved ? 'default' : 'warning'} />
+        <Chip size="small" label={saved ? t('saved') : t('unsaved')} color={saved ? 'default' : 'warning'} />
         <Box sx={{ flex: 1 }} />
         {/* Online collaborators with awareness */}
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
@@ -326,7 +328,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
         </Stack>
         {onSave && (
           <Button variant="contained" size="small" onClick={handleSave} disabled={saving || saved}>
-            {saving ? <CircularProgress size={16} /> : '保存'}
+            {saving ? <CircularProgress size={16} /> : t('save')}
           </Button>
         )}
       </Stack>
@@ -347,12 +349,12 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
           const target = e.target as HTMLTextAreaElement;
           handleCursorMove(target.selectionStart, target.selectionStart, target.selectionEnd);
         }}
-        placeholder="在此协作编辑文档内容…"
-        slotProps={{ htmlInput: { 'aria-label': '协同编辑区' } }}
+        placeholder={t('placeholder')}
+        slotProps={{ htmlInput: { 'aria-label': t('editorAria') } }}
       />
 
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-        多人同时编辑时支持字符级合并;改动会实时广播给同一文档的其他成员。
+        {t('footerHint')}
       </Typography>
     </Box>
   );

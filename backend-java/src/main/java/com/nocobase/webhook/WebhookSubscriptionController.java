@@ -43,7 +43,7 @@ public class WebhookSubscriptionController {
         this.auditService = auditService;
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping
     public Map<String, Object> list() {
         String tenant = TenantContext.currentTenantId();
@@ -52,7 +52,7 @@ public class WebhookSubscriptionController {
         return Map.of("code", 0, "message", "success", "data", data);
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
         String tenant = TenantContext.currentTenantId();
@@ -91,7 +91,7 @@ public class WebhookSubscriptionController {
     }
 
     /** 启停订阅(避免删除后重建)。 */
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PutMapping("/{id}/enabled")
     public Map<String, Object> setEnabled(@PathVariable UUID id, @RequestBody Map<String, Object> body) {
         String tenant = TenantContext.currentTenantId();
@@ -105,7 +105,7 @@ public class WebhookSubscriptionController {
         return Map.of("code", 0, "message", "success", "data", toDto(saved));
     }
 
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id) {
         String tenant = TenantContext.currentTenantId();

@@ -45,7 +45,7 @@ public class UserTenantController {
     }
 
     @GetMapping("/users/{userId}/tenants")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> listByUser(@PathVariable String userId,
                                           @AuthenticationPrincipal AuthenticatedUser user) {
         // 校验：目标用户必须属于当前租户
@@ -72,7 +72,7 @@ public class UserTenantController {
     }
 
     @PostMapping("/users/{userId}/tenants")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public ResponseEntity<Map<String, Object>> link(@PathVariable String userId,
                                                     @RequestBody LinkRequest req) {
         if (userTenantRepo.existsByUserIdAndTenantId(userId, req.tenantId())) {
@@ -90,7 +90,7 @@ public class UserTenantController {
     }
 
     @DeleteMapping("/users/{userId}/tenants/{tenantId}")
-    @PreAuthorize("hasRole(RoleName.ADMIN)")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     public Map<String, Object> unlink(@PathVariable String userId, @PathVariable String tenantId,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
         userTenantRepo.deleteByUserIdAndTenantId(userId, tenantId);
