@@ -205,9 +205,35 @@ compose 路径已由 `${MINIO_ROOT_PASSWORD:?}` 挡住，故仅本地直跑受�
 - 3 个 WebSocket 配置类注入 `SecurityConfig`，调用 `securityConfig.allowedOrigins()` 替换 `*`
 - 生产同源部署不受影响（CORS 仅在跨源时生效），开发 `localhost:5173` 访问正常
 
+### 已处置：浏览器安全响应头（PHASE115 审计项 #12）
+
+此前全站缺失 `X-Frame-Options` / `X-Content-Type-Options` / `Referrer-Policy` /
+`Content-Security-Policy`。在 `frontend/nginx.conf` 及渲染管线补全（实测生效）：
+
+| 头 | 值 | 防护 |
+|---|---|---|
+| `X-Frame-Options` | `DENY` | 防点击劫持（不被任何 `<iframe>` 嵌入） |
+| `X-Content-Type-Options` | `nosniff` | 防 MIME 嗅探降级 |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | 防 Referer 泄露敏感路径 |
+| `Content-Security-Policy` | `default-src 'self'; ... frame-ancestors 'none'; ...` | 收敛可加载资源来源 |
+
+**CSP 取舍**：保留 `script-src` 的 `unsafe-inline`/`unsafe-eval` 与 `style-src` 的
+`unsafe-inline`（Vite/React 开发态动态注入内联脚本/样式依赖此策略，收紧会白屏）。
+后续若前端改用 `nonce` 或外置脚本，可再逐步收敛为 `strict`。
+
+**渲染管线（PHASE114 双模式）**：nginx 配置由 `render_nginx.py` 从 `nginx.conf.template`
+渲染，安全头需在**两处**同步注入才全模式生效——
+- `nginx.conf.template`（80 块：域名模式跳转页 + IP 直连模式）
+- `render_nginx.py` 的 `TLS_BLOCK`（443 块）
+- 两处 `/assets/` location 因含自身 `add_header Cache-Control` 会阻断 server 级继承，
+  故在块内重复声明 4 个头。
+
+**实测验证**：`curl -I` 根路径与 `/assets/` 均返回 4 个头；冒烟 11/11、
+编排 8/8、启动检查 0 问题，SPA 与 API 反代无回归（CSP 未破坏前端）。
+
 ### 已知未处置（见 `TECH_DEBT.md`）
 
-- 缺 `X-Frame-Options` / `CSP` / `X-Content-Type-Options` 响应头
+- （本项已收口；CSP 的 `unsafe-inline/eval` 收敛待前端改造后推进）
 
 ## 7. PHASE99 官方安全门禁（Trivy + ZAP）
 

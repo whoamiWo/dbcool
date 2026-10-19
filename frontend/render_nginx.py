@@ -29,6 +29,11 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "    ssl_session_timeout 10m;\n" \
     "\n" \
     "    add_header Strict-Transport-Security \"max-age=63072000; includeSubDomains\" always;\n" \
+    "    # PHASE115 安全响应头（443 域名模式）\n" \
+    "    add_header X-Frame-Options \"DENY\" always;\n" \
+    "    add_header X-Content-Type-Options \"nosniff\" always;\n" \
+    "    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" \
+    "    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';\" always;\n" \
     "\n" \
     "    root /usr/share/nginx/html;\n" \
     "    index index.html;\n" \
@@ -56,6 +61,11 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "    location /assets/ {\n" \
     "        expires 1y;\n" \
     "        add_header Cache-Control \"public, immutable\";\n" \
+    "        # 本块有 add_header，会阻断 server 级安全头继承，故此处重复声明\n" \
+    "        add_header X-Frame-Options \"DENY\" always;\n" \
+    "        add_header X-Content-Type-Options \"nosniff\" always;\n" \
+    "        add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" \
+    "        add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';\" always;\n" \
     "        try_files $uri =404;\n" \
     "    }\n" \
     "\n" \
