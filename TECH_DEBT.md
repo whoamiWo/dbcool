@@ -31,9 +31,9 @@
 | 10 | ~~安全响应头缺失~~ ✅ | ~~🟡 中~~ 已修复 | 已在 `frontend/nginx.conf.template` + `render_nginx.py`（443 块）补 `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/`CSP`，`/assets/` 防继承阻断 | 见 SECURITY.md PHASE115 | 已修复（2026-10-19，CSP `unsafe-inline/eval` 收敛待前端改造） |
 | 11 | ~~CORS 配置漂移~~ ✅ | ~~🟡 低~~ 已修复 | `SecurityConfig` 已改为读取 `app.cors.allowed-origins`（默认 localhost），WebSocket 三处同源 | 见 SECURITY.md | 已修复（PHASE114 后续，2026-10-19） |
 | 12 | **Spring Boot 3.3.5 已 EOL** | 🟡 低 | `backend-java/pom.xml:7-10` | 3.3.x 分支停止 OSS 支持，安全补丁不再回溯 | 排期升级 3.4/3.5 |
-| 13 | **动态 SQL 标识符校验不完整** | 🟡 低 | `DynamicTableManager` 仅校验 columnName，**不校验 collectionName**（依赖调用方先查元数据）；`getNextAutonumber` 已补，其余路径仍靠 `CollectionService.get()` 库内白名单 | 新增调用方绕过即成注入点 | 在 `DynamicTableManager` 入口统一校验 |
-| 14 | **文档债务：228 个临时任务书未归档** | 🟡 低 | 根目录 232 个 md，其中 `PHASE*_PROMPT` 86、`PHASE*_TASKS` 64、`WEEK_*_HANDOFF` 36、`PHASE*_REWORK*` 42；`docs/archive/` 仅 1 个文件 | 仓库噪音，新人难辨有效文档 | 移入 `docs/archive/` |
-| 15 | 遗留调试容器 | 🟢 极低 | `dreamy_colden` 容器 unhealthy | 干扰 `docker ps` 健康判断 | 清理 |
+| 13 | ~~动态 SQL 标识符校验不完整~~ ✅ | ~~🟡 低~~ 已修复 | `DynamicTableManager` 全部 16 个 public 入口（create/drop/tableExists/insert/list/existsByFieldValue/aggregate/get/update/delete/add/drop/rename/alter/getColumns）已补 `validateIdentifier(collectionName)`，仅 `getNextAutonumber` 此前已加 | 在 `DynamicTableManager` 入口统一校验 | 已修复（PHASE116，2026-10-19，新增 16 条拒绝用例） |
+| 14 | ~~文档债务：228 个临时任务书未归档~~ ✅ | ~~🟡 低~~ 已修复 | 228 个文件（`PHASE*_PROMPT` 86 + `PHASE*_TASKS` 64 + `WEEK_*_HANDOFF` 36 + `PHASE*_REWORK*` 42）已移入 `docs/archive/`，并补 `docs/archive/README.md` 分类索引；根目录仅保留 3 个有效 PHASE 文档（DEPLOY_GUIDE/WIKI_DESIGN/95_103_INDEX） | 移入 `docs/archive/` | 已修复（PHASE116，2026-10-19） |
+| 15 | ~~遗留调试容器~~ ✅ | ~~🟢 极低~~ 已清理 | `dreamy_colden` 容器实测已不存在；本轮清理 `test-dom`/`test-ip4` + 10 个 Exited 遗留容器 | 干扰 `docker ps` 健康判断 | 已清理（PHASE116，2026-10-19） |
 
 ---
 
