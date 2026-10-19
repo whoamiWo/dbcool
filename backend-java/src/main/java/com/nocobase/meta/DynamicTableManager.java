@@ -50,6 +50,7 @@ public class DynamicTableManager {
      * 创建 collection 的物理表.
      */
     public void createTable(String collectionName) {
+        validateIdentifier(collectionName); // PHASE116 加固:public 入口自证,杜绝绕过 CollectionService 的注入面
         String sql = """
                 CREATE TABLE IF NOT EXISTS %s (
                     id UUID PRIMARY KEY,
@@ -71,6 +72,7 @@ public class DynamicTableManager {
      * 删除 collection 的物理表.
      */
     public void dropTable(String collectionName) {
+        validateIdentifier(collectionName); // PHASE116 加固
         jdbc.execute("DROP TABLE IF EXISTS " + physicalTableName(collectionName));
     }
 
@@ -78,6 +80,7 @@ public class DynamicTableManager {
      * 校验 collection 是否存在(物理表).
      */
     public boolean tableExists(String collectionName) {
+        validateIdentifier(collectionName); // PHASE116 加固
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables " +
                 "WHERE table_name = ? AND table_schema = ?",
@@ -92,6 +95,7 @@ public class DynamicTableManager {
      * 插入一条记录.
      */
     public void insertRecord(String collectionName, String id, String jsonData) {
+        validateIdentifier(collectionName); // PHASE116 加固
         jdbc.update(
                 "INSERT INTO " + physicalTableName(collectionName) +
                 " (id, extra) VALUES (?::uuid, ?::jsonb)",
@@ -107,6 +111,7 @@ public class DynamicTableManager {
      * 无 sortExpr 时维持原有 ORDER BY created_at DESC。
      */
     public List<String> listRecords(String collectionName, int limit) {
+        validateIdentifier(collectionName); // PHASE116 加固
         return listRecords(collectionName, limit, null, null);
     }
 
@@ -119,6 +124,7 @@ public class DynamicTableManager {
     public List<String> listRecords(String collectionName, int limit,
                                     String sortExpr,
                                     List<com.nocobase.meta.FieldDef> fields) {
+        validateIdentifier(collectionName); // PHASE116 加固
         // PHASE71: id 是独立列(extra 里没有),必须注入返回 JSON,
         // 否则前端拿不到 id(无法编辑/删除/建立关联),rollup 也无法定位关联记录。
         // 注意路径只能是 '{id}' —— PostgreSQL 的 jsonb_set 只能创建**最后一级**缺失键,
@@ -190,6 +196,7 @@ public class DynamicTableManager {
      */
     public boolean existsByFieldValue(String collectionName, String fieldName,
                                       String value, String excludeId) {
+        validateIdentifier(collectionName); // PHASE116 加固
         if (fieldName == null || !fieldName.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
             return false; // 非法字段名视为无法判定(不误报冲突)
         }
@@ -248,6 +255,7 @@ public class DynamicTableManager {
                                                 List<String> groupByFields,
                                                 List<AggSpec> aggSpecs,
                                                 List<CollectionService.FilterRule> filters) {
+        validateIdentifier(collectionName); // PHASE116 加固
         List<String> groups = safeFields(groupByFields);
         List<AggSpec> aggs = aggSpecs == null ? List.of() : aggSpecs.stream()
                 .filter(a -> a != null && isSafeName(a.field()))
@@ -348,6 +356,7 @@ public class DynamicTableManager {
      * 按 ID 取单条记录的 extra JSON(Week 14.5 P3-3 补完).
      */
     public java.util.Optional<String> getRecord(String collectionName, String id) {
+        validateIdentifier(collectionName); // PHASE116 加固
         // PHASE71: 同 listRecords —— 注入 id 到返回 JSON（路径只能是 '{id}'，见 listRecords 注释）
         var list = jdbc.queryForList(
                 "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
@@ -363,6 +372,7 @@ public class DynamicTableManager {
      * 更新记录 extra JSON(整段覆盖).
      */
     public int updateRecord(String collectionName, String id, String jsonData) {
+        validateIdentifier(collectionName); // PHASE116 加固
         return jdbc.update(
                 "UPDATE " + physicalTableName(collectionName) +
                 " SET extra = ?::jsonb, updated_at = NOW() WHERE id = ?::uuid",
@@ -374,6 +384,7 @@ public class DynamicTableManager {
      * 删除单条记录.
      */
     public int deleteRecord(String collectionName, String id) {
+        validateIdentifier(collectionName); // PHASE116 加固
         return jdbc.update(
                 "DELETE FROM " + physicalTableName(collectionName) +
                 " WHERE id = ?::uuid",
@@ -389,6 +400,7 @@ public class DynamicTableManager {
      * 添加物理列.
      */
     public void addPhysicalColumn(String collectionName, String columnName, String columnType) {
+        validateIdentifier(collectionName); // PHASE116 加固
         validateIdentifier(columnName);
         jdbc.execute("ALTER TABLE " + physicalTableName(collectionName) +
                 " ADD COLUMN " + columnName + " " + columnType);
@@ -398,6 +410,7 @@ public class DynamicTableManager {
      * 删除物理列.
      */
     public void dropPhysicalColumn(String collectionName, String columnName) {
+        validateIdentifier(collectionName); // PHASE116 加固
         validateIdentifier(columnName);
         jdbc.execute("ALTER TABLE " + physicalTableName(collectionName) +
                 " DROP COLUMN " + columnName);
@@ -407,6 +420,7 @@ public class DynamicTableManager {
      * 重命名物理列.
      */
     public void renamePhysicalColumn(String collectionName, String oldName, String newName) {
+        validateIdentifier(collectionName); // PHASE116 加固
         validateIdentifier(oldName);
         validateIdentifier(newName);
         jdbc.execute("ALTER TABLE " + physicalTableName(collectionName) +
@@ -421,6 +435,7 @@ public class DynamicTableManager {
      * 其他类型抛出明确错误(不静默放行)。
      */
     public void alterPhysicalColumn(String collectionName, String columnName, String newColumnType) {
+        validateIdentifier(collectionName); // PHASE116 加固
         validateIdentifier(columnName);
         String safeType = mapColumnType(newColumnType);
         jdbc.execute("ALTER TABLE " + physicalTableName(collectionName) +
@@ -467,6 +482,7 @@ public class DynamicTableManager {
      * 拿当前表的所有字段(包括物理列 + JSONB key).
      */
     public List<Map<String, Object>> getColumns(String collectionName) {
+        validateIdentifier(collectionName); // PHASE116 加固
         return jdbc.queryForList(
                 "SELECT column_name, data_type FROM information_schema.columns " +
                 "WHERE table_name = ? AND table_schema = ?",
