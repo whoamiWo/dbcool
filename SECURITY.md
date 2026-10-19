@@ -180,10 +180,21 @@ mvn -o test -Dtest=ControllerAuthorizationCoverageTest -DargLine="-Dauthz.update
   `application-test.properties:22` 对齐
 - `KeyRingService` 非 dev 阻断语义不变（仍抛异常，非 warn）
 
+### 已处置：MinIO 对象存储弱口令兜底移除（PHASE114 后续加固）
+
+`backend-python/services/backup.py:57` 原 `os.environ.get("MINIO_ROOT_PASSWORD", "minio123")`
+在「Python 直跑 + `MINIO_ENABLED=true` + 未注入密码」时以弱口令访问对象存储。
+compose 路径已由 `${MINIO_ROOT_PASSWORD:?}` 挡住，故仅本地直跑受影响。
+
+处置（与 JWT 同语义，延迟到消费时校验）：
+- `_MINIO_SECRET_KEY` 默认改为 `None`（移除 `minio123`）
+- 在 MinIO 分支真正使用 `Minio(client)` 前 `if not _MINIO_SECRET_KEY: raise RuntimeError`
+  避免模块导入期 `os.environ[...]` 让未启用 MinIO 的部署（默认路径）崩溃
+- `tests/conftest.py` 注入 `MINIO_ROOT_PASSWORD=ci_minio_root_password_for_tests`
+
 ### 已知未处置（见 `TECH_DEBT.md`）
 
-- `backend-python/.../backup.py:57` MinIO 口令回落 `minio123`（PHASE114 未处置）
-- WebSocket `setAllowedOriginPatterns("*")` 三处
+- WebSocket `setAllowedOriginPatterns("*")` 三处（`/ws/alerts` 自身无鉴权，风险面较大）
 - 缺 `X-Frame-Options` / `CSP` / `X-Content-Type-Options` 响应头
 
 ## 7. PHASE99 官方安全门禁（Trivy + ZAP）
