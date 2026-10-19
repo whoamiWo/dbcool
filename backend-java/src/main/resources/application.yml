@@ -86,7 +86,11 @@ app:
     agent-id: ${DINGTALK_AGENT_ID:}
     corp-id: ${DINGTALK_CORP_ID:}
   jwt:
-    secret: ${JWT_SECRET:dev_jwt_secret_at_least_32_characters_long_for_hs256}
+    # PHASE114: 移除 dev 占位默认值 —— 未注入 JWT_SECRET 直接启动失败(fail fast),
+    # 与 docker-compose 的 ${JWT_SECRET:?} 及 KeyRingService 硬阻断对齐。
+    # 本地开发:export JWT_SECRET=$(openssl rand -hex 32)
+    # 测试:application-test.properties 提供 ci_jwt_secret 专用值
+    secret: ${JWT_SECRET:?JWT_SECRET 环境变量未设置,参见 DEPLOY.md}
     # Week 42 R10:轮换期间保留上一个签名密钥,旧 kid 仍可验证
     # 真实部署应由 KMS 注入 — 本地测试可留空
     previous-secret: ${JWT_PREVIOUS_SECRET:}
