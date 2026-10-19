@@ -16,14 +16,18 @@ import com.nocobase.alert.ws.AlertWebSocketHandler;
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private final AlertWebSocketHandler alertHandler;
+    private final SecurityConfig securityConfig;
 
     @Autowired
-    public WebSocketConfig(AlertWebSocketHandler alertHandler) {
+    public WebSocketConfig(AlertWebSocketHandler alertHandler, SecurityConfig securityConfig) {
         this.alertHandler = alertHandler;
+        this.securityConfig = securityConfig;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(alertHandler, "/ws/alerts").setAllowedOriginPatterns("*");
+        // PHASE114 加固: 原为 setAllowedOriginPatterns("*") 任意源放行，现与 REST 同源白名单对齐
+        registry.addHandler(alertHandler, "/ws/alerts")
+                .setAllowedOriginPatterns(securityConfig.allowedOrigins().toArray(new String[0]));
     }
 }

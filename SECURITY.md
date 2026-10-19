@@ -192,9 +192,21 @@ compose 路径已由 `${MINIO_ROOT_PASSWORD:?}` 挡住，故仅本地直跑受�
   避免模块导入期 `os.environ[...]` 让未启用 MinIO 的部署（默认路径）崩溃
 - `tests/conftest.py` 注入 `MINIO_ROOT_PASSWORD=ci_minio_root_password_for_tests`
 
+### 已处置：WebSocket CORS 由 `*` 收敛为同源白名单（PHASE114 后续加固）
+
+**风险面**：原 `/ws/im/**`、`/ws/huddle`、`/ws/alerts` 三处均 `setAllowedOriginPatterns("*")`，
+允许任意来源浏览器 JS 发起 WebSocket 握手预检（OPTIONS）。虽 `StompHandshakeInterceptor`（握手阶段）与
+`anyRequest().authenticated()`（默认）已在更底层拦截无 JWT 请求，但 `*` 使 CORS 预检阶段泄露
+"服务端接受任何来源" 的安全信号，且一旦握手拦截漏掉则直接暴露。
+
+处置（与 REST CORS 白名单 `http://localhost:5173,http://localhost:3000,http://localhost` 对齐）：
+- `SecurityConfig#corsConfigurationSource()` 改为读取 `app.cors.allowed-origins`（原 yml 中已定义但未读）
+  —— 同步修掉 TECH_DEBT #11 配置漂移
+- 3 个 WebSocket 配置类注入 `SecurityConfig`，调用 `securityConfig.allowedOrigins()` 替换 `*`
+- 生产同源部署不受影响（CORS 仅在跨源时生效），开发 `localhost:5173` 访问正常
+
 ### 已知未处置（见 `TECH_DEBT.md`）
 
-- WebSocket `setAllowedOriginPatterns("*")` 三处（`/ws/alerts` 自身无鉴权，风险面较大）
 - 缺 `X-Frame-Options` / `CSP` / `X-Content-Type-Options` 响应头
 
 ## 7. PHASE99 官方安全门禁（Trivy + ZAP）

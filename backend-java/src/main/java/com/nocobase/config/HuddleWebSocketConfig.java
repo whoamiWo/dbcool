@@ -29,17 +29,21 @@ public class HuddleWebSocketConfig implements WebSocketConfigurer {
 
     private final JwtService jwtService;
     private final HuddleSignalingHandler huddleSignalingHandler;
+    private final SecurityConfig securityConfig;
 
-    public HuddleWebSocketConfig(JwtService jwtService, HuddleSignalingHandler huddleSignalingHandler) {
+    public HuddleWebSocketConfig(JwtService jwtService, HuddleSignalingHandler huddleSignalingHandler,
+                                 SecurityConfig securityConfig) {
         this.jwtService = jwtService;
         this.huddleSignalingHandler = huddleSignalingHandler;
+        this.securityConfig = securityConfig;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(huddleSignalingHandler, "/ws/huddle")
                 .addInterceptors(new StompHandshakeInterceptor(jwtService))
-                .setAllowedOriginPatterns("*");
+                // PHASE114 加固: 原为 "*" 任意源放行，现与 REST 同源白名单对齐
+                .setAllowedOriginPatterns(securityConfig.allowedOrigins().toArray(new String[0]));
     }
 
     /**

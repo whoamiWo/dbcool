@@ -4,6 +4,7 @@ import com.nocobase.apikey.ApiKeyFilter;
 import com.nocobase.auth.JwtAuthFilter;
 import com.nocobase.auth.MdcFilter;
 import com.nocobase.ratelimit.GlobalRateLimitFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -35,6 +36,10 @@ public class SecurityConfig {
     /** PHASE 60 R1: 全局限流过滤器，早于认证返回 401。 */
     private final GlobalRateLimitFilter globalRateLimitFilter;
     private final com.nocobase.quota.TenantQuotaFilter tenantQuotaFilter;
+
+    /** PHASE114: 统一 CORS/WS 允许来源，读取 app.cors.allowed-origins（默认 dev 本地） */
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://localhost}")
+    private String allowedOriginsRaw;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter,
                           GlobalRateLimitFilter globalRateLimitFilter,
@@ -149,11 +154,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(java.util.List.of(
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "http://localhost"
-        ));
+        config.setAllowedOrigins(allowedOrigins());
         config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(java.util.List.of("*"));
         config.setAllowCredentials(true);
@@ -162,5 +163,13 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    /** PHASE114: 解析逗号分隔的允许来源列表，供 REST CORS 与 WebSocket 端点共用。 */
+    public java.util.List<String> allowedOrigins() {
+        return java.util.Arrays.stream(allowedOriginsRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 }

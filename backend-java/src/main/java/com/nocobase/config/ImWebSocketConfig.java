@@ -30,9 +30,11 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class ImWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtService jwtService;
+    private final SecurityConfig securityConfig;
 
-    public ImWebSocketConfig(JwtService jwtService) {
+    public ImWebSocketConfig(JwtService jwtService, SecurityConfig securityConfig) {
         this.jwtService = jwtService;
+        this.securityConfig = securityConfig;
     }
 
     @Override
@@ -45,7 +47,8 @@ public class ImWebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint(StompDestinations.ENDPOINT)
-                .setAllowedOriginPatterns("*")
+                // PHASE114 加固: 原为 "*" 任意源放行，现与 REST 同源白名单对齐
+                .setAllowedOriginPatterns(securityConfig.allowedOrigins().toArray(new String[0]))
                 .addInterceptors(new StompHandshakeInterceptor(jwtService))
                 .withSockJS();
     }
