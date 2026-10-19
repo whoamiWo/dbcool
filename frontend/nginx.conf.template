@@ -20,6 +20,11 @@ server {
 __IF_TLS__
     # PHASE100 T3: 80 → 443 永久跳转
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    # PHASE115 安全响应头（域名模式 80 跳转页也需发送）
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';" always;
     return 301 https://$host$request_uri;
 __ELSE__
     # IP 直连模式：80 直接服务
@@ -29,6 +34,12 @@ __ELSE__
     gzip on;
     gzip_types text/plain text/css application/javascript application/json image/svg+xml;
     gzip_min_length 1024;
+
+    # PHASE115 安全响应头（IP 模式也需发送）
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';" always;
 
     # Java 后端
     location /api/ {
@@ -52,6 +63,11 @@ __ELSE__
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        # 本块有 add_header，会阻断 server 级安全头继承，故此处重复声明
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';" always;
         try_files $uri =404;
     }
 

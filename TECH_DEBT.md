@@ -27,10 +27,9 @@
 |---|------|--------|------|------|------|
 | 7 | **JWT 签名密钥有硬编码 dev 默认值** | 🔴 高 | `backend-java/src/main/resources/application.yml:89` `secret: ${JWT_SECRET:dev_jwt_secret_at_least_32_characters_long_for_hs256}`；`KeyRingService.java:80` 仅 warn 不阻断 | compose 路径已被 `${JWT_SECRET:?}` 挡住，但 **dev profile 直跑 Spring Boot 时该公开密钥生效** → 可自签任意 userId/tenantId 的 JWT，击穿租户隔离与鉴权 | 改为无回落（未注入即启动失败），或仅在 test profile 保留 |
 | 8 | ~~Python 侧 MinIO 弱口令回落~~ ✅ | ~~🟡 中~~ 已修复 | `backup.py:57` 已移除 `minio123` 默认值，MinIO 分支消费前 fail fast；`conftest.py` 注入 CI 专用密码 | 见 SECURITY.md | 已修复（PHASE114 后续，2026-10-19） |
-| 9 | WebSocket CORS 任意源 (`setAllowedOriginPatterns("*")`) 三处 | 🟡 中 | `WebSocketConfig.java:27`、`ImWebSocketConfig.java:48`、`HuddleWebSocketConfig.java:42` | 生产同源部署不受影响，但开发 `localhost:5173` 访问正常，CORS 预检阶段泄露安全信号 | 已修复（PHASE114 后续，2026-10-19） |
-| 9 | **WebSocket Origin 全开** | 🟡 中 | `config/WebSocketConfig.java:27`、`HuddleWebSocketConfig.java:42`、`ImWebSocketConfig.java:48` 均 `setAllowedOriginPatterns("*")` | 任意来源可建连；`/ws/alerts` 自身无鉴权（`SecurityConfig.java:104` 注释自承） | 收敛为域名白名单 |
-| 10 | **安全响应头缺失** | 🟡 中 | 全仓无 `X-Frame-Options` / `Content-Security-Policy` / `X-Content-Type-Options` / `Referrer-Policy`（HSTS ✅ 已配 `nginx.conf:36`） | 点击劫持、MIME 嗅探等 | nginx 或 SecurityConfig 补充 |
-| 11 | **CORS 配置漂移** | 🟡 低 | `application.yml:95-96` 定义 `app.cors.allowed-origins`，但 `SecurityConfig.java:150-165` 从未读取（硬编码 localhost） | 配置改了不生效，运维易误解 | 接入配置或删除死配置 |
+| 9 | ~~WebSocket Origin 全开~~ ✅ | ~~🟡 中~~ 已修复 | `WebSocketConfig.java:27`、`HuddleWebSocketConfig.java:42`、`ImWebSocketConfig.java:48` 原均 `setAllowedOriginPatterns("*")`，现已收敛为 `app.cors.allowed-origins` 白名单 | 任意来源可建连 | 已修复（PHASE114 后续，2026-10-19） |
+| 10 | ~~安全响应头缺失~~ ✅ | ~~🟡 中~~ 已修复 | 已在 `frontend/nginx.conf.template` + `render_nginx.py`（443 块）补 `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/`CSP`，`/assets/` 防继承阻断 | 见 SECURITY.md PHASE115 | 已修复（2026-10-19，CSP `unsafe-inline/eval` 收敛待前端改造） |
+| 11 | ~~CORS 配置漂移~~ ✅ | ~~🟡 低~~ 已修复 | `SecurityConfig` 已改为读取 `app.cors.allowed-origins`（默认 localhost），WebSocket 三处同源 | 见 SECURITY.md | 已修复（PHASE114 后续，2026-10-19） |
 | 12 | **Spring Boot 3.3.5 已 EOL** | 🟡 低 | `backend-java/pom.xml:7-10` | 3.3.x 分支停止 OSS 支持，安全补丁不再回溯 | 排期升级 3.4/3.5 |
 | 13 | **动态 SQL 标识符校验不完整** | 🟡 低 | `DynamicTableManager` 仅校验 columnName，**不校验 collectionName**（依赖调用方先查元数据）；`getNextAutonumber` 已补，其余路径仍靠 `CollectionService.get()` 库内白名单 | 新增调用方绕过即成注入点 | 在 `DynamicTableManager` 入口统一校验 |
 | 14 | **文档债务：228 个临时任务书未归档** | 🟡 低 | 根目录 232 个 md，其中 `PHASE*_PROMPT` 86、`PHASE*_TASKS` 64、`WEEK_*_HANDOFF` 36、`PHASE*_REWORK*` 42；`docs/archive/` 仅 1 个文件 | 仓库噪音，新人难辨有效文档 | 移入 `docs/archive/` |
