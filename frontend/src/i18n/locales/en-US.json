@@ -68,7 +68,10 @@
     "untitled": "Untitled",
     "view": "View",
     "name": "Name",
-    "description": "Description"
+    "description": "Description",
+    "back": "Back",
+    "submit": "Submit",
+    "submitting": "Submitting…"
   },
   "board": {
     "title": "Board",
@@ -209,7 +212,8 @@
     "uploadAttachmentHint": "Drag or click to upload (≤50MB)",
     "uploadAttachment": "Upload attachment",
     "inputMessage": "Type a message",
-    "sendMessage": "Send message"
+    "sendMessage": "Send message",
+    "burnedMessage": "This message has been burned"
   },
   "project": {
     "title": "Projects",
@@ -1192,5 +1196,72 @@
     "empty": "No audit records",
     "retentionPolicy": "Retention policy TBD — each query returns latest {{limit}}",
     "totalRecords": "{{total}} operations in tenant total"
+  },
+  "detail": {
+    "loading": "Loading…",
+    "recordNotFound": "Record not found"
+  },
+  "desktopWarning": {
+    "ariaLabel": "Mobile access notice",
+    "message": "This page is best viewed on a desktop for the optimal experience.",
+    "gotIt": "Got it"
+  },
+  "collab": {
+    "loadFailed": "Failed to load document",
+    "docNotFound": "Document not found",
+    "title": "Collaborative editing · Doc ID {{docId}}"
+  },
+  "kanbanView": {
+    "viewLoadFailed": "Failed to load view",
+    "collectionLoadFailed": "Failed to load collection meta",
+    "recordsLoadFailed": "Failed to load records",
+    "noGroupBy": "Kanban view has no groupBy field configured",
+    "emptyGroup": "(empty)",
+    "groupedBy": "Grouped by",
+    "groupCount": "{{count}} groups"
+  },
+  "erDiagram": {
+    "title": "Data Model ER Diagram",
+    "tables": "Tables",
+    "relations": "Relations",
+    "draggableNodes": "Draggable nodes",
+    "belongsTo": "Belongs to",
+    "hasMany": "Has many",
+    "legend": "🟢 System tables · 🔵 Business tables · 🟠 ER demo"
+  },
+  "gallery": {
+    "groupBy": "Group:",
+    "noGroup": "No grouping",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "totalRecords": "{{count}} records",
+    "groupCount": "{{count}} groups",
+    "itemsCount": "{{count}} items",
+    "noData": "No data"
+  },
+  "collectionDetail": {
+    "notFound": "Collection not found",
+    "editSchema": "Edit Schema",
+    "newForm": "New Form",
+    "newView": "New View",
+    "addRecord": "+ Add record",
+    "relatedForms": "Related forms",
+    "viewsSection": "Views",
+    "newRecord": "New record",
+    "recordsSection": "Records",
+    "noRecords": "No records yet"
+  },
+  "viewsList": {
+    "newView": "+ New view",
+    "emptyTitle": "No views yet",
+    "emptyDescWithCollection": "Create the first view for this collection — table, kanban, or gallery",
+    "emptyDesc": "Select a collection first, then create a view",
+    "name": "Name",
+    "type": "Type",
+    "collection": "Collection",
+    "actions": "Actions",
+    "open": "Open",
+    "edit": "Edit",
+    "label": "Views"
   }
 }

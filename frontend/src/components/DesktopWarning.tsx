@@ -6,11 +6,14 @@
  * - 改为 `position:'sticky'`：横幅进入正常文档流，内容自然下推，不再遮挡；
  *   同时外层补 flexWrap，避免窄屏下长文案换行后高度失控。
  */
+import { useTranslation } from 'react-i18next';
+
 export function DesktopWarning({ onDismiss }: { onDismiss?: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       role="region"
-      aria-label="移动端访问提示"
+      aria-label={t('desktopWarning.ariaLabel')}
       style={{
         position: 'sticky',
         top: 0,
@@ -36,7 +39,7 @@ export function DesktopWarning({ onDismiss }: { onDismiss?: () => void }) {
         }}
       >
         <span style={{ fontSize: 18 }}>⚠️</span>
-        <span style={{ fontWeight: 500 }}>该页面建议使用桌面端访问，以获得最佳体验。</span>
+        <span style={{ fontWeight: 500 }}>{t('desktopWarning.message')}</span>
         {onDismiss && (
           <button
             onClick={onDismiss}
@@ -50,7 +53,7 @@ export function DesktopWarning({ onDismiss }: { onDismiss?: () => void }) {
               fontSize: 14,
             }}
           >
-            知道了
+            {t('desktopWarning.gotIt')}
           </button>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import apiClient from '@/api/client';
@@ -14,6 +15,7 @@ interface WikiPageDto {
  * 协同编辑页 — 以 Wiki 文档为协作载体(docId 即 wiki page id)。
  */
 export default function CollabPage() {
+  const { t } = useTranslation();
   const { docId } = useParams<{ docId: string }>();
   const queryClient = useQueryClient();
 
@@ -40,7 +42,7 @@ export default function CollabPage() {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">
-          加载文档失败:{(error as Error)?.message ?? '文档不存在'}
+          {t('collab.loadFailed')}:{(error as Error)?.message ?? t('collab.docNotFound')}
         </Alert>
       </Box>
     );
@@ -54,7 +56,7 @@ export default function CollabPage() {
   return (
     <Box sx={{ p: 3, maxWidth: 1100, mx: 'auto' }}>
       <Typography variant="caption" color="text.secondary">
-        协同编辑 · 文档 ID {docId}
+        {t('collab.title', { docId })}
       </Typography>
       <CollabEditor
         docId={docId as string}

@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
@@ -6,6 +7,7 @@ import type { DetailConfig, ViewFull } from '@/types/view';
 
 /** 详情视图(US-205) — 单条记录垂直展示 */
 export function DetailViewPage() {
+  const { t } = useTranslation();
   const { id, recordId } = useParams<{ id: string; recordId: string }>();
   const { data: viewData } = useQuery({
     queryKey: ['view', id],
@@ -24,13 +26,13 @@ export function DetailViewPage() {
     enabled: !!collectionName,
   });
 
-  if (!viewData) return <p>加载中…</p>;
+  if (!viewData) return <p>{t('detail.loading')}</p>;
   const view = viewData;
   const config = view.config as unknown as DetailConfig;
   const fields: FieldDef[] = collectionData?.fields ?? [];
   const record = recordsData?.find((r: any) => r.id === recordId);
 
-  if (!record) return <p>记录不存在</p>;
+  if (!record) return <p>{t('detail.recordNotFound')}</p>;
 
   const displayFields = config.fields ?? fields.map((f) => f.name);
 

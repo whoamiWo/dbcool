@@ -1,4 +1,5 @@
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { } from '@/types/collection';
@@ -7,6 +8,7 @@ import EmptyState from '@/components/EmptyState';
 
 /** 视图列表 — Week 9 */
 export function ViewsListPage() {
+  const { t } = useTranslation();
   const { collection } = useParams<{ collection?: string }>();
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
@@ -22,14 +24,14 @@ export function ViewsListPage() {
     },
   });
 
-  if (isLoading) return <p>加载中…</p>;
+  if (isLoading) return <p>{t('common.loading')}</p>;
 
   const views = data ?? [];
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <h1>📊 视图{collection ? ` (${collection})` : ''}({views.length})</h1>
+        <h1>📊 {collection ? `${t('viewsList.label')} (${collection})(${views.length})` : `${t('viewsList.label')}(${views.length})`}</h1>
         {collection && (
           <Link
             to={`/designer/views/${collection}/new`}
@@ -41,20 +43,20 @@ export function ViewsListPage() {
               borderRadius: 4,
             }}
           >
-            + 新建视图
+            {t('viewsList.newView')}
           </Link>
         )}
       </div>
 
       {views.length === 0 ? (
         <EmptyState
-          title="还没有视图"
+          title={t('viewsList.emptyTitle')}
           description={
             collection
-              ? '为当前 Collection 创建第一个视图，自定义表格/看板/画廊展示'
-              : '先选择一个 Collection，再创建视图'
+              ? t('viewsList.emptyDescWithCollection')
+              : t('viewsList.emptyDesc')
           }
-          actionLabel={collection ? '+ 新建视图' : undefined}
+          actionLabel={collection ? t('viewsList.newView') : undefined}
           onAction={collection ? () => navigate(`/designer/views/${collection}/new`) : undefined}
         />
       ) : (
@@ -70,10 +72,10 @@ export function ViewsListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--color-bg-secondary)' }}>
-                <th style={{ padding: 12, textAlign: 'left' }}>名称</th>
-                <th style={{ padding: 12, textAlign: 'left' }}>类型</th>
-                <th style={{ padding: 12, textAlign: 'left' }}>Collection</th>
-                <th style={{ padding: 12, textAlign: 'right' }}>操作</th>
+                <th style={{ padding: 12, textAlign: 'left' }}>{t('viewsList.name')}</th>
+                <th style={{ padding: 12, textAlign: 'left' }}>{t('viewsList.type')}</th>
+                <th style={{ padding: 12, textAlign: 'left' }}>{t('viewsList.collection')}</th>
+                <th style={{ padding: 12, textAlign: 'right' }}>{t('viewsList.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -99,13 +101,13 @@ export function ViewsListPage() {
                       to={`/views/${v.id}/run`}
                       style={{ marginRight: 12, color: 'var(--color-success)', textDecoration: 'none' }}
                     >
-                      打开
+                      {t('viewsList.open')}
                     </Link>
                     <Link
                       to={`/designer/views/${v.collection_name}/${v.id}/edit`}
                       style={{ color: 'var(--color-info)', textDecoration: 'none' }}
                     >
-                      编辑
+                      {t('viewsList.edit')}
                     </Link>
                   </td>
                 </tr>
