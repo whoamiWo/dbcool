@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
 [![Backend CI](https://img.shields.io/badge/CI-passing-brightgreen)](./.github/workflows/backend-ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-83%25-brightgreen)](./backend-java/target/site/jacoco/index.html)
-[![Tests](https://img.shields.io/badge/tests-463%20passing-brightgreen)](#-测试)
+[![Tests](https://img.shields.io/badge/tests-2624%20passing-brightgreen)](#-测试)
 
 ## ✨ 核心能力
 
@@ -116,12 +116,45 @@ dbcool/
 
 ## 🧪 测试
 
-### 测试规模(Week 34 末)
+### 测试规模(PHASE117-121 最新实测)
 
-- **463 tests** 全 PASS
-- 单元测试(mock-based):440
-- E2E 集成测试(SpringBootTest + H2):8
-- 安全审计测试(SQL注入 / XSS / null / 大 body):15
+#### Java 后端（2242 tests）
+
+```bash
+cd backend-java && mvn test   # ✅ 2242/2242 PASS
+```
+
+| 类型 | 数量 | 说明 |
+|------|------|------|
+| 单元测试 | 2225 | mock-based，覆盖核心业务逻辑 |
+| E2E 集成测试 | 8 | SpringBootTest + H2（绕过 Flyway PG-specific） |
+| 安全审计测试 | 15 | SQL注入 / XSS / null / 大 body 拒绝用例 |
+| 门禁回归 | 94 | 鉴权棘轮（0缺口）、权限矩阵、SpEL 语法 |
+
+- **Jacoco 覆盖率**: 83% BUNDLE（10 条红线全达标，见下表）
+- **测试金字塔**: 单元 2225 / 安全 15 / E2E 8，顶层 E2E 抓集成层 bug，底层单元抓业务逻辑
+
+#### 前端 React（382 tests）
+
+```bash
+cd frontend && npx vitest run   # ✅ 382/382 PASS
+cd frontend && npx tsc --noEmit # ✅ 0 errors
+cd frontend && npx eslint src   # ✅ 0 warnings
+```
+
+| 类型 | 数量 | 说明 |
+|------|------|------|
+| vitest 单测 | 382 | DOM 交互、逻辑分支、i18n key 完整性 |
+| TypeScript 类型检查 | 0 error | 全量源码 tsc --noEmit 通过 |
+| ESLint 静态检查 | 0 warning | 遵循项目 ESLint 配置 |
+
+#### Playwright E2E（135 tests）
+
+```bash
+cd frontend && npx playwright test   # ✅ 135/135 PASS
+```
+
+覆盖登录流程、CRUD 操作、权限控制、i18n 切换等核心用户路径。
 
 ### 跑测试
 
@@ -215,19 +248,19 @@ add field → 同步 ALTER(小表秒过)
          → migration_jobs 表持久化
 ```
 
-### 4. 测试金字塔(Week 35)
+### 4. 测试金字塔(PHASE117 实测)
 
 ```
         /\
        /E \        E2E 集成(SpringBootTest + H2)
-      / 2  \       8 tests
+      / 8  \       8 tests
      /----\
     /SA \          安全审计(SQL 注入 / XSS / 越权)
-   / e2  \         15 tests
+   / 15  \         15 tests
   /------\
  / UNIT   \       单元测试(mock-based)
-/ tests    \      440 tests
-------------
+/ 2225    \      2225 tests
+----------
 ```
 
 每个测试类型抓不同层级的 bug。单元测试抓业务逻辑,E2E 抓集成层 bug,安全审计抓输入验证 bug。
@@ -241,19 +274,39 @@ add field → 同步 ALTER(小表秒过)
 | 2 MVP 定义(49 user stories) | ✅ |
 | 3 脚手架 + Week 3 真实代码 | ✅ |
 | 4 Epic 1-6 全功能 | ✅ Week 26 跑通 |
-| 4 测试饱和阶段(Week 25-33) | ✅ 440 tests / 83% bundle |
+| 4 测试饱和阶段(Week 25-33) | ✅ 83% bundle |
 | 4 方向变更阶段(Week 34-35) | ✅ E2E + 安全审计 + CI + 文档 |
-| 5 基线建立(下一阶段) | ⏳ |
+| 5 基线建立(PHASE110-116) | ✅ 上线终验 + 独立审计 |
+| 5 依赖升级(PHASE117) | ✅ Spring Boot 3.4.7 + SpEL 回归修复 |
+| 5 i18n 接入(PHASE118) | ✅ 5 批次 / 53 文件 / 250+ key |
+| 5 文档同步(PHASE119-123) | ✅ 门禁刷新 + 版本对齐 |
 | 6 迭代优化(Prime 协作) | ⏳ |
 | 7 终止判定 | ⏳ |
 
 ## 📈 进度数据
 
 - **后端 Java 源文件**:90+(12 个包)
-- **测试**:463 全 PASS(440 单元 + 8 E2E + 15 安全审计)
+- **测试**:2624 全 PASS（Java 2242 + 前端 382）
 - **覆盖率**:83% bundle / 10 条 Jacoco 红线全达标
-- **文档**:30+(规划 ADR 设计 WEEK_*_HANDOFF)
-- **总 commits**:44 (本会话累计)
+- **文档**:30+（规划 ADR 设计 WEEK_*_HANDOFF）
+- **总 commits**:120+（本会话累计）
+
+## 🛡️ 门禁状态（2026-10-20 实测）
+
+| 门禁 | 结果 |
+|------|------|
+| Java `mvn test` | ✅ 2242/2242 PASS（0F/0E） |
+| 前端 `npx vitest run` | ✅ 382/382 PASS |
+| 前端 `npx tsc --noEmit` | ✅ 0 errors |
+| 前端 `npx eslint src` | ✅ 0 warnings |
+| Playwright E2E | ✅ 135/135 PASS |
+| 冒烟测试 | ✅ 11/11 PASS |
+| 编排测试 | ✅ 8/8 PASS |
+| 依赖漏洞扫描 | ✅ 0 高危（1 MEDIUM，已登记可忽略） |
+| 跨栈契约 | ✅ 0 漂移 |
+| SaaS 就绪 | ✅ 11/11 |
+| 启动检查 | ✅ 0 问题 |
+| 密钥轮换 | ✅ 3/3 |
 
 ## 🐛 排错
 
