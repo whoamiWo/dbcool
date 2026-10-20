@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Card,
@@ -14,6 +15,7 @@ import {
 import { integrationApi } from '../api/integrations';
 
 export default function IntegrationsPage() {
+  const { t } = useTranslation();
   const [integrations, setIntegrations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +29,10 @@ export default function IntegrationsPage() {
       if (res.code === 0) {
         setIntegrations(res.data?.integrations || []);
       } else {
-        setError(res.message || '加载集成列表失败');
+        setError(res.message || t('integrations.loadFailed'));
       }
     } catch (err: any) {
-      setError(err.message || '网络错误');
+      setError(err.message || t('integrations.networkError'));
     } finally {
       setLoading(false);
     }
@@ -49,17 +51,17 @@ export default function IntegrationsPage() {
       if (res.code === 0) {
         await loadIntegrations();
       } else {
-        alert(res.message || '安装失败');
+        alert(res.message || t('integrations.installFailed'));
       }
     } catch (err: any) {
-      alert(err.message || '网络错误');
+      alert(err.message || t('integrations.networkError'));
     } finally {
       setProcessing(null);
     }
   };
 
   const handleUninstall = async (id: string) => {
-    if (!confirm('确定要卸载此集成吗？')) {
+    if (!confirm(t('integrations.confirmUninstall'))) {
       return;
     }
     try {
@@ -68,10 +70,10 @@ export default function IntegrationsPage() {
       if (res.code === 0) {
         await loadIntegrations();
       } else {
-        alert(res.message || '卸载失败');
+        alert(res.message || t('integrations.uninstallFailed'));
       }
     } catch (err: any) {
-      alert(err.message || '网络错误');
+      alert(err.message || t('integrations.networkError'));
     } finally {
       setProcessing(null);
     }
@@ -96,10 +98,10 @@ export default function IntegrationsPage() {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        集成市场
+        {t('integrations.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        连接第三方应用，扩展系统能力。安装集成后，可在相应设置页面进行配置。
+        {t('integrations.subtitle')}
       </Typography>
 
       <Grid container spacing={3}>
@@ -115,10 +117,10 @@ export default function IntegrationsPage() {
             >
               <CardHeader
                 title={integration.name}
-                subheader={integration.kind === 'builtin' ? '内置渠道' : '插件'}
+                subheader={integration.kind === 'builtin' ? t('integrations.kindBuiltin') : t('integrations.kindPlugin')}
                 action={
                   integration.installed && (
-                    <Chip label="已安装" color="success" size="small" />
+                    <Chip label={t('integrations.installed')} color="success" size="small" />
                   )
                 }
               />
@@ -136,7 +138,7 @@ export default function IntegrationsPage() {
                     disabled={processing === integration.id}
                     onClick={() => handleUninstall(integration.id)}
                   >
-                    {processing === integration.id ? '处理中...' : '卸载'}
+                    {processing === integration.id ? t('integrations.processing') : t('integrations.uninstall')}
                   </Button>
                 ) : (
                   <Button
@@ -145,7 +147,7 @@ export default function IntegrationsPage() {
                     disabled={processing === integration.id}
                     onClick={() => handleInstall(integration.id)}
                   >
-                    {processing === integration.id ? '安装中...' : '安装'}
+                    {processing === integration.id ? t('integrations.installing') : t('integrations.install')}
                   </Button>
                 )}
               </Box>
@@ -156,7 +158,7 @@ export default function IntegrationsPage() {
 
       {integrations.length === 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          暂无可用集成
+          {t('integrations.empty')}
         </Alert>
       )}
     </Box>

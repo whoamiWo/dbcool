@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Box, Card, CardContent, TextField, Typography,
@@ -13,21 +14,27 @@ import apiClient from '@/api/client';
 /** AI 工具类型 */
 type AITool = 'wiki' | 'task' | 'code' | 'search' | 'general';
 
-/** 快捷提示词 */
-const QUICK_PROMPTS: Array<{ label: string; tool: AITool; prompt: string }> = [
-  { label: '📄 生成文档', tool: 'wiki', prompt: '请帮我生成一份产品需求文档(PRD)，包含背景、目标、范围、详细需求' },
-  { label: '📋 创建任务', tool: 'task', prompt: '请帮我创建一个新项目任务，标题为"季度复盘"，优先级为高' },
-  { label: '🔍 搜索知识', tool: 'search', prompt: '请搜索知识库中关于产品架构的文档' },
-  { label: '💻 生成代码', tool: 'code', prompt: '请用 TypeScript 写一个带分页查询的 React Hook' },
-  { label: '💬 通用问答', tool: 'general', prompt: '请解释微服务架构中服务拆分的最佳实践' },
+/**
+ * 快捷提示词 —— PHASE118 i18n：改为存 key 而非字面量。
+ *
+ * 原实现在模块级常量里写死中文，而 useTranslation() 是 hook 无法在组件外调用，
+ * 故改为保存 key，在组件内用 t(key) 取值。
+ */
+const QUICK_PROMPTS: Array<{ labelKey: string; promptKey: string; tool: AITool }> = [
+  { labelKey: 'agentChat.quickDoc', promptKey: 'agentChat.quickDocPrompt', tool: 'wiki' },
+  { labelKey: 'agentChat.quickTask', promptKey: 'agentChat.quickTaskPrompt', tool: 'task' },
+  { labelKey: 'agentChat.quickSearch', promptKey: 'agentChat.quickSearchPrompt', tool: 'search' },
+  { labelKey: 'agentChat.quickCode', promptKey: 'agentChat.quickCodePrompt', tool: 'code' },
+  { labelKey: 'agentChat.quickGeneral', promptKey: 'agentChat.quickGeneralPrompt', tool: 'general' },
 ];
 
 /** 统一 AI Copilot 面板 */
 export function AgentChatPage() {
+  const { t } = useTranslation();
   const [prompt, setPrompt] = useState('');
   const [selectedTool, setSelectedTool] = useState<AITool>('general');
   const [messages, setMessages] = useState<{ role: string; content: string; tool?: AITool }[]>([
-    { role: 'assistant', content: '你好，我是 AI Copilot。我可以帮你：生成文档、创建任务、搜索知识、生成代码、通用问答。', tool: 'general' },
+    { role: 'assistant', content: t('agentChat.welcome'), tool: 'general' },
   ]);
 
   const quotaQuery = useQuery({
@@ -51,7 +58,7 @@ export function AgentChatPage() {
       });
     },
     onSuccess: (resp, { tool, p }) => {
-      const result = resp?.data?.result ?? '无响应';
+      const result = resp?.data?.result ?? t('agentChat.noResponse');
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: p, tool },
@@ -63,7 +70,7 @@ export function AgentChatPage() {
       setMessages((prev) => [
         ...prev,
         { role: 'user', content: p, tool },
-        { role: 'assistant', content: '请求失败，可能 LLM 网关未启用或配额已用尽。', tool },
+        { role: 'assistant', content: t('agentChat.requestFailed'), tool },
       ]);
       setPrompt('');
     },
@@ -83,7 +90,7 @@ export function AgentChatPage() {
     <Box sx={{ maxWidth: 1000, mx: 'auto', p: 3 }}>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <MagicIcon sx={{ color: 'var(--color-primary-400)' }} />
-        AI Copilot 统一入口
+        {t('agentChat.title')}
       </Typography>
 
       {/* 快捷工具栏 */}
@@ -91,10 +98,10 @@ export function AgentChatPage() {
         {QUICK_PROMPTS.map((q) => (
           <Chip
             key={q.tool}
-            label={q.label}
+            label={t(q.labelKey)}
             size="small"
             variant={selectedTool === q.tool ? 'filled' : 'outlined'}
-            onClick={() => handleQuickPrompt(q.tool, q.prompt)}
+            onClick={() => handleQuickPrompt(q.tool, t(q.promptKey))}
             sx={{
               cursor: 'pointer',
               bgcolor: selectedTool === q.tool ? 'var(--color-primary-500)' : undefined,
@@ -127,7 +134,7 @@ export function AgentChatPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 {m.role === 'assistant' && <MagicIcon sx={{ fontSize: 16, color: 'var(--color-primary-300)' }} />}
                 <Typography variant="caption" sx={{ fontWeight: 600, opacity: 0.8 }}>
-                  {m.role === 'user' ? '你' : 'Copilot'}
+                  {m.role === 'user' ? t('agentChat.roleUser') : t('agentChat.roleCopilot')}
                 </Typography>
                 {m.tool && (
                   <Chip size="small" label={m.tool} sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'var(--color-text-primary)', fontSize: 10, height: 16 }} />
@@ -158,14 +165,14 @@ export function AgentChatPage() {
               handleSend();
             }
           }}
-          placeholder={`选择工具后输入... (${selectedTool})`}
+          placeholder={t('agentChat.inputPlaceholder', { tool: selectedTool })}
           disabled={mutation.isPending}
           size="small"
         />
-        <Tooltip title={`发送 (${selectedTool})`}>
+        <Tooltip title={t('agentChat.sendTooltip', { tool: selectedTool })}>
           <IconButton
             onClick={handleSend}
-            aria-label="发送消息"
+            aria-label={t('agentChat.sendAria')}
             disabled={mutation.isPending || !prompt.trim()}
             sx={{
               bgcolor: 'var(--color-primary-500)',
@@ -182,7 +189,7 @@ export function AgentChatPage() {
       {/* 配额信息 */}
       {quotaQuery.data?.data?.remaining !== undefined && (
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          LLM 配额剩余: {quotaQuery.data.data.remaining} 次
+          {t('agentChat.quotaRemaining', { count: quotaQuery.data.data.remaining })}
         </Typography>
       )}
     </Box>

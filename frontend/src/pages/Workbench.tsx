@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -14,6 +15,7 @@ import apiClient from '@/api/client';
 
 /** 统一工作台门户 — 聚合视图、Wiki、BI、项目、IM 入口。 */
 export default function WorkbenchPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [q, setQ] = useState('');
 
@@ -69,12 +71,12 @@ export default function WorkbenchPage() {
   }, [channelsResp]);
 
   const cards = [
-    { icon: Storage, title: '数据模型', desc: '动态 Collection + 表单/视图设计器', path: '/designer/schemas', count: collections.length, meta: '低代码底座', color: 'var(--color-primary-500)' },
-    { icon: AutoGraph, title: 'BI 报表', desc: '数据透视与图表可视化', path: '/bi', count: views.length, meta: '数据分析', color: 'var(--color-secondary-500)' },
-    { icon: TaskAlt, title: '项目协同', desc: '任务看板与甘特图', path: '/projects', count: projects.length, meta: '项目管理', color: 'var(--color-success)' },
-    { icon: MessageIcon, title: '即时消息', desc: '频道、线程、在线状态', path: '/im', count: channels.length, meta: '团队协作', color: 'var(--color-info)' },
-    { icon: Workspaces, title: '工作流', desc: '审批/通知/数据更新/HTTP', path: '/designer/workflows', count: 0, meta: '流程引擎', color: 'var(--color-error)' },
-    { icon: FolderOpen, title: 'Wiki 知识库', desc: '文档编辑、版本历史、全文检索', path: '/wiki/kb', count: wikis.length, meta: '知识管理', color: 'var(--color-primary-400)' },
+    { icon: Storage, title: t('workbench.cardDataModel'), desc: t('workbench.cardDataModelDesc'), path: '/designer/schemas', count: collections.length, meta: t('workbench.cardDataModelMeta'), color: 'var(--color-primary-500)' },
+    { icon: AutoGraph, title: t('workbench.cardBi'), desc: t('workbench.cardBiDesc'), path: '/bi', count: views.length, meta: t('workbench.cardBiMeta'), color: 'var(--color-secondary-500)' },
+    { icon: TaskAlt, title: t('workbench.cardProject'), desc: t('workbench.cardProjectDesc'), path: '/projects', count: projects.length, meta: t('workbench.cardProjectMeta'), color: 'var(--color-success)' },
+    { icon: MessageIcon, title: t('workbench.cardIm'), desc: t('workbench.cardImDesc'), path: '/im', count: channels.length, meta: t('workbench.cardImMeta'), color: 'var(--color-info)' },
+    { icon: Workspaces, title: t('workbench.cardWorkflow'), desc: t('workbench.cardWorkflowDesc'), path: '/designer/workflows', count: 0, meta: t('workbench.cardWorkflowMeta'), color: 'var(--color-error)' },
+    { icon: FolderOpen, title: t('workbench.cardWiki'), desc: t('workbench.cardWikiDesc'), path: '/wiki/kb', count: wikis.length, meta: t('workbench.cardWikiMeta'), color: 'var(--color-primary-400)' },
   ];
 
   const filtered = cards.filter((c) =>
@@ -84,12 +86,12 @@ export default function WorkbenchPage() {
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
       <Stack direction="row" spacing={2} sx={{ mb: 3, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>🏢 统一工作台</Typography>
-        <Typography variant="body2" color="text.secondary">聚合数据、文档、项目与协作入口</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>🏢 {t('workbench.title')}</Typography>
+        <Typography variant="body2" color="text.secondary">{t('workbench.subtitle')}</Typography>
         <Box sx={{ flex: 1 }} />
         <TextField
           size="small"
-          placeholder="搜索模块…"
+          placeholder={t('workbench.searchPlaceholder')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           sx={{ minWidth: 240 }}
@@ -153,16 +155,16 @@ export default function WorkbenchPage() {
       </Grid>
 
       <Box sx={{ mt: 4, p: 3, background: 'var(--glass-bg-light)', backdropFilter: 'var(--glass-blur)', borderRadius: 'var(--radius-lg)', border: 'var(--glass-border)' }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: 'text.primary' }}>快速入口</Typography>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: 'text.primary' }}>{t('workbench.quickAccess')}</Typography>
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           {[
-            { label: '知识库列表', path: '/wiki/kb' },
-            { label: '数据模型设计', path: '/designer/schemas' },
-            { label: 'BI 报表', path: '/bi' },
-            { label: '项目任务', path: '/projects' },
-            { label: 'IM 消息', path: '/im' },
-            { label: '工作流', path: '/designer/workflows' },
-            { label: '协同编辑', path: '/collab/demo-doc-id' },
+            { label: t('workbench.quickKb'), path: '/wiki/kb' },
+            { label: t('workbench.quickSchema'), path: '/designer/schemas' },
+            { label: t('workbench.cardBi'), path: '/bi' },
+            { label: t('workbench.quickProject'), path: '/projects' },
+            { label: t('workbench.quickIm'), path: '/im' },
+            { label: t('workbench.cardWorkflow'), path: '/designer/workflows' },
+            { label: t('workbench.quickCollab'), path: '/collab/demo-doc-id' },
           ].map((item) => (
             <Button key={item.path} variant="outlined" size="small" onClick={() => navigate(item.path)}>
               {item.label}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -37,22 +38,26 @@ interface RunEvent {
   detail: string;
 }
 
-function slaChip(run?: PlaybookRun) {
+/** PHASE118 i18n：本函数为模块级（hook 不可用），故接收 t 参数由组件传入 */
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function slaChip(run: PlaybookRun | undefined, t: Translate) {
   if (!run) return null;
-  if (run.status === 'FINISHED') return <Chip size="small" color="success" label="已完成" />;
-  if (run.status === 'OVERDUE') return <Chip size="small" color="error" label="SLA 已逾期" />;
+  if (run.status === 'FINISHED') return <Chip size="small" color="success" label={t('playbookRun.statusFinished')} />;
+  if (run.status === 'OVERDUE') return <Chip size="small" color="error" label={t('playbookRun.slaOverdue')} />;
   if (run.dueAt) {
     const remainMs = new Date(run.dueAt).getTime() - Date.now();
-    if (remainMs < 0) return <Chip size="small" color="error" label="SLA 已逾期" />;
+    if (remainMs < 0) return <Chip size="small" color="error" label={t('playbookRun.slaOverdue')} />;
     if (remainMs < 3600_000) {
-      return <Chip size="small" color="warning" label={`即将到期 ${Math.floor(remainMs / 60000)} 分钟`} />;
+      return <Chip size="small" color="warning" label={t('playbookRun.dueSoon', { minutes: Math.floor(remainMs / 60000) })} />;
     }
-    return <Chip size="small" color="info" label={`剩余 ${Math.floor(remainMs / 3600000)} 小时`} />;
+    return <Chip size="small" color="info" label={t('playbookRun.remainingHours', { hours: Math.floor(remainMs / 3600000) })} />;
   }
-  return <Chip size="small" label="运行中" />;
+  return <Chip size="small" label={t('playbookRun.statusRunning')} />;
 }
 
 export function PlaybookRunPage() {
+  const { t, i18n } = useTranslation();
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -118,16 +123,16 @@ export function PlaybookRunPage() {
     <Box sx={{ maxWidth: 1080, mx: 'auto', p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 600, flexGrow: 1 }}>
-          {playbook?.name ?? '剧本详情'}
+          {playbook?.name ?? t('playbookRun.fallbackTitle')}
         </Typography>
-        {slaChip(run)}
+        {slaChip(run, t)}
         <Button
           variant="contained"
           startIcon={runMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <PlayIcon />}
           onClick={() => runMutation.mutate()}
           disabled={runMutation.isPending}
         >
-          运行
+          {t('playbookRun.run')}
         </Button>
         <Button
           variant="outlined"
@@ -136,7 +141,7 @@ export function PlaybookRunPage() {
           onClick={() => finishMutation.mutate()}
           disabled={finishMutation.isPending || !run || run.status === 'FINISHED'}
         >
-          完成并复盘
+          {t('playbookRun.finishAndRetro')}
         </Button>
       </Box>
 
@@ -144,7 +149,7 @@ export function PlaybookRunPage() {
         <Chip
           color="success"
           variant="outlined"
-          label="复盘页已生成"
+          label={t('playbookRun.retroCreated')}
           sx={{ mb: 2 }}
           component={Link}
           to="/wiki/kb"
@@ -166,7 +171,7 @@ export function PlaybookRunPage() {
               </Box>
               {checklist.length === 0 ? (
                 <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                  {isLoading ? '加载中…' : '该剧本暂无 Checklist 项,可在定义中补充 checklist 数组'}
+                  {isLoading ? t('playbookRun.loading') : t('playbookRun.noChecklist')}
                 </Typography>
               ) : (
                 <List dense>
@@ -216,43 +221,43 @@ export function PlaybookRunPage() {
           <Card variant="outlined" sx={{ borderRadius: 2 }}>
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                运行信息
+                {t('playbookRun.runInfo')}
               </Typography>
               {run ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    状态: {run.status}
+                    {t('playbookRun.status', { status: run.status })}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    开始: {new Date(run.startedAt).toLocaleString('zh-CN')}
+                    {t('playbookRun.startedAt', { date: new Date(run.startedAt).toLocaleString(i18n.language) })}
                   </Typography>
                   {run.finishedAt && (
                     <Typography variant="body2" color="text.secondary">
-                      结束: {new Date(run.finishedAt).toLocaleString('zh-CN')}
+                      {t('playbookRun.finishedAt', { date: new Date(run.finishedAt).toLocaleString(i18n.language) })}
                     </Typography>
                   )}
                   {run.dueAt && (
                     <Typography variant="body2" color="text.secondary">
-                      SLA 到期: {new Date(run.dueAt).toLocaleString('zh-CN')}
+                      {t('playbookRun.slaDueAt', { date: new Date(run.dueAt).toLocaleString(i18n.language) })}
                     </Typography>
                   )}
                 </Box>
               ) : (
                 <EmptyState
-                  title="还没有运行"
-                  description="点击右上角「运行」发起第一次执行，启动你的剧本"
-                  actionLabel="运行"
+                  title={t('playbookRun.emptyTitle')}
+                  description={t('playbookRun.emptyDesc')}
+                  actionLabel={t('playbookRun.run')}
                   onAction={() => runMutation.mutate()}
                 />
               )}
 
               <Divider sx={{ my: 1.5 }} />
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                事件流
+                {t('playbookRun.eventStream')}
               </Typography>
               {events.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
-                  暂无事件
+                  {t('playbookRun.noEvents')}
                 </Typography>
               ) : (
                 events.map((e, i) => (
@@ -260,7 +265,7 @@ export function PlaybookRunPage() {
                     <EventIcon fontSize="small" color="action" sx={{ mt: 0.3 }} />
                     <Box>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(e.at).toLocaleString('zh-CN')} · {e.event}
+                        {new Date(e.at).toLocaleString(i18n.language)} · {e.event}
                       </Typography>
                       <Typography variant="body2">{e.detail}</Typography>
                     </Box>
@@ -274,14 +279,14 @@ export function PlaybookRunPage() {
             <Card variant="outlined" sx={{ borderRadius: 2, mt: 2 }}>
               <CardContent>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  历史运行({runs.length})
+                  {t('playbookRun.historyRuns', { count: runs.length })}
                 </Typography>
                 {runs.map((r) => (
                   <Chip
                     key={r.id}
                     size="small"
                     sx={{ m: 0.25 }}
-                    label={`${new Date(r.startedAt).toLocaleDateString('zh-CN')} · ${r.status}`}
+                    label={`${new Date(r.startedAt).toLocaleDateString(i18n.language)} · ${r.status}`}
                     color={r.id === run?.id ? 'primary' : 'default'}
                     variant={r.id === run?.id ? 'filled' : 'outlined'}
                     onClick={() => setSelectedRunId(r.id)}

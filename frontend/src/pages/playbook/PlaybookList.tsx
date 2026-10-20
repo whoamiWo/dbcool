@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -18,11 +19,12 @@ export interface Playbook {
   createdAt: string;
 }
 
+/** PHASE118 i18n：模块级常量改存 key，在组件内用 t() 取值（hook 不能在组件外调用） */
 const STATUS_FILTERS = [
-  { key: 'ALL', label: '全部' },
-  { key: 'ACTIVE', label: '已激活' },
-  { key: 'DRAFT', label: '草稿' },
-  { key: 'ARCHIVED', label: '已归档' },
+  { key: 'ALL', labelKey: 'playbookList.filterAll' },
+  { key: 'ACTIVE', labelKey: 'playbookList.filterActive' },
+  { key: 'DRAFT', labelKey: 'playbookList.filterDraft' },
+  { key: 'ARCHIVED', labelKey: 'playbookList.filterArchived' },
 ] as const;
 
 const STATUS_COLOR: Record<string, 'success' | 'default' | 'warning'> = {
@@ -32,6 +34,7 @@ const STATUS_COLOR: Record<string, 'success' | 'default' | 'warning'> = {
 };
 
 export function PlaybookListPage() {
+  const { t, i18n } = useTranslation();
   const [filter, setFilter] = useState('ALL');
   const [createOpen, setCreateOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -61,10 +64,10 @@ export function PlaybookListPage() {
     <Box sx={{ maxWidth: 1080, mx: 'auto', p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          剧本 Playbooks
+          {t('playbookList.title')}
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>
-          新建剧本
+          {t('playbookList.newPlaybook')}
         </Button>
       </Box>
 
@@ -72,7 +75,7 @@ export function PlaybookListPage() {
         {STATUS_FILTERS.map((s) => (
           <Chip
             key={s.key}
-            label={s.label}
+            label={t(s.labelKey)}
             color={filter === s.key ? 'primary' : 'default'}
             variant={filter === s.key ? 'filled' : 'outlined'}
             onClick={() => setFilter(s.key)}
@@ -81,7 +84,7 @@ export function PlaybookListPage() {
       </Box>
 
       {isLoading ? (
-        <Typography color="text.secondary">加载中…</Typography>
+        <Typography color="text.secondary">{t('playbookList.loading')}</Typography>
       ) : (
         <Grid container spacing={2}>
           {list.map((pb) => (
@@ -100,10 +103,10 @@ export function PlaybookListPage() {
                       />
                     </Box>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, minHeight: 40 }}>
-                      {pb.description || '无描述'}
+                      {pb.description || t('playbookList.noDescription')}
                     </Typography>
                     <Typography variant="caption" color="text.disabled">
-                      创建于 {new Date(pb.createdAt).toLocaleString('zh-CN')}
+                      {t('playbookList.createdAt', { date: new Date(pb.createdAt).toLocaleString(i18n.language) })}
                     </Typography>
                   </CardContent>
                 </CardActionArea>
@@ -113,9 +116,9 @@ export function PlaybookListPage() {
           {list.length === 0 && (
             <Grid size={{ xs: 12 }}>
               <EmptyState
-                title="还没有剧本"
-                description="创建第一个剧本,将多步骤操作编排为可复用的自动化流程"
-                actionLabel="新建剧本"
+                title={t('playbookList.emptyTitle')}
+                description={t('playbookList.emptyDesc')}
+                actionLabel={t('playbookList.newPlaybook')}
                 onAction={() => setCreateOpen(true)}
               />
             </Grid>
@@ -141,6 +144,7 @@ function CreatePlaybookDialog({
   onSubmit: (body: { name: string; description: string; yamlSource: string }) => void;
   submitting: boolean;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
@@ -149,6 +153,7 @@ function CreatePlaybookDialog({
     onSubmit({
       name: name.trim(),
       description: description.trim(),
+      // 注意：此处的 message 是提交给后端的节点配置数据（非 UI 文案），保留原文不翻译
       yamlSource: JSON.stringify([
         { id: 'start', type: 'NOTIFICATION', config: { message: '剧本已启动' } },
       ]),
@@ -156,11 +161,11 @@ function CreatePlaybookDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth aria-label="新建剧本">
-      <DialogTitle>新建剧本</DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth aria-label={t('playbookList.newPlaybook')}>
+      <DialogTitle>{t('playbookList.newPlaybook')}</DialogTitle>
       <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
         <TextField
-          label="名称"
+          label={t('playbookList.nameLabel')}
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
           fullWidth
@@ -168,7 +173,7 @@ function CreatePlaybookDialog({
           autoFocus
         />
         <TextField
-          label="描述"
+          label={t('playbookList.descLabel')}
           value={description}
           onChange={(e) => setDescription(e.currentTarget.value)}
           fullWidth
@@ -176,13 +181,13 @@ function CreatePlaybookDialog({
           minRows={2}
         />
         <Typography variant="caption" color="text.secondary">
-          创建后可编辑节点定义 JSON(含 nodes / edges / checklist)
+          {t('playbookList.editHint')}
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>取消</Button>
+        <Button onClick={onClose}>{t('common.cancel')}</Button>
         <Button variant="contained" onClick={submit} disabled={submitting || !name.trim()}>
-          创建
+          {t('common.create')}
         </Button>
       </DialogActions>
     </Dialog>

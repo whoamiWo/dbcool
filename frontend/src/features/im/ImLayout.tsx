@@ -159,13 +159,13 @@ export function ImChatPage() {
     async (url: string, filename: string, _size: number) => {
       if (!currentChannel) return;
       try {
-        await sendMessage(currentChannel.id, `[附件] ${filename}\n${url}`, 'FILE');
+        await sendMessage(currentChannel.id, t('im.attachmentMessage', { filename, url }), 'FILE');
         refetchMessages();
       } catch (e) {
         console.error('发送附件消息失败', e);
       }
     },
-    [currentChannel, refetchMessages],
+    [currentChannel, refetchMessages, t],
   );
 
   const handleSearchResultClick = useCallback(
@@ -221,7 +221,7 @@ export function ImChatPage() {
         {/* Mobile: Hamburger menu button */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
-            <IconButton onClick={() => setChannelDrawerOpen(true)} size="small" aria-label="打开频道列表">
+            <IconButton onClick={() => setChannelDrawerOpen(true)} size="small" aria-label={t('im.openChannelList')}>
               <MenuIcon />
             </IconButton>
             <span style={{ marginLeft: 8, fontWeight: 600 }}>{currentChannel?.name || t('im.channels')}</span>
@@ -252,7 +252,7 @@ export function ImChatPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid var(--color-border)' }}>
               <span style={{ fontWeight: 600 }}>{t('im.channels')}</span>
-              <IconButton onClick={() => setChannelDrawerOpen(false)} size="small" aria-label="关闭频道列表">
+              <IconButton onClick={() => setChannelDrawerOpen(false)} size="small" aria-label={t('im.closeChannelList')}>
                 <CloseIcon />
               </IconButton>
             </div>
@@ -283,7 +283,7 @@ export function ImChatPage() {
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
                 placeholder={t('im.searchMessages')}
-                aria-label="搜索消息"
+                aria-label={t('im.searchMessages')}
                 className="input-glass"
                 style={{ width: isMobile ? 100 : 160 }}
               />
@@ -385,7 +385,7 @@ export function ImChatPage() {
         <div
           role="button"
           tabIndex={0}
-          aria-label="关闭新建频道弹窗"
+          aria-label={t('im.closeNewChannelDialog')}
           style={{
             position: 'fixed',
             inset: 0,
@@ -410,7 +410,7 @@ export function ImChatPage() {
             className="glass-strong"
             style={{ padding: 20, width: 320 }}
           >
-            <h3 style={{ margin: '0 0 12px', fontSize: 15, color: 'var(--color-text-primary)' }}>新建频道</h3>
+            <h3 style={{ margin: '0 0 12px', fontSize: 15, color: 'var(--color-text-primary)' }}>{t('im.newChannel')}</h3>
             <input
               value={newChannelName}
               onChange={(e) => setNewChannelName(e.target.value)}
