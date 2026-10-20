@@ -9,14 +9,14 @@
     "password": "密码",
     "submit": "登录",
     "loading": "登录中...",
-    "error": "登录失败，请检查网络",
+    "error": "登录失败,请检查网络",
     "subtitle": "登录开始使用",
     "remember": "记住用户名",
     "forgot": "忘记密码?",
     "dingtalk": "钉钉扫码登录",
     "resetHint": "请联系管理员重置密码",
     "scaffoldHint": "Week 3 脚手架版：任意非空账号密码可登录",
-    "successHint": "登录成功，正在跳转…",
+    "successHint": "登录成功,正在跳转…",
     "networkError": "登录失败，请检查网络",
     "validation": {
       "usernameRequired": "请输入用户名",
@@ -1374,5 +1374,33 @@
     "aclConfig": "权限配置",
     "deleteConfirm": "删除角色 \"{{name}}\"?",
     "createFailed": "创建失败"
+  },
+  "recycleBin": {
+    "title": "回收站",
+    "backTo": "返回",
+    "empty": "回收站为空",
+    "clear": "清空回收站",
+    "restore": "恢复",
+    "purge": "彻底删除",
+    "colId": "记录 ID",
+    "colData": "数据摘要",
+    "colActions": "操作",
+    "clearConfirmTitle": "确认清空回收站",
+    "clearConfirmMsg": "此操作将永久删除回收站中的全部记录，不可恢复。",
+    "restoreFailed": "恢复失败",
+    "purgeFailed": "彻底删除失败",
+    "clearFailed": "清空失败"
+  },
+  "recordVersion": {
+    "title": "版本历史",
+    "empty": "暂无版本记录",
+    "selectHint": "选择左侧版本查看字段差异",
+    "noDiff": "该版本无字段变更",
+    "field": "字段",
+    "oldValue": "旧值",
+    "newValue": "新值",
+    "restore": "回滚到此版本",
+    "restoreFailed": "回滚失败",
+    "version": "版本"
   }
 }

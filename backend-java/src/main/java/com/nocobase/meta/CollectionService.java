@@ -45,6 +45,13 @@ public class CollectionService {
     /** T1: ACL 播种依赖。 */
     private final RoleRepository roleRepository;
     private final AclPolicyRepository aclPolicyRepository;
+    /**
+     * PHASE125:记录版本留痕服务。
+     *
+     * <p>注意:兼容既有测试的自建构造器传 {@code null},故所有使用处必须判空 ——
+     * 留痕失败/缺失不得影响业务主流程。
+     */
+    private final RecordVersionService recordVersionService;
 
     /** 兼容既有测试：自建无状态依赖实例。 */
     public CollectionService(
@@ -57,7 +64,7 @@ public class CollectionService {
                 new ExpressionEvaluator(),
                 new RelationResolver(repository, tableManager, objectMapper),
                 new InverseRelationManager(repository, objectMapper),
-                null, null);
+                null, null, null);
     }
 
     @Autowired
@@ -70,7 +77,8 @@ public class CollectionService {
             RelationResolver relationResolver,
             InverseRelationManager inverseManager,
             RoleRepository roleRepository,
-            AclPolicyRepository aclPolicyRepository
+            AclPolicyRepository aclPolicyRepository,
+            RecordVersionService recordVersionService
     ) {
         this.repository = repository;
         this.tableManager = tableManager;
@@ -81,6 +89,7 @@ public class CollectionService {
         this.inverseManager = inverseManager;
         this.roleRepository = roleRepository;
         this.aclPolicyRepository = aclPolicyRepository;
+        this.recordVersionService = recordVersionService;
     }
 
     @Transactional
@@ -817,6 +826,200 @@ public boolean updateRecord(String collectionName, String id,
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
         return tableManager.deleteRecord(collectionName, id) > 0;
+    }
+
+    // ============================================================
+    //  PHASE125:回收站(软删除)与版本留痕
+    // ============================================================
+
+    /**
+     * 软删除并留痕(PHASE125 重载,带操作者)。
+     *
+     * <p>与 {@link #deleteRecord(String, String, String)} 的差别:本方法在删除前读取
+     * 记录快照并写入一条 DELETE 版本,使"误删可恢复 + 变更可追溯"成为可能。
+     * Controller 的删除端点应改为调用本重载。
+     */
+    public boolean deleteRecord(String collectionName, String id, String tenantId, java.util.UUID userId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        // 删前快照(记录不存在时 getRecord 抛 404,与既有行为一致)
+        Map<String, Object> before = getRecord(collectionName, id, tenantId);
+        boolean ok = tableManager.deleteRecord(collectionName, id, userId) > 0;
+        if (ok && recordVersionService != null) {
+            recordVersionService.record(tenantId, collectionName, id, before, before, "DELETE", userId);
+        }
+        return ok;
+    }
+
+    /** 回收站列表(已软删记录,按删除时间倒序)。 */
+    public List<Map<String, Object>> listDeletedRecords(String collectionName, String tenantId, int limit) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (String json : tableManager.listDeleted(collectionName, limit)) {
+            out.add(unwrapRecord(json));
+        }
+        return out;
+    }
+
+    /** 恢复回收站记录,并写入 RESTORE 版本。 */
+    public boolean restoreRecord(String collectionName, String id, String tenantId, java.util.UUID userId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        // 记录此刻仍在回收站中(已软删),故必须用"含已删"的查询取快照
+        String json = tableManager.getRecordIncludeDeleted(collectionName, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在"));
+        Map<String, Object> snapshot = unwrapRecord(json);
+        boolean ok = tableManager.restoreRecord(collectionName, id) > 0;
+        if (ok && recordVersionService != null) {
+            recordVersionService.record(tenantId, collectionName, id, snapshot, snapshot, "RESTORE", userId);
+        }
+        return ok;
+    }
+
+    /**
+     * 彻底删除(物理删除,<strong>不可恢复</strong>),并清理该记录的版本历史。
+     *
+     * <p>仅回收站的"彻底删除"使用;正常删除请走 {@link #deleteRecord}。
+     */
+    public boolean hardDeleteRecord(String collectionName, String id, String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        boolean ok = tableManager.hardDeleteRecord(collectionName, id) > 0;
+        if (ok && recordVersionService != null) {
+            recordVersionService.deleteVersions(tenantId, collectionName, id);
+        }
+        return ok;
+    }
+
+    /** 清空回收站:物理删除全部已软删记录,并清理各自的版本历史。 */
+    public int clearRecycleBin(String collectionName, String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        int removed = 0;
+        for (String json : tableManager.listDeleted(collectionName, 500)) {
+            Map<String, Object> rec = unwrapRecord(json);
+            Object rid = rec.get("id");
+            if (rid == null) continue;
+            String id = String.valueOf(rid);
+            if (tableManager.hardDeleteRecord(collectionName, id) > 0) {
+                if (recordVersionService != null) {
+                    recordVersionService.deleteVersions(tenantId, collectionName, id);
+                }
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * 解包记录 JSON:DB 存 {@code {"data": {...}}} 时取内层,否则整体返回。
+     *
+     * <p><b>必须保留 id</b>:{@code listDeleted} 返回的 JSON 由
+     * {@code jsonb_set(extra,'{id}',...)} 在<strong>外层</strong>注入 id,
+     * 而 data 内层没有 —— 若只取内层会丢失 id,导致恢复/彻底删除无法定位记录。
+     */
+    private Map<String, Object> unwrapRecord(String json) {
+        try {
+            Map<String, Object> wrapper = objectMapper.readValue(json, new TypeReference<>() {});
+            Object inner = wrapper.get("data");
+            Map<String, Object> record = (inner instanceof Map<?, ?> m)
+                    ? new java.util.HashMap<>((Map<String, Object>) m)
+                    : new java.util.HashMap<>(wrapper);
+            Object id = wrapper.get("id");
+            if (id != null) record.putIfAbsent("id", id);
+            return record;
+        } catch (Exception e) {
+            return new java.util.HashMap<>();
+        }
+    }
+
+    /**
+     * 列出某条记录的版本历史(新 → 旧)。
+     *
+     * <p><b>只返回摘要,不返回完整快照</b>:列表接口若带上每条版本的 data_json 会因
+     * 记录体积大而拖垮响应;完整快照由"查看指定版本"按需获取。
+     *
+     * @return 版本摘要列表;recordVersionService 未注入(兼容构造器)时返回空列表
+     */
+    public List<Map<String, Object>> listRecordVersions(String collectionName, String recordId, String tenantId) {
+        if (recordVersionService == null || tenantId == null || tenantId.isBlank()) {
+            return List.of();
+        }
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (RecordVersionEntity e : recordVersionService.listVersions(tenantId, collectionName, recordId)) {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("version", e.getVersion());
+            m.put("operation", e.getOperation());
+            m.put("changedFields", e.getChangedFields());
+            m.put("changedBy", e.getChangedBy() == null ? null : e.getChangedBy().toString());
+            m.put("changedAt", e.getChangedAt() == null ? null : e.getChangedAt().toString());
+            out.add(m);
+        }
+        return out;
+    }
+
+    /**
+     * 将记录回滚到指定历史版本。
+     *
+     * <p>流程:取该版本快照 → 整段覆盖当前记录 → 再写一条 RESTORE 版本
+     * (保证"回滚"这个动作本身也留痕,可继续被回滚或审计)。
+     *
+     * <p><b>不写回 id</b>:快照里的 id 是 JSON 注入的业务字段,而物理表 id 是主键列;
+     * 写回会造成冗余/混淆,故覆盖前移除。
+     */
+    public boolean restoreRecordVersion(String collectionName, String recordId, int version,
+                                        String tenantId, java.util.UUID userId) {
+        if (recordVersionService == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED, "版本服务未启用");
+        }
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
+        }
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        Map<String, Object> snapshot = recordVersionService
+                .getVersionSnapshot(tenantId, collectionName, recordId, version)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在"));
+        snapshot.remove("id");
+        try {
+            String json = objectMapper.writeValueAsString(snapshot);
+            boolean ok = tableManager.updateRecord(collectionName, recordId, json) > 0;
+            if (ok) {
+                recordVersionService.record(tenantId, collectionName, recordId,
+                        snapshot, snapshot, "RESTORE", userId);
+            }
+            return ok;
+        } catch (Exception e) {
+            throw new RuntimeException("版本回滚失败", e);
+        }
     }
 
     /**

@@ -194,8 +194,12 @@ class DynamicTableManagerAggregateTest {
 
         manager.aggregate("c1", null, specs, List.of(rule("x", "bogus_op", "v")));
 
-        // 未知 op 被忽略 → 无 WHERE
-        assertThat(captureSql()).doesNotContain("WHERE");
+        // 未知 op 被忽略 → 不产生该字段的过滤条件。
+        // 注意:PHASE125 起 WHERE 恒定带软删除过滤(deleted_at IS NULL),
+        // 故此处不再断言"无 WHERE",改为断言被忽略的字段未进入 SQL。
+        String sql = captureSql();
+        assertThat(sql).doesNotContain("extra->>'x'");
+        assertThat(sql).contains("deleted_at IS NULL");
     }
 
     @Test
@@ -205,7 +209,10 @@ class DynamicTableManagerAggregateTest {
 
         manager.aggregate("c1", null, specs, List.of(rule("bad;field", "eq", "v")));
 
-        assertThat(captureSql()).doesNotContain("WHERE");
+        // 不安全字段名被忽略 → 不产生该字段的过滤条件(软删除过滤仍恒定存在)
+        String sql = captureSql();
+        assertThat(sql).doesNotContain("bad");
+        assertThat(sql).contains("deleted_at IS NULL");
     }
 
     @Test

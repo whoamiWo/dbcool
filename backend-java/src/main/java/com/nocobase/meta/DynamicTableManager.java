@@ -51,6 +51,9 @@ public class DynamicTableManager {
      */
     public void createTable(String collectionName) {
         validateIdentifier(collectionName); // PHASE116 加固:public 入口自证,杜绝绕过 CollectionService 的注入面
+        // PHASE125:软删除列(deleted_at / deleted_by)—— 新建表直接包含,存量表由
+        // SoftDeleteMigrationService 补列。放在物理列而非 extra JSONB 内,便于
+        // SQL 直接过滤(deleted_at IS NULL)且与 BI 聚合下推 SQL 兼容。
         String sql = """
                 CREATE TABLE IF NOT EXISTS %s (
                     id UUID PRIMARY KEY,
@@ -58,6 +61,8 @@ public class DynamicTableManager {
                     created_by UUID,
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     updated_by UUID,
+                    deleted_at TIMESTAMPTZ,
+                    deleted_by UUID,
                     extra JSONB NOT NULL DEFAULT '{}'::jsonb
                 )
                 """.formatted(physicalTableName(collectionName));
@@ -66,6 +71,39 @@ public class DynamicTableManager {
                 "CREATE INDEX IF NOT EXISTS idx_" + collectionName + "_extra " +
                 "ON " + physicalTableName(collectionName) + " USING GIN (extra jsonb_path_ops)"
         );
+    }
+
+    /**
+     * 为存量 collection 物理表补充软删除列(deleted_at / deleted_by)。
+     *
+     * <p>PHASE125:新建表在 {@link #createTable} 中已直接包含这两列;本方法用于
+     * <strong>存量表迁移</strong> —— 由 {@code SoftDeleteMigrationService} 在启动时
+     * 遍历租户 × collection 调用,保证升级后既有表也具备软删除能力。
+     *
+     * <p><b>幂等</b>:使用 {@code ADD COLUMN IF NOT EXISTS},可重复执行;已存在列时
+     * PostgreSQL 返回 notice 而非错误,H2 同样支持该语法。
+     *
+     * <p><b>降级</b>:单列失败不影响另一列,也不阻断启动(仅 warn)—— 与
+     * {@link #applyDefaultLockTimeout()} 的 H2 降级策略一致。
+     *
+     * @param collectionName collection 名(经 {@link #validateIdentifier} 校验)
+     */
+    public void ensureDeletedAtColumn(String collectionName) {
+        validateIdentifier(collectionName); // PHASE116 加固
+        try {
+            jdbc.execute("ALTER TABLE " + physicalTableName(collectionName) +
+                    " ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ");
+        } catch (Exception e) {
+            log.warn("[tablemanager] 补 deleted_at 列失败(表可能不存在或数据库不支持): {}.{} — {}",
+                    TenantContext.currentSchema(), bareTableName(collectionName), e.getMessage());
+        }
+        try {
+            jdbc.execute("ALTER TABLE " + physicalTableName(collectionName) +
+                    " ADD COLUMN IF NOT EXISTS deleted_by UUID");
+        } catch (Exception e) {
+            log.warn("[tablemanager] 补 deleted_by 列失败(表可能不存在或数据库不支持): {}.{} — {}",
+                    TenantContext.currentSchema(), bareTableName(collectionName), e.getMessage());
+        }
     }
 
     /**
@@ -131,7 +169,9 @@ public class DynamicTableManager {
         // 用 '{data,id}' 不会创建中间的 data 对象(实测返回原值不变)。
         StringBuilder sql = new StringBuilder(
                 "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM ")
-                .append(physicalTableName(collectionName));
+                .append(physicalTableName(collectionName))
+                // PHASE125:列表默认排除已软删记录(回收站记录由 listDeleted 单独查询)
+                .append(" WHERE deleted_at IS NULL");
         String orderBy = buildOrderBy(sortExpr, fields);
         if (orderBy != null) {
             sql.append(" ORDER BY ").append(orderBy);
@@ -285,9 +325,14 @@ public class DynamicTableManager {
                 .append(" FROM ").append(physicalTableName(collectionName));
 
         // WHERE:FilterRule → SQL(值绑定)
+        // PHASE125:BI 聚合必须排除已软删记录,否则报表会把回收站数据算进去
         List<Object> args = new ArrayList<>();
         String where = buildWhere(filters, args);
-        if (where != null) sql.append(" WHERE ").append(where);
+        if (where != null) {
+            sql.append(" WHERE deleted_at IS NULL AND (").append(where).append(")");
+        } else {
+            sql.append(" WHERE deleted_at IS NULL");
+        }
 
         if (!groupCols.isEmpty()) {
             sql.append(" GROUP BY ").append(String.join(", ", groupCols));
@@ -361,7 +406,7 @@ public class DynamicTableManager {
         var list = jdbc.queryForList(
                 "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
                         + physicalTableName(collectionName) +
-                        " WHERE id = ?::uuid",
+                        " WHERE id = ?::uuid AND deleted_at IS NULL",
                 String.class,
                 id
         );
@@ -381,14 +426,102 @@ public class DynamicTableManager {
     }
 
     /**
-     * 删除单条记录.
+     * 软删除单条记录(PHASE125)。
+     *
+     * <p>将 {@code deleted_at} 置为当前时间,记录进入回收站,可再 {@link #restoreRecord} 恢复。
+     * <strong>不再物理删除</strong> —— 这是本次"数据资产治理"的核心变更。
+     *
+     * <p>对既有调用方({@code CollectionService.deleteRecord})行为保持一致:
+     * 记录从列表消失、接口仍返回"已删除",只是底层改为可恢复。
+     *
+     * @return 受影响行数(0 = 记录不存在或已在回收站中,幂等)
      */
     public int deleteRecord(String collectionName, String id) {
+        return deleteRecord(collectionName, id, null);
+    }
+
+    /**
+     * 软删除单条记录(带删除人)。
+     *
+     * @param deletedBy 删除操作者 userId,可为 null(则不写 deleted_by)
+     */
+    public int deleteRecord(String collectionName, String id, java.util.UUID deletedBy) {
+        validateIdentifier(collectionName); // PHASE116 加固
+        // AND deleted_at IS NULL:已删记录不重复软删,保证幂等
+        if (deletedBy == null) {
+            return jdbc.update(
+                    "UPDATE " + physicalTableName(collectionName) +
+                    " SET deleted_at = NOW() WHERE id = ?::uuid AND deleted_at IS NULL",
+                    id
+            );
+        }
+        return jdbc.update(
+                "UPDATE " + physicalTableName(collectionName) +
+                " SET deleted_at = NOW(), deleted_by = ?::uuid WHERE id = ?::uuid AND deleted_at IS NULL",
+                deletedBy.toString(), id
+        );
+    }
+
+    /**
+     * 物理删除单条记录(仅回收站"彻底删除"使用)。
+     *
+     * <p><strong>慎用</strong>:该操作不可恢复。正常删除请走 {@link #deleteRecord}。
+     */
+    public int hardDeleteRecord(String collectionName, String id) {
         validateIdentifier(collectionName); // PHASE116 加固
         return jdbc.update(
                 "DELETE FROM " + physicalTableName(collectionName) +
                 " WHERE id = ?::uuid",
                 id
+        );
+    }
+
+    /**
+     * 恢复回收站中的记录(deleted_at 置 NULL)。
+     *
+     * @return 受影响行数(0 = 记录不存在或未被删除)
+     */
+    public int restoreRecord(String collectionName, String id) {
+        validateIdentifier(collectionName); // PHASE116 加固
+        return jdbc.update(
+                "UPDATE " + physicalTableName(collectionName) +
+                " SET deleted_at = NULL, deleted_by = NULL WHERE id = ?::uuid AND deleted_at IS NOT NULL",
+                id
+        );
+    }
+
+    /**
+     * 取单条记录(含已软删记录)—— 供回收站展示与版本回滚使用。
+     *
+     * <p>与 {@link #getRecord} 的区别:后者排除已删记录(业务列表语义),
+     * 本方法不排除,因为回收站本身要展示的就是已删数据。
+     */
+    public java.util.Optional<String> getRecordIncludeDeleted(String collectionName, String id) {
+        validateIdentifier(collectionName); // PHASE116 加固
+        var list = jdbc.queryForList(
+                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
+                        + physicalTableName(collectionName) +
+                        " WHERE id = ?::uuid",
+                String.class,
+                id
+        );
+        return list.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(list.get(0));
+    }
+
+    /**
+     * 列出回收站中的已删记录(PHASE125)。
+     *
+     * <p>按删除时间倒序,返回 extra JSON(含注入的 id)+ 删除时间/删除人需由上层
+     * 另外查询或本方法扩展;此处保持与 {@link #listRecords} 一致的返回形态。
+     */
+    public List<String> listDeleted(String collectionName, int limit) {
+        validateIdentifier(collectionName); // PHASE116 加固
+        return jdbc.queryForList(
+                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
+                        + physicalTableName(collectionName) +
+                        " WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?",
+                String.class,
+                Math.min(limit, 500)
         );
     }
 
