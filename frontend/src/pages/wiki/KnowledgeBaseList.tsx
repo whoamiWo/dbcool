@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Button,
@@ -23,6 +24,7 @@ import type { KnowledgeBase } from '@/types/wiki';
 import EmptyState from '@/components/EmptyState';
 
 export function KnowledgeBaseListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -48,7 +50,7 @@ export function KnowledgeBaseListPage() {
       setError(null);
     },
     onError: (e: any) => {
-      setError(e?.response?.data?.message || '创建失败');
+      setError(e?.response?.data?.message || t('wiki.createFailed'));
     },
   });
 
@@ -61,7 +63,7 @@ export function KnowledgeBaseListPage() {
 
   const handleCreate = () => {
     if (!newName.trim() || !newSlug.trim()) {
-      setError('名称和 slug 必填');
+      setError(t('wiki.nameRequired'));
       return;
     }
     createMutation.mutate({ name: newName, slug: newSlug, description: newDescription });
@@ -73,14 +75,14 @@ export function KnowledgeBaseListPage() {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1">
-          📚 知识库
+          {t('wiki.pageTitle')}
         </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setOpen(true)}
         >
-          新建知识库
+          {t('wiki.newKB')}
         </Button>
       </Box>
 
@@ -91,12 +93,12 @@ export function KnowledgeBaseListPage() {
       )}
 
       {isLoading ? (
-        <Typography>加载中...</Typography>
+        <Typography>{t('wiki.loading')}</Typography>
       ) : kbList.length === 0 ? (
         <EmptyState
-          title="还没有知识库"
-          description="创建第一个知识库，开始沉淀组织内的文档与知识"
-          actionLabel="新建知识库"
+          title={t('wiki.emptyTitle')}
+          description={t('wiki.emptyDesc')}
+          actionLabel={t('wiki.actionLabel')}
           onAction={() => setOpen(true)}
         />
       ) : (
@@ -107,36 +109,36 @@ export function KnowledgeBaseListPage() {
                 <CardContent>
                   <Typography variant="h6">{kb.name}</Typography>
                   <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    {kb.description || '暂无描述'}
+                    {kb.description || t('wiki.noDesc')}
                   </Typography>
                   <Typography variant="caption" color="textSecondary">
-                    Slug: {kb.slug}
+                    {t('wiki.slugLabel')}: {kb.slug}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-                    <Tooltip title="查看文档">
+                    <Tooltip title={t('wiki.viewDocs')}>
                       <Button
                         size="small"
                         variant="outlined"
                         onClick={() => navigate(`/wiki/kb/${kb.id}`)}
                       >
-                        查看
+                        {t('common.view')}
                       </Button>
                     </Tooltip>
-                    <Tooltip title="编辑">
+                    <Tooltip title={t('common.edit')}>
                       <IconButton
                         size="small"
                         onClick={() => navigate(`/wiki/kb/${kb.id}/edit`)}
-                        aria-label={`编辑知识库 ${kb.name}`}
+                        aria-label={t('wiki.editHint', { name: kb.name })}
                       >
                         <EditIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="删除">
+                    <Tooltip title={t('common.delete')}>
                       <IconButton
                         size="small"
                         color="error"
                         onClick={() => deleteMutation.mutate(kb.id)}
-                        aria-label={`删除知识库 ${kb.name}`}
+                        aria-label={t('wiki.deleteHint', { name: kb.name })}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -150,26 +152,26 @@ export function KnowledgeBaseListPage() {
       )}
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>新建知识库</DialogTitle>
+        <DialogTitle>{t('wiki.newKB')}</DialogTitle>
         <DialogContent>
           <Box component="form" sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="名称"
+              label={t('common.name')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               fullWidth
               required
             />
             <TextField
-              label="Slug"
+              label={t('wiki.slugLabel')}
               value={newSlug}
               onChange={(e) => setNewSlug(e.target.value)}
               fullWidth
-              helperText="唯一标识，如：my-wiki"
+              helperText={t('wiki.slugHint')}
               required
             />
             <TextField
-              label="描述"
+              label={t('common.description')}
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               multiline
@@ -179,9 +181,9 @@ export function KnowledgeBaseListPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>取消</Button>
+          <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
           <Button variant="contained" onClick={handleCreate} disabled={createMutation.isPending}>
-            创建
+            {t('common.create')}
           </Button>
         </DialogActions>
       </Dialog>

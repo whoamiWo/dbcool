@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { FormRuntime as FormRuntimeComponent } from '@/components/forms/FormRuntime';
@@ -8,6 +9,7 @@ import { FormRuntime as FormRuntimeComponent } from '@/components/forms/FormRunt
  * URL: /forms/:formId/fill
  */
 export function FormRuntimePage() {
+  const { t } = useTranslation();
   const { formId } = useParams<{ formId: string }>();
   const navigate = useNavigate();
 
@@ -74,13 +76,13 @@ export function FormRuntimePage() {
     },
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
-      alert('提交失败:' + (e.response?.data?.message ?? '未知错误'));
+      alert(`${t('formRuntime.submitFailed')}: ${e.response?.data?.message ?? t('common.loadFailed')}`);
     },
   });
 
-  if (isLoading) return <p>加载中…</p>;
-  if (!formData) return <p>表单不存在</p>;
-  if (!collectionData) return <p>关联的 Collection 不存在</p>;
+  if (isLoading) return <p>{t('formRuntime.loading')}</p>;
+  if (!formData) return <p>{t('formRuntime.formNotFound')}</p>;
+  if (!collectionData) return <p>{t('formRuntime.collectionNotFound')}</p>;
 
   // 解析 layout_json / rules_json 给 FormRuntime 组件用
   let parsedLayout: { field: string; span?: number }[] = [];

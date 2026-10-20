@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 
 interface AuditEntry {
@@ -45,6 +46,7 @@ const actionTag = (action: string): React.CSSProperties => ({
 });
 
 export function AuditLogsPage() {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -87,9 +89,9 @@ export function AuditLogsPage() {
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <div style={headerCard}>
-        <h1 style={{ color: 'var(--color-text-primary)', margin: 0 }}>🔍 审计日志</h1>
+        <h1 style={{ color: 'var(--color-text-primary)', margin: 0 }}>{t('auditLogs.title')}</h1>
         <p style={{ color: 'var(--color-border-medium)', marginTop: 8, marginBottom: 0 }}>
-          租户内共 <strong style={{ color: 'var(--color-warning)' }}>{total}</strong> 条操作记录 — 当前展示 <strong>{logs.length}</strong> 条
+          {t('auditLogs.totalRecords', { total })} — {t('auditLogs.showing', { count: logs.length })}
         </p>
       </div>
 
@@ -98,12 +100,12 @@ export function AuditLogsPage() {
           <span style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>Action:</span>
           <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
             style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-border-medium)' }}>
-            <option value="">全部</option>
+            <option value="">{t('auditLogs.all')}</option>
             {actions.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
           <span style={{ color: 'var(--color-text-disabled)', fontSize: 13 }}>Resource:</span>
           <input
-            placeholder="例: audit_test"
+            placeholder={t('auditLogs.resourcePlaceholder')}
             value={resourceFilter}
             onChange={e => setResourceFilter(e.target.value)}
             style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-border-medium)', minWidth: 180 }}
@@ -117,7 +119,7 @@ export function AuditLogsPage() {
             style={{
               padding: '4px 16px', borderRadius: 4, border: 'none',
               background: 'var(--color-info)', color: 'var(--color-text-primary)', cursor: 'pointer',
-            }}>🔄 刷新</button>
+            }}>{t('auditLogs.refresh')}</button>
         </div>
       </div>
 
@@ -135,19 +137,19 @@ export function AuditLogsPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--color-border-medium)', textAlign: 'left', color: 'var(--color-text-disabled)' }}>
-              <th style={{ padding: 8 }}>时间</th>
-              <th style={{ padding: 8 }}>Action</th>
-              <th style={{ padding: 8 }}>Resource</th>
-              <th style={{ padding: 8 }}>用户</th>
+              <th style={{ padding: 8 }}>{t('auditLogs.colTime')}</th>
+              <th style={{ padding: 8 }}>{t('auditLogs.colAction')}</th>
+              <th style={{ padding: 8 }}>{t('auditLogs.colResource')}</th>
+              <th style={{ padding: 8 }}>{t('auditLogs.colUser')}</th>
               <th style={{ padding: 8 }}>IP</th>
-              <th style={{ padding: 8 }}>Detail</th>
-              <th style={{ padding: 8, width: 40 }} aria-label="操作"></th>
+              <th style={{ padding: 8 }}>{t('auditLogs.colDetail')}</th>
+              <th style={{ padding: 8, width: 40 }} aria-label={t('auditLogs.colActions')}></th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>加载中…</td></tr>}
+            {loading && <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>{t('auditLogs.loading')}</td></tr>}
             {!loading && logs.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>暂无审计记录</td></tr>
+              <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>{t('auditLogs.empty')}</td></tr>
             )}
             {logs.map(l => (
               <>
@@ -191,7 +193,7 @@ export function AuditLogsPage() {
                           background: expanded[l.id] ? 'var(--color-error)' : 'var(--color-border-medium)',
                           color: expanded[l.id] ? 'var(--color-text-primary)' : 'var(--color-bg-secondary)',
                           border: 'none', cursor: 'pointer', fontSize: 11,
-                        }}>{expanded[l.id] ? '收起' : '展开'}</button>
+                        }}>{expanded[l.id] ? t('auditLogs.collapse') : t('auditLogs.expand')}</button>
                     )}
                   </td>
                 </tr>
@@ -202,7 +204,7 @@ export function AuditLogsPage() {
                         background: 'var(--color-bg-primary)', color: 'var(--color-border-medium)', padding: 12, borderRadius: 4,
                         fontSize: 11, overflow: 'auto', maxHeight: 200, margin: 0,
                       }}>
-                        {l.payload_json ? JSON.stringify(JSON.parse(l.payload_json), null, 2) : '(无 payload)'}
+                        {l.payload_json ? JSON.stringify(JSON.parse(l.payload_json), null, 2) : t('auditLogs.noPayload')}
                       </pre>
                     </td>
                   </tr>
@@ -214,7 +216,7 @@ export function AuditLogsPage() {
       </div>
 
       <div style={{ color: 'var(--color-text-muted)', fontSize: 12, textAlign: 'center', marginTop: 16 }}>
-        数据保留策略待定 — 当前每次查询最新 <strong>{limit}</strong> 条
+        {t('auditLogs.retentionPolicy', { limit })}
       </div>
     </div>
   );
