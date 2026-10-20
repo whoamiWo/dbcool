@@ -1,3 +1,33 @@
+## Week 43 (2026-10-20) — 基础设施升级、国际化全量、安全文档收尾
+
+> **五阶段连续交付**：Spring Boot 3.4.7 升级（含 SpEL 回归修复）、前端 i18n 53 文件全量接入、CSP 注释收尾、版本门禁对齐。全量门禁零回归。
+
+### 1. 基础设施升级
+
+| 项 | 说明 | 实证 |
+|---|---|---|
+| **Spring Boot 3.3.5 → 3.4.7** | 父版本升级，同步 springdoc 2.8.5 / Lombok 1.18.36 / MapStruct 1.6.3；清理 3 处重复依赖声明 | `af757be` PHASE117 |
+| **SpEL 回归修复** | Spring Security 6.4 不再解析裸常量引用，82 处 `@PreAuthorize("hasRole(RoleName.ADMIN)")` 改为标准 SpEL `hasRole(T(com.nocobase.auth.RoleName).ADMIN)` | Java 2242/0F/0E、E2E 135/135、冒烟 11/11、编排 8/8 |
+| **依赖漏洞清零** | 0 高危 / 1 MEDIUM（已登记可忽略），`mvn dependency:tree` 离线跑通 | `scripts/java-dependency-audit.py` |
+
+### 2. 国际化全量接入（前端）
+
+| 项 | 说明 | 实证 |
+|---|---|---|
+| **5 批次 / 53 文件 / 250+ key** | 分批接入 i18n：CollabEditor / ViewDesigner / FilterBar / WorkflowDesigner / LivechatWidget / SchemaDesigner / KanbanView / TableView / PlaybookList / AgentChatPage / 其余 43 文件 | `5e36e10` / `e2a0a94` / `4fd3280` / `9c7bba3` / `ab0c0fc` / `94a46bd` |
+| **命名空间 50+ / key 250+** | 单 `translation` 命名空间架构，中英 key 严格对齐，`useTranslation()` 无参调用 | `src/i18n/i18n.test.ts` 6/6 通过 |
+| **全量门禁** | tsc 0 error / vitest 382/382 / E2E 135/135 / 冒烟 11/11 / 编排 8/8 | `cc39acd` |
+
+### 3. 安全与文档收尾
+
+| 项 | 说明 | 实证 |
+|---|---|---|
+| **CSP 三处注释完善** | `nginx.conf` / `nginx.conf.template` / `render_nginx.py` 同步 6 行逐指令注释，阐明 unsafe-inline/eval 保留理由与收紧路径 | `cc39acd` PHASE121 |
+| **版本一致性对齐** | README Spring Boot 3.3→3.4（badge/表格/目录 3 处）；BASELINE.md Java 936→2242、前端 233→382 | `cc39acd` |
+| **文档同步** | SECURITY.md CSP 状态订正；TECH_DEBT.md 第 31 行补充 PHASE121 说明；CHANGELOG/ROADMAP/PHASE110 报告同步 | 统一提交 `cc39acd` |
+
+---
+
 ## Week 42 (2026-10-17) — DBCool v1.0.0 正式发布
 
 > **对外 SaaS 上线全链路闭环**：P0 阻断项清零，GDPR 合规修复，容量基线实测，无障碍合规，钉钉回调假实现清零。

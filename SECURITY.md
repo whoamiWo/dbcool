@@ -233,7 +233,7 @@ compose 路径已由 `${MINIO_ROOT_PASSWORD:?}` 挡住，故仅本地直跑受�
 
 ### 已知未处置（见 `TECH_DEBT.md`）
 
-- （本项已收口；CSP 的 `unsafe-inline/eval` 收敛待前端改造后推进）
+- CSP 的 `unsafe-inline/eval` 保留属**已说明的已知取舍**：PHASE121 已在 `nginx.conf` / `nginx.conf.template` / `render_nginx.py` 三处同步添加逐指令注释，阐明 Vite/React 开发态依赖内联脚本与动态样式的现实约束，收敛路径沉淀为配置注释；后续若前端改用 `nonce` 或外置脚本，可再逐步收紧。
 
 ## 7. PHASE99 官方安全门禁（Trivy + ZAP）
 
