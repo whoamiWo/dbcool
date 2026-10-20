@@ -27,11 +27,13 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { wikiApi } from '@/api/wiki';
 import EmptyState from '@/components/EmptyState';
 import type { WikiCategory } from '@/types/wiki';
 
 export function WikiCategoryManagementPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<WikiCategory | null>(null);
@@ -65,7 +67,7 @@ export function WikiCategoryManagementPage() {
       setTimeout(() => setSuccess(false), 2000);
     },
     onError: (e: any) => {
-      setError(e?.response?.data?.message || '创建失败');
+      setError(e?.response?.data?.message || t('wiki.createFailed'));
     },
   });
 
@@ -80,7 +82,7 @@ export function WikiCategoryManagementPage() {
       setTimeout(() => setSuccess(false), 2000);
     },
     onError: (e: any) => {
-      setError(e?.response?.data?.message || '更新失败');
+      setError(e?.response?.data?.message || t('wiki.createFailed'));
     },
   });
 
@@ -136,10 +138,10 @@ export function WikiCategoryManagementPage() {
                   }
                   secondary={
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <IconButton aria-label={`编辑${category.name}`} size="small" onClick={(e) => { e.stopPropagation(); handleEdit(category); }}>
+                      <IconButton aria-label={t('wiki.editHint', { name: category.name })} size="small" onClick={(e) => { e.stopPropagation(); handleEdit(category); }}>
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      <IconButton aria-label={`删除${category.name}`} size="small" color="error" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(category.id); }}>
+                      <IconButton aria-label={t('wiki.deleteHint', { name: category.name })} size="small" color="error" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(category.id); }}>
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Box>
@@ -172,7 +174,7 @@ export function WikiCategoryManagementPage() {
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      setError('名称必填');
+      setError(t('wiki.nameRequired'));
       return;
     }
     const slug = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -192,7 +194,7 @@ export function WikiCategoryManagementPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h4" component="h1">
-            📂 分类管理
+            {t('wiki.categoryTitle')}
           </Typography>
           <Button
             size="small"
@@ -200,7 +202,7 @@ export function WikiCategoryManagementPage() {
             startIcon={<ArrowBackIcon />}
             onClick={() => (window.location.href = '/wiki/kb')}
           >
-            返回知识库列表
+            {t('wiki.returnKbList')}
           </Button>
         </Box>
         <Button
@@ -208,7 +210,7 @@ export function WikiCategoryManagementPage() {
           startIcon={<AddIcon />}
           onClick={handleAdd}
         >
-          新建分类
+          {t('wiki.newCategory')}
         </Button>
       </Box>
 
@@ -219,7 +221,7 @@ export function WikiCategoryManagementPage() {
       )}
       {success && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          操作成功
+          {t('common.save')}
         </Alert>
       )}
 
@@ -229,9 +231,9 @@ export function WikiCategoryManagementPage() {
         </Box>
       ) : categories.length === 0 ? (
         <EmptyState
-          title="还没有分类"
-          description="创建第一个分类，组织知识库的层级结构"
-          actionLabel="新建分类"
+          title={t('wiki.noCategories')}
+          description={t('wiki.catCreateHint')}
+          actionLabel={t('wiki.newCategory')}
           onAction={handleAdd}
         />
       ) : (
@@ -241,11 +243,11 @@ export function WikiCategoryManagementPage() {
       )}
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingCategory ? '编辑分类' : '新建分类'}</DialogTitle>
+        <DialogTitle>{editingCategory ? t('wiki.editCategory') : t('wiki.newCategory')}</DialogTitle>
         <DialogContent>
           <Box component="form" sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="分类名称"
+              label={t('wiki.categoryName')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               fullWidth
@@ -255,13 +257,13 @@ export function WikiCategoryManagementPage() {
             />
             <TextField
               select
-              label="父分类"
+              label={t('wiki.parentCategory')}
               value={parentId || ''}
               onChange={(e) => setParentId(e.target.value || null)}
               fullWidth
               slotProps={{ select: { native: true } }}
             >
-              <option value="">无（作为根分类）</option>
+              <option value="">{t('wiki.noParent')}</option>
               {categories
                 .filter(c => c.id !== editingCategory?.id)
                 .map(c => (
@@ -271,13 +273,13 @@ export function WikiCategoryManagementPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>取消</Button>
+          <Button onClick={() => setOpen(false)}>{t('wiki.cancel')}</Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
             disabled={createMutation.isPending || updateMutation.isPending}
           >
-            {editingCategory ? '更新' : '创建'}
+            {editingCategory ? t('wiki.update') : t('wiki.create')}
           </Button>
         </DialogActions>
       </Dialog>

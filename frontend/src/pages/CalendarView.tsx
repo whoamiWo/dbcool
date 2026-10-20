@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
@@ -7,6 +8,7 @@ import type { ViewFull } from '@/types/view';
 
 /** 日历视图 — 按日期字段分组展示记录 (T3: 支持翻月) */
 export function CalendarViewPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
@@ -49,7 +51,7 @@ export function CalendarViewPage() {
     [allRecords, currentMonth, dateField, titleField]
   );
 
-  if (!viewData || !collectionData) return <p>加载中…</p>;
+  if (!viewData || !collectionData) return <p>{t('calendarView.loading')}</p>;
 
   const goToPrevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
@@ -69,13 +71,13 @@ export function CalendarViewPage() {
       
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <button onClick={goToPrevMonth} className="glass-button" style={{ padding: '4px 12px', fontSize: 12 }}>
-          ← 上一月
+          {t('calendarView.prevMonth')}
         </button>
         <button onClick={goToNextMonth} className="glass-button" style={{ padding: '4px 12px', fontSize: 12 }}>
-          下一月 →
+          {t('calendarView.nextMonth')}
         </button>
         <button onClick={goToToday} className="glass-button" style={{ padding: '4px 12px', fontSize: 12 }}>
-          回到今天
+          {t('calendarView.today')}
         </button>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
           {monthName}
@@ -83,11 +85,11 @@ export function CalendarViewPage() {
       </div>
 
       <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>
-        共 {allRecords.length} 条记录 · 按 <code>{dateField}</code> 排列
+        {t('calendarView.recordCount', { count: allRecords.length })} · {t('calendarView.sortedBy', { field: dateField })}
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--color-border-light)', borderRadius: 8, overflow: 'hidden' }}>
-        {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+        {(JSON.parse(t('calendarView.dayWeeks')) as string[]).map((day) => (
           <div key={day} style={{ background: 'rgba(255,255,255,0.02)', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-text-muted)' }}>
             {day}
           </div>
@@ -95,7 +97,7 @@ export function CalendarViewPage() {
 
         {weeks.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
-            该月份无数据
+            {t('calendarView.noData')}
           </div>
         ) : (
           weeks.map((week, wi) =>
@@ -126,7 +128,7 @@ export function CalendarViewPage() {
                     </div>
                   ))}
                   {day.records.length > 3 && (
-                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>还有 {day.records.length - 3} 条</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{t('calendarView.moreRecords', { count: day.records.length - 3 })}</div>
                   )}
                 </div>
               </div>

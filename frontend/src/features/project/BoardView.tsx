@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
 import { AddCircleOutlined } from '@mui/icons-material';
 import {
@@ -40,6 +41,7 @@ interface Card {
  * 重复度实证（PHASE64 T2-R）：与 KanbanView 无成段重复代码，重复率 0%，不合并。
  */
 export function BoardView({ projectId }: { projectId: string }) {
+  const { t } = useTranslation();
   const [columns, setColumns] = useState<Column[]>([
     { id: 'col-todo', title: '待办', type: 'TODO' },
     { id: 'col-progress', title: '进行中', type: 'IN_PROGRESS' },
@@ -62,7 +64,7 @@ export function BoardView({ projectId }: { projectId: string }) {
       setColumns(colsRes.data);
       setCards(cardsRes.data);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : '看板数据加载失败');
+      setLoadError(e instanceof Error ? e.message : t('board.loadError'));
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,7 @@ export function BoardView({ projectId }: { projectId: string }) {
 
   // PHASE98 R3: 错误态优先于 loading —— 失败时给出原因与重试入口
   if (loadError) {
-    return <ErrorState message={`看板数据加载失败：${loadError}`} onRetry={loadData} />;
+    return <ErrorState message={`${t('board.loadError')}：${loadError}`} onRetry={loadData} />;
   }
 
   if (loading) return <CircularProgress sx={{ mt: 4 }} />;
@@ -123,7 +125,7 @@ export function BoardView({ projectId }: { projectId: string }) {
   };
 
   const handleAddCard = (columnId: string) => {
-    const title = prompt('输入卡片标题:');
+    const title = prompt(t('board.inputCardTitle'));
     if (!title) return;
     apiClient.post('/project-boards/tasks', {
       projectId,
@@ -136,9 +138,9 @@ export function BoardView({ projectId }: { projectId: string }) {
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6">看板</Typography>
+        <Typography variant="h6">{t('board.title')}</Typography>
         <Button variant="outlined" startIcon={<AddCircleOutlined />} onClick={loadData}>
-          刷新
+          {t('board.refresh')}
         </Button>
       </Box>
       <DndContext
