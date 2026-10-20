@@ -6,7 +6,7 @@
 ```bash
 cd backend-java
 mvn clean compile          # ✅ BUILD SUCCESS
-mvn test                   # ✅ 936/936 PASS
+mvn test                   # ✅ 2242/2242 PASS
 mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```
 
@@ -36,7 +36,7 @@ mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```bash
 cd frontend
 npx tsc --noEmit         # ✅ 0 errors
-npx vitest run           # ✅ 233/233 PASS
+npx vitest run           # ✅ 382/382 PASS
 npm run build            # ✅ dist/ 生成成功
 ```
 
