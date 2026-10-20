@@ -1,9 +1,11 @@
 import { Box, Button, Typography, Card, CardContent, Grid, Alert, Chip } from '@mui/material';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDingTalkAuth } from '@/hooks/useDingTalkAuth';
 import { dingtalkApi } from '@/api/integrations';
 
 export function DingTalkPage() {
+  const { t } = useTranslation();
   const { loading, error, isInDingTalk: inDingTalk } = useDingTalkAuth();
   const [syncStatus, setSyncStatus] = useState<any>(null);
   const [userMappings, setUserMappings] = useState<any[]>([]);
@@ -26,19 +28,19 @@ export function DingTalkPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>钉钉集成</Typography>
+      <Typography variant="h4" gutterBottom>{t('dingtalk.title')}</Typography>
 
       <Grid container spacing={3}>
         {/* SSO 状态 */}
         <Grid size={{ xs: 12, md: 4 }}>
           <Card>
             <CardContent>
-              <Typography variant="h6">SSO 登录</Typography>
-              <Chip label={inDingTalk ? "钉钉环境" : "普通环境"} color={inDingTalk ? "success" : "default"} />
-              {loading && <Typography variant="body2">加载中...</Typography>}
+              <Typography variant="h6">{t('dingtalk.ssoLogin')}</Typography>
+              <Chip label={inDingTalk ? t('dingtalk.dingEnv') : t('dingtalk.normalEnv')} color={inDingTalk ? "success" : "default"} />
+              {loading && <Typography variant="body2">{t('common.loading')}</Typography>}
               {error && <Alert severity="error">{error}</Alert>}
               <Button variant="contained" onClick={() => window.location.href = '/api/dingtalk/auth-url'}>
-                钉钉扫码登录
+                {t('dingtalk.scanLogin')}
               </Button>
             </CardContent>
           </Card>
@@ -48,13 +50,13 @@ export function DingTalkPage() {
         <Grid size={{ xs: 12, md: 4 }}>
           <Card>
             <CardContent>
-              <Typography variant="h6">组织架构同步</Typography>
+              <Typography variant="h6">{t('dingtalk.orgSync')}</Typography>
               <Button variant="contained" onClick={handleSyncOrg} disabled={loading}>
-                立即同步
+                {t('dingtalk.syncNow')}
               </Button>
               {syncStatus && (
                 <Typography variant="body2" sx={{ mt: 1 }}>
-                  部门: {syncStatus.data?.departmentsSynced} | 用户: {syncStatus.data?.usersSynced}
+                  {t('dingtalk.deptUsers', { depts: syncStatus.data?.departmentsSynced, users: syncStatus.data?.usersSynced })}
                 </Typography>
               )}
             </CardContent>
@@ -65,7 +67,7 @@ export function DingTalkPage() {
         <Grid size={{ xs: 12, md: 4 }}>
           <Card>
             <CardContent>
-              <Typography variant="h6">用户映射 ({userMappings.length})</Typography>
+              <Typography variant="h6">{t('dingtalk.userMapping')} ({userMappings.length})</Typography>
               {userMappings.slice(0, 5).map((m, i) => (
                 <Chip key={i} label={`${m.username} (${m.dingtalkUserId})`} sx={{ mr: 1, mb: 1 }} />
               ))}

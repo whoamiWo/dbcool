@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import i18n from '@/i18n';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
@@ -11,8 +12,8 @@ import { useTranslation } from 'react-i18next';
 const REMEMBER_KEY = 'nocobase:login:lastUsername';
 
 const loginSchema = z.object({
-  username: z.string().min(1, '请输入用户名'),
-  password: z.string().min(1, '请输入密码'),
+  username: z.string().min(1, i18n.t('login.usernameRequired')),
+  password: z.string().min(1, i18n.t('login.passwordRequired')),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -78,11 +79,11 @@ export function LoginPage() {
         respData.refresh_token ?? respData.refreshToken ?? '',
         respData.user ?? respData,
       );
-      setSuccessHint('登录成功,正在跳转…');
+      setSuccessHint(i18n.t('login.successHint'));
       setTimeout(() => navigate('/home'), 300);
     } catch (e) {
       const err = e as { response?: { data?: { message?: string } } };
-      setError(err.response?.data?.message ?? '登录失败,请检查网络');
+      setError(err.response?.data?.message ?? i18n.t('login.error'));
     } finally {
       setLoading(false);
     }
