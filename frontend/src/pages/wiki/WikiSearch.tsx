@@ -18,10 +18,13 @@ import {
   Chip,
 } from '@mui/material';
 import { Search as SearchIcon, FilterList as FilterIcon } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
 import { wikiApi } from '@/api/wiki';
 
 
 export function WikiSearchPage() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -63,32 +66,32 @@ export function WikiSearchPage() {
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto', px: 2, py: 4 }}>
       <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
-        🔍 知识库搜索
+        {t('wiki.searchTitle')}
       </Typography>
 
       {/* 搜索框 */}
       <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
         <TextField
-          label="搜索内容"
+          label={t('wiki.searchContent')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           fullWidth
-          placeholder="输入关键词搜索文档..."
+          placeholder={t('wiki.searchPlaceholder')}
         />
         <Button
           variant="contained"
           onClick={handleSearch}
           startIcon={<SearchIcon />}
         >
-          搜索
+          {t('wiki.searchBtn')}
         </Button>
         <Button
           variant="outlined"
           onClick={() => setShowFilters(!showFilters)}
           startIcon={<FilterIcon />}
         >
-          筛选
+          {t('wiki.filterBtn')}
         </Button>
       </Box>
 
@@ -97,13 +100,13 @@ export function WikiSearchPage() {
         <Paper sx={{ p: 2, mb: 2 }}>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>知识库</InputLabel>
+              <InputLabel>{t('wiki.knowledgeBase')}</InputLabel>
               <Select
                 value={selectedKb}
-                label="知识库"
+                label={t('wiki.knowledgeBase')}
                 onChange={(e) => setSelectedKb(e.target.value)}
               >
-                <MenuItem value="">全部知识库</MenuItem>
+                <MenuItem value="">{t('wiki.allKb')}</MenuItem>
                 {knowledgeBases.map((kb: any) => (
                   <MenuItem key={kb.id} value={kb.id}>{kb.name}</MenuItem>
                 ))}
@@ -111,23 +114,23 @@ export function WikiSearchPage() {
             </FormControl>
 
             <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>状态</InputLabel>
+              <InputLabel>{t('wiki.status')}</InputLabel>
               <Select
                 value={selectedStatus}
-                label="状态"
+                label={t('wiki.status')}
                 onChange={(e) => setSelectedStatus(e.target.value)}
               >
-                <MenuItem value="">全部状态</MenuItem>
-                <MenuItem value="DRAFT">草稿</MenuItem>
-                <MenuItem value="PUBLISHED">已发布</MenuItem>
-                <MenuItem value="ARCHIVED">已归档</MenuItem>
+                <MenuItem value="">{t('wiki.allStatus')}</MenuItem>
+                <MenuItem value="DRAFT">{t('wiki.statusDraft')}</MenuItem>
+                <MenuItem value="PUBLISHED">{t('wiki.statusPublished')}</MenuItem>
+                <MenuItem value="ARCHIVED">{t('wiki.statusArchived')}</MenuItem>
               </Select>
             </FormControl>
           </Box>
           {(selectedKb || selectedStatus) && (
             <Box sx={{ mt: 1 }}>
-              <Chip label="知识库" size="small" onDelete={() => setSelectedKb('')} />
-              <Chip label="状态" size="small" onDelete={() => setSelectedStatus('')} sx={{ ml: 1 }} />
+              <Chip label={t('wiki.knowledgeBase')} size="small" onDelete={() => setSelectedKb('')} />
+              <Chip label={t('wiki.status')} size="small" onDelete={() => setSelectedStatus('')} sx={{ ml: 1 }} />
             </Box>
           )}
         </Paper>
@@ -140,14 +143,14 @@ export function WikiSearchPage() {
       ) : searched && results.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography color="textSecondary">
-            未找到与 "{query}" 相关的文档
+            {t('wiki.noResults', { query })}
           </Typography>
         </Paper>
       ) : searched && results.length > 0 ? (
         <Paper>
           <Box sx={{ px: 2, py: 1, borderBottom: '1px solid var(--color-border-light)' }}>
             <Typography variant="body2" color="textSecondary">
-              找到 {results.length} 条结果
+              {t('wiki.resultCount', { count: results.length })}
             </Typography>
           </Box>
           <List>
@@ -167,7 +170,7 @@ export function WikiSearchPage() {
                     secondary={
                       <>
                         <Typography variant="caption" color="textSecondary">
-                          Slug: {page.slug} · 更新时间: {new Date(page.updated_at).toLocaleString('zh-CN')}
+                          {t('wiki.slugUpdated', { slug: page.slug, time: new Date(page.updated_at).toLocaleString(i18n.language) })}
                         </Typography>
                         {page.content && (
                           <Typography
@@ -190,7 +193,7 @@ export function WikiSearchPage() {
       ) : (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography color="textSecondary">
-            输入关键词开始搜索
+            {t('wiki.startSearch')}
           </Typography>
         </Paper>
       )}

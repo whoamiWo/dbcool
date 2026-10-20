@@ -1132,7 +1132,17 @@
     "confirmRollbackBtn": "确认回滚",
     "rollbackSuccess": "已成功回滚到版本 {{version}}",
     "rollbackFailed": "回滚失败",
-    "closeDiff": "关闭对比"
+    "closeDiff": "关闭对比",
+    "searchContent": "搜索内容",
+    "status": "状态",
+    "statusDraft": "草稿",
+    "statusPublished": "已发布",
+    "statusArchived": "已归档",
+    "slugUpdated": "Slug: {{slug}} · 更新时间: {{time}}",
+    "startSearch": "输入关键词开始搜索",
+    "versionNumber": "版本 {{version}}",
+    "diffTitle": "版本对比：v{{old}} → v{{new}}",
+    "confirmRollbackMsg": "确定要回滚到版本 {{version}} 吗？"
   },
   "calendarView": {
     "prevMonth": "← 上一月",
