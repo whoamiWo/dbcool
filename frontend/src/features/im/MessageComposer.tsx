@@ -33,7 +33,7 @@ const SlashPanel = ({
     <div
       ref={listRef}
       role="listbox"
-      aria-label="Slash 命令列表"
+      aria-label={t('im.slashCommandList')}
       className="glass-strong"
       style={{
         position: 'fixed',
@@ -57,7 +57,7 @@ const SlashPanel = ({
         style={{ width: '100%', padding: '6px 8px', marginBottom: 4 }}
       />
       {filtered.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: '8px 0' }}>无匹配命令</div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: '8px 0' }}>{t('im.noMatchCommand')}</div>
       ) : (
         filtered.map((cmd) => (
           <div
@@ -198,7 +198,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
       )}
       <div
         role="presentation"
-        aria-label="消息输入区（支持拖放附件到此处）"
+        aria-label={t('im.inputAreaHint')}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         style={{
@@ -228,8 +228,8 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            title="拖拽或点击上传文件（≤50MB）"
-            aria-label="上传附件"
+            title={t('im.uploadAttachmentHint')}
+            aria-label={t('im.uploadAttachment')}
             className="glass-button"
             // 触控区 ≥44px（移动端可点性下限）
             style={{
@@ -267,7 +267,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             onKeyDown={handleKeyDown}
             placeholder={disabled ? t('im.selectChannelPlaceholder') : t('im.inputPlaceholder')}
             disabled={disabled}
-            aria-label="输入消息"
+            aria-label={t('im.inputMessage')}
             className="textarea-glass"
             style={{
               fontSize: isMobile ? 16 : 13, // iOS 16px 避免自动缩放
@@ -279,7 +279,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
           <button
             onClick={handleSend}
             disabled={!content.trim() || isSending || disabled}
-            aria-label="发送消息"
+            aria-label={t('im.sendMessage')}
             className="glass-button-primary"
             // 触控区 ≥44px
             style={{
