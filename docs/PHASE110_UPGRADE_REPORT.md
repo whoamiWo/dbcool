@@ -53,6 +53,32 @@
 
 ---
 
+## 4. 升级后回归与修复（PHASE117 补充）
+
+Spring Boot 3.3.5 → 3.4.7 升级过程中，暴露一处**破坏性变更**：
+
+### 4.1 Spring Security 6.4 SpEL 回归
+
+**现象**：Spring Security 6.4 不再解析裸常量引用 `hasRole(RoleName.ADMIN)`，导致 82 处 `@PreAuthorize` 注解失效，权限校验绕过。
+
+**影响范围**：`backend-java/src/main/java` 下 82 个 `@PreAuthorize("hasRole(RoleName.*)")` 注解。
+
+**修复方案**：改为标准 SpEL 类型引用 `hasRole(T(com.nocobase.auth.RoleName).ADMIN)`，保持常量单一真相源。
+
+**实证**：
+- Java 测试：**2242/0F/0E**（`mvn test`）
+- E2E 测试：**135/135**
+- 冒烟测试：**11/11**
+- 编排测试：**8/8**
+
+**提交**：`af757be` PHASE117
+
+---
+
+*报告生成：2026-10-17（含独立审计修正）；PHASE117 补充：2026-10-20*
+
+---
+
 ## 3. 实测门禁（审计后重跑，非初版声称）
 
 | 门禁 | 结果 |
