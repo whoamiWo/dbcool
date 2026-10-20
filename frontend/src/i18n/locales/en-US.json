@@ -1132,7 +1132,17 @@
     "confirmRollbackBtn": "Confirm rollback",
     "rollbackSuccess": "Rolled back to version {{version}}",
     "rollbackFailed": "Rollback failed",
-    "closeDiff": "Close diff"
+    "closeDiff": "Close diff",
+    "searchContent": "Search content",
+    "status": "Status",
+    "statusDraft": "Draft",
+    "statusPublished": "Published",
+    "statusArchived": "Archived",
+    "slugUpdated": "Slug: {{slug}} · Updated: {{time}}",
+    "startSearch": "Enter keywords to start searching",
+    "versionNumber": "Version {{version}}",
+    "diffTitle": "Version diff: v{{old}} → v{{new}}",
+    "confirmRollbackMsg": "Roll back to version {{version}}?"
   },
   "calendarView": {
     "prevMonth": "← Previous",

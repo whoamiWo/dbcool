@@ -21,11 +21,13 @@ import {
   ArrowBack as ArrowBackIcon,
   Restore as RestoreIcon,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 import { wikiApi } from '@/api/wiki';
 import { VersionDiff } from '@/components/wiki/VersionDiff';
 import type { WikiVersion, WikiPage } from '@/types/wiki';
 
 export function WikiVersionHistoryPage() {
+  const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -65,7 +67,7 @@ export function WikiVersionHistoryPage() {
       setTimeout(() => setSuccess(false), 3000);
     },
     onError: (e: any) => {
-      setError(e?.response?.data?.message || '回滚失败');
+      setError(e?.response?.data?.message || t('wiki.rollbackFailed'));
     },
   });
 
@@ -86,7 +88,7 @@ export function WikiVersionHistoryPage() {
     } else if (compareVersion === null) {
       setCompareVersion(version);
     } else {
-      // 对比两个版本
+      // {t('wiki.compare')}两个版本
       const v1 = versions.find((v: WikiVersion) => v.version === compareVersion);
       const v2 = versions.find((v: WikiVersion) => v.version === version);
       if (v1 && v2) {
@@ -110,8 +112,8 @@ export function WikiVersionHistoryPage() {
   if (!pageData) {
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="h5" color="error">页面不存在</Typography>
-        <Button sx={{ mt: 2 }} href="/wiki/kb">返回知识库</Button>
+        <Typography variant="h5" color="error">{t('wiki.pageNotFound')}</Typography>
+        <Button sx={{ mt: 2 }} href="/wiki/kb">{t('wiki.returnKb')}</Button>
       </Box>
     );
   }
@@ -121,11 +123,11 @@ export function WikiVersionHistoryPage() {
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto', px: 2, py: 4 }}>
       <Button startIcon={<ArrowBackIcon />} onClick={() => window.location.href = `/wiki/${slug}`}>
-        返回文档
+        {t('wiki.returnDoc')}
       </Button>
 
       <Typography variant="h4" component="h1" sx={{ mt: 2, mb: 3 }}>
-        📜 版本历史 - {pageData.title}
+        {t('wiki.versionTitle', { title: pageData.title })}
       </Typography>
 
       {error && (
@@ -135,7 +137,7 @@ export function WikiVersionHistoryPage() {
       )}
       {success && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          已成功回滚到版本 {selectedVersion}
+          {t('wiki.rollbackSuccess', { version: selectedVersion })}
         </Alert>
       )}
 
@@ -143,7 +145,7 @@ export function WikiVersionHistoryPage() {
         <CircularProgress />
       ) : versions.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="textSecondary">暂无版本记录</Typography>
+          <Typography color="textSecondary">{t('wiki.noVersions')}</Typography>
         </Paper>
       ) : (
         <Box sx={{ mt: 2 }}>
@@ -152,7 +154,7 @@ export function WikiVersionHistoryPage() {
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
-                    <Typography variant="h6">版本 {v.version}</Typography>
+                    <Typography variant="h6">{t('wiki.versionNumber', { version: v.version })}</Typography>
                     <Typography variant="body2" color="textSecondary">
                       {new Date(v.created_at).toLocaleString('zh-CN')}
                     </Typography>
@@ -168,7 +170,7 @@ export function WikiVersionHistoryPage() {
                       size="small"
                       onClick={() => handleCompareClick(v.version)}
                     >
-                      对比
+                      {t('wiki.compare')}
                     </Button>
                     <Button
                       variant="outlined"
@@ -179,7 +181,7 @@ export function WikiVersionHistoryPage() {
                         setOpen(true);
                       }}
                     >
-                      回滚
+                      {t('wiki.rollback')}
                     </Button>
                   </Box>
                 </Box>
@@ -206,8 +208,8 @@ export function WikiVersionHistoryPage() {
       {showDiff && diffData && (
         <Paper sx={{ p: 3, mt: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">版本对比：v{diffData.old.version} → v{diffData.new.version}</Typography>
-            <Button size="small" onClick={() => setShowDiff(false)}>关闭对比</Button>
+            <Typography variant="h6">{t('wiki.diffTitle', { old: diffData.old.version, new: diffData.new.version })}</Typography>
+            <Button size="small" onClick={() => setShowDiff(false)}>{t('wiki.closeDiff')}</Button>
           </Box>
           <VersionDiff
             oldContent={diffData.old.content}
@@ -219,13 +221,13 @@ export function WikiVersionHistoryPage() {
       )}
 
       <Dialog open={open} onClose={() => setOpen(false)}>
-        <DialogTitle>确认回滚</DialogTitle>
+        <DialogTitle>{t('wiki.confirmRollback')}</DialogTitle>
         <DialogContent>
           <Typography sx={{ mt: 1 }}>
-            确定要回滚到版本 {selectedVersion} 吗？
+            {t('wiki.confirmRollbackMsg', { version: selectedVersion })}
           </Typography>
           <TextField
-            label="回滚说明（可选）"
+            label={t('wiki.rollbackReason')}
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             fullWidth
@@ -235,9 +237,9 @@ export function WikiVersionHistoryPage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>取消</Button>
+          <Button onClick={() => setOpen(false)}>{t('wiki.cancel')}</Button>
           <Button variant="contained" color="primary" onClick={handleRestore} disabled={restoreMutation.isPending}>
-            确认回滚
+            {t('wiki.confirmRollbackBtn')}
           </Button>
         </DialogActions>
       </Dialog>
