@@ -3,7 +3,7 @@
 > 一个 NocoBase 风格的可视化低代码平台 · Java + Python + React 三栈 · 单机即可演示
 
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-green)](https://spring.io/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-green)](https://spring.io/)
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://python.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
@@ -29,7 +29,7 @@
 | 层 | 技术 | 版本 | 作用 |
 |---|---|---|---|
 | 前端 | React + TypeScript + Vite | 18 / 5 / 5 | 可视化设计器 + 运行时渲染 |
-| 后端核心 | Java + Spring Boot | 21 / 3.3 | 数据模型 / 权限 / 工作流 |
+| 后端核心 | Java + Spring Boot | 21 / 3.4 | 数据模型 / 权限 / 工作流 |
 | 后端 AI | Python + FastAPI | 3.12 / 0.115 | LLM 集成 / 异步任务 |
 | 数据库 | PostgreSQL | 16 | JSONB 存动态字段 |
 | 缓存 | Redis | 7 | 缓存 / Streams / Refresh Token |
@@ -68,7 +68,7 @@ docker compose up -d --build
 dbcool/
 ├── ADR/                        # 8 份架构决策记录
 ├── contracts/                   # OpenAPI + 错误码(SSOT)
-├── backend-java/                # Spring Boot 3.3 + JDK 21
+├── backend-java/                # Spring Boot 3.4 + JDK 21
 │   ├── src/main/java/com/nocobase/
 │   │   ├── auth/                # JWT 认证 + RBAC
 │   │   ├── meta/                # Collection Engine
