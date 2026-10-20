@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
@@ -9,6 +10,7 @@ interface GroupedRow { _groupKey: string; _count: number; _children: any[]; }
 
 /** 画廊视图 — 卡片式展示记录 + R2 T2 group by */
 export function GalleryViewPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
 
   const { data: viewData } = useQuery({
@@ -94,7 +96,7 @@ export function GalleryViewPage() {
       
       {groupByField && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 12 }}>
-          <span>分组:</span>
+          <span>{t('gallery.groupBy')}</span>
           <select
             value={groupByField}
             onChange={(e) => {
@@ -103,18 +105,18 @@ export function GalleryViewPage() {
             }}
             style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-light)' }}
           >
-            <option value="">无分组</option>
+            <option value="">{t('gallery.noGroup')}</option>
             {groupableFields.map(f => (
               <option key={f.name} value={f.name}>{f.label ?? f.name}</option>
             ))}
           </select>
-          <button onClick={expandAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>全部展开</button>
-          <button onClick={collapseAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>全部折叠</button>
+          <button onClick={expandAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>{t('gallery.expandAll')}</button>
+          <button onClick={collapseAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>{t('gallery.collapseAll')}</button>
         </div>
       )}
 
       <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>
-        共 {(groupByField ? (groupedData?.reduce((a, g) => a + g._count, 0) ?? 0) : records.length)} 条记录{(groupByField ? ` (${groupedData?.length ?? 0} 组)` : '')}
+        {t('gallery.totalRecords', { count: (groupByField ? (groupedData?.reduce((a, g) => a + g._count, 0) ?? 0) : records.length) })}{(groupByField ? ` (${t('gallery.groupCount', { count: groupedData?.length ?? 0 })})` : '')}
       </p>
 
       {!groupByField ? (
@@ -141,7 +143,7 @@ export function GalleryViewPage() {
                 onClick={() => toggleGroup(group._groupKey)}
               >
                 <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                  {expandedGroups.has(group._groupKey) ? '▼' : '▶'} {group._groupKey} ({group._count} 条)
+                  {expandedGroups.has(group._groupKey) ? '▼' : '▶'} {group._groupKey} ({t('gallery.itemsCount', { count: group._count })})
                 </span>
               </div>
               {expandedGroups.has(group._groupKey) && (
@@ -158,7 +160,7 @@ export function GalleryViewPage() {
 
       {(!groupByField ? records : groupedData?.flatMap(g => g._children) ?? []).length === 0 && (
         <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
-          无数据
+          {t('gallery.noData')}
         </div>
       )}
     </div>

@@ -67,7 +67,7 @@ export function MessageList({
   };
   const renderContent = (content: string, isBurned: boolean, mentions?: Array<{displayName: string; userId: string}>) => {
     if (isBurned) {
-      return <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>该消息已焚毁</span>;
+      return <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>{t('im.burnedMessage')}</span>;
     }
     
     if (mentions && mentions.length > 0) {

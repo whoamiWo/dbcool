@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -22,6 +23,7 @@ interface Record { id: string; [k: string]: unknown; }
  * 重复度实证（PHASE64 T2-R）：与 BoardView 无成段重复代码，重复率 0%，不合并。
  */
 export function KanbanViewPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const isMobile = useIsMobile();
   // PHASE98 R3: 三个 query 全部取 isError/refetch。
@@ -62,7 +64,7 @@ export function KanbanViewPage() {
   if (viewError) {
     return (
       <ErrorState
-        message={`视图加载失败：${(viewErrObj as Error)?.message ?? ''}`}
+        message={`${t('kanbanView.viewLoadFailed')}: ${(viewErrObj as Error)?.message ?? ''}`}
         onRetry={() => void refetchView()}
       />
     );
@@ -70,7 +72,7 @@ export function KanbanViewPage() {
   if (collectionError) {
     return (
       <ErrorState
-        message={`集合元信息加载失败：${(collectionErrObj as Error)?.message ?? ''}`}
+        message={`${t('kanbanView.collectionLoadFailed')}: ${(collectionErrObj as Error)?.message ?? ''}`}
         onRetry={() => void refetchCollection()}
       />
     );
@@ -78,22 +80,22 @@ export function KanbanViewPage() {
   if (recordsError) {
     return (
       <ErrorState
-        message={`记录加载失败：${(recordsErrObj as Error)?.message ?? ''}`}
+        message={`${t('kanbanView.recordsLoadFailed')}: ${(recordsErrObj as Error)?.message ?? ''}`}
         onRetry={() => void refetchRecords()}
       />
     );
   }
-  if (!viewData) return <p>加载中…</p>;
+  if (!viewData) return <p>{t('common.loading')}</p>;
   const view = viewData;
   const config = view.config as unknown as KanbanConfig;
   const fields: FieldDef[] = collectionData?.fields ?? [];
   const records: Record[] = recordsData ?? [];
 
-  if (!config.groupBy) return <p>看板视图未配置 groupBy 字段</p>;
+  if (!config.groupBy) return <p>{t('kanbanView.noGroupBy')}</p>;
 
   const groups = new Map<string, Record[]>();
   for (const r of records) {
-    const key = String(r[config.groupBy] ?? '(空)');
+    const key = String(r[config.groupBy] ?? t('kanbanView.emptyGroup'));
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(r);
   }
@@ -101,11 +103,11 @@ export function KanbanViewPage() {
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
       <Link to={`/designer/collections/${collectionName}`} style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>
-        ← 返回 {collectionName}
+        ← {t('common.back')} {collectionName}
       </Link>
       <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{view.title}</h1>
       <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
-        按 <code>{config.groupBy}</code> 分组({groups.size} 个分组)
+        {t('kanbanView.groupedBy')} <code>{config.groupBy}</code> ({t('kanbanView.groupCount', { count: groups.size })})
       </p>
 
       {/*

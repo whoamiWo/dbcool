@@ -68,7 +68,10 @@
     "untitled": "(无标题)",
     "view": "查看",
     "name": "名称",
-    "description": "描述"
+    "description": "描述",
+    "back": "返回",
+    "submit": "提交",
+    "submitting": "提交中…"
   },
   "board": {
     "title": "看板",
@@ -209,7 +212,8 @@
     "uploadAttachmentHint": "拖拽或点击上传文件（≤50MB）",
     "uploadAttachment": "上传附件",
     "inputMessage": "输入消息",
-    "sendMessage": "发送消息"
+    "sendMessage": "发送消息",
+    "burnedMessage": "该消息已焚毁"
   },
   "project": {
     "title": "项目协同",
@@ -1192,5 +1196,72 @@
     "empty": "暂无审计记录",
     "retentionPolicy": "数据保留策略待定 — 当前每次查询最新 {{limit}} 条",
     "totalRecords": "租户内共 {{total}} 条操作记录"
+  },
+  "detail": {
+    "loading": "加载中…",
+    "recordNotFound": "记录不存在"
+  },
+  "desktopWarning": {
+    "ariaLabel": "移动端访问提示",
+    "message": "该页面建议使用桌面端访问，以获得最佳体验。",
+    "gotIt": "知道了"
+  },
+  "collab": {
+    "loadFailed": "加载文档失败",
+    "docNotFound": "文档不存在",
+    "title": "协同编辑 · 文档 ID {{docId}}"
+  },
+  "kanbanView": {
+    "viewLoadFailed": "视图加载失败",
+    "collectionLoadFailed": "集合元信息加载失败",
+    "recordsLoadFailed": "记录加载失败",
+    "noGroupBy": "看板视图未配置 groupBy 字段",
+    "emptyGroup": "(空)",
+    "groupedBy": "按",
+    "groupCount": "{{count}} 个分组"
+  },
+  "erDiagram": {
+    "title": "数据模型 ER 图",
+    "tables": "张表",
+    "relations": "条关系",
+    "draggableNodes": "可拖动节点",
+    "belongsTo": "属于",
+    "hasMany": "拥有多个",
+    "legend": "🟢 系统表 · 🔵 业务表 · 🟠 ER demo"
+  },
+  "gallery": {
+    "groupBy": "分组:",
+    "noGroup": "无分组",
+    "expandAll": "全部展开",
+    "collapseAll": "全部折叠",
+    "totalRecords": "共 {{count}} 条记录",
+    "groupCount": "{{count}} 组",
+    "itemsCount": "{{count}} 条",
+    "noData": "无数据"
+  },
+  "collectionDetail": {
+    "notFound": "Collection 不存在",
+    "editSchema": "编辑 Schema",
+    "newForm": "建表单",
+    "newView": "建视图",
+    "addRecord": "+ 添加记录",
+    "relatedForms": "关联表单",
+    "viewsSection": "视图",
+    "newRecord": "新记录",
+    "recordsSection": "记录",
+    "noRecords": "暂无记录"
+  },
+  "viewsList": {
+    "newView": "+ 新建视图",
+    "emptyTitle": "还没有视图",
+    "emptyDescWithCollection": "为当前 Collection 创建第一个视图，自定义表格/看板/画廊展示",
+    "emptyDesc": "先选择一个 Collection，再创建视图",
+    "name": "名称",
+    "type": "类型",
+    "collection": "Collection",
+    "actions": "操作",
+    "open": "打开",
+    "edit": "编辑",
+    "label": "视图"
   }
 }

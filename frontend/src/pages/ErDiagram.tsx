@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 
 /**
@@ -47,6 +48,7 @@ const VIEW_W = 1600;
 const VIEW_H = 1000;
 
 export function ErDiagramPage() {
+  const { t } = useTranslation();
   const [data, setData] = useState<ErPayload | null>(null);
   const [error, setError] = useState<string>('');
   const [hoverEdge, setHoverEdge] = useState<number | null>(null);
@@ -141,23 +143,23 @@ export function ErDiagramPage() {
   const onMouseUp = () => { dragRef.current = null; };
 
   if (error) return <div style={{ padding: 24, color: 'crimson' }}>{error}</div>;
-  if (!data) return <div style={{ padding: 24 }}>加载中…</div>;
+  if (!data) return <div style={{ padding: 24 }}>{t('common.loading')}</div>;
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ margin: 0 }}>📊 数据模型 ER 图</h2>
+        <h2 style={{ margin: 0 }}>{t('erDiagram.title')}</h2>
         <div style={{ display: 'flex', gap: 16, color: 'var(--color-bg-elevated)', fontSize: 14 }}>
-          <span><b>{data.stats.collections}</b> 张表</span>
-          <span><b>{data.stats.relationships}</b> 条关系</span>
-          <span style={{ color: 'var(--color-text-muted)' }}>可拖动节点</span>
+          <span><b>{data.stats.collections}</b> {t('erDiagram.tables')}</span>
+          <span><b>{data.stats.relationships}</b> {t('erDiagram.relations')}</span>
+          <span style={{ color: 'var(--color-text-muted)' }}>{t('erDiagram.draggableNodes')}</span>
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 13, color: 'var(--color-bg-elevated)' }}>
-        <span>─── belongsTo 属于</span>
-        <span>┄┄┄ hasMany 拥有多个</span>
-        <span style={{ color: 'var(--color-text-muted)' }}>🟢 系统表 · 🔵 业务表 · 🟠 ER demo</span>
+        <span>─── {t('erDiagram.belongsTo')}</span>
+        <span>┄┄┄ {t('erDiagram.hasMany')}</span>
+        <span style={{ color: 'var(--color-text-muted)' }}>{t('erDiagram.legend')}</span>
       </div>
 
       <div role="presentation"

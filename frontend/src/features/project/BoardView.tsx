@@ -43,9 +43,9 @@ interface Card {
 export function BoardView({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
   const [columns, setColumns] = useState<Column[]>([
-    { id: 'col-todo', title: '待办', type: 'TODO' },
-    { id: 'col-progress', title: '进行中', type: 'IN_PROGRESS' },
-    { id: 'col-done', title: '已完成', type: 'DONE' },
+    { id: 'col-todo', title: t('board.todo'), type: 'TODO' },
+    { id: 'col-progress', title: t('board.inProgress'), type: 'IN_PROGRESS' },
+    { id: 'col-done', title: t('board.done'), type: 'DONE' },
   ]);
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);

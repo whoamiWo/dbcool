@@ -101,7 +101,7 @@ export function FormRuntimePage() {
         onClick={() => navigate(`/designer/collections/${formData.collection_name}`)}
         style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}
       >
-        ← 返回
+        ← {t('formRuntime.back')}
       </button>
       <div
         style={{
@@ -115,7 +115,7 @@ export function FormRuntimePage() {
           form={formForComponent}
           fields={collectionData.fields ?? []}
           onSubmit={(data) => { submitMutation.mutate(data); }}
-          submitLabel={submitMutation.isPending ? '提交中…' : '提交'}
+          submitLabel={submitMutation.isPending ? t('formRuntime.submitting') : t('formRuntime.submit')}
           onTriggerWorkflow={triggerWorkflow}
         />
       </div>
