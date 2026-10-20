@@ -1374,5 +1374,33 @@
     "aclConfig": "ACL Config",
     "deleteConfirm": "Delete role \"{{name}}\"?",
     "createFailed": "Failed to create"
+  },
+  "recycleBin": {
+    "title": "Recycle Bin",
+    "backTo": "Back to",
+    "empty": "Recycle bin is empty",
+    "clear": "Clear recycle bin",
+    "restore": "Restore",
+    "purge": "Delete permanently",
+    "colId": "Record ID",
+    "colData": "Data summary",
+    "colActions": "Actions",
+    "clearConfirmTitle": "Clear recycle bin?",
+    "clearConfirmMsg": "This permanently deletes all records in the recycle bin and cannot be undone.",
+    "restoreFailed": "Restore failed",
+    "purgeFailed": "Delete failed",
+    "clearFailed": "Clear failed"
+  },
+  "recordVersion": {
+    "title": "Version history",
+    "empty": "No version records",
+    "selectHint": "Select a version on the left to see field diffs",
+    "noDiff": "No field changes in this version",
+    "field": "Field",
+    "oldValue": "Old value",
+    "newValue": "New value",
+    "restore": "Restore this version",
+    "restoreFailed": "Restore failed",
+    "version": "Version"
   }
 }

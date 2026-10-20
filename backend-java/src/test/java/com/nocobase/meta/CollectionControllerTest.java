@@ -448,7 +448,9 @@ class CollectionControllerTest {
     void deleteRecord_succeedsAndAudits() {
         Map<String, Object> existing = Map.of("id", "rec-1");
         when(service.getRecord("posts", "rec-1", "tenant_default")).thenReturn(existing);
-        when(service.deleteRecord("posts", "rec-1", "tenant_default")).thenReturn(true);
+        // PHASE125:删除端点改走带操作者的重载(以便写 DELETE 版本),stub 需同步为 4 参
+        when(service.deleteRecord(eq("posts"), eq("rec-1"), eq("tenant_default"), any()))
+                .thenReturn(true);
 
         Map<String, Object> resp = controller.deleteRecord("posts", "rec-1", testUser);
 
@@ -461,7 +463,7 @@ class CollectionControllerTest {
     void deleteRecord_notFound_returns404() {
         Map<String, Object> existing = Map.of("id", "rec-1");
         when(service.getRecord("posts", "rec-1", "tenant_default")).thenReturn(existing);
-        when(service.deleteRecord(anyString(), anyString(), anyString())).thenReturn(false);
+        when(service.deleteRecord(anyString(), anyString(), anyString(), any())).thenReturn(false);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> controller.deleteRecord("posts", "rec-1", testUser));

@@ -46,9 +46,10 @@ class CollectionServiceAclSeedTest {
 @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
+        // PHASE125:末位 null 为 RecordVersionService(本测试不覆盖版本留痕)
         service = new CollectionService(
                 collectionRepository, tableManager, migrationService, objectMapper,
-                null, null, null, roleRepository, aclPolicyRepository);
+                null, null, null, roleRepository, aclPolicyRepository, null);
 
         when(objectMapper.writeValueAsString(any())).thenReturn("[]");
     }

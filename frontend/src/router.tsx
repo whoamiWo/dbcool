@@ -143,6 +143,9 @@ const PlaybookListPage = lazy(() =>
 const PlaybookRunPage = lazy(() =>
   import('./pages/playbook/PlaybookRun').then(m => ({ default: m.PlaybookRunPage } as { default: React.ComponentType })),
 );
+const RecycleBinPage = lazy(() =>
+  import('./pages/RecycleBin').then(m => ({ default: m.RecycleBinPage } as { default: React.ComponentType })),
+);
 
 /** R12 懒加载占位 */
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -168,6 +171,8 @@ export const router = createBrowserRouter([
       { path: 'designer/schemas/new', element: <Lazy><SchemaDesignerPage /></Lazy> },
       { path: 'designer/schemas/:name/edit', element: <Lazy><SchemaEditorPage /></Lazy> },
       { path: 'designer/collections/:name', element: <Lazy><CollectionDetailPage /></Lazy> },
+      // PHASE125:回收站(软删除记录恢复)
+      { path: 'designer/collections/:name/recycle', element: <Lazy><RecycleBinPage /></Lazy> },
 
       // Form
       { path: 'designer/forms', element: <Lazy><FormsListPage /></Lazy> },

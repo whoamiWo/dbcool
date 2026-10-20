@@ -416,7 +416,8 @@ public class CollectionController {
         if (!rowAclService.evaluateDelete(user.tenantId(), name, existing, rowAclPrincipal(user))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ROW ACL 拒绝:不可删除此记录");
         }
-        boolean ok = service.deleteRecord(name, id, user.tenantId());
+        // PHASE125:改用带操作者的重载 —— 删除前写 DELETE 版本(误删可恢复 + 留痕)
+        boolean ok = service.deleteRecord(name, id, user.tenantId(), user.userId());
         if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "DELETE", name, id, existing);
@@ -425,6 +426,123 @@ public class CollectionController {
                 RecordChangeEvent.ChangeType.DELETE, name, id, null,
                 user.tenantId(), user.userId()));
         return Map.of("code", 0, "message", "deleted", "data", Map.of("id", id));
+    }
+
+    // ============================================================
+    //  PHASE125:回收站(软删除恢复)端点
+    //
+    //  权限说明:均走 assertCan(DELETE)—— 回收站操作本质属"删除域"的延伸。
+    //  此处不叠加 rowAcl 行级过滤:已删记录的归属语义复杂(原行级策略可能已变),
+    //  且回收站本身是管理域能力,操作级鉴权 + 审计留痕已满足治理要求。
+    // ============================================================
+
+    /** 回收站列表:列出该 collection 已软删的记录(按删除时间倒序)。 */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{name}/recycle")
+    public Map<String, Object> listRecycleBin(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "100") int limit,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        List<Map<String, Object>> records = service.listDeletedRecords(name, user.tenantId(), limit);
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("collection", name, "records", records, "total", records.size()));
+    }
+
+    /** 恢复回收站中的记录(deleted_at 置空,记录重回业务列表)。 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{name}/recycle/{id}/restore")
+    public Map<String, Object> restoreRecord(
+            @PathVariable String name,
+            @PathVariable String id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        boolean ok = service.restoreRecord(name, id, user.tenantId(), user.userId());
+        if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或未被删除");
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "RESTORE", name, id, null);
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.UPDATE, name, id, null,
+                user.tenantId(), user.userId()));
+        return Map.of("code", 0, "message", "restored", "data", Map.of("id", id));
+    }
+
+    /**
+     * 彻底删除(物理删除,<strong>不可恢复</strong>),并清理该记录的版本历史。
+     */
+    @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/{name}/recycle/{id}")
+    public Map<String, Object> hardDeleteRecord(
+            @PathVariable String name,
+            @PathVariable String id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        boolean ok = service.hardDeleteRecord(name, id, user.tenantId());
+        if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "PURGE", name, id, null);
+        return Map.of("code", 0, "message", "purged", "data", Map.of("id", id));
+    }
+
+    /** 清空回收站:物理删除全部已软删记录。 */
+    @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/{name}/recycle")
+    public Map<String, Object> clearRecycleBin(
+            @PathVariable String name,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        int removed = service.clearRecycleBin(name, user.tenantId());
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "PURGE_ALL", name, null, Map.of("removed", removed));
+        return Map.of("code", 0, "message", "cleared", "data", Map.of("removed", removed));
+    }
+
+    // ============================================================
+    //  PHASE125:版本历史端点
+    // ============================================================
+
+    /** 版本历史列表(摘要,不含完整快照 —— 避免响应体积过大)。 */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{name}/records/{id}/versions")
+    public Map<String, Object> listRecordVersions(
+            @PathVariable String name,
+            @PathVariable String id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+        List<Map<String, Object>> versions = service.listRecordVersions(name, id, user.tenantId());
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("collection", name, "recordId", id, "versions", versions));
+    }
+
+    /** 回滚记录到指定历史版本(回滚动作本身也会留一条 RESTORE 版本)。 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{name}/records/{id}/versions/{version}/restore")
+    public Map<String, Object> restoreRecordVersion(
+            @PathVariable String name,
+            @PathVariable String id,
+            @PathVariable int version,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        boolean ok = service.restoreRecordVersion(name, id, version, user.tenantId(), user.userId());
+        if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在或回滚失败");
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "RESTORE_VERSION", name, id, Map.of("version", version));
+        eventPublisher.publishEvent(new RecordChangeEvent(
+                RecordChangeEvent.ChangeType.UPDATE, name, id, null,
+                user.tenantId(), user.userId()));
+        return Map.of("code", 0, "message", "restored", "data", Map.of("id", id, "version", version));
     }
 
     // ============================================================
