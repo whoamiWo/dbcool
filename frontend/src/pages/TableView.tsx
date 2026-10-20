@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -14,6 +15,7 @@ interface GroupedRow { _groupKey: string; _count: number; _aggregations: Record<
 
 /** 表格视图 (US-201/202/203/206) — Week 9 MVP + R2 T2 group by */
 export function TableViewPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [filters, setFilters] = useState<FilterRule[]>([]);
   const [sort, setSort] = useState<SortRule[]>([]);
@@ -255,26 +257,26 @@ export function TableViewPage() {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
       <Link to={`/designer/collections/${collectionName}`} style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>
-        ← 返回 {collectionName}
+        ← {t('common.back')} {collectionName}
       </Link>
       <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{view.title}</h1>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button onClick={exportCsv} className="glass-button-primary" style={{ padding: '4px 12px', fontSize: 12 }}>
-          📥 导出 CSV
+          📥 {t('table.exportCsv')}
         </button>
         <label style={{ padding: '4px 12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-text-primary)', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-          📤 导入 CSV
+          📤 {t('table.importCsv')}
           <input type="file" accept=".csv" onChange={handleImport} style={{ display: 'none' }} />
         </label>
         {importResult && <span style={{ alignSelf: 'center', fontSize: 12, color: importResult.failed > 0 ? 'var(--color-error)' : 'var(--color-success)' }}>
-          {importResult.success}/{importResult.total} 成功{importResult.failed > 0 ? `, ${importResult.failed} 失败` : ''}
+          {importResult.success}/{importResult.total} {t('table.importSuccess')}{importResult.failed > 0 ? `, ${importResult.failed} ${t('table.importFailed')}` : ''}
         </span>}
       </div>
 
       {groupByField && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 12 }}>
-          <span>分组:</span>
+          <span>{t('table.groupBy')}</span>
           <select
             value={groupByField}
             onChange={(e) => {
@@ -283,20 +285,20 @@ export function TableViewPage() {
             }}
             style={{ padding: '4px 8px', borderRadius: 4, background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-light)' }}
           >
-            <option value="">无分组</option>
+            <option value="">{t('table.noGroup')}</option>
             {groupableFields.map(f => (
               <option key={f.name} value={f.name}>{f.label ?? f.name}</option>
             ))}
           </select>
-          <button onClick={expandAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>全部展开</button>
-          <button onClick={collapseAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>全部折叠</button>
+          <button onClick={expandAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>{t('table.expandAll')}</button>
+          <button onClick={collapseAll} className="glass-button" style={{ padding: '2px 8px', fontSize: 11 }}>{t('table.collapseAll')}</button>
         </div>
       )}
 
       <FilterBar fields={fields} filters={filters} onChange={setFilters} />
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 12, color: 'var(--color-text-muted)' }}>
-        <span>点击列头排序:</span>
+        <span>{t('table.clickToSort')}</span>
         {columns.map((c) => {
           const s = sort.find((x) => x.field === c.field);
           return (
@@ -320,7 +322,7 @@ export function TableViewPage() {
       </div>
 
       {isLoading ? (
-        <p style={{ color: 'var(--color-text-muted)' }}>加载中…</p>
+        <p style={{ color: 'var(--color-text-muted)' }}>{t('common.loading')}</p>
       ) : (
         <div
           className={isMobile ? 'table-view-container glass-card' : 'glass-card'}
@@ -346,7 +348,7 @@ export function TableViewPage() {
               {(!groupByField ? sorted : groupedData ?? []).length === 0 ? (
                 <tr>
                   <td colSpan={columns.length + (groupByField ? 1 : 0)} style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    无数据
+                    {t('table.noData')}
                   </td>
                 </tr>
               ) : (
@@ -486,7 +488,7 @@ export function TableViewPage() {
                           }
                           return <td key={c.field} style={{ padding: 8, color: 'var(--color-text-muted)' }}>—</td>;
                         })}
-                        <td style={{ padding: 8, fontWeight: 600, color: 'var(--color-info)' }}>{g._count} 条</td>
+                        <td style={{ padding: 8, fontWeight: 600, color: 'var(--color-info)' }}>{t('table.itemsCount', { count: g._count })}</td>
                       </tr>
                       {expandedGroups.has(g._groupKey) && g._children.map((r) => (
                         <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)', background: 'rgba(0,0,0,0.02)' }}>
@@ -543,7 +545,7 @@ export function TableViewPage() {
       )}
 
       <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
-        共 {(groupByField ? (groupedData?.length ?? 0) : sorted.length)} 条{(groupByField ? ` (${groupedData?.reduce((a, g) => a + g._count, 0)} 记录)` : '')}
+        {t('table.totalRecords', { count: (groupByField ? (groupedData?.length ?? 0) : sorted.length) })}{(groupByField ? ` (${t('table.recordsCount', { count: groupedData?.reduce((a, g) => a + g._count, 0) ?? 0 })})` : '')}
       </p>
     </div>
   );

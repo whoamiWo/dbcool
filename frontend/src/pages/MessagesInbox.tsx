@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import EmptyState from '@/components/EmptyState';
 
@@ -25,6 +26,7 @@ interface InboxResp {
  * 站内信 inbox(US-505/506,Week 12 + Week 13 cursor 分页).
  */
 export function MessagesInboxPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [stack, setStack] = useState<{ cursor: string | null; messages: Message[] }>({
@@ -60,10 +62,10 @@ export function MessagesInboxPage() {
 
   return (
     <div style={{ maxWidth: 700 }}>
-      <h1>📬 站内信</h1>
+      <h1>📬 {t('messages.title')}</h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <span style={{ fontSize: 14, color: 'var(--color-bg-elevated)' }}>
-          未读 <b style={{ color: 'var(--color-error)' }}>{data?.unread_count ?? 0}</b>
+          {t('messages.unread')} <b style={{ color: 'var(--color-error)' }}>{data?.unread_count ?? 0}</b>
         </span>
         <label style={{ fontSize: 14 }}>
           <input
@@ -73,14 +75,14 @@ export function MessagesInboxPage() {
               setUnreadOnly(e.target.checked);
               setStack({ cursor: null, messages: [] });
             }}
-          /> 只看未读
+          />{t('messages.unreadOnly')}
         </label>
       </div>
-      {isLoading && stack.messages.length === 0 ? <p>加载中…</p> : null}
+      {isLoading && stack.messages.length === 0 ? <p>{t('common.loading')}</p> : null}
       {merged.length === 0 && !isLoading ? (
         <EmptyState
-          title="暂无消息"
-          description="消息由系统通知或他人发送后显示在这里；收到后会实时出现在本列表"
+          title={t("messages.emptyTitle")}
+          description={t("messages.emptyDescription")}
         />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -103,14 +105,14 @@ export function MessagesInboxPage() {
                 </small>
               </div>
               <div style={{ marginTop: 4, color: 'var(--color-bg-elevated)' }}>{m.body}</div>
-              {!m.read && <small style={{ color: 'var(--color-error)' }}>● 未读</small>}
+              {!m.read && <small style={{ color: 'var(--color-error)' }}>{t('messages.unreadLabel')}</small>}
             </div>
           ))}
         </div>
       )}
       {data?.has_more && (
         <button onClick={loadMore} style={{ marginTop: 12, ...btnStyle }}>
-          加载更多(已加载 {merged.length} 条)
+          {t('messages.loadMore', { count: merged.length })}
         </button>
       )}
     </div>

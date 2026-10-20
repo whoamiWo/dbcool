@@ -9,7 +9,7 @@
     "password": "密码",
     "submit": "登录",
     "loading": "登录中...",
-    "error": "登录失败，请检查用户名和密码",
+    "error": "登录失败，请检查网络",
     "subtitle": "登录开始使用",
     "remember": "记住用户名",
     "forgot": "忘记密码?",
@@ -21,7 +21,9 @@
     "validation": {
       "usernameRequired": "请输入用户名",
       "passwordRequired": "请输入密码"
-    }
+    },
+    "usernameRequired": "请输入用户名",
+    "passwordRequired": "请输入密码"
   },
   "nav": {
     "home": "首页",
@@ -1263,5 +1265,114 @@
     "open": "打开",
     "edit": "编辑",
     "label": "视图"
+  },
+  "collections": {
+    "title": "Collections",
+    "loadFailed": "Collection 列表加载失败",
+    "emptyTitle": "还没有 Collection",
+    "emptyDescription": "Collection 是数据的结构定义，创建后才能录入记录。",
+    "newCollection": "新建 Collection"
+  },
+  "workflows": {
+    "title": "工作流",
+    "newWorkflow": "新建工作流",
+    "emptyTitle": "暂无工作流",
+    "emptyDescription": "创建第一个工作流，自动化审批、通知与数据流转",
+    "name": "名称",
+    "titleCol": "标题",
+    "collection": "Collection",
+    "status": "状态",
+    "actions": "操作",
+    "enabled": "启用",
+    "disabled": "禁用",
+    "edit": "编辑",
+    "trigger": "触发"
+  },
+  "forms": {
+    "title": "表单",
+    "loadFailed": "表单列表加载失败",
+    "newForm": "新建表单",
+    "emptyCollection": "该 collection 还没有表单",
+    "emptyGlobal": "你还没有创建任何表单",
+    "description": "表单用于收集和录入结构化数据。",
+    "titleCol": "标题",
+    "collection": "Collection",
+    "createdAt": "创建时间",
+    "actions": "操作",
+    "edit": "编辑",
+    "fill": "填表"
+  },
+  "messages": {
+    "title": "站内信",
+    "unread": "未读",
+    "unreadOnly": "只看未读",
+    "emptyTitle": "暂无消息",
+    "emptyDescription": "消息由系统通知或他人发送后显示在这里",
+    "unreadLabel": "● 未读",
+    "loadMore": "加载更多 (已加载 {{count}} 条)"
+  },
+  "table": {
+    "exportCsv": "导出 CSV",
+    "importCsv": "导入 CSV",
+    "noGroup": "无分组",
+    "expandAll": "全部展开",
+    "collapseAll": "全部折叠",
+    "clickToSort": "点击列头排序:",
+    "groupBy": "分组:",
+    "noData": "无数据",
+    "itemsCount": "{{count}} 条",
+    "totalRecords": "共 {{count}} 条",
+    "recordsCount": "{{count}} 记录",
+    "importSuccess": "成功",
+    "importFailed": "失败"
+  },
+  "myTasks": {
+    "title": "我的待办任务",
+    "pendingCount": "待审批 {{count}} 项",
+    "emptyTitle": "🎉 当前没有待办任务",
+    "emptyDescription": "有新的审批任务分配给你时，会显示在这里",
+    "workflow": "工作流",
+    "node": "节点",
+    "triggerData": "触发数据",
+    "relatedRecord": "关联记录",
+    "createdAt": "创建时间",
+    "status": "状态",
+    "actions": "操作",
+    "approve": "✅ 通过",
+    "reject": "❌ 拒绝"
+  },
+  "dingtalk": {
+    "title": "钉钉集成",
+    "dingEnv": "钉钉环境",
+    "normalEnv": "普通环境",
+    "scanLogin": "钉钉扫码登录",
+    "orgSync": "组织架构同步",
+    "syncNow": "立即同步",
+    "deptUsers": "部门: {{depts}} | 用户: {{users}}",
+    "userMapping": "用户映射",
+    "ssoLogin": "SSO 登录"
+  },
+  "profile": {
+    "title": "个人中心",
+    "infoTitle": "我的信息",
+    "username": "用户名",
+    "userId": "用户 ID",
+    "tenant": "租户",
+    "roles": "角色",
+    "registeredAt": "注册时间",
+    "changePassword": "修改密码",
+    "oldPassword": "旧密码",
+    "newPassword": "新密码",
+    "changeFailed": "修改失败"
+  },
+  "roles": {
+    "title": "角色管理",
+    "newRole": "新建角色",
+    "nameLabel": "名称（英文，小写） *",
+    "descLabel": "描述",
+    "noDescription": "(无描述)",
+    "aclConfig": "权限配置",
+    "deleteConfirm": "删除角色 \"{{name}}\"?",
+    "createFailed": "创建失败"
   }
 }

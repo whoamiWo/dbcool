@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import EmptyState from '@/components/EmptyState';
@@ -28,6 +29,7 @@ const statusColor: Record<string, string> = {
 };
 
 export function MyTasksPage() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const qc = useQueryClient();
 
@@ -55,27 +57,27 @@ export function MyTasksPage() {
   const pending = (tasks ?? []).filter((t) => t.status === 'PENDING');
   return (
     <div style={{ padding: 16 }}>
-      <h2>📋 我的待办任务</h2>
+      <h2>📋 {t('myTasks.title')}</h2>
       <p style={{ color: 'var(--color-bg-elevated)' }}>
-        待审批 {pending.length} 项 
+        {t('myTasks.pendingCount', { count: pending.length })}
       </p>
 
-      {isLoading && <p>加载中...</p>}
+      {isLoading && <p>{t('common.loading')}</p>}
 
-      <TaskTable tasks={pending} showActions act={act} />
+      <TaskTable tasks={pending} showActions act={act} t={t} />
 
       {pending.length === 0 && (
         <EmptyState
-          title="🎉 当前没有待办任务"
-          description="有新的审批任务分配给你时，会显示在这里"
+          title={t('myTasks.emptyTitle')}
+          description={t('myTasks.emptyDescription')}
         />
       )}
     </div>
   );
 }
 
-function TaskTable({ tasks, showActions, act }: {
-  tasks: Task[]; showActions?: boolean;
+function TaskTable({ tasks, showActions, act, t }: {
+  tasks: Task[]; showActions?: boolean; t: (k: string, o?: Record<string, unknown>) => string;
   act: ReturnType<typeof useMutation<unknown, unknown, { id: string; op: 'approve' | 'reject'; comment?: string }>>;
 }) {
   return (
@@ -85,52 +87,52 @@ function TaskTable({ tasks, showActions, act }: {
     <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8 }}>
       <thead>
         <tr style={{ background: 'var(--color-bg-secondary)' }}>
-          <th style={th}>工作流</th>
-          <th style={th}>节点</th>
-          <th style={th}>触发数据</th>
-          <th style={th}>关联记录</th>
-          <th style={th}>创建时间</th>
-          <th style={th}>状态</th>
-          {showActions && <th style={th}>操作</th>}
+          <th style={th}>{t('myTasks.workflow')}</th>
+          <th style={th}>{t('myTasks.node')}</th>
+          <th style={th}>{t('myTasks.triggerData')}</th>
+          <th style={th}>{t('myTasks.relatedRecord')}</th>
+          <th style={th}>{t('myTasks.createdAt')}</th>
+          <th style={th}>{t('myTasks.status')}</th>
+          {showActions && <th style={th}>{t('myTasks.actions')}</th>}
         </tr>
       </thead>
       <tbody>
-        {tasks.map((t) => {
+        {tasks.map((task) => {
           let trig: Record<string, unknown> = {};
-          try { trig = JSON.parse(t.trigger_data_json || '{}'); } catch {}
+          try { trig = JSON.parse(task.trigger_data_json || '{}'); } catch {}
           return (
-            <tr key={t.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
+            <tr key={task.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
               <td style={td}>
-                <Link to={`/designer/instances/${t.instance_id}`}>{t.workflow_title || t.workflow_name}</Link>
+                <Link to={`/designer/instances/${task.instance_id}`}>{task.workflow_title || task.workflow_name}</Link>
               </td>
-              <td style={td}>{t.node_id}</td>
+              <td style={td}>{task.node_id}</td>
               <td style={td}>
                 <code style={{ fontSize: 11, background: 'var(--color-bg-secondary)', padding: 2 }}>
                   {JSON.stringify(trig).slice(0, 40)}
                 </code>
               </td>
-              <td style={td}>{t.record_id || '—'}</td>
-              <td style={td}>{(t.created_at || '').replace('T', ' ').slice(0, 19)}</td>
+              <td style={td}>{task.record_id || '—'}</td>
+              <td style={td}>{(task.created_at || '').replace('T', ' ').slice(0, 19)}</td>
               <td style={td}>
-                <span style={{ padding: '2px 8px', background: statusColor[t.status] || 'var(--color-text-muted)',
+                <span style={{ padding: '2px 8px', background: statusColor[task.status] || 'var(--color-text-muted)',
                                color: 'var(--color-text-primary)', borderRadius: 4, fontSize: 12 }}>
-                  {t.status}
+                  {task.status}
                 </span>
               </td>
               {showActions && (
                 <td style={td}>
                   <button
-                    onClick={() => act.mutate({ id: t.id, op: 'approve' })}
+                    onClick={() => act.mutate({ id: task.id, op: 'approve' })}
                     disabled={act.isPending}
                     style={{ marginRight: 4, padding: '4px 10px', background: 'var(--color-success)',
                              color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                  >✅ 通过</button>
+                  >{t('myTasks.approve')}</button>
                   <button
-                    onClick={() => act.mutate({ id: t.id, op: 'reject' })}
+                    onClick={() => act.mutate({ id: task.id, op: 'reject' })}
                     disabled={act.isPending}
                     style={{ padding: '4px 10px', background: 'var(--color-error)',
                              color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                  >❌ 拒绝</button>
+                  >{t('myTasks.reject')}</button>
                 </td>
               )}
             </tr>

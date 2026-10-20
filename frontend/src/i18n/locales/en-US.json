@@ -9,19 +9,21 @@
     "password": "Password",
     "submit": "Login",
     "loading": "Logging in...",
-    "error": "Login failed. Please check your credentials.",
+    "error": "Login failed, please check network",
     "subtitle": "Sign in to get started",
     "remember": "Remember username",
     "forgot": "Forgot password?",
     "dingtalk": "DingTalk QR Login",
     "resetHint": "Please contact administrator to reset password",
     "scaffoldHint": "Week 3 scaffold: any non-empty credentials work",
-    "successHint": "Login successful, redirecting…",
+    "successHint": "Login successful, redirecting...",
     "networkError": "Login failed, please check network",
     "validation": {
       "usernameRequired": "Please enter username",
       "passwordRequired": "Please enter password"
-    }
+    },
+    "usernameRequired": "Please enter username",
+    "passwordRequired": "Please enter password"
   },
   "nav": {
     "home": "Home",
@@ -1263,5 +1265,114 @@
     "open": "Open",
     "edit": "Edit",
     "label": "Views"
+  },
+  "collections": {
+    "title": "Collections",
+    "loadFailed": "Failed to load collections",
+    "emptyTitle": "No collections yet",
+    "emptyDescription": "A collection is a structural definition — records can only be entered after creation.",
+    "newCollection": "New Collection"
+  },
+  "workflows": {
+    "title": "Workflows",
+    "newWorkflow": "New workflow",
+    "emptyTitle": "No workflows yet",
+    "emptyDescription": "Create the first workflow to automate approvals, notifications & data transfer",
+    "name": "Name",
+    "titleCol": "Title",
+    "collection": "Collection",
+    "status": "Status",
+    "actions": "Actions",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "edit": "Edit",
+    "trigger": "Trigger"
+  },
+  "forms": {
+    "title": "Forms",
+    "loadFailed": "Failed to load forms",
+    "newForm": "New form",
+    "emptyCollection": "No forms in this collection yet",
+    "emptyGlobal": "You have not created any forms yet",
+    "description": "Forms are used to collect and enter structured data.",
+    "titleCol": "Title",
+    "collection": "Collection",
+    "createdAt": "Created at",
+    "actions": "Actions",
+    "edit": "Edit",
+    "fill": "Fill"
+  },
+  "messages": {
+    "title": "Inbox",
+    "unread": "Unread",
+    "unreadOnly": "Unread only",
+    "emptyTitle": "No messages",
+    "emptyDescription": "System notifications and messages from others appear here",
+    "unreadLabel": "● Unread",
+    "loadMore": "Load more (loaded {{count}})"
+  },
+  "table": {
+    "exportCsv": "Export CSV",
+    "importCsv": "Import CSV",
+    "noGroup": "No grouping",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "clickToSort": "Click column to sort:",
+    "groupBy": "Group by:",
+    "noData": "No data",
+    "itemsCount": "{{count}} items",
+    "totalRecords": "{{count}} total records",
+    "recordsCount": "{{count}} records",
+    "importSuccess": "successful",
+    "importFailed": "failed"
+  },
+  "myTasks": {
+    "title": "My pending tasks",
+    "pendingCount": "{{count}} pending approval",
+    "emptyTitle": "🎉 No pending tasks",
+    "emptyDescription": "New approval tasks assigned to you will appear here",
+    "workflow": "Workflow",
+    "node": "Node",
+    "triggerData": "Trigger data",
+    "relatedRecord": "Related record",
+    "createdAt": "Created at",
+    "status": "Status",
+    "actions": "Actions",
+    "approve": "✅ Approve",
+    "reject": "❌ Reject"
+  },
+  "dingtalk": {
+    "title": "DingTalk Integration",
+    "dingEnv": "DingTalk env",
+    "normalEnv": "Normal env",
+    "scanLogin": "DingTalk QR login",
+    "orgSync": "Org structure sync",
+    "syncNow": "Sync now",
+    "deptUsers": "Depts: {{depts}} | Users: {{users}}",
+    "userMapping": "User mappings",
+    "ssoLogin": "SSO Login"
+  },
+  "profile": {
+    "title": "Profile",
+    "infoTitle": "My Info",
+    "username": "Username",
+    "userId": "User ID",
+    "tenant": "Tenant",
+    "roles": "Roles",
+    "registeredAt": "Registered at",
+    "changePassword": "Change password",
+    "oldPassword": "Old password",
+    "newPassword": "New password",
+    "changeFailed": "Failed to update"
+  },
+  "roles": {
+    "title": "Role Management",
+    "newRole": "New role",
+    "nameLabel": "Name (English, lowercase) *",
+    "descLabel": "Description",
+    "noDescription": "(No description)",
+    "aclConfig": "ACL Config",
+    "deleteConfirm": "Delete role \"{{name}}\"?",
+    "createFailed": "Failed to create"
   }
 }

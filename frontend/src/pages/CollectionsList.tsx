@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyState } from '@/components/EmptyState';
 import type { CollectionMeta } from '@/types/collection';
 
 export function CollectionsListPage() {
+  const { t } = useTranslation();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['collections'],
     queryFn: async () => {
@@ -18,13 +20,13 @@ export function CollectionsListPage() {
   });
 
   // PHASE98 R3: 错误态改为可重试 + 展示真实原因（原先只有一句"加载失败"）
-  if (isLoading) return <p>加载中…</p>;
+  if (isLoading) return <p>{t('common.loading')}</p>;
   if (error) {
     return (
       <div>
-        <h1>📚 Collections</h1>
+        <h1>📚 {t('collections.title')}</h1>
         <ErrorState
-          message={`Collection 列表加载失败：${(error as Error)?.message ?? ''}`}
+          message={t('collections.loadFailed', { error: (error as Error)?.message ?? '' })}
           onRetry={() => void refetch()}
         />
       </div>
@@ -36,7 +38,7 @@ export function CollectionsListPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>📚 Collections({collections.length})</h1>
+        <h1>📚 {t('collections.title')}({collections.length})</h1>
         <Link
           to="/designer/schemas"
           style={{
@@ -47,16 +49,16 @@ export function CollectionsListPage() {
             borderRadius: 4,
           }}
         >
-          + 新建 Collection
+          {t('collections.newCollection')}
         </Link>
       </div>
 
       {/* PHASE98 R3: 空态改为带 CTA —— 原引导语"点上方"里的"上方"不可点击 */}
       {collections.length === 0 ? (
         <EmptyState
-          title="还没有 Collection"
-          description="Collection 是数据的结构定义，创建后才能录入记录。"
-          actionLabel="+ 新建 Collection"
+          title={t('collections.emptyTitle')}
+          description={t('collections.emptyDescription')}
+          actionLabel={t('collections.newCollection')}
           onAction={() => (window.location.href = '/designer/schemas')}
         />
       ) : (

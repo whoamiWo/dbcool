@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import apiClient from '@/api/client';
 import EmptyState from '@/components/EmptyState';
 
@@ -14,6 +15,7 @@ interface WorkflowMeta {
 }
 
 export function WorkflowsListPage() {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ['workflows', 'all'],
     queryFn: async () => {
@@ -26,29 +28,29 @@ export function WorkflowsListPage() {
   });
   const navigate = useNavigate();
   // PHASE98 R3: 顺手修掉双分号 `</p>;;`
-  if (isLoading) return <p>加载中…</p>;
+  if (isLoading) return <p>{t('common.loading')}</p>;
   const workflows = data ?? [];
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <h1>⚡ 工作流({workflows.length})</h1>
-        <Link to="/designer/workflows/new" style={{ padding: '8px 16px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', textDecoration: 'none', borderRadius: 4 }}>+ 新建工作流</Link>
+        <h1>⚡ {t('workflows.title')}({workflows.length})</h1>
+        <Link to="/designer/workflows/new" style={{ padding: '8px 16px', background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', textDecoration: 'none', borderRadius: 4 }}>{t('workflows.newWorkflow')}</Link>
       </div>
       {workflows.length === 0 ? (
         <EmptyState
-          title="暂无工作流"
-          description="创建第一个工作流，自动化审批、通知与数据流转"
-          actionLabel="+ 新建工作流"
+          title={t('workflows.emptyTitle')}
+          description={t('workflows.emptyDescription')}
+          actionLabel={t('workflows.newWorkflow')}
           onAction={() => navigate('/designer/workflows/new')}
         />
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', borderRadius: 8, overflow: 'hidden', marginTop: 16 }}>
           <thead><tr style={{ background: 'var(--color-bg-secondary)' }}>
-            <th style={{ padding: 12, textAlign: 'left' }}>名称</th>
-            <th style={{ padding: 12, textAlign: 'left' }}>标题</th>
-            <th style={{ padding: 12, textAlign: 'left' }}>Collection</th>
-            <th style={{ padding: 12, textAlign: 'left' }}>状态</th>
-            <th style={{ padding: 12, textAlign: 'right' }}>操作</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('workflows.name')}</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('workflows.titleCol')}</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('workflows.collection')}</th>
+            <th style={{ padding: 12, textAlign: 'left' }}>{t('workflows.status')}</th>
+            <th style={{ padding: 12, textAlign: 'right' }}>{t('workflows.actions')}</th>
           </tr></thead>
           <tbody>
             {workflows.map((w) => (
@@ -57,12 +59,12 @@ export function WorkflowsListPage() {
                 <td style={{ padding: 12 }}>{w.title}</td>
                 <td style={{ padding: 12, fontFamily: 'monospace' }}>{w.collection_name}</td>
                 <td style={{ padding: 12 }}>
-                  {w.enabled ? <span style={{ padding: '2px 8px', background: 'rgba(16,185,129,0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>启用</span>
-                            : <span style={{ padding: '2px 8px', background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>禁用</span>}
+                  {w.enabled ? <span style={{ padding: '2px 8px', background: 'rgba(16,185,129,0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>{t('workflows.enabled')}</span>
+                            : <span style={{ padding: '2px 8px', background: 'rgba(239,68,68,0.2)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>{t('workflows.disabled')}</span>}
                 </td>
                 <td style={{ padding: 12, textAlign: 'right' }}>
-                  <Link to={`/designer/workflows/${w.id}/edit`} style={{ marginRight: 12, color: 'var(--color-info)', textDecoration: 'none' }}>编辑</Link>
-                  <Link to={`/api/workflows/${w.id}/trigger`} style={{ color: 'var(--color-success)', textDecoration: 'none' }}>触发</Link>
+                  <Link to={`/designer/workflows/${w.id}/edit`} style={{ marginRight: 12, color: 'var(--color-info)', textDecoration: 'none' }}>{t('workflows.edit')}</Link>
+                  <Link to={`/api/workflows/${w.id}/trigger`} style={{ color: 'var(--color-success)', textDecoration: 'none' }}>{t('workflows.trigger')}</Link>
                 </td>
               </tr>
             ))}

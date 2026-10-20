@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { ErrorState } from '@/components/ErrorState';
@@ -7,6 +8,7 @@ import type { } from '@/types/collection';
 import type { FormMeta } from '@/types/form';
 
 export function FormsListPage() {
+  const { t } = useTranslation();
   const { collection } = useParams<{ collection?: string }>();
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['forms', collection ?? 'all'],
@@ -22,13 +24,13 @@ export function FormsListPage() {
   });
 
   // PHASE98 R3: 错误态改为可重试 + 展示真实原因
-  if (isLoading) return <p>加载中…</p>;
+  if (isLoading) return <p>{t('common.loading')}</p>;
   if (error) {
     return (
       <div>
-        <h1>📋 表单</h1>
+        <h1>📋 {t('forms.title')}</h1>
         <ErrorState
-          message={`表单列表加载失败：${(error as Error)?.message ?? ''}`}
+          message={t('forms.loadFailed')}
           onRetry={() => void refetch()}
         />
       </div>
@@ -40,7 +42,7 @@ export function FormsListPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>📋 表单{collection ? ` (${collection})` : ''}({forms.length})</h1>
+        <h1>📋 {t('forms.title')}{collection ? ` (${collection})` : ''}({forms.length})</h1>
         {collection && (
           <Link
             to={`/designer/forms/${collection}/new`}
@@ -52,7 +54,7 @@ export function FormsListPage() {
               borderRadius: 4,
             }}
           >
-            + 新建表单
+            {t('forms.newForm')}
           </Link>
         )}
       </div>
@@ -60,9 +62,9 @@ export function FormsListPage() {
       {/* PHASE98 R3: 空态带 CTA（原引导语"点上方"不可点击） */}
       {forms.length === 0 ? (
         <EmptyState
-          title={collection ? '该 collection 还没有表单' : '你还没有创建任何表单'}
-          description="表单用于收集和录入结构化数据。"
-          actionLabel={collection ? '+ 新建表单' : undefined}
+          title={collection ? t('forms.emptyCollection') : t('forms.emptyGlobal')}
+          description={t('forms.description')}
+          actionLabel={collection ? '+' + t('forms.newForm') : undefined}
           onAction={
             collection
               ? () => (window.location.href = `/designer/forms/${collection}/new`)
@@ -82,10 +84,10 @@ export function FormsListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--color-bg-secondary)' }}>
-                <th style={{ padding: 12, textAlign: 'left' }}>标题</th>
-                <th style={{ padding: 12, textAlign: 'left' }}>Collection</th>
-                <th style={{ padding: 12, textAlign: 'left' }}>创建时间</th>
-                <th style={{ padding: 12, textAlign: 'right' }}>操作</th>
+                <th style={{ padding: 12, textAlign: 'left' }}>{t('forms.titleCol')}</th>
+                <th style={{ padding: 12, textAlign: 'left' }}>{t('forms.collection')}</th>
+                <th style={{ padding: 12, textAlign: 'left' }}>{t('forms.createdAt')}</th>
+                <th style={{ padding: 12, textAlign: 'right' }}>{t('forms.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -101,13 +103,13 @@ export function FormsListPage() {
                       to={`/designer/forms/${f.collection_name}/${f.id}/edit`}
                       style={{ marginRight: 12, color: 'var(--color-info)', textDecoration: 'none' }}
                     >
-                      编辑
+                      {t('forms.edit')}
                     </Link>
                     <Link
                       to={`/forms/${f.id}/fill`}
                       style={{ color: 'var(--color-success)', textDecoration: 'none' }}
                     >
-                      填表
+                      {t('forms.fill')}
                     </Link>
                   </td>
                 </tr>
