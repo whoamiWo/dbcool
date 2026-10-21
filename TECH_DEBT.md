@@ -1,6 +1,6 @@
 # 技术债登记
 
-> 最后更新：2026-10-21（PHASE128 门禁实测后校准）
+> 最后更新：2026-10-21（PHASE129 CSP 收紧实测后校准）
 >
 > 说明：本文件此前仅 19 行且条目全部标记"已解决"，与实际债务规模严重不符。
 > 本次按 PHASE114 只读勘察 + 实测门禁的证据重写。
@@ -28,7 +28,7 @@
 | 7 | ~~JWT 签名密钥有硬编码 dev 默认值~~ ✅ | ~~🔴 高~~ 已修复 | 实证：`application.yml:93` 已为 `secret: ${JWT_SECRET:?JWT_SECRET 环境变量未设置,参见 DEPLOY.md}`（无回落，未注入即启动失败）；`backend-python/config.py` 移除默认值并加 `model_validator` 生产防护 | dev profile 直跑时公开密钥生效 → 可自签 JWT 击穿租户隔离 | 已修复（PHASE114 后续，2026-10-19）。**注：代码早已加固，但本表登记滞后未更新，PHASE117 审计时按实证订正** |
 | 8 | ~~Python 侧 MinIO 弱口令回落~~ ✅ | ~~🟡 中~~ 已修复 | `backup.py:57` 已移除 `minio123` 默认值，MinIO 分支消费前 fail fast；`conftest.py` 注入 CI 专用密码 | 见 SECURITY.md | 已修复（PHASE114 后续，2026-10-19） |
 | 9 | ~~WebSocket Origin 全开~~ ✅ | ~~🟡 中~~ 已修复 | `WebSocketConfig.java:27`、`HuddleWebSocketConfig.java:42`、`ImWebSocketConfig.java:48` 原均 `setAllowedOriginPatterns("*")`，现已收敛为 `app.cors.allowed-origins` 白名单 | 任意来源可建连 | 已修复（PHASE114 后续，2026-10-19） |
-| 10 | ~~安全响应头缺失~~ ✅ | ~~🟡 中~~ 已修复 | 已在 `frontend/nginx.conf.template` + `render_nginx.py`（443 块）补 `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/`CSP`，`/assets/` 防继承阻断 | 见 SECURITY.md PHASE115 | 已修复（PHASE115，2026-10-19；PHASE121 补充：三处 CSP 配置同步加注释，逐指令说明保留 unsafe-inline/eval 的原因与收紧路径，收敛仍待前端改造） |
+| 10 | ~~安全响应头缺失~~ ✅ | ~~🟡 中~~ 已修复 | 已在 `frontend/nginx.conf.template` + `render_nginx.py`（443 块）补 `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/`CSP`，`/assets/` 防继承阻断 | 见 SECURITY.md PHASE115 | 已修复（PHASE115，2026-10-19；PHASE121 补充：三处 CSP 配置同步加注释；**PHASE129 收紧**：移除 `script-src unsafe-eval`（产物无 eval/Function 调用）、`connect-src` 由 `'self' wss: ws:` 收窄为 `'self'`；`style-src unsafe-inline` 留待阶段二 nonce 化后移除） |
 | 11 | ~~CORS 配置漂移~~ ✅ | ~~🟡 低~~ 已修复 | `SecurityConfig` 已改为读取 `app.cors.allowed-origins`（默认 localhost），WebSocket 三处同源 | 见 SECURITY.md | 已修复（PHASE114 后续，2026-10-19） |
 | 12 | ~~Spring Boot 3.3.5 已 EOL~~ ✅ | ~~🟡 中~~ 已修复 | `backend-java/pom.xml:10` 已升 **3.4.7**；同步 springdoc 2.6.0→2.8.5、Lombok 1.18.34→1.18.36、MapStruct 1.5.5→1.6.3，并清理 logstash-logback-encoder(7.4) / micrometer-tracing / otel 三处重复依赖声明 | 3.3.x 停止 OSS 支持，安全补丁不回溯 | 已修复（PHASE117，2026-10-20）。**升级暴露一处运行时回归并已修**：Spring Security 6.4 的 SpEL 不再解析裸常量引用，`82` 处 `@PreAuthorize("hasRole(RoleName.ADMIN)")` 改为 `hasRole(T(com.nocobase.auth.RoleName).ADMIN)`（标准 SpEL 类型引用，保留常量单一真相源）。实测：Java 2263/0F/0E、E2E 135/135、冒烟 11/11、编排 8/8 |
 | 13 | ~~动态 SQL 标识符校验不完整~~ ✅ | ~~🟡 低~~ 已修复 | `DynamicTableManager` 全部 16 个 public 入口（create/drop/tableExists/insert/list/existsByFieldValue/aggregate/get/update/delete/add/drop/rename/alter/getColumns）已补 `validateIdentifier(collectionName)`，仅 `getNextAutonumber` 此前已加 | 在 `DynamicTableManager` 入口统一校验 | 已修复（PHASE116，2026-10-19，新增 16 条拒绝用例） |
@@ -41,4 +41,4 @@
 
 - 完整审计：`docs/PHASE113_AUDIT_REPORT.md`
 - 鉴权修复：本次 PHASE114（棘轮门禁 + 203 处注解 + 14 条白名单）
-- 门禁现状（2026-10-21 实测，PHASE128 后）：Java **2263/0F/0E**、前端 vitest **403/403**（50 文件）、E2E **159/159**、ESLint **0 error / 0 warning**、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、无假实现 **P0 0/P1 0**、启动检查 **0 问题**、密钥轮换 **3/3**
+- 门禁现状（2026-10-21 实测，PHASE129 后）：Java **2263/0F/0E**、前端 vitest **403/403**（50 文件）、E2E **159/159**、ESLint **0 error / 0 warning**、CSP `unsafe-eval` 已移除、`connect-src` 已收窄、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、无假实现 **P0 0/P1 0**、启动检查 **0 问题**、密钥轮换 **3/3**

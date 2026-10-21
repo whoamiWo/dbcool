@@ -10,7 +10,9 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 # 复制依赖文件(利用 Docker 缓存)
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
+# PHASE129: registry.npmjs.org 在当前网络环境频繁 ETIMEDOUT，显式指定国内镜像源
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN pnpm install --frozen-lockfile --registry=$NPM_REGISTRY || pnpm install --registry=$NPM_REGISTRY
 
 # 复制源码并构建
 COPY . .
