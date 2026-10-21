@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import type { Plugin, ViteDevServer } from 'vite';
+import type { Plugin } from 'vite';
 import path from 'path';
 import { VitePWA } from 'vite-plugin-pwa';
 import crypto from 'crypto';
@@ -28,30 +28,27 @@ function noncePlugin(): Plugin {
     },
     
     // 注入到 index.html（作为 meta 标签，供运行时读取）
+    // PHASE130 审计修复：nonce 未生成时直接抛错中断构建，
+    // 避免把 'undefined' 注入产物并一路带到线上（届时 style-src 'nonce-undefined' 会导致整站白屏）
     transformIndexHtml(html: string) {
+      if (!nonce) {
+        throw new Error('[nonce] nonce 未生成，拒绝产出 index.html（避免注入 undefined）');
+      }
       return html.replace('<head>', `<head>\n    <meta name="csp-nonce" content="${nonce}" />\n`);
     },
     
     // 写 nonce 文件（使用 emitFile）
     generateBundle(_outputOptions, _bundle, isWrite) {
       if (!isWrite) return;
+      if (!nonce) {
+        throw new Error('[nonce] nonce 未生成，拒绝产出 .nonce 文件');
+      }
       this.emitFile({
         type: 'asset',
         fileName: '.nonce',
         source: nonce,
       });
       console.log(`[nonce] Emitted as asset: .nonce`);
-    },
-    
-    // 开发模式也注入（供本地调试）
-    configureServer(server: ViteDevServer) {
-      server.middlewares.use((req, res, next) => {
-        if (req.url === '/') {
-          const currentNonce = crypto.randomBytes(16).toString('base64');
-          res.setHeader('X-CSP-Nonce', currentNonce);
-        }
-        next();
-      });
     },
   };
 }
