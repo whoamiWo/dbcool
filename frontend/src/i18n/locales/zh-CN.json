@@ -1402,5 +1402,32 @@
     "restore": "回滚到此版本",
     "restoreFailed": "回滚失败",
     "version": "版本"
+  },
+  "attachment": {
+    "preview": "预览",
+    "thumbnail": "缩略图",
+    "loadFailed": "预览加载失败",
+    "notImage": "仅支持图片类附件",
+    "unsupportedMedia": "不支持的媒体类型",
+    "delete": "删除",
+    "upload": "上传",
+    "uploading": "上传中",
+    "uploadFailed": "上传失败",
+    "cancel": "取消",
+    "empty": "拖拽或点击上传文件",
+    "noDiff": "无法生成缩略图",
+    "file": "文件",
+    "image": "图片",
+    "size": "大小",
+    "confirm": "确认",
+    "confirmDelete": "确认删除该附件?",
+    "offlineBanner": "您当前处于离线状态",
+    "offlineBannerBtn": "恢复网络",
+    "attach": "附件",
+    "attachment": "附件"
+  },
+  "offlineBanner": {
+    "title": "您当前处于离线状态",
+    "description": "网络已断开，部分功能受限。请恢复网络后重试。"
   }
 }

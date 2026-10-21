@@ -563,6 +563,9 @@ function renderCell(value: unknown, field?: { type?: string }): React.ReactNode 
   if (value == null) return <span style={{ color: 'var(--color-text-muted)' }}>—</span>;
   if (field?.type === 'boolean') return value === 'true' || value === true ? '✓' : '✗';
   if (field?.type === 'date') return String(value).slice(0, 10);
+  if (field?.type === 'attachment' && typeof value === 'string') {
+    return <span title={value}>({value.split('/').pop()})</span>;
+  }
   if (field?.type === 'belongsTo' && typeof value === 'object') {
     const obj = value as { id?: string; title?: string };
     return <span title={obj.id ?? ''}>{obj.title ?? obj.id ?? '—'}</span>;

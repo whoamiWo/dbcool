@@ -308,13 +308,11 @@ describe('FormRuntime — 提交流程', () => {
       expect(input).not.toBeNull();
     });
 
-    it('attachment 字段渲染 storageKey input + 禁用上传按钮', () => {
+    it('attachment 字段渲染附件上传区', () => {
       wrap({ fields: [{ name: 'receipt', label: '回执', type: 'attachment', required: false }] });
-      const input = screen.getByPlaceholderText(/storageKey/);
-      expect(input).not.toBeNull();
-      const uploadBtn = screen.getByRole('button', { name: /上传/ });
-      expect(uploadBtn).toBeDisabled();
-      expect(uploadBtn.getAttribute('title')).toContain('D1.4');
+      // AttachmentPreview edit 模式渲染上传区
+      expect(screen.getByText(/点击或拖拽文件上传/i)).toBeInTheDocument();
+      expect(screen.getByText(/支持图片、PDF、Office 文档/i)).toBeInTheDocument();
     });
   });
 
