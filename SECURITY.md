@@ -217,9 +217,16 @@ compose 路径已由 `${MINIO_ROOT_PASSWORD:?}` 挡住，故仅本地直跑受�
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | 防 Referer 泄露敏感路径 |
 | `Content-Security-Policy` | `default-src 'self'; ... frame-ancestors 'none'; ...` | 收敛可加载资源来源 |
 
-**CSP 取舍**：保留 `script-src` 的 `unsafe-inline`/`unsafe-eval` 与 `style-src` 的
-`unsafe-inline`（Vite/React 开发态动态注入内联脚本/样式依赖此策略，收紧会白屏）。
-后续若前端改用 `nonce` 或外置脚本，可再逐步收敛为 `strict`。
+**CSP 收紧历史（PHASE129 → PHASE130）**：
+
+- **PHASE129**：移除 `script-src 'unsafe-eval'`（实测 dist/assets/*.js 无 eval/Function 调用）、
+  `connect-src` 由 `'self' wss: ws:` 收窄为 `'self'`（同源 WebSocket 用 `'self'` 覆盖）。
+- **PHASE130**：`style-src` 由 `'unsafe-inline'` 改为 `'nonce-xxx'` —— 构建期生成随机 nonce
+  （`vite.config.ts` 的 `noncePlugin`），注入到 `index.html` 的 `<meta name="csp-nonce">`
+  和 `dist/.nonce` 文件；`render_nginx.py` 读取 nonce 并动态渲染 `style-src 'nonce-xxx'`；
+  Emotion 的 `CacheProvider` 接入 nonce（`main.tsx` 的 `readCspNonce`），
+  使运行时注入的 `<style>` 标签携带 nonce，彻底移除 `'unsafe-inline'`。
+- 三处 CSP 声明同步一致（`nginx.conf.template` 80 块 + `/assets/` 块 + `render_nginx.py` TLS_BLOCK）。
 
 **渲染管线（PHASE114 双模式）**：nginx 配置由 `render_nginx.py` 从 `nginx.conf.template`
 渲染，安全头需在**两处**同步注入才全模式生效——
@@ -233,7 +240,7 @@ compose 路径已由 `${MINIO_ROOT_PASSWORD:?}` 挡住，故仅本地直跑受�
 
 ### 已知未处置（见 `TECH_DEBT.md`）
 
-- CSP 的 `unsafe-inline/eval` 保留属**已说明的已知取舍**：PHASE121 已在 `nginx.conf` / `nginx.conf.template` / `render_nginx.py` 三处同步添加逐指令注释，阐明 Vite/React 开发态依赖内联脚本与动态样式的现实约束，收敛路径沉淀为配置注释；后续若前端改用 `nonce` 或外置脚本，可再逐步收紧。
+无。PHASE130 已完成 CSP `style-src` nonce 化，所有安全响应头已收紧至生产就绪。
 
 ## 7. PHASE99 官方安全门禁（Trivy + ZAP）
 
