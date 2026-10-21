@@ -3,30 +3,34 @@
 
 从环境变量读取 PUBLIC_HOST，决定 IP 直连模式（80 HTTP）还是域名模式（443 TLS）。
 输出到 /etc/nginx/conf.d/default.conf。
+
+PHASE130 审计后改造：nonce 由「构建期」改为「容器启动期」生成并注入 index.html。
+每次容器启动 nonce 都会变化，避免旧镜像里被长期共享的静态 nonce；
+同时废弃独立的 dist/.nonce 文件（该文件此前可被直接 GET）。
 """
 import os
 import re
+import secrets
 
 TEMPLATE = "/etc/nginx/nginx.conf.template"
 OUTPUT = "/etc/nginx/conf.d/default.conf"
-NONCE_FILE = "/usr/share/nginx/html/.nonce"
+INDEX_HTML = "/usr/share/nginx/html/index.html"
+NONCE_PLACEHOLDER = "__CSP_NONCE__"
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "").strip()
 SERVER_NAME = PUBLIC_HOST if PUBLIC_HOST else "_"
 ENABLE_TLS = "1" if PUBLIC_HOST else "0"
 
-# PHASE130 审计修复：nonce 有效性判定
-# crypto.randomBytes(16).toString('base64') 产出 24 字符 base64（含 + / =），此处取 16 为下限留余量
 MIN_NONCE_LEN = 16
-BASE64_RE = re.compile(r"^[A-Za-z0-9+/=]+$")
-# 'undefined'/'null' 全为字母，会通过 base64 正则，必须显式排除（vite 侧 buildStart 异常时的特征值）
-INVALID_LITERALS = {"undefined", "null", "none", ""}
+# 允许标准 base64（+ / =）与 URL-safe base64（- _）
+NONCE_RE = re.compile(r"^[A-Za-z0-9+/=_-]+$")
+# 异常字面量（占位符未替换、JS undefined 等）需显式排除，它们全为字母会通过字符集校验
+INVALID_LITERALS = {"undefined", "null", "none", "", NONCE_PLACEHOLDER.lower()}
 
 
 def is_valid_nonce(value):
-    """判定 nonce 是否为可信的构建期产物。
+    """判定 nonce 是否为可信随机值。
 
-    需同时满足：非空、非异常字面量、长度达标、字符集为 base64。
-    任一条不满足即视为无效，交由调用方回退策略，避免渲染出空 nonce 导致整站样式阻断。
+    需同时满足：非空、非异常字面量/占位符、长度达标、字符集合法。
     """
     if not value:
         return False
@@ -35,28 +39,53 @@ def is_valid_nonce(value):
         return False
     if len(value) < MIN_NONCE_LEN:
         return False
-    return bool(BASE64_RE.match(value))
+    return bool(NONCE_RE.match(value))
 
 
-# PHASE130: 读取构建期生成的 nonce，用于 style-src nonce 白名单
-# 文件缺失或内容无效时回退到 'unsafe-inline'，保证站点可用性优先于策略严格性
-try:
-    with open(NONCE_FILE, encoding="utf-8") as f:
-        NONCE = f.read().strip()
-except FileNotFoundError:
-    NONCE = ""
-    print("[entrypoint] 警告：未找到 .nonce 文件（旧镜像未重新构建？）")
+def generate_nonce():
+    """生成 URL-safe 随机 nonce（约 32 字符）。"""
+    return secrets.token_urlsafe(24)
 
-if is_valid_nonce(NONCE):
+
+def inject_nonce_into_html(nonce):
+    """把 index.html 里的占位符替换为真实 nonce。
+
+    返回 True 表示替换成功；False 表示失败（文件缺失、无占位符或写回失败）。
+    """
+    try:
+        with open(INDEX_HTML, encoding="utf-8") as f:
+            html = f.read()
+    except OSError as e:
+        print(f"[entrypoint] 警告：读取 index.html 失败（{e}），nonce 注入跳过")
+        return False
+
+    if NONCE_PLACEHOLDER not in html:
+        print("[entrypoint] 警告：index.html 未找到 nonce 占位符"
+              f"（{NONCE_PLACEHOLDER}），可能未重新构建，nonce 注入跳过")
+        return False
+
+    try:
+        with open(INDEX_HTML, "w", encoding="utf-8") as f:
+            f.write(html.replace(NONCE_PLACEHOLDER, nonce))
+    except OSError as e:
+        print(f"[entrypoint] 警告：写回 index.html 失败（{e}），nonce 注入跳过")
+        return False
+
+    return True
+
+
+# PHASE130: 容器启动期生成 nonce → 注入 index.html → 填入 CSP。
+# 任一环节失败则回退 'unsafe-inline'，保证站点可用性优先于策略严格性。
+NONCE = generate_nonce()
+if is_valid_nonce(NONCE) and inject_nonce_into_html(NONCE):
     STYLE_SRC = "'self' 'nonce-" + NONCE + "'"
-    print(f"[entrypoint] 已加载构建期 nonce（长度 {len(NONCE)}），style-src 启用 nonce 白名单")
+    print(f"[entrypoint] 已生成容器级 nonce（长度 {len(NONCE)}）并注入 index.html，"
+          f"style-src 启用 nonce 白名单")
 else:
+    NONCE = ""
     STYLE_SRC = "'self' 'unsafe-inline'"
-    if NONCE:
-        print(f"[entrypoint] 警告：.nonce 内容无效（疑似非 base64 或长度不足 {MIN_NONCE_LEN}），"
-              f"style-src 回退到 'unsafe-inline'")
-    else:
-        print("[entrypoint] 警告：.nonce 为空或缺失，style-src 回退到 'unsafe-inline'")
+    print("[entrypoint] 警告：nonce 生成或注入失败，style-src 回退到 'unsafe-inline'"
+          "（此时 index.html 中的占位符会残留，但 unsafe-inline 放行所有 style，不会白屏）")
 
 CSP_VALUE = "default-src 'self'; script-src 'self' 'unsafe-inline'; " \
     "style-src " + STYLE_SRC + "; img-src 'self' data: blob:; " \
@@ -85,7 +114,7 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "    # CSP 说明（PHASE129 收紧 / PHASE130 nonce 化）：\n" \
     "    #   default-src 'self' —— 默认所有资源仅同源\n" \
     "    #   script-src 'self' 'unsafe-inline' —— PHASE129 已移除 'unsafe-eval'\n" \
-    "    #   style-src 'self' 'nonce-xxx' —— PHASE130 由构建期 nonce 取代 'unsafe-inline'\n" \
+    "    #   style-src 'self' 'nonce-xxx' —— PHASE130 由容器启动期 nonce 取代 'unsafe-inline'\n" \
     "    #   connect-src 'self' —— PHASE129 由 'self' wss: ws: 收窄为 'self'\n" \
     "    add_header Content-Security-Policy \"" + CSP_VALUE + "\" always;\n" \
     "\n" \

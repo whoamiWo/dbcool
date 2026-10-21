@@ -221,11 +221,12 @@ compose 路径已由 `${MINIO_ROOT_PASSWORD:?}` 挡住，故仅本地直跑受�
 
 - **PHASE129**：移除 `script-src 'unsafe-eval'`（实测 dist/assets/*.js 无 eval/Function 调用）、
   `connect-src` 由 `'self' wss: ws:` 收窄为 `'self'`（同源 WebSocket 用 `'self'` 覆盖）。
-- **PHASE130**：`style-src` 由 `'unsafe-inline'` 改为 `'nonce-xxx'` —— 构建期生成随机 nonce
-  （`vite.config.ts` 的 `noncePlugin`），注入到 `index.html` 的 `<meta name="csp-nonce">`
-  和 `dist/.nonce` 文件；`render_nginx.py` 读取 nonce 并动态渲染 `style-src 'nonce-xxx'`；
-  Emotion 的 `CacheProvider` 接入 nonce（`main.tsx` 的 `readCspNonce`），
-  使运行时注入的 `<style>` 标签携带 nonce，彻底移除 `'unsafe-inline'`。
+- **PHASE130**：`style-src` 由 `'unsafe-inline'` 改为 `'nonce-xxx'` ——
+  `vite.config.ts` 构建期在 `index.html` 注入占位符 `__CSP_NONCE__`；容器启动时
+  `render_nginx.py` 生成随机 nonce（每次启动唯一），把占位符替换为真实 nonce，
+  并同步渲染 `style-src 'nonce-xxx'`；Emotion 的 `CacheProvider` 接入该 nonce
+  （`main.tsx` 的 `readCspNonce`），使运行时注入的 `<style>` 标签携带 nonce，彻底移除 `'unsafe-inline'`。
+  nonce 注入失败时回退 `'unsafe-inline'` 并告警，避免整站白屏。
 - 三处 CSP 声明同步一致（`nginx.conf.template` 80 块 + `/assets/` 块 + `render_nginx.py` TLS_BLOCK）。
 
 **渲染管线（PHASE114 双模式）**：nginx 配置由 `render_nginx.py` 从 `nginx.conf.template`

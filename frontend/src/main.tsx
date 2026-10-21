@@ -14,7 +14,9 @@ import './styles.css';
 import './theme/glass.css';
 
 /**
- * PHASE130: 读取构建期注入的 CSP nonce（见 vite.config.ts noncePlugin）。
+ * PHASE130: 读取 CSP nonce。
+ * vite.config.ts 构建期只注入占位符 `__CSP_NONCE__`，真实 nonce 由容器启动时
+ * （render_nginx.py）生成并替换进 index.html，因此每次部署 nonce 都会变化。
  * Emotion 运行时注入的 <style> 标签必须携带该 nonce，否则在
  * style-src 'self' 'nonce-xxx' 策略下会被浏览器拦截，导致 MUI 样式失效。
  */
