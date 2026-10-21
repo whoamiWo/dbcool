@@ -1,3 +1,67 @@
+## Week 43.8 (2026-10-22) — CSP `style-src` nonce 化（PHASE130）
+
+> **彻底移除 `unsafe-inline`**：样式库运行时注入 `<style>` 无法用 hash 静态列举，改为构建期占位 + 容器启动期注入 nonce。审计后追加两轮加固，4 项风险全部闭环。
+
+### 1. nonce 机制主链路
+
+| 项 | 说明 | 涉及文件 |
+|---|---|---|
+| **构建期占位** | `noncePlugin` 简化为注入占位符 `__CSP_NONCE__`，不再烧死 nonce、不再产出 `dist/.nonce` | `vite.config.ts` |
+| **容器启动期生成** | `secrets.token_urlsafe(24)` 生成随机 nonce（每次启动唯一），替换 `index.html` 占位符 | `render_nginx.py` |
+| **CSP 同步渲染** | 同一 nonce 填入 `style-src 'nonce-xxx'`，三处声明（80 块 / `/assets/` 块 / TLS_BLOCK）一致 | `render_nginx.py` + `nginx.conf.template` |
+| **运行时接入** | `readCspNonce()` 读 meta → `createCache({ nonce })`，Emotion 注入的 `<style>` 携带 nonce | `main.tsx` |
+
+### 2. 审计发现与修复（4 项）
+
+| 级别 | 风险 | 处置 |
+|---|---|---|
+| 🔴 | 构建期静态 nonce，全会话共享 | **改造**：nonce 生成移到容器启动期，每次部署/重启变化（纯静态 SPA 无法 per-request——Emotion 须从 HTML 读 nonce，per-request 需 SSR/边缘注入，成本远超收益） |
+| 🟡 | dev 模式 `configureServer` 生成另一个 nonce 写入 `X-CSP-Nonce`，与 meta 中不一致且无消费者 | **删除**：连带清理未使用的 `ViteDevServer` 类型导入 |
+| 🟡 | nonce 为空/无效时无校验，可能渲染 `'nonce-undefined'` 致整站白屏 | **双兜底**：vite 侧 `!nonce` 抛错中断构建；nginx 侧 `is_valid_nonce()`（长度 ≥16、base64/URL-safe 正则、排除 `undefined`/`null`/占位符）无效则回退 `'unsafe-inline'` + 告警 |
+| 🟢 | `dist/.nonce` 可被直接 GET | **自动解决**：该文件已废弃不再生成（nonce 本就在 HTML meta 明文存在，原非新增泄露面） |
+
+### 3. 验证
+
+| 场景 | 结果 |
+|---|---|
+| 首次容器启动 | nonce 注入 `index.html` 且 CSP 用同一值 ✅ |
+| 新容器启动 | nonce 变化，验证每次启动唯一 ✅ |
+| 重复启动 / 占位符缺失 | 回退 `'unsafe-inline'` + 告警（不白屏）✅ |
+| `tsc --noEmit` / `eslint` | 0 error / 0 problems ✅ |
+
+---
+
+## Week 43.7 (2026-10-21) — CSP 收紧阶段一（PHASE129）
+
+> **摘低垂果实**：先移除零风险的 `'unsafe-eval'` 并收窄 `connect-src`，`style-src` 的 `'unsafe-inline'` 留待 PHASE130 nonce 化。
+
+### 1. 策略收紧
+
+| 项 | 说明 | 依据 |
+|---|---|---|
+| **移除 `script-src unsafe-eval`** | 产物无动态代码执行 | 实测 `dist/assets/*.js` 中 `eval(` / `Function(` / `new Function(` 命中数为 **0**；此前匹配到的 2 处是 Prism 语法高亮的关键字正则**字符串字面量**（`eval(?:cmd)?`），非执行代码 |
+| **`connect-src` 收窄** | 由 `'self' wss: ws:` 改为 `'self'` | `wss:`/`ws:` 是 scheme 级通配（允许**任意主机**的 ws），同源 WebSocket 用 `'self'` 即可覆盖 |
+| **三处声明同步** | 80 块 + `/assets/` 块 + `render_nginx.py` TLS_BLOCK | nginx `add_header` 不继承，必须逐处一致，否则「首页严格、静态资源宽松」 |
+
+### 2. 构建环境问题修复
+
+`registry.npmjs.org` 频繁 `ETIMEDOUT` 导致 `docker compose build` 失败。`.npmrc` 因在 `COPY . .` 之后才进容器而**不生效**，改为在 `Dockerfile` 显式指定：
+
+```dockerfile
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN pnpm install --frozen-lockfile --registry=$NPM_REGISTRY || pnpm install --registry=$NPM_REGISTRY
+```
+
+### 3. 门禁
+
+| 检查 | 结果 |
+|---|---|
+| 镜像重建 | ✅ 成功（npmmirror 源） |
+| 响应头实测（`/`、`/assets/`、`80` 跳转页） | ✅ 三处 CSP 完全一致 |
+| WebSocket / API 端点 | ✅ `/ws/im`、`/ws/huddle`、`/api/health` 均 200，无 CSP 阻塞 |
+
+---
+
 ## Week 43.6 (2026-10-21) — ESLint a11y 警告清零（PHASE128）
 
 > **前端静态门禁归零**：`eslint .` 由「0 error / N warning」收敛为 **0 error / 0 warning**，消除 a11y 与 hooks 依赖两类告警，不改动任何业务行为。
