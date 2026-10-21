@@ -1,11 +1,65 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import type { Plugin, ViteDevServer } from 'vite';
 import path from 'path';
 import { VitePWA } from 'vite-plugin-pwa';
+import crypto from 'crypto';
+
+/**
+ * PHASE130: Vite 构建期 nonce 生成与注入插件
+ * 
+ * 目的：为 CSP 的 style-src 提供 nonce 机制，从而移除 'unsafe-inline'
+ * 
+ * 流程：
+ * 1. 构建开始时生成随机 nonce（base64 编码）
+ * 2. 通过 transformIndexHtml 钩子注入到 index.html
+ * 3. 写入 dist/.nonce 文件，供 render_nginx.py 读取并填入响应头
+ */
+function noncePlugin(): Plugin {
+  let nonce: string;
+
+  return {
+    name: 'vite-plugin-nonce',
+    
+    // 构建开始前生成 nonce
+    buildStart() {
+      nonce = crypto.randomBytes(16).toString('base64');
+      console.log(`[nonce] Generated nonce: ${nonce}`);
+    },
+    
+    // 注入到 index.html（作为 meta 标签，供运行时读取）
+    transformIndexHtml(html: string) {
+      return html.replace('<head>', `<head>\n    <meta name="csp-nonce" content="${nonce}" />\n`);
+    },
+    
+    // 写 nonce 文件（使用 emitFile）
+    generateBundle(_outputOptions, _bundle, isWrite) {
+      if (!isWrite) return;
+      this.emitFile({
+        type: 'asset',
+        fileName: '.nonce',
+        source: nonce,
+      });
+      console.log(`[nonce] Emitted as asset: .nonce`);
+    },
+    
+    // 开发模式也注入（供本地调试）
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url === '/') {
+          const currentNonce = crypto.randomBytes(16).toString('base64');
+          res.setHeader('X-CSP-Nonce', currentNonce);
+        }
+        next();
+      });
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
     react(),
+    noncePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'vite.svg'],
@@ -43,15 +97,12 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,gif,webp,woff,woff2,ttf,eot,otf}'],
         navigateFallback: '/index.html',
-        // 显式不注册任何 /api/** runtime caching 规则
-        // 确保业务接口数据不进入离线缓存
       },
       devOptions: {
         enabled: false,
       },
     }),
   ],
-  // sockjs-client 在浏览器引用 Node 全局变量 global,需 polyfill
   define: {
     global: 'globalThis',
   },
@@ -64,26 +115,21 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      // 开发时代理 API 请求到后端
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/api'),
       },
-      // Python 后端单独的 AI 端点
       '/api/ai': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ai/, '/api/ai'),
       },
-      // 统一实时消息总线(STOMP over WebSocket)
-      // ws:true 必须显式开启 —— 否则开发环境 WebSocket 升级请求无法通过代理
       '/ws': {
         target: 'http://localhost:8080',
         changeOrigin: true,
         ws: true,
       },
-      // Huddle 音视频信令通道（独立 WebSocket）
       '/ws/huddle': {
         target: 'http://localhost:8080',
         changeOrigin: true,
@@ -94,7 +140,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    // R12: 代码分割 — 将大型依赖拆到独立 chunk,首屏只加载 React + Router
     rollupOptions: {
       output: {
         manualChunks: {
@@ -111,7 +156,6 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
-    // H1：跨文件污染治理 —— 每个测试文件独立子进程/模块注册表
     pool: 'forks',
     isolate: true,
     sequence: { concurrent: false },
@@ -129,7 +173,7 @@ export default defineConfig({
         'src/main.tsx',
         'src/router.tsx',
         'src/types/**',
-        'src/pages/*.tsx',     // 页面组件大多未测,先不计入覆盖率
+        'src/pages/*.tsx',
       ],
     },
   },

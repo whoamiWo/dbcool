@@ -22,6 +22,7 @@
 
 ## 二、存量债务（未清偿）
 | 16 | ~~硬编码 hasRole('ADMIN') 81 处~~ ✅ | ~~🟢 低~~ 已修复 | `@PreAuthorize("hasRole('ADMIN')")` 已替换为 `RoleName.ADMIN` 常量 | 见 SECURITY.md §6.1 | 已修复（PHASE115 审计项 #10，2026-10-19） |
+| 17 | ~~CSP style-src 'unsafe-inline'~~ ✅ | ~~🟡 中~~ 已修复 | PHASE129 移除 `script-src unsafe-eval`、收窄 `connect-src`；**PHASE130** 引入构建期 nonce（vite.config.ts noncePlugin）、Emotion CacheProvider 接入 nonce、render_nginx.py 动态渲染 `style-src 'nonce-xxx'`，彻底移除 `'unsafe-inline'` | 样式库运行时注入 `<style>` 需 nonce，否则 CSP 阻断 | 已修复（PHASE130，2026-10-21）：构建产物 nonce 注入验证、nginx 渲染一致性验证、tsc 0 error、WebSocket 实测 200 |
 
 | # | 债务 | 优先级 | 证据 | 影响 | 建议 |
 |---|------|--------|------|------|------|
@@ -41,4 +42,4 @@
 
 - 完整审计：`docs/PHASE113_AUDIT_REPORT.md`
 - 鉴权修复：本次 PHASE114（棘轮门禁 + 203 处注解 + 14 条白名单）
-- 门禁现状（2026-10-21 实测，PHASE129 后）：Java **2263/0F/0E**、前端 vitest **403/403**（50 文件）、E2E **159/159**、ESLint **0 error / 0 warning**、CSP `unsafe-eval` 已移除、`connect-src` 已收窄、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、无假实现 **P0 0/P1 0**、启动检查 **0 问题**、密钥轮换 **3/3**
+- 门禁现状（2026-10-21 实测，PHASE130 后）：Java **2263/0F/0E**、前端 vitest **403/403**（50 文件）、E2E **159/159**、ESLint **0 error / 0 warning**、CSP `unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化、`connect-src` 已收窄、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、无假实现 **P0 0/P1 0**、启动检查 **0 问题**、密钥轮换 **3/3**
