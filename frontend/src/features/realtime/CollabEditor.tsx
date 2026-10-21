@@ -8,6 +8,7 @@ import {
   sendCollabJoin, sendCollabLeave, sendCollabUpdate, subscribeToCollab,
 } from '@/lib/stompClient';
 import { useAuthStore } from '@/stores/auth';
+import ConflictResolver from '@/components/ConflictResolver';
 
 /** Uint8Array → Base64(浏览器环境)。 */
 function toBase64(bytes: Uint8Array): string {
@@ -31,7 +32,7 @@ interface Props {
   onSave?: (content: string) => Promise<void> | void;
 }
 
-interface AwarenessState {
+export interface AwarenessState {
   userId: string;
   username: string;
   cursorPosition?: number;
@@ -142,6 +143,10 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
   const [connected, setConnected] = useState(false);
   const [collaborators, setCollaborators] = useState<Array<AwarenessState>>([]);
   const [error, setError] = useState<string | null>(null);
+  // PHASE127: 冲突检测 —— 记录进入编辑时的基准文本与最近一次远端文本
+  const [localOriginalText, setLocalOriginalText] = useState(initialContent);
+  const [remoteText, setRemoteText] = useState<string | undefined>(undefined);
+  const [conflictTick, setConflictTick] = useState(0);
 
   const me = useAuthStore((s) => s.user) as unknown as Record<string, unknown> | null;
   const myId = String(me?.id ?? me?.user_id ?? me?.userId ?? '');
@@ -197,8 +202,15 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
             applyingRemote.current = true;
             const stateBytes = fromBase64(msg.state);
             Y.applyUpdate(ydoc, stateBytes, 'remote');
-            setText(ytext.toString());
-            lastKnownText.current = ytext.toString();
+            const remoteInitial = ytext.toString();
+            setText(remoteInitial);
+            lastKnownText.current = remoteInitial;
+            // PHASE127: 初始化时比对本地基准与远端
+            setLocalOriginalText(localOriginalText);
+            setRemoteText(remoteInitial);
+            if (remoteInitial !== localOriginalText) {
+              setConflictTick((n) => n + 1);
+            }
             applyingRemote.current = false;
             console.log('[collab] 收到服务端初始状态:', docId);
             return;
@@ -236,8 +248,11 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
           if (!msg.update) return;
           applyingRemote.current = true;
           Y.applyUpdate(ydoc, fromBase64(msg.update), 'remote');
-          setText(ytext.toString());
-          lastKnownText.current = ytext.toString();
+          const merged = ytext.toString();
+          setText(merged);
+          lastKnownText.current = merged;
+          // PHASE127: 记录远端合并结果，供冲突面板比对
+          setRemoteText(merged);
           applyingRemote.current = false;
         } catch (e) {
           console.error('[collab] 处理远端消息失�:', e);
@@ -356,6 +371,22 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
         {t('footerHint')}
       </Typography>
+
+      {/* PHASE127: 冲突解决面板 —— 远端与本地基准不一致时自动弹出 */}
+      {conflictTick > 0 && (
+        <ConflictResolver
+          key={`conflict-${conflictTick}`}
+          docId={docId}
+          remoteText={remoteText}
+          localOriginalText={localOriginalText}
+          collaborators={collaborators}
+          onResolved={() => {
+            setLocalOriginalText(ytext.toString());
+            setRemoteText(undefined);
+            setConflictTick(0);
+          }}
+        />
+      )}
     </Box>
   );
 }

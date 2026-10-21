@@ -1429,5 +1429,29 @@
   "offlineBanner": {
     "title": "您当前处于离线状态",
     "description": "网络已断开，部分功能受限。请恢复网络后重试。"
+  },
+  "conflict": {
+    "title": "检测到编辑冲突",
+    "localVersion": "本地版本",
+    "remoteVersion": "远端版本",
+    "keepLocal": "保留本地",
+    "acceptRemote": "采用远端",
+    "rollback": "回滚到此版本",
+    "rollbackSuccess": "已回滚",
+    "loadFailed": "拉取冲突失败",
+    "empty": "暂无冲突记录",
+    "resolveLabel": "解决冲突",
+    "resolveTooltip": "打开冲突解决面板",
+    "versionHistory": "版本历史",
+    "versionLabel": "版本 {version}",
+    "diffPreview": "差异预览 (v{version})",
+    "diffHint": "绿色 = 远端新增，红色删除线 = 本地删除",
+    "collaborators": "{count} 位协作者",
+    "cancel": "取消",
+    "applyRemote": "采用远端",
+    "fetchFailed": "拉取冲突失败",
+    "rollBackSuccess": "已回滚到版本 {version}",
+    "rollBackFailed": "回滚失败",
+    "alert": "检测到冲突：当前 v{currentVersion}，基线 v{since}，{conflicts} 个新版本"
   }
 }

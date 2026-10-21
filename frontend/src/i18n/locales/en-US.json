@@ -1429,5 +1429,29 @@
   "offlineBanner": {
     "title": "You are offline",
     "description": "Network is disconnected, some features are limited. Please restore network and retry."
+  },
+  "conflict": {
+    "title": "Editing conflict detected",
+    "localVersion": "Local version",
+    "remoteVersion": "Remote version",
+    "keepLocal": "Keep local",
+    "acceptRemote": "Accept remote",
+    "rollback": "Roll back to this version",
+    "rollbackSuccess": "Rolled back",
+    "loadFailed": "Failed to load conflicts",
+    "empty": "No conflicts found",
+    "resolveLabel": "Resolve conflict",
+    "resolveTooltip": "Open conflict resolution panel",
+    "versionHistory": "Version history",
+    "versionLabel": "Version {version}",
+    "diffPreview": "Diff preview (v{version})",
+    "diffHint": "Green = remote added, Red strikethrough = local removed",
+    "collaborators": "{count} collaborator(s)",
+    "cancel": "Cancel",
+    "applyRemote": "Apply remote",
+    "fetchFailed": "Failed to fetch conflicts",
+    "rollBackSuccess": "Rolled back to version {version}",
+    "rollBackFailed": "Rollback failed",
+    "alert": "Conflict detected: current v{currentVersion}, base v{since}, {conflicts} new version(s)"
   }
 }
