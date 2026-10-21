@@ -3,52 +3,31 @@ import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import path from 'path';
 import { VitePWA } from 'vite-plugin-pwa';
-import crypto from 'crypto';
 
 /**
- * PHASE130: Vite 构建期 nonce 生成与注入插件
- * 
+ * PHASE130: CSP nonce 占位符注入插件
+ *
  * 目的：为 CSP 的 style-src 提供 nonce 机制，从而移除 'unsafe-inline'
- * 
- * 流程：
- * 1. 构建开始时生成随机 nonce（base64 编码）
- * 2. 通过 transformIndexHtml 钩子注入到 index.html
- * 3. 写入 dist/.nonce 文件，供 render_nginx.py 读取并填入响应头
+ *
+ * 设计：构建期只注入占位符 `__CSP_NONCE__`，真实 nonce 由容器启动时
+ * （render_nginx.py）生成并替换。这样每次容器启动 nonce 都会变化，
+ * 而非烧进镜像被所有部署/会话长期共享。
+ *
+ * 回退：若容器启动替换失败，占位符会残留在 meta 中，但 render_nginx.py
+ * 会同时把 CSP 降级为 'unsafe-inline'，此时 Emotion 注入的 style 仍被放行，
+ * 不会出现白屏。
  */
 function noncePlugin(): Plugin {
-  let nonce: string;
+  const NONCE_PLACEHOLDER = '__CSP_NONCE__';
 
   return {
     name: 'vite-plugin-nonce',
-    
-    // 构建开始前生成 nonce
-    buildStart() {
-      nonce = crypto.randomBytes(16).toString('base64');
-      console.log(`[nonce] Generated nonce: ${nonce}`);
-    },
-    
-    // 注入到 index.html（作为 meta 标签，供运行时读取）
-    // PHASE130 审计修复：nonce 未生成时直接抛错中断构建，
-    // 避免把 'undefined' 注入产物并一路带到线上（届时 style-src 'nonce-undefined' 会导致整站白屏）
+
     transformIndexHtml(html: string) {
-      if (!nonce) {
-        throw new Error('[nonce] nonce 未生成，拒绝产出 index.html（避免注入 undefined）');
-      }
-      return html.replace('<head>', `<head>\n    <meta name="csp-nonce" content="${nonce}" />\n`);
-    },
-    
-    // 写 nonce 文件（使用 emitFile）
-    generateBundle(_outputOptions, _bundle, isWrite) {
-      if (!isWrite) return;
-      if (!nonce) {
-        throw new Error('[nonce] nonce 未生成，拒绝产出 .nonce 文件');
-      }
-      this.emitFile({
-        type: 'asset',
-        fileName: '.nonce',
-        source: nonce,
-      });
-      console.log(`[nonce] Emitted as asset: .nonce`);
+      return html.replace(
+        '<head>',
+        `<head>\n    <meta name="csp-nonce" content="${NONCE_PLACEHOLDER}" />\n`,
+      );
     },
   };
 }
