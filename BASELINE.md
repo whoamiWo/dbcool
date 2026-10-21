@@ -36,7 +36,7 @@ mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```bash
 cd frontend
 npx tsc --noEmit         # ✅ 0 errors
-npx vitest run           # ✅ 382/382 PASS
+npx vitest run           # ✅ 403/403 PASS
 npm run build            # ✅ dist/ 生成成功
 ```
 
@@ -302,7 +302,7 @@ cd backend-java && mvn -o test
 
 # 前端单元
 cd frontend && npm run test:run
-# Test Files: 46 passed, Tests: 382 passed
+# Test Files: 50 passed, Tests: 403 passed
 
 # 前端类型检查
 cd frontend && npx tsc --noEmit
@@ -315,7 +315,7 @@ cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q
 
 ### 十.2 集成测试
 
-Playwright e2e：64 passed (2 pre-existing backend down failures - 非本次改动原因)
+Playwright e2e：159 passed (2 pre-existing backend down failures - 非本次改动原因)
 
 ### 十.3 提交 hash
 

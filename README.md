@@ -134,24 +134,24 @@ cd backend-java && mvn test   # ✅ 2263/2263 PASS
 - **Jacoco 覆盖率**: 83% BUNDLE（10 条红线全达标，见下表）
 - **测试金字塔**: 单元 2225 / 安全 15 / E2E 8，顶层 E2E 抓集成层 bug，底层单元抓业务逻辑
 
-#### 前端 React（382 tests）
+#### 前端 React（403 tests）
 
 ```bash
-cd frontend && npx vitest run   # ✅ 382/382 PASS
+cd frontend && npx vitest run   # ✅ 403/403 PASS
 cd frontend && npx tsc --noEmit # ✅ 0 errors
 cd frontend && npx eslint src   # ✅ 0 warnings
 ```
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| vitest 单测 | 382 | DOM 交互、逻辑分支、i18n key 完整性 |
+| vitest 单测 | 403 | DOM 交互、逻辑分支、i18n key 完整性 |
 | TypeScript 类型检查 | 0 error | 全量源码 tsc --noEmit 通过 |
 | ESLint 静态检查 | 0 warning | 遵循项目 ESLint 配置 |
 
-#### Playwright E2E（135 tests）
+#### Playwright E2E（159 tests）
 
 ```bash
-cd frontend && npx playwright test   # ✅ 135/135 PASS
+cd frontend && npx playwright test   # ✅ 159/159 PASS
 ```
 
 覆盖登录流程、CRUD 操作、权限控制、i18n 切换等核心用户路径。
@@ -287,7 +287,7 @@ add field → 同步 ALTER(小表秒过)
 ## 📈 进度数据
 
 - **后端 Java 源文件**:90+(12 个包)
-- **测试**:2624 全 PASS（Java 2263 + 前端 403）
+- **测试**:2666 全 PASS（Java 2263 + 前端 403）
 - **覆盖率**:83% bundle / 10 条 Jacoco 红线全达标
 - **文档**:30+（规划 ADR 设计 WEEK_*_HANDOFF）
 - **总 commits**:120+（本会话累计）
@@ -297,10 +297,10 @@ add field → 同步 ALTER(小表秒过)
 | 门禁 | 结果 |
 |------|------|
 | Java `mvn test` | ✅ 2263/2263 PASS（0F/0E） |
-| 前端 `npx vitest run` | ✅ 382/382 PASS |
+| 前端 `npx vitest run` | ✅ 403/403 PASS |
 | 前端 `npx tsc --noEmit` | ✅ 0 errors |
 | 前端 `npx eslint src` | ✅ 0 warnings |
-| Playwright E2E | ✅ 135/135 PASS |
+| Playwright E2E | ✅ 159/159 PASS |
 | 冒烟测试 | ✅ 11/11 PASS |
 | 编排测试 | ✅ 8/8 PASS |
 | 依赖漏洞扫描 | ✅ 0 高危（1 MEDIUM，已登记可忽略） |
