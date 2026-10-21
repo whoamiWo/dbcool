@@ -6,7 +6,7 @@
 ```bash
 cd backend-java
 mvn clean compile          # ✅ BUILD SUCCESS
-mvn test                   # ✅ 2242/2242 PASS
+mvn test                   # ✅ 2263/2263 PASS
 mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```
 
@@ -298,7 +298,7 @@ docker compose up -d --no-build backend-java
 ```bash
 # Java 后端
 cd backend-java && mvn -o test
-# Tests run: 2242, Failures: 0, Errors: 0
+# Tests run: 2263, Failures: 0, Errors: 0
 
 # 前端单元
 cd frontend && npm run test:run
