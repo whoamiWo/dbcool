@@ -14,20 +14,49 @@ PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "").strip()
 SERVER_NAME = PUBLIC_HOST if PUBLIC_HOST else "_"
 ENABLE_TLS = "1" if PUBLIC_HOST else "0"
 
+# PHASE130 审计修复：nonce 有效性判定
+# crypto.randomBytes(16).toString('base64') 产出 24 字符 base64（含 + / =），此处取 16 为下限留余量
+MIN_NONCE_LEN = 16
+BASE64_RE = re.compile(r"^[A-Za-z0-9+/=]+$")
+# 'undefined'/'null' 全为字母，会通过 base64 正则，必须显式排除（vite 侧 buildStart 异常时的特征值）
+INVALID_LITERALS = {"undefined", "null", "none", ""}
+
+
+def is_valid_nonce(value):
+    """判定 nonce 是否为可信的构建期产物。
+
+    需同时满足：非空、非异常字面量、长度达标、字符集为 base64。
+    任一条不满足即视为无效，交由调用方回退策略，避免渲染出空 nonce 导致整站样式阻断。
+    """
+    if not value:
+        return False
+    value = value.strip()
+    if value.lower() in INVALID_LITERALS:
+        return False
+    if len(value) < MIN_NONCE_LEN:
+        return False
+    return bool(BASE64_RE.match(value))
+
+
 # PHASE130: 读取构建期生成的 nonce，用于 style-src nonce 白名单
-# 若文件不存在（例如旧镜像未重新构建），回退到 'unsafe-inline' 保证可用性
+# 文件缺失或内容无效时回退到 'unsafe-inline'，保证站点可用性优先于策略严格性
 try:
     with open(NONCE_FILE, encoding="utf-8") as f:
         NONCE = f.read().strip()
 except FileNotFoundError:
     NONCE = ""
+    print("[entrypoint] 警告：未找到 .nonce 文件（旧镜像未重新构建？）")
 
-if NONCE:
+if is_valid_nonce(NONCE):
     STYLE_SRC = "'self' 'nonce-" + NONCE + "'"
     print(f"[entrypoint] 已加载构建期 nonce（长度 {len(NONCE)}），style-src 启用 nonce 白名单")
 else:
     STYLE_SRC = "'self' 'unsafe-inline'"
-    print("[entrypoint] 警告：未找到 .nonce 文件，style-src 回退到 'unsafe-inline'")
+    if NONCE:
+        print(f"[entrypoint] 警告：.nonce 内容无效（疑似非 base64 或长度不足 {MIN_NONCE_LEN}），"
+              f"style-src 回退到 'unsafe-inline'")
+    else:
+        print("[entrypoint] 警告：.nonce 为空或缺失，style-src 回退到 'unsafe-inline'")
 
 CSP_VALUE = "default-src 'self'; script-src 'self' 'unsafe-inline'; " \
     "style-src " + STYLE_SRC + "; img-src 'self' data: blob:; " \
