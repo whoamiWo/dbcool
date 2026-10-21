@@ -149,6 +149,17 @@ async function applyUpdate(docId, updateBase64) {
       updated_at = NOW()
   `, [docId, Buffer.from(stateBytes), newVersion]);
 
+  // PHASE127: 同步写入版本快照（冲突检测与回滚的依据）
+  try {
+    await pool.query(`
+      INSERT INTO crdt_doc_versions (doc_id, version, state, user_id, tenant_id)
+      VALUES ($1, $2, $3, NULL, NULL)
+      ON CONFLICT (doc_id, version) DO NOTHING
+    `, [docId, newVersion, Buffer.from(stateBytes)]);
+  } catch (snapErr) {
+    console.warn(`[CRDT] 版本快照写入失败（不阻断主流程）: ${snapErr.message}`);
+  }
+
   // 更新内存缓存
   docCache.set(docId, { doc, version: newVersion });
 
@@ -264,6 +275,118 @@ app.post('/docs/:docId/updates', async (req, res) => {
   }
 });
 
+/**
+ * PHASE127: 查询文档版本历史与冲突候选
+ * GET /docs/:docId/conflicts?since=<version>
+ *
+ * 返回:
+ * {
+ *   docId,
+ *   currentVersion: number,
+ *   since: number,
+ *   conflicting: boolean,        // since 之后是否有他人改动
+ *   versions: [{ version, createdAt, size }]
+ * }
+ *
+ * <p>判定逻辑：客户端提交本地基线版本 since，若服务端 currentVersion > since，
+ * 说明期间存在其他成员的提交，即构成潜在冲突，需前端拉取差异并人工/自动合并。
+ */
+app.get('/docs/:docId/conflicts', async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const sinceRaw = req.query.since;
+    const since = sinceRaw === undefined ? 0 : Number.parseInt(String(sinceRaw), 10);
+
+    if (!Number.isFinite(since) || since < 0) {
+      return res.status(400).json({ error: 'Invalid since parameter' });
+    }
+
+    const cur = await pool.query(
+      'SELECT version FROM crdt_docs WHERE doc_id = $1',
+      [docId],
+    );
+    const currentVersion = cur.rowCount === 0 ? 0 : Number(cur.rows[0].version);
+
+    const rows = await pool.query(
+      `SELECT version, created_at, octet_length(state) AS size
+         FROM crdt_doc_versions
+        WHERE doc_id = $1 AND version > $2
+        ORDER BY version ASC`,
+      [docId, since],
+    );
+
+    res.json({
+      docId,
+      currentVersion,
+      since,
+      conflicting: currentVersion > since,
+      versions: rows.rows.map((r) => ({
+        version: Number(r.version),
+        createdAt: r.created_at,
+        size: Number(r.size),
+      })),
+    });
+  } catch (e) {
+    console.error('[CRDT] 查询冲突失败:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * PHASE127: 回滚到指定版本（以历史快照覆盖当前状态，产生一个新版本）
+ * POST /docs/:docId/rollback
+ * Body: { version: number }
+ * 返回: { docId, version: 新版本号, state: base64 }
+ */
+app.post('/docs/:docId/rollback', async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const targetVersion = Number.parseInt(String(req.body?.version), 10);
+
+    if (!Number.isFinite(targetVersion) || targetVersion < 1) {
+      return res.status(400).json({ error: 'Invalid version' });
+    }
+
+    const snap = await pool.query(
+      'SELECT state FROM crdt_doc_versions WHERE doc_id = $1 AND version = $2',
+      [docId, targetVersion],
+    );
+    if (snap.rowCount === 0) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+
+    const cur = await pool.query(
+      'SELECT version FROM crdt_docs WHERE doc_id = $1',
+      [docId],
+    );
+    const newVersion = (cur.rowCount === 0 ? 0 : Number(cur.rows[0].version)) + 1;
+    const restored = snap.rows[0].state;
+
+    await pool.query(`
+      INSERT INTO crdt_docs (doc_id, state, version, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (doc_id)
+      DO UPDATE SET state = EXCLUDED.state, version = EXCLUDED.version, updated_at = NOW()
+    `, [docId, restored, newVersion]);
+
+    await pool.query(`
+      INSERT INTO crdt_doc_versions (doc_id, version, state, user_id, tenant_id)
+      VALUES ($1, $2, $3, NULL, NULL)
+      ON CONFLICT (doc_id, version) DO NOTHING
+    `, [docId, newVersion, restored]);
+
+    res.json({
+      docId,
+      version: newVersion,
+      rolledBackFrom: targetVersion,
+      state: Buffer.from(restored).toString('base64'),
+    });
+  } catch (e) {
+    console.error('[CRDT] 回滚失败:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ==================== 启动 ====================
 
 async function init() {
@@ -277,7 +400,23 @@ async function init() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
-  console.log('[CRDT] 数据库表初始化完成');
+  // PHASE127: 冲突版本快照表（用于冲突检测与回滚）
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crdt_doc_versions (
+      doc_id TEXT NOT NULL,
+      version BIGINT NOT NULL,
+      state BYTEA NOT NULL,
+      user_id UUID,
+      tenant_id TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (doc_id, version)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_crdt_doc_versions_lookup
+    ON crdt_doc_versions(doc_id, version DESC)
+  `);
+  console.log('[CRDT] 数据库表初始化完成 (含 PHASE127 版本表)');
 
   app.listen(PORT, () => {
     console.log(`[CRDT] 服务端合并服务启动: http://localhost:${PORT}`);

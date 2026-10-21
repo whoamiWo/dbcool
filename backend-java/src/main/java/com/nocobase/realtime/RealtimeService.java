@@ -202,6 +202,74 @@ public class RealtimeService {
         broadcast(StompDestinations.collabTopic(tenantId, docId), payload);
     }
 
+    /**
+     * PHASE127: 查询文档版本历史与冲突候选。
+     * 复用已有 crdtWebClient，调用 CRDT 服务 /docs/{docId}/conflicts。
+     *
+     * @param docId  文档 ID
+     * @param since  客户端本地基线版本号（null = 0）
+     * @return CRDT 服务返回的 JSON Map（含 currentVersion/conflicting/versions），
+     *         若 CRDT 服务不可用返回 null
+     */
+    public Map<String, Object> fetchConflicts(String docId, Long since) {
+        if (crdtWebClient == null) {
+            log.warn("[Realtime] CRDT 服务未配置，无法查询冲突");
+            return null;
+        }
+        try {
+            String uri = since != null
+                    ? "/docs/{docId}/conflicts?since={since}"
+                    : "/docs/{docId}/conflicts";
+            Map<String, Object> response = crdtWebClient.get()
+                    .uri(uri, docId, since != null ? since : 0)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block(java.time.Duration.ofSeconds(5));
+
+            if (response != null) {
+                log.debug("[Realtime] 查询冲突: doc={}, since={}, conflicting={}",
+                        docId, since, response.get("conflicting"));
+                return response;
+            }
+        } catch (Exception e) {
+            log.warn("[Realtime] CRDT 冲突查询失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * PHASE127: 回滚到指定版本。
+     * 复用 crdtWebClient，调用 CRDT 服务 POST /docs/{docId}/rollback。
+     *
+     * @param docId        文档 ID
+     * @param targetVersion 目标版本号
+     * @return CRDT 服务返回的 JSON Map（含 version/rolledBackFrom/state），
+     *         若 CRDT 服务不可用返回 null
+     */
+    public Map<String, Object> rollbackToVersion(String docId, int targetVersion) {
+        if (crdtWebClient == null) {
+            log.warn("[Realtime] CRDT 服务未配置，无法回滚");
+            return null;
+        }
+        try {
+            Map<String, Object> response = crdtWebClient.post()
+                    .uri("/docs/{docId}/rollback", docId)
+                    .bodyValue(Map.of("version", targetVersion))
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block(java.time.Duration.ofSeconds(5));
+
+            if (response != null) {
+                log.info("[Realtime] 回滚: doc={}, from v{} to v{}",
+                        docId, response.get("rolledBackFrom"), response.get("version"));
+                return response;
+            }
+        } catch (Exception e) {
+            log.warn("[Realtime] CRDT 回滚失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
     /** 实际发送;失败仅告警(降级),不阻断业务。 */
     private void broadcast(String destination, Map<String, Object> payload) {
         if (messagingTemplate == null) {
