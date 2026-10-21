@@ -6,6 +6,7 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import { router } from './router';
 import { darkTheme } from './theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { OfflineBanner } from './components/OfflineBanner';
 import './i18n';
 import './styles.css';
 import './theme/glass.css';
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')!).render(
         <ErrorBoundary>
           <RouterProvider router={router} />
         </ErrorBoundary>
+        <OfflineBanner />
       </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,

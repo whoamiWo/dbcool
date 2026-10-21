@@ -205,5 +205,8 @@ function renderValue(value: any, field: FieldDef): React.ReactNode {
   if (field.type === 'date') return String(value).slice(0, 10);
   if (field.type === 'datetime') return String(value).slice(0, 16).replace('T', ' ');
   if (field.type === 'number') return Number(value).toLocaleString();
+  if (field.type === 'attachment' && typeof value === 'string') {
+    return <span title={value}>({value.split('/').pop()})</span>;
+  }
   return String(value);
 }

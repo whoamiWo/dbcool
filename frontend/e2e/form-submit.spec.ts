@@ -194,9 +194,7 @@ test.describe('表单提交流程 E2E', () => {
 
     // datetime-local input
     await expect(page.locator('input[type="datetime-local"]')).toBeVisible({ timeout: 5000 });
-    // attachment placeholder input
-    await expect(page.getByPlaceholder(/storageKey/)).toBeVisible();
-    // disabled upload button(Week 42+ D1.4)
-    await expect(page.getByRole('button', { name: /上传/ })).toBeDisabled();
+    // attachment 字段（PHASE126 升级为真实上传 UI）
+    await expect(page.getByText(/点击或拖拽文件上传/i)).toBeVisible();
   });
 

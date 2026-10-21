@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FieldDef, FormFull, FormLayoutItem } from '@/types/form';
+import AttachmentPreview from '../attachment/AttachmentPreview';
 
 interface FormRuntimeProps {
   form: FormFull;
@@ -247,33 +248,13 @@ export function FormRuntime({
           />
         );
       case 'attachment':
-        // Week 41 D1.2: Week 42+ 接 MinIO 后会升级为完整上传 UI
-        // Week 41 暂为 placeholder 输入框,接收 storageKey 字符串
         return (
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              style={{ ...inputStyle, width: '100%' }}
-              placeholder={t('formRuntime.storageKeyPlaceholder')}
-            />
-            <button
-              type="button"
-              disabled
-              style={{
-                padding: '4px 8px',
-                background: 'var(--color-border-light)',
-                color: 'var(--color-text-disabled)',
-                border: 'none',
-                borderRadius: 4,
-                cursor: 'not-allowed',
-                fontSize: 12,
-              }}
-              title={t('formRuntime.uploadSoon')}
-            >
-              {t('formRuntime.uploadButton')}
-            </button>
-          </div>
+          <AttachmentPreview
+            value={value as string}
+            mode="edit"
+            size="md"
+            onChange={(key) => onChange(key)}
+          />
         );
       case 'select':
         return (
