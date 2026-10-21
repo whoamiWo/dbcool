@@ -15,12 +15,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from collections.abc import Iterable
 from typing import Any
 
 from fastapi import WebSocket
-
 
 logger = logging.getLogger(__name__)
 

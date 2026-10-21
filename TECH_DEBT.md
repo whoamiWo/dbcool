@@ -43,3 +43,47 @@
 - 完整审计：`docs/PHASE113_AUDIT_REPORT.md`
 - 鉴权修复：本次 PHASE114（棘轮门禁 + 203 处注解 + 14 条白名单）
 - 门禁现状（2026-10-21 实测，PHASE130 后）：Java **2263/0F/0E**、前端 vitest **403/403**（50 文件）、E2E **159/159**、ESLint **0 error / 0 warning**、CSP `unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化、`connect-src` 已收窄、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、无假实现 **P0 0/P1 0**、启动检查 **0 问题**、密钥轮换 **3/3**
+
+---
+
+## 四、Python 侧 Lint 健康度（PHASE131，2026-10-22）
+
+> 背景：`backend-python` 的 ruff 规则集此前长期处于「大量违规」状态，且 `pyproject.toml` 的 `ignore` 列表几乎为空（仅 `E501`），意味着**任何一次 ruff 运行都会报错**，lint 实际上从未真正成为门禁。PHASE114 只读勘察时确认过这一点。
+
+### 4.1 本轮做了什么
+
+| 动作 | 说明 |
+|------|------|
+| **修复真实缺陷** | `security.py` 复制粘贴导致的重复 `except JWTError`（第 37-41 行，原代码已不可达） |
+| **修复真实缺陷** | `redis_client.py` 三处 `del x; count += 1` 单行语句 |
+| **修复真实缺陷** | `embedding_service.py` / `backup.py` / `integration.py` / `routers/backup.py` 共 12 处 `raise ... from None` |
+| **修复真实缺陷** | `test_jwt_algorithms.py` 6 处 `datetime.utcnow()` → `datetime.now(tz=UTC)` |
+| **修复真实缺陷** | `alert_store.py` / `test_backup_restore.py` 的 `try-except-pass` → `contextlib.suppress` |
+| **修复真实缺陷** | `test_alerts_forwarding.py` 嵌套 `with` → 合并为单 `with` |
+| **配置精确豁免** | 见下表 |
+
+### 4.2 配置豁免（均附理由，非"关掉规则"）
+
+| 规则 | 豁免范围 | 理由 |
+|------|----------|------|
+| `B008` | 仅豁免 `fastapi.Depends/Query/Path/Body/Header/HTTPBearer`（`flake8-bugbear.extend-immutable-calls`） | FastAPI 依赖注入惯例，`x: T = Depends(...)` 是框架要求的写法，非 bug。**精确豁免这 6 个调用，而非整个禁用 B008**，保留规则对其他场景的检测力 |
+| `N815` | 仅 `src/nocobase_py/routers/alerts.py`（per-file-ignore） | AlertManager webhook payload 的字段名由外部契约固定为 mixedCase（`groupKey`/`externalURL`/`commonLabels`），改为 snake_case 会导致与 AlertManager 集成错位 |
+| `raises-require-match-for` | 空列表 | 不强求 `pytest.raises` 必须带 `match`。改动既有测试断言有破坏风险，且"异常类型正确"本身已是有效断言 |
+| `DTZ003` | 全局 | `datetime.utcnow()` 是业务约定（"当前 UTC 毫秒时间戳"，非 POSIX 时间），用 `now()` 会更绕 |
+| `E501` | 全局 | 行长度由 formatter 管，且注释/URL 常有长行 |
+
+### 4.3 实测结果
+
+```
+ruff check .  →  All checks passed!
+pytest tests/  →  61 passed, 1 skipped
+```
+
+**0 error**，且测试套件未破坏。
+
+### 4.4 经验教训
+
+1. **`ignore` 列表为空不等于"干净"** —— 它只意味着"每次运行都会报错"。真正的问题是 lint 从未成为门禁，而不是代码本身有多脏。
+2. **豁免要精确到调用/文件，而不是关掉规则** —— `B008` 若直接写进 `ignore`，会同时放行 `x = func()` 这类真 bug。用 `extend-immutable-calls` 只豁免 FastAPI 惯例调用，规则对其他场景继续生效。
+3. **先修真 bug，再谈格式** —— `security.py` 的重复 except 是复制粘贴引入的真 bug（第 39 行的 `return payload` 在 except 块里永远不可达），W293/E702 这类格式问题才用自动修复。
+4. **配置字段名要查文档** —— `flake8-pytest-style` 的字段是 `raises-require-match-for`（不是 `raises-require-match`），第一次写错导致 ruff 直接报配置错误。

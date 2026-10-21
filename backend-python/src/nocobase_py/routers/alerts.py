@@ -1,6 +1,5 @@
 """告警接收端点（AlertManager webhook）—— PHASE104 T7.3."""
 
-import json
 import logging
 import time
 import uuid
@@ -67,12 +66,12 @@ def _parse_ts(ts: str) -> float:
     import datetime
 
     if not ts:
-        return datetime.datetime.now(datetime.timezone.utc).timestamp()
+        return datetime.datetime.now(datetime.UTC).timestamp()
     try:
         dt = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
         return dt.timestamp()
     except ValueError:
-        return datetime.datetime.now(datetime.timezone.utc).timestamp()
+        return datetime.datetime.now(datetime.UTC).timestamp()
 
 
 @router.post("/webhook")

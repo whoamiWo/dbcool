@@ -2,7 +2,6 @@ package com.nocobase.integration.slack;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nocobase.im.ImMessageRepository;
 import com.nocobase.integration.common.InboundMessageService;
 import com.nocobase.integration.credential.TenantCredentialService;
 import org.slf4j.Logger;

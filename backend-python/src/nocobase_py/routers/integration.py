@@ -16,12 +16,12 @@ from pydantic import BaseModel, Field
 
 from nocobase_py.config import get_settings
 from nocobase_py.security import AuthUser, get_current_user
+from nocobase_py.services.connectors.base import ConnectorConfig
 from nocobase_py.services.connectors.dingtalk import DingTalkConnector
 from nocobase_py.services.connectors.feishu import FeishuConnector
 from nocobase_py.services.connectors.mattermost import MattermostConnector
 from nocobase_py.services.connectors.slack import SlackConnector
 from nocobase_py.services.connectors.wecom import WeComConnector
-from nocobase_py.services.connectors.base import ConnectorConfig
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ async def _forward_to_java(event: dict) -> None:
     channel_id = event.get("channel_id") or s.slack_event_channel_id
     if not channel_id:
         logger.warning("[Slack] slack_event_channel_id 未配置，跳过转发")
-        raise HTTPException(status_code=500, detail="slack_event_channel_id 未配置")
+        raise HTTPException(status_code=500, detail="slack_event_channel_id 未配置") from None
     url = f"{s.java_backend_url}/api/im/messages"
     token = _service_token()
     async with httpx.AsyncClient(timeout=10.0) as client:
@@ -84,7 +84,7 @@ async def _forward_to_java(event: dict) -> None:
             },
         )
     if resp.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Java 转发失败: {resp.status_code}")
+        raise HTTPException(status_code=502, detail=f"Java 转发失败: {resp.status_code}") from None
 
 
 def _slack_connector() -> SlackConnector:
@@ -159,7 +159,7 @@ async def slack_send(
     """发送消息到 Slack 频道。"""
     connector = _slack_connector()
     if not connector.is_configured:
-        raise HTTPException(status_code=400, detail="Slack 未配置")
+        raise HTTPException(status_code=400, detail="Slack 未配置") from None
 
     result = await connector.send_message(
         channel=payload.channel,
@@ -174,7 +174,7 @@ async def slack_verify(
     request: Request,
 ) -> PlainTextResponse | dict[str, Any]:
     """验证 Slack Events API 请求签名并处理 challenge。
-    
+
     修复：先验签再返 challenge（Slack 要求先返回 challenge 完成握手）。
     不需要用户鉴权（Slack 事件推送无需 JWT）。
     """
@@ -182,12 +182,12 @@ async def slack_verify(
     body_bytes = await request.body()
     timestamp = int(request.headers.get("X-Slack-Request-Timestamp", 0))
     signature = request.headers.get("X-Slack-Signature", "")
-    
+
     # 先验签
     valid = connector.verify_signature(timestamp, signature, body_bytes)
     if not valid:
-        raise HTTPException(status_code=401, detail="Invalid signature")
-    
+        raise HTTPException(status_code=401, detail="Invalid signature") from None
+
     # 验签通过后，处理 URL 验证挑战或入站事件
     try:
         body_json = json.loads(body_bytes.decode("utf-8"))
@@ -209,7 +209,7 @@ async def slack_verify(
             raise
         except Exception as e:
             logger.error("[Slack] 入站转发失败: %s", e)
-            raise HTTPException(status_code=500, detail=f"转发失败: {e}")
+            raise HTTPException(status_code=500, detail=f"转发失败: {e}") from None
     return {"code": 0, "data": {"valid": True}}
 
 
@@ -227,7 +227,7 @@ async def wecom_send(
     """发送企业微信应用消息。"""
     connector = _wecom_connector()
     if not connector.is_configured:
-        raise HTTPException(status_code=400, detail="企业微信未配置")
+        raise HTTPException(status_code=400, detail="企业微信未配置") from None
     result = await connector.send_message(user_id=payload.to, text=payload.text)
     return {"code": 0 if result.get("errcode") == 0 else 1, "data": result}
 
@@ -240,7 +240,7 @@ async def dingtalk_send(
     """发送钉钉应用消息。"""
     connector = _dingtalk_connector()
     if not connector.is_configured:
-        raise HTTPException(status_code=400, detail="钉钉未配置")
+        raise HTTPException(status_code=400, detail="钉钉未配置") from None
     result = await connector.send_message(user_id=payload.to, text=payload.text)
     return {"code": 0 if result.get("errcode") == 0 else 1, "data": result}
 
@@ -253,7 +253,7 @@ async def feishu_send(
     """发送飞书消息。"""
     connector = _feishu_connector()
     if not connector.is_configured:
-        raise HTTPException(status_code=400, detail="飞书未配置")
+        raise HTTPException(status_code=400, detail="飞书未配置") from None
     result = await connector.send_message(open_id=payload.to, text=payload.text)
     return {"code": 0 if result.get("code") == 0 else 1, "data": result}
 
@@ -270,7 +270,7 @@ async def feishu_verify(request: Request) -> PlainTextResponse | dict[str, Any]:
     """
     connector = _feishu_connector()
     if not connector.is_configured:
-        raise HTTPException(status_code=503, detail="飞书未配置")
+        raise HTTPException(status_code=503, detail="飞书未配置") from None
 
     body_bytes = await request.body()
     timestamp = request.headers.get("X-Lark-Request-Timestamp", "")
@@ -279,7 +279,7 @@ async def feishu_verify(request: Request) -> PlainTextResponse | dict[str, Any]:
 
     if not connector.verify_signature_hex(signature, timestamp, nonce, body_bytes):
         logger.warning("[Feishu] 入站签名校验失败 ts=%s nonce=%s", timestamp, nonce)
-        raise HTTPException(status_code=401, detail="Invalid signature")
+        raise HTTPException(status_code=401, detail="Invalid signature") from None
 
     try:
         body_json = json.loads(body_bytes.decode("utf-8"))
@@ -315,7 +315,7 @@ async def feishu_verify(request: Request) -> PlainTextResponse | dict[str, Any]:
         raise
     except Exception as e:
         logger.error("[Feishu] 入站转发失败: %s", e)
-        raise HTTPException(status_code=500, detail=f"转发失败: {e}")
+        raise HTTPException(status_code=500, detail=f"转发失败: {e}") from None
     return {"code": 0, "data": {"valid": True}}
 
 
@@ -337,7 +337,7 @@ async def mattermost_send(
     """发送 Mattermost 消息（通过 Incoming Webhook）。"""
     connector = _mattermost_connector()
     if not connector.is_configured:
-        raise HTTPException(status_code=400, detail="Mattermost 未配置")
+        raise HTTPException(status_code=400, detail="Mattermost 未配置") from None
     result = await connector.send_message(channel=payload.to, text=payload.text)
     return {"code": 0 if result.get("ok") else 1, "data": result}
 
@@ -376,7 +376,7 @@ async def mattermost_verify(request: Request) -> dict[str, Any]:
 
     if not connector.verify_webhook_token(str(token)):
         logger.warning("[Mattermost] 入站 webhook token 校验失败 channel=%s", channel_id)
-        raise HTTPException(status_code=401, detail="Invalid webhook token")
+        raise HTTPException(status_code=401, detail="Invalid webhook token") from None
 
     # 入站事件落地
     event_id = f"mm-{channel_id}-{text[:64]}"
@@ -394,5 +394,5 @@ async def mattermost_verify(request: Request) -> dict[str, Any]:
         raise
     except Exception as e:
         logger.error("[Mattermost] 入站转发失败: %s", e)
-        raise HTTPException(status_code=500, detail=f"转发失败: {e}")
+        raise HTTPException(status_code=500, detail=f"转发失败: {e}") from None
     return {"code": 0, "data": {"valid": True}}

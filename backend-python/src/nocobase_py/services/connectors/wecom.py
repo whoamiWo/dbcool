@@ -3,8 +3,6 @@
 复用 WebhookPusher 的 HMAC 签名模式。
 """
 
-import hashlib
-import hmac
 import logging
 import time
 
@@ -50,9 +48,8 @@ class WeComConnector(BaseConnector):
             if self.webhook_url:
                 result = await self.send_webhook_message("health check")
                 return result.get("ok", False)
-            else:
-                token = await self.get_access_token()
-                return bool(token)
+            token = await self.get_access_token()
+            return bool(token)
         except Exception as e:
             logger.warning("[WeCom] 健康检查失败：%s", e)
             return False
@@ -66,13 +63,13 @@ class WeComConnector(BaseConnector):
         now = time.time()
         if self.cached_token and now < self.cached_token_expire_at:
             return self.cached_token
-        
+
         if not self.corp_id or not self.corp_secret:
             raise RuntimeError("企业微信未配置")
 
         async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
             resp = await client.get(
-                f"https://qyapi.weixin.qq.com/cgi-bin/gettoken",
+                "https://qyapi.weixin.qq.com/cgi-bin/gettoken",
                 params={"corpid": self.corp_id, "corpsecret": self.corp_secret},
             )
             data = resp.json()

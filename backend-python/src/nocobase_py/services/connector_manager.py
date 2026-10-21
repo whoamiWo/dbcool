@@ -1,15 +1,14 @@
 """连接器管理服务 (W4)。"""
 
 import logging
-from typing import Dict, Optional
 
+from nocobase_py.models.settings import Settings
 from nocobase_py.services.connectors import (
     BaseConnector,
     ConnectorConfig,
     get_connector,
     list_connectors,
 )
-from nocobase_py.models.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +17,14 @@ class ConnectorManager:
     """连接器管理器，负责连接器的生命周期管理和消息分发。"""
 
     def __init__(self):
-        self._connectors: Dict[str, BaseConnector] = {}
-        self._settings: Optional[Settings] = None
+        self._connectors: dict[str, BaseConnector] = {}
+        self._settings: Settings | None = None
 
     def set_settings(self, settings: Settings):
         """设置 Settings 实例（从数据库加载配置）。"""
         self._settings = settings
 
-    def _load_config(self, name: str) -> Optional[ConnectorConfig]:
+    def _load_config(self, name: str) -> ConnectorConfig | None:
         """从 Settings 加载连接器配置。"""
         if not self._settings:
             return None
@@ -46,7 +45,7 @@ class ConnectorManager:
             logger.warning("[ConnectorManager] 加载 %s 配置失败：%s", name, e)
             return None
 
-    async def get_or_create_connector(self, name: str) -> Optional[BaseConnector]:
+    async def get_or_create_connector(self, name: str) -> BaseConnector | None:
         """获取或创建连接器实例。"""
         if name in self._connectors:
             return self._connectors[name]
@@ -89,10 +88,10 @@ class ConnectorManager:
             logger.error("[ConnectorManager] 发送消息失败：%s", e)
             return {"ok": False, "error": str(e), "platform": platform}
 
-    async def health_check_all(self) -> Dict[str, bool]:
+    async def health_check_all(self) -> dict[str, bool]:
         """对所有已配置的连接器进行健康检查。"""
         results = {}
-        for name in list_connectors().keys():
+        for name in list_connectors():
             connector = await self.get_or_create_connector(name)
             if connector:
                 try:
@@ -108,7 +107,7 @@ class ConnectorManager:
 
     async def broadcast(
         self, message: str, platforms: list | None = None, **kwargs
-    ) -> Dict[str, dict]:
+    ) -> dict[str, dict]:
         """广播消息到多个平台。
 
         Args:

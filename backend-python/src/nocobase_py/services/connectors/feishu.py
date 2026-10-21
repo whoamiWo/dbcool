@@ -139,7 +139,7 @@ class FeishuConnector(BaseConnector):
             message = (timestamp or "") + (nonce or "") + body_bytes.decode("utf-8")
         except UnicodeDecodeError:
             return False
-        sig = hmac.new(self.app_secret.encode(), message.encode(), hashlib.sha256).digest()
+        hmac.new(self.app_secret.encode(), message.encode(), hashlib.sha256).digest()
         # 入站时调用方未提供 signature_hex，本方法用作"重算签名"工具,
         # 实际校验请用 verify_signature_hex(signature_hex, ...)
         return False  # 本方法仅做签名计算参考,见下方 verify_signature_hex

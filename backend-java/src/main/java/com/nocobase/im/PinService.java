@@ -2,8 +2,6 @@ package com.nocobase.im;
 
 import com.nocobase.im.entity.ImPinEntity;
 import com.nocobase.im.entity.ImMessageEntity;
-import com.nocobase.im.ImPinRepository;
-import com.nocobase.im.ImMessageRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

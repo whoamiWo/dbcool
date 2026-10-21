@@ -1,7 +1,6 @@
 package com.nocobase.audit;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

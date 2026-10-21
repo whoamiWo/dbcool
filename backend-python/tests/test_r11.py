@@ -1,7 +1,6 @@
 """R11 LLM 成本控制 — 限流 + 缓存 + 配额测试."""
 
 import asyncio
-import time
 
 import pytest
 from fastapi.testclient import TestClient

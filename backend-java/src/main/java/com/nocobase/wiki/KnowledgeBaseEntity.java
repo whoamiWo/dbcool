@@ -3,8 +3,6 @@ package com.nocobase.wiki;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * 知识库实体 — Week 1 MVP:基础表结构。

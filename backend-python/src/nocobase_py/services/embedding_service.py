@@ -11,7 +11,6 @@
 """
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -44,10 +43,10 @@ async def load_model():
     global _model
     try:
         from sentence_transformers import SentenceTransformer
-        
+
         # 优先使用 GPU，若无则回退 CPU
         device = "cuda" if _has_gpu() else "cpu"
-        
+
         _model = SentenceTransformer(
             "paraphrase-multilingual-MiniLM-L12-v2",
             device=device,
@@ -71,19 +70,19 @@ def _has_gpu() -> bool:
 async def embed(req: EmbedRequest) -> EmbedResponse:
     """生成文本的向量嵌入."""
     if _model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    
+        raise HTTPException(status_code=503, detail="Model not loaded") from None
+
     try:
         embeddings = _model.encode([req.text], convert_to_numpy=True)
         embedding_list = embeddings[0].tolist()
-        
+
         return EmbedResponse(
             model=_model.model_name_or_path,
             embedding=embedding_list,
             tokens=len(req.text) // 4,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from None
 
 
 @app.get("/health")

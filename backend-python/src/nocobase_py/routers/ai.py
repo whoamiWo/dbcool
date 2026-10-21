@@ -1,8 +1,9 @@
 """AI 增强端点 — R11 LLM 成本控制(限流 + 缓存 + 配额)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import JSONResponse
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from nocobase_py.config import get_settings
@@ -10,6 +11,11 @@ from nocobase_py.middleware.rate_limit import SlidingWindowRateLimiter
 from nocobase_py.security import AuthUser, get_current_user, get_service_or_user
 from nocobase_py.services.llm_cache import LLMCache
 from nocobase_py.services.quota import QuotaService
+
+# sentence-transformers 为可选依赖（semantic extra），仅在类型检查期导入：
+# 运行时不引入该依赖，注解因 `from __future__ import annotations` 延迟求值而不会触发 NameError。
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -99,11 +105,11 @@ class EmbeddingResponse(BaseModel):
 #  - 未安装/加载失败 → 回退确定性哈希向量（保证接口始终可用）
 # ============================================================
 
-_MODEL: "SentenceTransformer | None" = None
+_MODEL: SentenceTransformer | None = None
 _MODEL_LOAD_FAILED = False
 
 
-def _load_sentence_model() -> "SentenceTransformer | None":
+def _load_sentence_model() -> SentenceTransformer | None:
     """尝试加载 sentence-transformers 语义模型；不可用返回 None（回退哈希）。"""
     global _MODEL, _MODEL_LOAD_FAILED
     if _MODEL_LOAD_FAILED:
@@ -112,8 +118,6 @@ def _load_sentence_model() -> "SentenceTransformer | None":
         return _MODEL
     try:
         from sentence_transformers import SentenceTransformer
-
-        import numpy as np
 
         _MODEL = SentenceTransformer(
             "paraphrase-multilingual-MiniLM-L12-v2",
@@ -542,26 +546,26 @@ def _generate_embedding(text: str, dimensions: int = 768) -> list[float]:
 
 def _generate_hash_embedding(text: str, dimensions: int = 768) -> list[float]:
     """Generate deterministic non-zero embedding using SHA-256 hashing.
-    
+
     This produces a 768-dimension vector with values in [-1, 1] range.
     The same input text always produces the same output vector.
     Different texts produce different vectors.
-    
+
     Note: This is a lightweight alternative to sentence-transformers
     that doesn't require heavy ML dependencies (torch, transformers).
     For production use with real semantic similarity, install sentence-transformers.
     """
     import hashlib
-    
+
     embedding = []
     # Generate enough hash bytes for all dimensions (need 2 floats per byte pair for -1 to 1 range)
-    bytes_needed = dimensions * 2
+    dimensions * 2
     hash_hex = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    
+
     # Extend hash if text is short to ensure variability
     extended_text = text + hash_hex[:16]
     full_hash = hashlib.sha256(extended_text.encode("utf-8")).hexdigest()
-    
+
     # Convert hex pairs to float values in [-1, 1]
     for i in range(dimensions):
         byte_pos = (i % (len(full_hash) // 2)) * 2
@@ -569,7 +573,7 @@ def _generate_hash_embedding(text: str, dimensions: int = 768) -> list[float]:
         # Normalize to [-1, 1]
         float_val = (byte_val / 127.5) - 1.0
         embedding.append(float_val)
-    
+
     return embedding
 
 

@@ -2,11 +2,6 @@ package com.nocobase.im;
 
 import com.nocobase.im.entity.ImHuddleEntity;
 import com.nocobase.im.entity.ImHuddleParticipantEntity;
-import com.nocobase.im.entity.ImChannelMemberEntity;
-import com.nocobase.im.ImChannelMemberRepository;
-import com.nocobase.im.ImChannelRepository;
-import com.nocobase.im.ImHuddleRepository;
-import com.nocobase.im.ImHuddleParticipantRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

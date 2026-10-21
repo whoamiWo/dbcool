@@ -3,8 +3,6 @@ package com.nocobase.project;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * 项目任务实体 — 甘特图/看板/里程碑。

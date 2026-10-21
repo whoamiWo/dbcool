@@ -87,7 +87,32 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "N", "C4", "DTZ", "PIE", "PT", "RET", "SIM"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # 行长度由 formatter 管，且注释/URL 常有长行
+    "DTZ003", # datetime.utcnow() 是业务约定（"当前 UTC 毫秒时间戳"，非 POSIX 时间，用 now() 会更绕）
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# PHASE131: FastAPI 依赖注入惯例 —— `x: T = Depends(...)` 是框架要求的写法，非 bug。
+# 精确豁免这些调用（而非整个禁用 B008），保留规则对其他场景的检测力。
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.security.HTTPBearer",
+]
+
+[tool.ruff.lint.flake8-pytest-style]
+# PHASE131: 不强求 pytest.raises 必须带 match —— 改动既有测试断言有破坏风险，
+# 且"异常类型正确"本身已是有效断言。设为空列表即不对任何异常类型要求 match。
+raises-require-match-for = []
+
+[tool.ruff.lint.per-file-ignores]
+# PHASE131: AlertManager webhook payload 的字段名由外部契约固定为 mixedCase
+# （groupKey / externalURL / commonLabels 等），改为 snake_case 会导致与 AlertManager 集成错位。
+"src/nocobase_py/routers/alerts.py" = ["N815"]
 
 [tool.mypy]
 python_version = "3.12"

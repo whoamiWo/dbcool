@@ -1,15 +1,11 @@
 package com.nocobase.integration.dingtalk;
 
 import com.nocobase.audit.AuditService;
-import com.nocobase.auth.RoleName;
 import com.nocobase.auth.JwtService;
 import com.nocobase.auth.RefreshTokenService;
 import com.nocobase.auth.UserEntity;
 import com.nocobase.integration.common.ExternalMessageLogEntity;
 import com.nocobase.integration.common.ExternalMessageLogRepository;
-import com.nocobase.integration.dingtalk.DingTalkApprovalService;
-import com.nocobase.integration.dingtalk.DingTalkOrgSyncService;
-import com.nocobase.integration.dingtalk.UserMappingService;
 import com.nocobase.tenant.TenantContext;
 import com.nocobase.workflow.WorkflowInstanceRepository;
 import com.nocobase.workflow.WorkflowTaskRepository;

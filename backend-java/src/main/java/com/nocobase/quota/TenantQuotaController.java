@@ -1,7 +1,6 @@
 package com.nocobase.quota;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import com.nocobase.tenant.TenantEntity;
 import com.nocobase.tenant.TenantRepository;
 import com.nocobase.audit.AuditService;

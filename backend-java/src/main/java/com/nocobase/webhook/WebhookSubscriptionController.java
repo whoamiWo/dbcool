@@ -1,7 +1,6 @@
 package com.nocobase.webhook;
 
 import com.nocobase.audit.AuditService;
-import com.nocobase.auth.RoleName;
 import com.nocobase.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;

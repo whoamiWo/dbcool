@@ -1,6 +1,5 @@
 package com.nocobase.compliance;
 
-import com.nocobase.ai.AiConversationEntity;
 import com.nocobase.ai.AiConversationEntityRepository;
 import com.nocobase.audit.AuditLogRepository;
 import com.nocobase.audit.AuditService;
@@ -13,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 

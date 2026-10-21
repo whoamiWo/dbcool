@@ -14,8 +14,8 @@ import threading
 import time
 import traceback
 from collections.abc import Callable
+from datetime import UTC
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ class BackgroundScheduler:
             return list(self._tasks.keys()) + list(self._cron_tasks.keys())
 
     def _loop(self) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         # 上次检查 cron 的"分钟桶"(避免同分钟内重复触发)
         last_cron_minute: tuple[int, int, int, int, int] | None = None
@@ -141,7 +141,7 @@ class BackgroundScheduler:
             now = time.monotonic()
             next_wake = self._tick(now)
             # cron 检查(每分钟最多一次)
-            now_wall = datetime.now(timezone.utc)
+            now_wall = datetime.now(UTC)
             bucket = (now_wall.year, now_wall.month, now_wall.day, now_wall.hour, now_wall.minute)
             if bucket != last_cron_minute:
                 last_cron_minute = bucket

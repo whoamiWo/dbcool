@@ -3,11 +3,9 @@ package com.nocobase.search;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 统一搜索索引 Repository — 基于 PostgreSQL FTS (tsvector/tsquery/ts_headline)。

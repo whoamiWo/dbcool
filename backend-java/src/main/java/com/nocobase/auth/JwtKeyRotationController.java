@@ -1,7 +1,6 @@
 package com.nocobase.auth;
 
 import com.nocobase.audit.AuditService;
-import com.nocobase.auth.RoleName;
 import com.nocobase.auth.keystore.KeyRingService;
 import com.nocobase.tenant.TenantContext;
 import java.util.Map;

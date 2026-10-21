@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  PHASE131: Java 静态检查规则集（checkstyle）
+
+  设计原则：先启用「高置信度且项目已合规」的基础规则，确保 lint 可真实运行且 0 错误，
+  避免一次性引入 Google/Sun 全量规则导致数千条违规、反而让门禁失去意义。
+  后续可按需逐条增加规则（每加一条需同步修复存量或明确豁免）。
+-->
+<module name="Checker">
+  <property name="severity" value="error"/>
+  <property name="fileExtensions" value="java"/>
+
+  <!-- 禁止源文件中使用 tab 字符 -->
+  <module name="FileTabCharacter">
+    <property name="eachLine" value="false"/>
+  </module>
+
+  <module name="TreeWalker">
+    <!-- import 相关 -->
+    <module name="UnusedImports">
+      <property name="processJavadoc" value="true"/>
+    </module>
+    <module name="RedundantImport"/>
+    <!--
+      刻意不启用 AvoidStarImport：项目既有风格大量使用 `import x.y.*;`（Spring/Jakarta 惯例），
+      存量 70 处、展开为机械改动且无实质收益，强制要求只会制造噪音。
+    -->
+
+    <!-- 命名约定（对应 BASELINE.md 1.2 代码规范） -->
+    <module name="PackageName">
+      <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+    </module>
+    <module name="TypeName"/>
+    <module name="MethodName"/>
+    <!--
+      刻意不启用 ConstantName：项目统一使用 `private static final Logger log`（Slf4j 惯例），
+      存量 102 处会被判违规 —— 属规则误伤，强制改成 LOG 与项目惯例冲突且无收益。
+    -->
+    <module name="LocalVariableName"/>
+    <module name="MemberName"/>
+    <module name="ParameterName"/>
+    <module name="StaticVariableName"/>
+  </module>
+</module>

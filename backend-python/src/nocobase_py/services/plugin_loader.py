@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Protocol
-
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def _parse_simple_yaml(content: str) -> dict[str, str]:
         if not line.strip():
             continue
         stripped = line.lstrip()
-        indent = len(line) - len(stripped)
+        len(line) - len(stripped)
         if stripped.startswith("- "):
             # 列表项
             list_items.append(stripped[2:].strip())
