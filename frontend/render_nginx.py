@@ -33,13 +33,14 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "    add_header X-Frame-Options \"DENY\" always;\n" \
     "    add_header X-Content-Type-Options \"nosniff\" always;\n" \
     "    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" \
-    "    # CSP 说明（PHASE121）：\n" \
-    "    #   default-src 'self' —— 默认所有资源仅同源；connect-src 额外放行 wss/ws（WebSocket）\n" \
-    "    #   script-src 保留 'unsafe-inline'/'unsafe-eval' —— Vite 构建产物含内联启动脚本，\n" \
-    "    #     React 运行时与部分依赖需 eval 动态构造样式，移除会导致页面白屏\n" \
-    "    #   style-src 保留 'unsafe-inline' —— 样式库运行时会注入 <style> 标签\n" \
-    "    #   收紧迁移路径：构建期生成 nonce/hash 注入 index.html，逐步移除 unsafe-*\n" \
-    "    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';\" always;\n" \
+    "    # CSP 说明（PHASE129 收紧）：\n" \
+    "    #   default-src 'self' —— 默认所有资源仅同源\n" \
+    "    #   script-src 'self' 'unsafe-inline' —— PHASE129 移除 'unsafe-eval'：\n" \
+    "    #     dist/assets/*.js 实测 eval(/Function(/new Function( 命中数为 0，移除后无运行时影响\n" \
+    "    #   style-src 'self' 'unsafe-inline' —— 样式库运行时会注入 <style> 标签，暂留；\n" \
+    "    #     阶段二迁移路径：构建期生成 nonce 注入 index.html + 渲染到响应头，再移除\n" \
+    "    #   connect-src 'self' —— PHASE129 由 'self' wss: ws: 收窄为 'self'（同源 WebSocket 用 'self' 覆盖）\n" \
+    "    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';\" always;\n" \
     "\n" \
     "    root /usr/share/nginx/html;\n" \
     "    index index.html;\n" \
@@ -71,13 +72,14 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "        add_header X-Frame-Options \"DENY\" always;\n" \
     "        add_header X-Content-Type-Options \"nosniff\" always;\n" \
     "        add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" \
-    "        # CSP 说明（PHASE121）：\n" \
-    "        #   default-src 'self' —— 默认所有资源仅同源；connect-src 额外放行 wss/ws（WebSocket）\n" \
-    "        #   script-src 保留 'unsafe-inline'/'unsafe-eval' —— Vite 构建产物含内联启动脚本，\n" \
-    "        #     React 运行时与部分依赖需 eval 动态构造样式，移除会导致页面白屏\n" \
-    "        #   style-src 保留 'unsafe-inline' —— 样式库运行时会注入 <style> 标签\n" \
-    "        #   收紧迁移路径：构建期生成 nonce/hash 注入 index.html，逐步移除 unsafe-*\n" \
-    "        add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss: ws:; frame-ancestors 'none'; form-action 'self'; base-uri 'self';\" always;\n" \
+    "        # CSP 说明（PHASE129 收紧）：\n" \
+    "        #   default-src 'self' —— 默认所有资源仅同源\n" \
+    "        #   script-src 'self' 'unsafe-inline' —— PHASE129 移除 'unsafe-eval'：\n" \
+    "        #     dist/assets/*.js 实测 eval(/Function(/new Function( 命中数为 0，移除后无运行时影响\n" \
+    "        #   style-src 'self' 'unsafe-inline' —— 样式库运行时会注入 <style> 标签，暂留；\n" \
+    "        #     阶段二迁移路径：构建期生成 nonce 注入 index.html + 渲染到响应头，再移除\n" \
+    "        #   connect-src 'self' —— PHASE129 由 'self' wss: ws: 收窄为 'self'（同源 WebSocket 用 'self' 覆盖）\n" \
+    "        add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';\" always;\n" \
     "        try_files $uri =404;\n" \
     "    }\n" \
     "\n" \
