@@ -3,13 +3,13 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from nocobase_py.db.session import get_db_session
 from nocobase_py.models.settings import Settings
 from nocobase_py.services.connector_manager import connector_manager
-from nocobase_py.services.connectors import get_connector, list_connectors
+from nocobase_py.services.connectors import list_connectors
 
 logger = logging.getLogger(__name__)
 

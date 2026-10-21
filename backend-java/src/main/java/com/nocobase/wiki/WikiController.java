@@ -1,9 +1,5 @@
 package com.nocobase.wiki;
 
-import com.nocobase.wiki.WikiTemplateService;
-import com.nocobase.wiki.WikiBacklinkRepository;
-import com.nocobase.wiki.WikiBacklinkEntity;
-import com.nocobase.wiki.WikiEmbeddingService;
 import com.nocobase.ai.AiAssistantService;
 import com.nocobase.auth.AclEnforcer;
 import com.nocobase.audit.AuditService;
@@ -14,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
@@ -31,8 +26,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.access.prepost.PreAuthorize;
 

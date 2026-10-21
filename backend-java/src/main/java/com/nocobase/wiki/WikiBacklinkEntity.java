@@ -3,8 +3,6 @@ package com.nocobase.wiki;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * Wiki 双向链接关系实体 — source_page → target_page。

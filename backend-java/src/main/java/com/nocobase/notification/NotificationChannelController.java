@@ -2,7 +2,6 @@ package com.nocobase.notification;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

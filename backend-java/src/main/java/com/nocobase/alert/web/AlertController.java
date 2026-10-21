@@ -128,11 +128,12 @@ public class AlertController {
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/subscriptions")
     public Map<String, Object> unsubscribe(
-            @RequestParam String user_id,
+            // 显式绑定名保持 API 契约不变（查询参数仍为 user_id），参数本身改为驼峰以符合命名规范
+            @RequestParam("user_id") String userId,
             @RequestParam String kind
     ) {
-        boolean removed = store.unsubscribe(user_id, kind);
-        return Map.of("ok", removed, "user_id", user_id, "kind", kind);
+        boolean removed = store.unsubscribe(userId, kind);
+        return Map.of("ok", removed, "user_id", userId, "kind", kind);
     }
 
     @PreAuthorize("isAuthenticated()")

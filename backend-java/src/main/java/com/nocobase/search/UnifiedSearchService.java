@@ -1,6 +1,5 @@
 package com.nocobase.search;
 
-import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.im.ImChannelMemberRepository;
 import com.nocobase.wiki.WikiPageService;
 import com.nocobase.wiki.WikiPageEntity;

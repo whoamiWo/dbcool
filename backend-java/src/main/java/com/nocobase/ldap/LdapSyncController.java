@@ -3,7 +3,6 @@ package com.nocobase.ldap;
 import com.nocobase.ldap.entity.LdapConfigEntity;
 import com.nocobase.ldap.entity.LdapUserMappingEntity;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

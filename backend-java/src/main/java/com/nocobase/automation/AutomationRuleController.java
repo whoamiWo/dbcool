@@ -3,7 +3,6 @@ package com.nocobase.automation;
 import com.nocobase.automation.entity.AutomationExecutionEntity;
 import com.nocobase.automation.entity.AutomationRuleEntity;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import jakarta.persistence.PreUpdate;
 
 /**
  * 文档页面实体 — 支持层级结构、版本控制、状态管理、FTS 全文检索。

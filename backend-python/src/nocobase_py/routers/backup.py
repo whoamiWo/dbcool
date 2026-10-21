@@ -30,7 +30,7 @@ async def create_backup(user: AuthUser = Depends(get_current_admin_user)) -> dic
         return {"code": 0, "message": "backup created", "data": result}
     except Exception as e:
         logger.exception("[backup] create failed")
-        raise HTTPException(status_code=500, detail=f"backup failed: {e}")
+        raise HTTPException(status_code=500, detail=f"backup failed: {e}") from None
 
 
 @router.get("")
@@ -47,10 +47,10 @@ async def restore_backup(backup_id: str, user: AuthUser = Depends(get_current_ad
         result = backup_service.restore_backup(backup_id)
         return {"code": 0, "message": "restored", "data": result}
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from None
     except Exception as e:
         logger.exception("[backup] restore failed")
-        raise HTTPException(status_code=500, detail=f"restore failed: {e}")
+        raise HTTPException(status_code=500, detail=f"restore failed: {e}") from None
 
 
 @router.get("/health")

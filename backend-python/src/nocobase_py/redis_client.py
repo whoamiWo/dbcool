@@ -7,7 +7,6 @@ W1 (P0) 要求：Redis 连接失败须返回明确错误，禁止无感降级到
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import redis.asyncio as redis
 
@@ -16,7 +15,7 @@ from nocobase_py.config import get_settings
 logger = logging.getLogger(__name__)
 
 _redis: redis.Redis | None = None
-_memory: "_MemoryRedis | None" = None
+_memory: _MemoryRedis | None = None
 
 
 class RedisUnavailableError(RuntimeError):
@@ -78,11 +77,14 @@ class _MemoryRedis:
         count = 0
         for n in names:
             if n in self._strings:
-                del self._strings[n]; count += 1
+                del self._strings[n]
+                count += 1
             if n in self._sets:
-                del self._sets[n]; count += 1
+                del self._sets[n]
+                count += 1
             if n in self._hashes:
-                del self._hashes[n]; count += 1
+                del self._hashes[n]
+                count += 1
         return count
 
     async def setex(self, name: str, time: int, value: str) -> int:

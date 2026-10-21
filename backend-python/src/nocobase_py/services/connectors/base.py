@@ -1,7 +1,7 @@
 """连接器抽象基类与注册表 (W4)。"""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Type
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -30,12 +30,10 @@ class BaseConnector(ABC):
     @abstractmethod
     async def health_check(self) -> bool:
         """健康检查。"""
-        pass
 
     @abstractmethod
     async def authenticate(self) -> bool:
         """认证测试。"""
-        pass
 
     async def send_message(self, channel_id: str, message: dict) -> bool:
         """发送消息（可选实现）。"""
@@ -46,10 +44,10 @@ class BaseConnector(ABC):
         raise NotImplementedError("该连接器不支持接收事件")
 
 
-_connector_registry: Dict[str, Type[BaseConnector]] = {}
+_connector_registry: dict[str, type[BaseConnector]] = {}
 
 
-def register_connector(connector_class: Type[BaseConnector]):
+def register_connector(connector_class: type[BaseConnector]):
     """注册连接器类。"""
     _connector_registry[connector_class.NAME] = connector_class
     return connector_class
@@ -62,7 +60,7 @@ def get_connector(name: str, config: ConnectorConfig) -> BaseConnector:
     return _connector_registry[name](config)
 
 
-def list_connectors() -> Dict[str, dict]:
+def list_connectors() -> dict[str, dict]:
     """列出所有已注册的连接器。"""
     return {
         name: {

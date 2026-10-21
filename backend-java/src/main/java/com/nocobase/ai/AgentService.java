@@ -2,8 +2,6 @@ package com.nocobase.ai;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.wiki.WikiPageEntity;
 import com.nocobase.wiki.WikiPageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +11,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

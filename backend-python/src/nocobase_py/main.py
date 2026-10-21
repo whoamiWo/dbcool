@@ -86,9 +86,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # W6: 安装生产化闭环任务（告警巡检 + 定时备份 + 租户配额清理）
     try:
-        from nocobase_py.services.scheduler import get_scheduler, install_default_alert_checks
         from nocobase_py.services import backup as backup_service
         from nocobase_py.services.llm_cache import LLMCache
+        from nocobase_py.services.scheduler import get_scheduler, install_default_alert_checks
 
         # PHASE100 T6: 告警持久化 —— 初始化全局 AlertStore 并 attach 到 collector。
         # 此前 get_store() 无人调用，告警只进内存 deque，重启即丢。
@@ -108,7 +108,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         alert_webhook_secret = os.environ.get("ALERT_WEBHOOK_SECRET", "")
         if alert_webhook_url:
             try:
-                from nocobase_py.services.webhook import WebhookConfig, WebhookPusher, install_pusher
+                from nocobase_py.services.webhook import (
+                    WebhookConfig,
+                    WebhookPusher,
+                    install_pusher,
+                )
 
                 pusher = WebhookPusher(WebhookConfig(
                     url=alert_webhook_url,
@@ -145,8 +149,9 @@ def _reset_quotas() -> None:
     """每日重置所有租户配额（调用 QuotaService.reset_daily）。"""
     try:
         import asyncio
-        from nocobase_py.services.quota import QuotaService
+
         from nocobase_py.redis_client import get_redis
+        from nocobase_py.services.quota import QuotaService
 
         async def _do():
             redis = await get_redis()

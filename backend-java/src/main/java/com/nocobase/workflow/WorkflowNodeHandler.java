@@ -1,7 +1,5 @@
 package com.nocobase.workflow;
 
-import com.nocobase.event.RecordChangeEvent;
-import java.util.Map;
 
 /**
  * 工作流节点处理器(Week 41 D4b — 节点策略化).

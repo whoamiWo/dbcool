@@ -89,16 +89,16 @@ def _ensure_dir() -> Path:
 
 def _postgres_dump() -> bytes:
     """备份 PostgreSQL 主库（pg_dump -Fc 自定义格式）。
-    
+
     fail-closed：备份失败时抛出异常，禁止静默返回空值后误报「备份成功」。
     连接参数全部来自环境变量，支持容器内（POSTGRES_HOST=postgres）和本地（localhost）。
     """
     if not _POSTGRES_DB:
-        raise RuntimeError("POSTGRES_DB not configured; cannot backup PostgreSQL")
-    
+        raise RuntimeError("POSTGRES_DB not configured; cannot backup PostgreSQL") from None
+
     env = os.environ.copy()
     env["PGPASSWORD"] = _POSTGRES_PASSWORD
-    
+
     try:
         result = subprocess.run(
             [
@@ -115,7 +115,7 @@ def _postgres_dump() -> bytes:
             env=env,
         )
         if result.returncode == 0 and result.stdout:
-            logger.info("[backup] pg_dump success: host=%s port=%s db=%s", 
+            logger.info("[backup] pg_dump success: host=%s port=%s db=%s",
                        _POSTGRES_HOST, _POSTGRES_PORT, _POSTGRES_DB)
             return result.stdout
         raise RuntimeError(f"pg_dump returned empty output: {result.stderr.decode()}")
@@ -124,9 +124,9 @@ def _postgres_dump() -> bytes:
         logger.error("[backup] pg_dump failed: %s", error_msg)
         raise RuntimeError(f"pg_dump failed: {error_msg}") from e
     except FileNotFoundError:
-        raise RuntimeError("pg_dump not found; cannot backup PostgreSQL")
+        raise RuntimeError("pg_dump not found; cannot backup PostgreSQL") from None
     except subprocess.TimeoutExpired:
-        raise RuntimeError("pg_dump timed out after 120s")
+        raise RuntimeError("pg_dump timed out after 120s") from None
     except Exception as e:
         logger.error("[backup] PostgreSQL backup failed: %s", e)
         raise
@@ -143,11 +143,11 @@ def _redis_snapshot() -> bytes:
     """
     if not _settings.redis_enabled:
         raise RuntimeError("Redis is not enabled (redis_enabled=false); cannot take snapshot")
-    
+
     env = os.environ.copy()
     if _REDIS_PASSWORD:
         env["REDISCLI_AUTH"] = _REDIS_PASSWORD
-    
+
     try:
         # 先触发持久化（SAVE）
         save_result = subprocess.run(
@@ -158,7 +158,7 @@ def _redis_snapshot() -> bytes:
         )
         if save_result.returncode != 0:
             raise RuntimeError(f"redis-cli SAVE failed: {save_result.stderr.decode()}")
-        
+
         # 直连方式：redis-cli --rdb 输出二进制
         result = subprocess.run(
             ["redis-cli", "-h", _REDIS_HOST, "-p", str(_REDIS_PORT), "--rdb", "-"],
@@ -170,15 +170,15 @@ def _redis_snapshot() -> bytes:
         if result.returncode == 0 and result.stdout:
             logger.info("[backup] redis snapshot via --rdb: %s:%s", _REDIS_HOST, _REDIS_PORT)
             return result.stdout
-        raise RuntimeError("redis-cli --rdb returned empty data")
+        raise RuntimeError("redis-cli --rdb returned empty data") from None
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.decode() if e.stderr else str(e)
         logger.error("[backup] redis snapshot failed: %s", error_msg)
         raise RuntimeError(f"redis snapshot failed: {error_msg}") from e
     except FileNotFoundError:
-        raise RuntimeError("redis-cli not found; cannot backup Redis")
+        raise RuntimeError("redis-cli not found; cannot backup Redis") from None
     except subprocess.TimeoutExpired:
-        raise RuntimeError("redis snapshot timed out")
+        raise RuntimeError("redis snapshot timed out") from None
     except Exception as e:
         logger.error("[backup] Redis snapshot failed: %s", e)
         raise
@@ -186,9 +186,9 @@ def _redis_snapshot() -> bytes:
 
 def _backup_media() -> tuple[list[tuple[str, bytes]], list[str]]:
     """备份媒体资产（MinIO 对象或本地目录）。
-    
+
     返回：([(path, bytes), ...], warnings)
-    
+
     策略：
     - 如果 MINIO_ENABLED=true：用 minio SDK 下载对象
     - 否则如果 _MEDIA_DIR.exists()：打包本地目录
@@ -196,14 +196,14 @@ def _backup_media() -> tuple[list[tuple[str, bytes]], list[str]]:
     """
     files: list[tuple[str, bytes]] = []
     warnings: list[str] = []
-    
+
     if _MINIO_ENABLED:
         # PHASE114 加固: 启用 MinIO 但缺对象存储凭据时 fail fast（不再回落到弱口令）。
         if not _MINIO_SECRET_KEY:
             raise RuntimeError(
                 "MINIO_ENABLED=true 但 MINIO_ROOT_PASSWORD 未设置；"
                 "对象存储凭据必须显式注入，禁止使用硬编码弱口令兜底"
-            )
+            ) from None
         # MinIO 模式：下载所有对象
         try:
             from minio import Minio
@@ -215,11 +215,11 @@ def _backup_media() -> tuple[list[tuple[str, bytes]], list[str]]:
                 secret_key=_MINIO_SECRET_KEY,
                 secure=_MINIO_ENDPOINT.startswith("https://"),
             )
-            
+
             objects = client.list_objects(_MINIO_BUCKET, prefix=_MINIO_PREFIX, recursive=True)
             count = 0
             total_bytes = 0
-            
+
             for obj in objects:
                 try:
                     data = client.get_object(_MINIO_BUCKET, obj.object_name).read()
@@ -230,20 +230,20 @@ def _backup_media() -> tuple[list[tuple[str, bytes]], list[str]]:
                     total_bytes += len(data)
                 except S3Error as e:
                     warnings.append(f"minio object {obj.object_name}: {e}")
-            
+
             if count > 0:
                 logger.info("[backup] minio media: %d objects, %d bytes", count, total_bytes)
             else:
                 warnings.append("minio bucket empty or no objects with prefix")
-                
+
         except ImportError:
             warnings.append("minio SDK not installed; cannot backup MinIO objects")
         except Exception as e:
             warnings.append(f"minio backup failed: {e}")
-    
+
     elif _MEDIA_DIR.exists():
         # 本地目录模式
-        for root, dirs, filenames in os.walk(_MEDIA_DIR):
+        for root, _dirs, filenames in os.walk(_MEDIA_DIR):
             for filename in filenames:
                 file_path = Path(root) / filename
                 rel_path = file_path.relative_to(_MEDIA_DIR)
@@ -252,34 +252,34 @@ def _backup_media() -> tuple[list[tuple[str, bytes]], list[str]]:
                     files.append((f"media/{rel_path}", data))
                 except Exception as e:
                     warnings.append(f"media file {rel_path}: {e}")
-        
+
         if files:
             logger.info("[backup] local media: %d files, %d bytes", len(files), sum(len(d) for _, d in files))
         else:
             warnings.append("media directory exists but contains no files")
-    
+
     else:
         # 既不是 MinIO 也没有本地目录
         warnings.append("media: source not available (MinIO disabled and media dir does not exist)")
-    
+
     return files, warnings
 
 
 def _restore_postgres(dump_bytes: bytes) -> bool:
     """恢复 PostgreSQL 主库（pg_restore 或 psql）。
-    
+
     返回 True 表示恢复成功。
     """
     if not _POSTGRES_DB:
-        raise RuntimeError("POSTGRES_DB not configured; cannot restore PostgreSQL")
-    
+        raise RuntimeError("POSTGRES_DB not configured; cannot restore PostgreSQL") from None
+
     env = os.environ.copy()
     env["PGPASSWORD"] = _POSTGRES_PASSWORD
-    
+
     # 先清空数据库（可选，视恢复策略而定）
     try:
         subprocess.run(
-            ["psql", "-h", _POSTGRES_HOST, "-p", _POSTGRES_PORT, 
+            ["psql", "-h", _POSTGRES_HOST, "-p", _POSTGRES_PORT,
              "-U", _POSTGRES_USER, "-d", _POSTGRES_DB,
              "-c", "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"],
             env=env,
@@ -288,7 +288,7 @@ def _restore_postgres(dump_bytes: bytes) -> bool:
         )
     except Exception as e:
         logger.warning("[restore] schema reset failed (may not exist): %s", e)
-    
+
     # 使用 pg_restore 恢复自定义格式 dump
     try:
         proc = subprocess.Popen(
@@ -307,7 +307,7 @@ def _restore_postgres(dump_bytes: bytes) -> bool:
         raise RuntimeError(f"pg_restore failed: {stderr.decode()}")
     except subprocess.TimeoutExpired:
         proc.kill()
-        raise RuntimeError("pg_restore timed out after 120s")
+        raise RuntimeError("pg_restore timed out after 120s") from None
     except Exception as e:
         logger.error("[restore] PostgreSQL restore failed: %s", e)
         raise
@@ -368,7 +368,7 @@ def create_backup() -> dict[str, Any]:
 
     返回：
         backup_id, path, size_bytes, components, warnings, manifest, created_at
-    
+
     PHASE 58 P0-1：新增 PostgreSQL 主库备份，关键组件失败时整体失败。
     PHASE 68 P0: 不再静默跳过缺失组件；显式 WARN + manifest。
     """
@@ -376,13 +376,13 @@ def create_backup() -> dict[str, Any]:
     backup_id = f"backup_{stamp}"
     out_name = f"{backup_id}.tar.gz"
     out_path = _ensure_dir() / out_name
-    
+
     components: list[str] = []
     warnings: list[str] = []
     manifest_entries: dict[str, Any] = {}
     postgres_bytes: bytes | None = None
     rdb_bytes: bytes | None = None
-    
+
     # 1. PostgreSQL 主库（关键组件，失败则整体失败）
     try:
         postgres_bytes = _postgres_dump()
@@ -391,7 +391,7 @@ def create_backup() -> dict[str, Any]:
     except Exception as e:
         logger.error("[backup] PostgreSQL backup FAILED: %s", e)
         raise RuntimeError(f"PostgreSQL backup failed (critical): {e}") from e
-    
+
     # 2. SQLite 数据库文件（alerts.db 等）
     sqlite_count = 0
     sqlite_bytes = 0
@@ -403,18 +403,18 @@ def create_backup() -> dict[str, Any]:
             w = f"sqlite: source file not found: {db_path}"
             warnings.append(w)
             logger.warning("[backup] %s", w)
-    
+
     if sqlite_count > 0:
         manifest_entries["sqlite"] = {"files": sqlite_count, "bytes": sqlite_bytes}
-    
+
     # 3. 媒体资产（MinIO 或本地目录）
     media_files, media_warnings = _backup_media()
     warnings.extend(media_warnings)
-    
+
     if media_files:
         media_bytes = sum(len(d) for _, d in media_files)
         manifest_entries["media"] = {"files": len(media_files), "bytes": media_bytes}
-    
+
     # 4. Redis 快照（关键组件）
     try:
         rdb_bytes = _redis_snapshot()
@@ -423,7 +423,7 @@ def create_backup() -> dict[str, Any]:
     except Exception as e:
         logger.error("[backup] Redis backup FAILED: %s", e)
         raise RuntimeError(f"Redis backup failed (critical): {e}") from e
-    
+
     # 5. 写入 tar 包
     with tarfile.open(out_path, "w:gz") as tar:
         # PostgreSQL
@@ -436,14 +436,14 @@ def create_backup() -> dict[str, Any]:
             tar.addfile(ti, pg_file)
             components.append("postgresql")
             logger.info("[backup] added postgresql/dump.pg (%d bytes)", len(postgres_bytes))
-        
+
         # SQLite
         for db_path in _SQLITE_PATHS:
             if db_path.exists():
                 tar.add(db_path, arcname=f"sqlite/{db_path.name}")
                 components.append("sqlite")
                 logger.info("[backup] added sqlite/%s", db_path.name)
-        
+
         # Media
         for arc_path, data in media_files:
             import io
@@ -454,7 +454,7 @@ def create_backup() -> dict[str, Any]:
         if media_files:
             components.append("media")
             logger.info("[backup] added media/ (%d files, %d bytes)", len(media_files), sum(len(d) for _, d in media_files))
-        
+
         # Redis
         if rdb_bytes:
             import io
@@ -465,7 +465,7 @@ def create_backup() -> dict[str, Any]:
             tar.addfile(ti, rdb_file)
             components.append("redis")
             logger.info("[backup] added redis/dump.rdb (%d bytes)", len(rdb_bytes))
-        
+
         # Manifest
         manifest_entries["backup_id"] = backup_id
         manifest_entries["created_at"] = datetime.now(UTC).isoformat()
@@ -477,10 +477,10 @@ def create_backup() -> dict[str, Any]:
         ti.size = len(manifest_bytes)
         ti.mtime = time.time()
         tar.addfile(ti, io.BytesIO(manifest_bytes))
-    
+
     size = out_path.stat().st_size
     logger.info("[backup] created %s (%d bytes, components=%s, warnings=%s)", out_path, size, components, warnings)
-    
+
     return {
         "backup_id": backup_id,
         "path": str(out_path),
@@ -522,14 +522,14 @@ def _safe_extract(tar: tarfile.TarFile, member: tarfile.TarInfo, path: str = "."
       3. 拒绝特殊文件（设备、FIFO）
     """
     if member.issym() or member.islnk():
-        raise RuntimeError(f"[restore] 拒绝解包链接成员（防路径穿越）: {member.name}")
+        raise RuntimeError(f"[restore] 拒绝解包链接成员（防路径穿越）: {member.name}") from None
     if member.isdev():
-        raise RuntimeError(f"[restore] 拒绝解包设备文件: {member.name}")
+        raise RuntimeError(f"[restore] 拒绝解包设备文件: {member.name}") from None
 
     dest_abs = Path(path).resolve()
     target = (dest_abs / member.name).resolve()
     if target != dest_abs and not str(target).startswith(str(dest_abs) + os.sep):
-        raise RuntimeError(f"[restore] 拒绝解包越界成员（防路径穿越）: {member.name} -> {target}")
+        raise RuntimeError(f"[restore] 拒绝解包越界成员（防路径穿越）: {member.name} -> {target}") from None
 
     tar.extract(member, path=path)
     return str(target)
@@ -626,7 +626,7 @@ def restore_backup(backup_id: str, dry_run: bool = False) -> dict[str, Any]:
         w = f"pre-restore snapshot FAILED (continue anyway): {e}"
         warnings.append(w)
         logger.warning("[restore] %s", w)
-    
+
     with tarfile.open(backup_path, "r:gz") as tar:
         members = tar.getmembers()
         for m in members:
@@ -654,7 +654,7 @@ def restore_backup(backup_id: str, dry_run: bool = False) -> dict[str, Any]:
                 # 读取 manifest 用于验证
                 data = tar.extractfile(m)
                 if data:
-                    manifest = json.loads(data.read().decode("utf-8"))
+                    json.loads(data.read().decode("utf-8"))
                     # 可以在此处验证组件完整性
 
     # 恢复 PostgreSQL（关键组件，失败则整体失败）

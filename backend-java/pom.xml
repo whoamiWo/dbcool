@@ -245,6 +245,28 @@
                 </configuration>
             </plugin>
 
+            <!-- PHASE131: Java 静态检查（三栈 lint 之 Java 侧） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <configLocation>checkstyle.xml</configLocation>
+                    <consoleOutput>true</consoleOutput>
+                    <failsOnError>true</failsOnError>
+                    <!-- 仅 error 级别违规阻断；规则集当前全部为 error 且项目已合规 -->
+                    <violationSeverity>error</violationSeverity>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle-check</id>
+                        <phase>validate</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Week 19: JaCoCo 覆盖率 + 红线 -->
             <plugin>
                 <groupId>org.jacoco</groupId>

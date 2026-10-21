@@ -2,8 +2,6 @@ package com.nocobase.project;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.event.RecordChangeEvent;
-import com.nocobase.project.CardChecklistItemEntity;
-import com.nocobase.project.CardChecklistItemRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

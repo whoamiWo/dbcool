@@ -15,11 +15,9 @@ import logging
 import time
 import uuid
 from collections import deque
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 

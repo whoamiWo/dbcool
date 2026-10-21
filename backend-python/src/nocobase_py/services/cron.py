@@ -22,7 +22,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 
 @dataclass
@@ -37,7 +37,7 @@ class CronSchedule:
     raw: str
 
     def matches(self, dt: datetime | None = None) -> bool:
-        dt = dt or datetime.now(timezone.utc)
+        dt = dt or datetime.now(UTC)
         return (
             dt.minute in self.minutes
             and dt.hour in self.hours
@@ -48,7 +48,7 @@ class CronSchedule:
 
     def next_fire_after(self, now: datetime | None = None) -> datetime:
         """计算下一次触发时间(简化:扫描未来 366 天)."""
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(UTC)
         # 替换秒/微秒为 0
         candidate = now.replace(second=0, microsecond=0)
         for _ in range(366 * 24 * 60):
@@ -60,7 +60,7 @@ class CronSchedule:
 
     def seconds_until_next(self, now: datetime | None = None) -> float:
         next_fire = self.next_fire_after(now)
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(UTC)
         return max(0.0, (next_fire - now).total_seconds())
 
 

@@ -1,7 +1,6 @@
 package com.nocobase.auth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.nocobase.auth.RoleName;
 import com.nocobase.audit.AuditService;
 import com.nocobase.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.tags.Tag;

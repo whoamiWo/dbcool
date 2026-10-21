@@ -2,7 +2,6 @@ package com.nocobase.apikey;
 
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import com.nocobase.tenant.TenantContext;
 import java.time.Instant;
 import java.util.List;

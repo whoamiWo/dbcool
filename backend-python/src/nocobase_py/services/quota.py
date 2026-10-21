@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import calendar
-import json
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 from nocobase_py.redis_client import get_redis
 
@@ -56,8 +55,8 @@ class QuotaService:
         now = time.time()
         redis = await get_redis()
 
-        daily_key = self._daily_key(user_id)
-        monthly_key = self._monthly_key(user_id)
+        self._daily_key(user_id)
+        self._monthly_key(user_id)
 
         # 获取当前配额
         d = await self._get_daily(redis, user_id)

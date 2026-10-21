@@ -2,12 +2,9 @@ package com.nocobase.auth;
 
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;

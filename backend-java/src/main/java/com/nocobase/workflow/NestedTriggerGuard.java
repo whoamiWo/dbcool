@@ -1,7 +1,5 @@
 package com.nocobase.workflow;
 
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 嵌套触发器守卫(Week 42 D4b.2 — R08 死循环防护第 3 道).

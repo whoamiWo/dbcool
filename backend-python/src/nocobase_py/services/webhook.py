@@ -23,7 +23,6 @@ import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-
 logger = logging.getLogger(__name__)
 
 # 签名 header 名(兼容 Slack/通用 webhook 命名)
@@ -36,10 +35,7 @@ def compute_signature(secret: str, body: bytes, timestamp: str | None = None) ->
 
     格式:`sha256=<hex>`.可选 timestamp 防重放(拼到 body 前).
     """
-    if timestamp:
-        msg = timestamp.encode("utf-8") + b"." + body
-    else:
-        msg = body
+    msg = timestamp.encode("utf-8") + b"." + body if timestamp else body
     digest = hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
@@ -251,9 +247,7 @@ class BatchWebhookPusher:
         should_flush = False
         with self._lock:
             self._buffer.append(event)
-            if len(self._buffer) >= self.config.batch_size:
-                should_flush = True
-            elif (
+            if len(self._buffer) >= self.config.batch_size or (
                 time.monotonic() - self._last_flush
             ) >= self.config.batch_window_seconds:
                 should_flush = True

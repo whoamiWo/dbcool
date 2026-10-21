@@ -1,6 +1,5 @@
 package com.nocobase.automation;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.automation.entity.AutomationExecutionEntity;
 import com.nocobase.automation.entity.AutomationRuleEntity;
@@ -9,7 +8,6 @@ import com.nocobase.automation.repository.AutomationRuleRepository;
 import com.nocobase.meta.CollectionService;
 import com.nocobase.notification.NotificationService;
 import com.nocobase.notification.WebhookDispatcher;
-import com.nocobase.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;

@@ -1,7 +1,5 @@
 package com.nocobase.config;
 
-import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;

@@ -1,6 +1,5 @@
 package com.nocobase.webhook;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.config.AsyncTask;
 import com.nocobase.config.AsyncTaskPublishException;
 import com.nocobase.config.AsyncTaskPublisher;
@@ -10,7 +9,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;

@@ -1,7 +1,6 @@
 package com.nocobase.compliance;
 
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
-import com.nocobase.auth.RoleName;
 import com.nocobase.audit.AuditService;
 import com.nocobase.userdata.UserDataErasureRequest;
 import com.nocobase.userdata.UserDataExport;

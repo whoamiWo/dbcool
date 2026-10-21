@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import sqlite3
@@ -22,7 +23,6 @@ import time
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -298,8 +298,6 @@ def reset_store_for_tests() -> None:
     """测试辅助:重置全局单例."""
     global _store
     if _store is not None:
-        try:
+        with contextlib.suppress(Exception):  # noqa: BLE001
             _store.close()
-        except Exception:  # noqa: BLE001
-            pass
     _store = None

@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Header, HTTPException, status
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
@@ -33,9 +33,6 @@ def _decode_token(token: str) -> dict | None:
         # 必须为 access token
         if payload.get("typ") != "access":
             return None
-        return payload
-    except JWTError:
-        return None
         return payload
     except JWTError:
         return None

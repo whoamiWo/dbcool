@@ -1,8 +1,8 @@
 """文档模型 — 用于 RAG 检索的向量存储."""
 
-from sqlalchemy import Column, String, Text, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, FLOAT
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import Column, ForeignKey, String, Text, text
+from sqlalchemy.dialects.postgresql import ARRAY, FLOAT, UUID
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
@@ -19,7 +19,7 @@ class Document(Base):
     # 向量列：PostgreSQL pgvector 需要 vector 类型
     # 注意：实际使用时需确保 pgvector 扩展已启用
     embedding = Column(ARRAY(FLOAT), nullable=True)  # 临时用 ARRAY，后期迁移至 vector
-    
+
     # 时间戳
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)

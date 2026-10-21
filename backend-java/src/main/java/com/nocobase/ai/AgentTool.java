@@ -1,7 +1,6 @@
 package com.nocobase.ai;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Agent 工具接口（SPI）。

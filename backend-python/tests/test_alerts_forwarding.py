@@ -1,9 +1,6 @@
 """PHASE104 T9: 告警二次推送 + 重试逻辑测试."""
 
-import logging
 from unittest import mock
-
-import pytest
 
 from nocobase_py.routers import alerts as alerts_router
 
@@ -68,9 +65,11 @@ class TestForwardWithRetry:
     def test_all_attempts_fail_logs_warning(self):
         pusher = mock.MagicMock()
         pusher.push.return_value = False
-        with mock.patch.object(alerts_router.time, "sleep"):
-            with mock.patch.object(alerts_router.logger, "warning") as warn:
-                alerts_router._forward_alert_with_retry(pusher, {"kind": "k"}, max_attempts=3)
+        with (
+            mock.patch.object(alerts_router.time, "sleep"),
+            mock.patch.object(alerts_router.logger, "warning") as warn,
+        ):
+            alerts_router._forward_alert_with_retry(pusher, {"kind": "k"}, max_attempts=3)
         assert pusher.push.call_count == 3
         # 重试耗尽必须留下 WARN 日志（不得静默）
         assert warn.called
@@ -94,9 +93,11 @@ class TestForwardWithRetry:
 
     def test_webhook_endpoint_persists_and_returns(self):
         """端点本身：落盘 + 返回 received 计数."""
-        import tempfile, os
+        import os
+        import tempfile
         os.chdir(tempfile.mkdtemp())
         from fastapi.testclient import TestClient
+
         from nocobase_py.main import create_app
 
         client = TestClient(create_app())

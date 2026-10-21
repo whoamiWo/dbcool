@@ -3,7 +3,6 @@ package com.nocobase.im;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.im.entity.ImChannelEntity;
-import com.nocobase.im.entity.ImChannelMemberEntity;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
