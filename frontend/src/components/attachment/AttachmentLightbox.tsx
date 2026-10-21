@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogTitle,
@@ -19,6 +20,7 @@ interface AttachmentLightboxProps {
 }
 
 export function AttachmentLightbox({ open, onClose, storageKey }: AttachmentLightboxProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +79,7 @@ export function AttachmentLightbox({ open, onClose, storageKey }: AttachmentLigh
         </Typography>
         <IconButton
           onClick={handleClose}
+          aria-label={t("common.close")}
           sx={{ color: "white", "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}
         >
           <X size={20} />
@@ -104,6 +107,7 @@ export function AttachmentLightbox({ open, onClose, storageKey }: AttachmentLigh
           </Box>
         )}
         {previewUrl && !error && (
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onLoad/onError 是图片生命周期事件，非交互事件
           <img
             src={previewUrl}
             alt={filename}

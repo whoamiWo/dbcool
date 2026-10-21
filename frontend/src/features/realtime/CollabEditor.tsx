@@ -145,6 +145,11 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
   const [error, setError] = useState<string | null>(null);
   // PHASE127: 冲突检测 —— 记录进入编辑时的基准文本与最近一次远端文本
   const [localOriginalText, setLocalOriginalText] = useState(initialContent);
+  // 订阅 effect 经 ref 读取，避免把 state 加入依赖导致重复订阅
+  const localOriginalTextRef = useRef(localOriginalText);
+  useEffect(() => {
+    localOriginalTextRef.current = localOriginalText;
+  }, [localOriginalText]);
   const [remoteText, setRemoteText] = useState<string | undefined>(undefined);
   const [conflictTick, setConflictTick] = useState(0);
 
@@ -184,7 +189,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
     };
     ydoc.on('update', handler);
     return () => ydoc.off('update', handler);
-  }, [ydoc, docId]);
+  }, [ydoc, docId, t]);
 
   // Subscribe to remote updates + join/leave room
   useEffect(() => {
@@ -205,10 +210,9 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
             const remoteInitial = ytext.toString();
             setText(remoteInitial);
             lastKnownText.current = remoteInitial;
-            // PHASE127: 初始化时比对本地基准与远端
-            setLocalOriginalText(localOriginalText);
+            // PHASE127: 初始化时比对本地基准与远端（经 ref 读取，避免订阅 effect 依赖 state）
             setRemoteText(remoteInitial);
-            if (remoteInitial !== localOriginalText) {
+            if (remoteInitial !== localOriginalTextRef.current) {
               setConflictTick((n) => n + 1);
             }
             applyingRemote.current = false;
@@ -271,7 +275,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
       try { sendCollabLeave(docId); } catch { /* ignore leave errors */ }
       unsub?.();
     };
-  }, [docId, ydoc, ytext, myId]);
+  }, [docId, ydoc, ytext, myId, t]);
 
   /**
    * 本地编辑 → 字符级 diff → 应用到 Y.Text。
@@ -313,7 +317,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
     } finally {
       setSaving(false);
     }
-  }, [onSave, ytext]);
+  }, [onSave, ytext, t]);
 
   return (
     <Box>

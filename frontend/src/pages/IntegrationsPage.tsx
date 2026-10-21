@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -21,7 +21,7 @@ export default function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  const loadIntegrations = async () => {
+  const loadIntegrations = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -36,13 +36,12 @@ export default function IntegrationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t, setLoading, setError, setIntegrations]);
 
-   
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     loadIntegrations();
-  }, []);
+  }, [loadIntegrations]);
 
   const handleInstall = async (id: string) => {
     try {

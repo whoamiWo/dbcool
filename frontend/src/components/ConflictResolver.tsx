@@ -96,9 +96,11 @@ export default function ConflictResolver(props: Props) {
   }, [docId, t]);
 
   // PHASE127: 当 remoteText 变化且与本地不一致时，主动拉取冲突
+  // 说明：fetchConflicts 为 async，内部 setState 均发生在 await 之后，非同步级联渲染
   useEffect(() => {
     if (!remoteText || !localOriginalText) return;
     if (remoteText === localOriginalText) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 异步回调中的 setState，非 effect 体内同步调用
     fetchConflicts();
   }, [remoteText, localOriginalText, fetchConflicts]);
 
