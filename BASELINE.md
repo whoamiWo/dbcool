@@ -285,9 +285,9 @@ docker compose up -d --no-build backend-java
 
 ---
 
-**最后更新**: 2026-10-08（PHASE88）  
+**最后更新**: 2026-10-21（PHASE127 CRDT 版本快照身份归属补全）  
 **维护者**: 三栈开发团队  
-**版本**: 1.1.0
+**版本**: 1.2.0
 
 ---
 
@@ -298,7 +298,7 @@ docker compose up -d --no-build backend-java
 ```bash
 # Java 后端
 cd backend-java && mvn -o test
-# Tests run: 1396, Failures: 0, Errors: 0
+# Tests run: 2242, Failures: 0, Errors: 0
 
 # 前端单元
 cd frontend && npm run test:run
