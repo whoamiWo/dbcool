@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
 [![Backend CI](https://img.shields.io/badge/CI-passing-brightgreen)](./.github/workflows/backend-ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-83%25-brightgreen)](./backend-java/target/site/jacoco/index.html)
-[![Tests](https://img.shields.io/badge/tests-2624%20passing-brightgreen)](#-测试)
+[![Tests](https://img.shields.io/badge/tests-2666%20passing-brightgreen)](#-测试)
 
 ## ✨ 核心能力
 
@@ -118,10 +118,10 @@ dbcool/
 
 ### 测试规模(PHASE117-121 最新实测)
 
-#### Java 后端（2242 tests）
+#### Java 后端（2263 tests）
 
 ```bash
-cd backend-java && mvn test   # ✅ 2242/2242 PASS
+cd backend-java && mvn test   # ✅ 2263/2263 PASS
 ```
 
 | 类型 | 数量 | 说明 |
@@ -287,7 +287,7 @@ add field → 同步 ALTER(小表秒过)
 ## 📈 进度数据
 
 - **后端 Java 源文件**:90+(12 个包)
-- **测试**:2624 全 PASS（Java 2242 + 前端 403）
+- **测试**:2624 全 PASS（Java 2263 + 前端 403）
 - **覆盖率**:83% bundle / 10 条 Jacoco 红线全达标
 - **文档**:30+（规划 ADR 设计 WEEK_*_HANDOFF）
 - **总 commits**:120+（本会话累计）
@@ -296,7 +296,7 @@ add field → 同步 ALTER(小表秒过)
 
 | 门禁 | 结果 |
 |------|------|
-| Java `mvn test` | ✅ 2242/2242 PASS（0F/0E） |
+| Java `mvn test` | ✅ 2263/2263 PASS（0F/0E） |
 | 前端 `npx vitest run` | ✅ 382/382 PASS |
 | 前端 `npx tsc --noEmit` | ✅ 0 errors |
 | 前端 `npx eslint src` | ✅ 0 warnings |
