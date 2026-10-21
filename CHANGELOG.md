@@ -1,3 +1,59 @@
+## Week 43.6 (2026-10-21) — ESLint a11y 警告清零（PHASE128）
+
+> **前端静态门禁归零**：`eslint .` 由「0 error / N warning」收敛为 **0 error / 0 warning**，消除 a11y 与 hooks 依赖两类告警，不改动任何业务行为。
+
+### 1. 告警处置明细
+
+| 文件 | 问题 | 处置 |
+|---|---|---|
+| `ConflictResolver.tsx` | effect 内无意义自赋值 + 重复订阅 | 改用 `ref` 读取，避免冗余依赖 |
+| `AttachmentLightbox.tsx` | 缺 `useTranslation` + `disable` 注释位置错误 | 补 hook 导入，注释移至正确行 |
+| `AttachmentPreview.tsx` | 可点击 `img` 无语义 | 改为 `Box component="button"`，补键盘可达性 |
+| `LivechatWidget.tsx` / `IntegrationsPage.tsx` | 缺 `useCallback` import + 注释被误删 | 补 import，恢复既有 `eslint-disable` 注释 |
+| `BoardView.tsx` | `eslint-disable` 注释丢失 | 恢复注释 |
+| `CollabEditor.tsx` | `t` 依赖不全 + 外部文本同步缺失 | 补全依赖数组，新增 `localOriginalTextRef` 同步 effect |
+
+### 2. 门禁
+
+| 检查 | 结果 |
+|---|---|
+| `eslint .` | ✅ 0 error / 0 warning |
+| `tsc --noEmit` | ✅ 0 error |
+| `vitest run` | ✅ 403/403 |
+| Playwright E2E | ✅ 159/159 |
+
+---
+
+## Week 43.5 (2026-10-21) — 附件预览与 PWA（PHASE126）
+
+> **附件能力闭环 + 可安装离线外壳**：后端补齐字节读取与缩略图生成，前端新增预览/灯箱组件与 PWA 配置，并落地离线提示。
+
+### 1. 后端附件能力
+
+| 项 | 说明 | 涉及文件 |
+|---|---|---|
+| **字节读取 + 缩略图** | `MinioStorageService` 新增字节读取与基于 `ImageIO` 的缩略图生成 | `MinioStorageService.java` |
+| **预览/缩略图端点** | `AttachmentController` 新增 `/preview`、`/thumbnail`，带租户隔离校验 | `AttachmentController.java` |
+
+### 2. 前端预览与 PWA
+
+| 项 | 说明 |
+|---|---|
+| **预览组件** | 新增 `AttachmentPreview`（294 行）+ `AttachmentLightbox`（141 行），支持图片放大查看与非图片类型图标展示 |
+| **渲染接入** | `FormRuntime` / `Table` / `Gallery` 三类视图接入附件渲染 |
+| **PWA** | `vite-plugin-pwa` + manifest + 192/512/maskable/apple-touch 图标 |
+| **离线提示** | 新增 `OfflineBanner` + attachments/offline 相关 i18n key |
+
+### 3. 门禁
+
+| 检查 | 结果 |
+|---|---|
+| `tsc --noEmit` | ✅ 0 error |
+| `vitest run` | ✅ 396/396（当时） |
+| Playwright E2E | ✅ 159/159（新增 24 条附件用例） |
+
+---
+
 ## Week 43.5 (2026-10-21) — CRDT 版本快照身份归属补全（PHASE127）
 
 > **冲突追溯链路闭环**：`crdt_doc_versions` 表的 `user_id` / `tenant_id` 此前恒为 `NULL`，导致冲突检测与回滚无法定位责任人。本次打通 Java → CRDT 服务的身份透传链路。
