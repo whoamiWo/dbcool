@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Box, Typography, Button, Card, IconButton } from "@mui/material";
 import { ImageOff, FileText, Download, Trash2 } from "lucide-react";
 import axios from "axios";
@@ -24,6 +25,7 @@ export function AttachmentPreview({
   onUploadSuccess,
   onUploadError,
 }: AttachmentPreviewProps) {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -111,21 +113,34 @@ export function AttachmentPreview({
   const renderImage = () => {
     if (!thumbnailUrl) return renderPlaceholder();
     return (
-      <img
-        src={thumbnailUrl}
-        alt="thumbnail"
-        loading="lazy"
-        style={{
-          width: sizePx,
-          height: sizePx,
-          objectFit: "cover",
-          borderRadius: 1,
-          border: "1px solid var(--color-border)",
-          cursor: "pointer",
-        }}
-        onError={() => setImgError(true)}
+      <Box
+        component="button"
+        type="button"
+        aria-label={t("attachment.download")}
         onClick={() => handleDownload()}
-      />
+        sx={{
+          p: 0,
+          border: "none",
+          background: "none",
+          cursor: "pointer",
+          lineHeight: 0,
+        }}
+      >
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- img 的 onError 是生命周期事件，非交互事件；交互已由外层 button 承载 */}
+        <img
+          src={thumbnailUrl}
+          alt={t("attachment.thumbnailAlt")}
+          loading="lazy"
+          style={{
+            width: sizePx,
+            height: sizePx,
+            objectFit: "cover",
+            borderRadius: 1,
+            border: "1px solid var(--color-border)",
+          }}
+          onError={() => setImgError(true)}
+        />
+      </Box>
     );
   };
 
@@ -165,7 +180,7 @@ export function AttachmentPreview({
           </Typography>
         </Box>
         {mode === "edit" && (
-          <IconButton size="small" onClick={handleDelete}>
+          <IconButton size="small" onClick={handleDelete} aria-label={t("attachment.delete")}>
             <Trash2 size={14} />
           </IconButton>
         )}

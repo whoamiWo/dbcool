@@ -22,7 +22,7 @@
  * - PHASE98 R4：补齐 4 个图标按钮的 aria-label（入口气泡/最小化/关闭/发送）。
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Minimize2, Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -64,7 +64,7 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const initSession = async () => {
+  const initSession = useCallback(async () => {
     try {
       setError(null);
       const resp = await apiClient.post<{ code: number; data: { sessionId: string } }>(
@@ -87,15 +87,14 @@ export const LivechatWidget: React.FC<LivechatWidgetProps> = ({
       // PHASE98 R1: 原来是 `// 会话初始化失败，静默处理` —— 用户零感知
       setError(t('livechat.initFailed'));
     }
-  };
+  }, [t, setError, setSessionId, setMessages]);
 
   // 初始化会话
-   
   useEffect(() => {
     if (!enabled) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
     initSession();
-  }, [enabled]);
+  }, [enabled, initSession]);
 
   // 自动滚动到底部
   useEffect(() => {

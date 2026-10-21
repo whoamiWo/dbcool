@@ -68,7 +68,7 @@ export function BoardView({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   // 挂载 / projectId 变化时加载数据。
   // 注意：此前 loadData 定义后从未被调用，组件会永远停留在 loading 态（坏死代码的典型症状）。
