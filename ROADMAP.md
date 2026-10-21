@@ -136,11 +136,11 @@ Cline 角色:
 - ✅ **33 个 P0 全完成（33/33 = 100%）—— 终止判定以此为准**
   - （P1 13 个当前 5 done / 2 partial / 5 not-started；**P1 非终止条件** ——
     其在 `USER_STORIES.md` 中定义为「强烈推荐、非必做」，移入后续版本）
+- ✅ **三栈 lint 0 错误**：前端 eslint ✅；Java checkstyle ✅（`checkstyle.xml` + pom 插件，2263/0E）；Python ruff ✅（61 passed, 1 skipped，精确豁免 B008/N815/raises-require-match-for）
+- ✅ **ADR 011 已索引**：补入 `ADR/README.md`，并增加 `IMPLEMENTED` 状态，011 回填
 - ❌ BASELINE 指标未全达标：前端覆盖率 **44.33%**（要求 >80%）、主包 **541KB**（要求 <500KB）、
   API **P95 298ms**（要求 <200ms，即便 50VU 安全区也未达）
-- ⚠️ 三栈 lint：前端 eslint **0 error / 0 warning** ✅；**Java 与 Python 均无 lint 工具配置**
 - ⚠️ 200 并发：失败率 **0%** ✅，但 P95 **1.13s** / P99 **1.43s** 超 SLA，官方结论标「❌ 延迟激增」
-- ⚠️ ADR：001-008 + 010 已落地；**011 未列入 `ADR/README.md` 索引**；状态字段无「已实施」档位
 
 > **终止标准修订（2026-10-22）**：P1 移出终止条件 —— 其在 `USER_STORIES.md` 中定义为
 > 「强烈推荐、非必做」，将其列为终止条件是标准定错，而非项目未达标。终止判定改以 **P0 全完成** 为准。

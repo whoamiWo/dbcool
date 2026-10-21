@@ -13,6 +13,7 @@
 |---|---|
 | PROPOSED | 已提出,等待评审 |
 | ACCEPTED | 已接受,正在执行 |
+| IMPLEMENTED | 已实施,已在代码库落地并有实测证据 |
 | DEPRECATED | 已被新决策取代 |
 | SUPERSEDED-BY-NNN | 被编号 NNN 的 ADR 取代 |
 
@@ -29,3 +30,4 @@
 | [007](./007-multitenancy.md) | 多租户采用 Schema 隔离 | ACCEPTED | 全部 |
 | [008](./008-plugin-system.md) | 插件系统采用 Java SPI + REST Hook | ACCEPTED | 全部 |
 | [010](./010-bugs-fixed.md) | Week 0~9 期间修复的真实 Bug 清单(8 个) | ACCEPTED | 全部 |
+| [011](./011-lint-tools-config.md) | 三栈 Lint 工具配置（Java Checkstyle + Python Ruff + ESLint） | IMPLEMENTED | 全部 |
