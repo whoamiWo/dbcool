@@ -73,8 +73,9 @@ public class CrdtConflictController {
             return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "Invalid docId"));
         }
 
-        // 调用 CRDT 服务获取版本历史
-        Map<String, Object> crdtResp = realtimeService.fetchConflicts(docId, since);
+        // 调用 CRDT 服务获取版本历史（透传操作者身份，未来可用于权限过滤）
+        Map<String, Object> crdtResp = realtimeService.fetchConflicts(
+                docId, since, user.userId(), user.tenantId());
         if (crdtResp == null) {
             return ResponseEntity.status(503).body(Map.of("code", 503, "message", "CRDT service unavailable"));
         }
@@ -134,8 +135,9 @@ public class CrdtConflictController {
             return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "Version must be >= 1"));
         }
 
-        // 调用 CRDT 服务回滚
-        Map<String, Object> crdtResp = realtimeService.rollbackToVersion(docId, targetVersion);
+        // 调用 CRDT 服务回滚（透传操作者身份，用于版本快照归属）
+        Map<String, Object> crdtResp = realtimeService.rollbackToVersion(
+                docId, targetVersion, user.userId(), user.tenantId());
         if (crdtResp == null) {
             return ResponseEntity.status(503).body(Map.of("code", 503, "message", "CRDT service unavailable"));
         }

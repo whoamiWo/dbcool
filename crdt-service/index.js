@@ -113,7 +113,14 @@ async function getDocument(docId) {
  * 应用增量并持久化
  * 返回新的完整状态（Base64）供广播给其他客户端
  */
-async function applyUpdate(docId, updateBase64) {
+/**
+ * 应用增量并持久化文档状态。
+ * @param {string} docId
+ * @param {string} updateBase64
+ * @param {string} userId - 当前操作者 UUID（可为空字符串表示匿名）
+ * @param {string} tenantId - 租户标识（可为空字符串）
+ */
+async function applyUpdate(docId, updateBase64, userId = '', tenantId = '') {
   if (!updateBase64) {
     throw new Error('Missing update');
   }
@@ -153,9 +160,9 @@ async function applyUpdate(docId, updateBase64) {
   try {
     await pool.query(`
       INSERT INTO crdt_doc_versions (doc_id, version, state, user_id, tenant_id)
-      VALUES ($1, $2, $3, NULL, NULL)
+      VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''))
       ON CONFLICT (doc_id, version) DO NOTHING
-    `, [docId, newVersion, Buffer.from(stateBytes)]);
+    `, [docId, newVersion, Buffer.from(stateBytes), userId, tenantId]);
   } catch (snapErr) {
     console.warn(`[CRDT] 版本快照写入失败（不阻断主流程）: ${snapErr.message}`);
   }
@@ -214,14 +221,14 @@ app.get('/docs/:docId/state', async (req, res) => {
 app.post('/docs/:docId/update', async (req, res) => {
   try {
     const { docId } = req.params;
-    const { update } = req.body;
+    const { update, userId, tenantId } = req.body;
 
     if (!update) {
       return res.status(400).json({ error: 'Missing update' });
     }
 
     // 服务端合并：应用增量 → 持久化 → 返回新状态
-    const { version } = await applyUpdate(docId, update);
+    const { version } = await applyUpdate(docId, update, userId, tenantId);
 
     // 返回完整新状态（供广播给其他客户端）
     const { state } = await getDocumentState(docId);
@@ -341,7 +348,8 @@ app.get('/docs/:docId/conflicts', async (req, res) => {
 app.post('/docs/:docId/rollback', async (req, res) => {
   try {
     const { docId } = req.params;
-    const targetVersion = Number.parseInt(String(req.body?.version), 10);
+    const { version: versionRaw, userId, tenantId } = req.body;
+    const targetVersion = Number.parseInt(String(versionRaw), 10);
 
     if (!Number.isFinite(targetVersion) || targetVersion < 1) {
       return res.status(400).json({ error: 'Invalid version' });
@@ -371,9 +379,9 @@ app.post('/docs/:docId/rollback', async (req, res) => {
 
     await pool.query(`
       INSERT INTO crdt_doc_versions (doc_id, version, state, user_id, tenant_id)
-      VALUES ($1, $2, $3, NULL, NULL)
+      VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''))
       ON CONFLICT (doc_id, version) DO NOTHING
-    `, [docId, newVersion, restored]);
+    `, [docId, newVersion, restored, userId, tenantId]);
 
     res.json({
       docId,

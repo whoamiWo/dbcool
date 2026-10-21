@@ -116,7 +116,7 @@ public class RealtimeService {
      */
     public long applyUpdate(String docId, String tenantId, UUID userId, String updateBase64) {
         // P2-5: 调用 CRDT 服务服务端合并
-        String mergedStateBase64 = callCrdtService(docId, updateBase64);
+        String mergedStateBase64 = callCrdtService(docId, updateBase64, tenantId, userId);
         if (mergedStateBase64 == null) {
             // 降级：CRDT 服务不可用，回退增量透传
             log.warn("[Realtime] CRDT 服务不可达，回退增量透传模式");
@@ -149,11 +149,15 @@ public class RealtimeService {
      * 调用 CRDT 服务完成服务端合并。
      * @return 合并后的完整状态 (Base64)，失败返回 null
      */
-    private String callCrdtService(String docId, String updateBase64) {
+    private String callCrdtService(String docId, String updateBase64, String tenantId, UUID userId) {
         try {
             Map<String, String> response = crdtWebClient.post()
                     .uri("/docs/{docId}/update", docId)
-                    .bodyValue(Map.of("update", updateBase64))
+                    .bodyValue(Map.of(
+                            "update", updateBase64 == null ? "" : updateBase64,
+                            "userId", userId == null ? "" : userId.toString(),
+                            "tenantId", tenantId == null ? "" : tenantId
+                    ))
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block(java.time.Duration.ofSeconds(5));
@@ -211,7 +215,7 @@ public class RealtimeService {
      * @return CRDT 服务返回的 JSON Map（含 currentVersion/conflicting/versions），
      *         若 CRDT 服务不可用返回 null
      */
-    public Map<String, Object> fetchConflicts(String docId, Long since) {
+    public Map<String, Object> fetchConflicts(String docId, Long since, UUID userId, String tenantId) {
         if (crdtWebClient == null) {
             log.warn("[Realtime] CRDT 服务未配置，无法查询冲突");
             return null;
@@ -246,7 +250,7 @@ public class RealtimeService {
      * @return CRDT 服务返回的 JSON Map（含 version/rolledBackFrom/state），
      *         若 CRDT 服务不可用返回 null
      */
-    public Map<String, Object> rollbackToVersion(String docId, int targetVersion) {
+    public Map<String, Object> rollbackToVersion(String docId, int targetVersion, UUID userId, String tenantId) {
         if (crdtWebClient == null) {
             log.warn("[Realtime] CRDT 服务未配置，无法回滚");
             return null;
@@ -254,7 +258,11 @@ public class RealtimeService {
         try {
             Map<String, Object> response = crdtWebClient.post()
                     .uri("/docs/{docId}/rollback", docId)
-                    .bodyValue(Map.of("version", targetVersion))
+                    .bodyValue(Map.of(
+                            "version", targetVersion,
+                            "userId", userId == null ? "" : userId.toString(),
+                            "tenantId", tenantId == null ? "" : tenantId
+                    ))
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block(java.time.Duration.ofSeconds(5));

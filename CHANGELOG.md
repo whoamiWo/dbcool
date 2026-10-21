@@ -1,3 +1,34 @@
+## Week 43.5 (2026-10-21) — CRDT 版本快照身份归属补全（PHASE127）
+
+> **冲突追溯链路闭环**：`crdt_doc_versions` 表的 `user_id` / `tenant_id` 此前恒为 `NULL`，导致冲突检测与回滚无法定位责任人。本次打通 Java → CRDT 服务的身份透传链路。
+
+### 1. 身份透传链路修复
+
+| 项 | 说明 | 涉及文件 |
+|---|---|---|
+| **Java 侧透传** | `callCrdtService` 由 2 参扩为 4 参，请求体新增 `userId` / `tenantId`；`applyUpdate` 调用处同步调整 | `RealtimeService.java` |
+| **CRDT 服务接收** | `POST /docs/:docId/update` 解构 `userId` / `tenantId` 并下传 `applyUpdate(docId, update, userId, tenantId)` | `crdt-service/index.js` |
+| **快照写入落库** | 版本快照 INSERT 由硬编码 `NULL, NULL` 改为 `NULLIF($4,''), NULLIF($5,'')`，空串归一为 NULL 保持语义一致 | `crdt-service/index.js` |
+| **回滚同源修复** | `POST /docs/:docId/rollback` 同样接收身份并写入回滚产生的版本快照，避免回滚后新版本无归属 | `crdt-service/index.js` |
+
+### 2. 服务层签名收敛
+
+| 项 | 说明 |
+|---|---|
+| **`rollbackToVersion`** | 签名由 `(docId, targetVersion)` 扩为 `(docId, targetVersion, userId, tenantId)`，避免 Service 层反向依赖 Web 层 `AuthenticatedUser` |
+| **`fetchConflicts`** | 同步扩参 `(docId, since, userId, tenantId)`，为后续按租户/用户过滤版本历史预留入口 |
+| **Controller 调用点** | `CrdtConflictController` 两处调用透传 `user.userId()` / `user.tenantId()` |
+
+### 3. 门禁
+
+| 检查 | 结果 |
+|---|---|
+| `mvn compile` | ✅ 通过 |
+| `mvn test` | ✅ 通过（0F/0E） |
+| IDE 诊断 | ✅ 0 error / 0 warning |
+
+---
+
 ## Week 43 (2026-10-20) — 基础设施升级、国际化全量、安全文档收尾
 
 > **五阶段连续交付**：Spring Boot 3.4.7 升级（含 SpEL 回归修复）、前端 i18n 53 文件全量接入、CSP 注释收尾、版本门禁对齐。全量门禁零回归。
