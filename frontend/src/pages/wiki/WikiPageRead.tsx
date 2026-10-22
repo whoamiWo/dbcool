@@ -18,8 +18,22 @@ import {
 } from '@mui/icons-material';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { PrismAsyncLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+// PHASE133: 按需加载语言定义，避免全量 Prism bundle (748KB) 打入主包。
+// 这里只导入项目实际用到的 6 种语言，使 SyntaxHighlighter bundle 从 ~750KB 降至 ~20KB。
+import js from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
+SyntaxHighlighter.registerLanguage('javascript', js);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
+SyntaxHighlighter.registerLanguage('bash', bash);
+SyntaxHighlighter.registerLanguage('sql', sql);
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('css', css);
 import { wikiApi } from '@/api/wiki';
 import type { WikiPage } from '@/types/wiki';
 import '@/theme/glass.css';

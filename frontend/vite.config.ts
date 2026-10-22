@@ -120,6 +120,15 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // PHASE133: MUI 全家桶独立分包（约 150-200KB），避免打散到主 bundle
+          'mui-vendor': [
+            '@mui/material',
+            '@mui/icons-material',
+            '@mui/system',
+            '@emotion/react',
+            '@emotion/styled',
+            '@emotion/cache',
+          ],
           'reactflow-vendor': ['reactflow'],
           'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
           'state-vendor': ['zustand', '@tanstack/react-query'],
