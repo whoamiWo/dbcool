@@ -938,6 +938,23 @@
     "footerHint": "Character-level merging is supported for concurrent editing; changes are broadcast in real time to other members of the same document.",
     "cursorPosition": "Position: {{pos}}"
   },
+  "sharePanel": {
+    "title": "Sharing & Permissions",
+    "editShare": "Edit Sharing",
+    "saveShare": "Save",
+    "savingShare": "Saving…",
+    "addRow": "Add Share",
+    "typeLabel": "Type",
+    "nameLabel": "Name",
+    "userPlaceholder": "Search username or email",
+    "rolePlaceholder": "Select a role",
+    "none": "None",
+    "role": "Role",
+    "user": "User",
+    "addUser": "+ Add User",
+    "addRole": "+ Add Role",
+    "deleteConfirm": "Remove this share?"
+  },
   "viewDesigner": {
     "newView": "New View",
     "saveFailed": "Save failed",
