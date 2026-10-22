@@ -158,7 +158,6 @@ export default defineConfig({
         'src/main.tsx',
         'src/router.tsx',
         'src/types/**',
-        'src/pages/*.tsx',
       ],
     },
   },

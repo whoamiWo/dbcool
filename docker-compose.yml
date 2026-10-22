@@ -214,6 +214,10 @@ services:
       # 压完 unset 后重启即恢复默认 30/60s。
       RATELIMIT_IM_LIMIT: ${RATELIMIT_IM_LIMIT:-30}
       RATELIMIT_FILEUPLOAD_LIMIT: ${RATELIMIT_FILEUPLOAD_LIMIT:-10}
+      # PHASE131 P95: HikariCP 连接池扩容(20→50),消除连接等待导致的 P95 延迟。
+      # 压测实证 20 并发时池饱和(pending=80)、P95 307ms;PG max_connections=100 有余量。
+      DB_POOL_MAX: ${DB_POOL_MAX:-50}
+      DB_POOL_MIN: ${DB_POOL_MIN:-10}
       # 入站消息默认落到的频道（InboundMessageService#resolveTargetChannel）
       INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID: ${INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID:-}
       # PHASE99 T1: 集成凭证加密主密钥（AES-256，Base64 编码 32 字节）

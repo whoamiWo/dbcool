@@ -23,8 +23,8 @@ mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 - **SQL 注入**: 只允许 MyBatis XML 参数化查询，禁止字符串拼接
 
 ### 1.4 性能指标
-- **API 响应时间**: P95 < 300ms (PHASE133 校准：50 VU 实测 298ms，原 <200ms 阈值过高；目标：后续优化至 <200ms)
-- **数据库连接池**: HikariCP maxPoolSize=20, minIdle=5
+- **API 响应时间**: P95 < 300ms @ 50 VU（PHASE133 校准：50 VU 实测 298ms，原 <200ms 阈值过高；目标：后续优化至 <200ms）
+- **数据库连接池**: HikariCP maxPoolSize=50, minIdle=10（PHASE133 优化：20→50，应对 tenant 表行锁争用）
 - **缓存策略**: Redis TTL 5-30 分钟，热点数据预加载
 - **异步处理**: 耗时操作走 `@Async` + 独立线程池
 

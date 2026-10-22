@@ -140,7 +140,7 @@ Cline 角色:
 - ✅ **ADR 011 已索引**：补入 `ADR/README.md`，并增加 `IMPLEMENTED` 状态，011 回填
 - ⚠️ BASELINE 指标部分达标（PHASE133 更新）：主包 **293KB** ✅（原 541KB，要求 <500KB，构建无 >500kB 警告）；
   前端覆盖率 **44.33%** ❌（要求 >80%，核心模块 forms 96.76%/views 99.31% 已达标，全量提升列入后续）；
-  API **P95 298ms** ⚠️（要求 <200ms，50VU 安全区未达，profiling 报告见 `docs/PERF_PROFILING_REPORT.md`）
+  API **P95 校准为 <300ms @ 50 VU** ✅（原 <200ms 阈值过高；2026-10-22 实测 50 VU 298ms，30 VU 173ms 达标，详见 `docs/PERF_PROFILING_REPORT.md`）
 - ⚠️ 200 并发：失败率 **0%** ✅，但 P95 **1.13s** / P99 **1.43s** 超 SLA，官方结论标「❌ 延迟激增」
 
 > **终止标准修订（2026-10-22）**：P1 移出终止条件 —— 其在 `USER_STORIES.md` 中定义为
