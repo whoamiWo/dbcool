@@ -9,6 +9,15 @@ vi.mock('@/api/client', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 
+// Mock PermissionPreview component
+vi.mock('@/components/PermissionPreview', () => ({
+  PermissionPreview: vi.fn(({ userId }: { userId: string }) => (
+    <div data-testid={`permission-preview-${userId}`}>
+      权限预览 - {userId}
+    </div>
+  )),
+}));
+
 describe('UsersListPage', () => {
   let qc: QueryClient;
 
@@ -118,5 +127,42 @@ describe('UsersListPage', () => {
 
     const createBtn = screen.getByRole('button', { name: /^创建$/ });
     expect(createBtn).toBeDisabled();
+  });
+
+  // US-307: 权限预览集成测试
+  it('点击"查看权限"按钮:展开用户权限预览', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue([
+      { id: 'u1', username: 'alice', display_name: 'Alice', enabled: true, created_at: '2026-01-15T10:00:00Z' },
+    ] as any);
+
+    renderPage();
+
+    // 等待列表渲染
+    await screen.findByText('alice');
+    // 展开前:无权限预览组件
+    expect(screen.queryByTestId('permission-preview-u1')).not.toBeInTheDocument();
+
+    // 点击"查看权限"
+    fireEvent.click(screen.getByRole('button', { name: /查看权限/ }));
+
+    // 展开后:渲染 PermissionPreview,userId 正确传递
+    expect(await screen.findByTestId('permission-preview-u1')).toBeInTheDocument();
+  });
+
+  it('再次点击"查看权限"按钮:收起权限预览', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue([
+      { id: 'u1', username: 'alice', display_name: 'Alice', enabled: true, created_at: '2026-01-15T10:00:00Z' },
+    ] as any);
+
+    renderPage();
+    await screen.findByText('alice');
+
+    // 展开
+    fireEvent.click(screen.getByRole('button', { name: /查看权限/ }));
+    expect(await screen.findByTestId('permission-preview-u1')).toBeInTheDocument();
+
+    // 再次点击:收起
+    fireEvent.click(screen.getByRole('button', { name: /查看权限/ }));
+    expect(screen.queryByTestId('permission-preview-u1')).not.toBeInTheDocument();
   });
 });

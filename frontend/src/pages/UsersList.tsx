@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyState } from '@/components/EmptyState';
+import { PermissionPreview } from '@/components/PermissionPreview';
 import apiClient from '@/api/client';
 import type { UserMeta } from '@/types/acl';
 
@@ -18,6 +19,8 @@ export function UsersListPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // US-307: 展开查看某用户的生效权限
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   // PHASE98 R3: 取 isError/error/refetch。此前只解构 data/isLoading ——
   // 请求 500 时 data 为 undefined，页面渲染「用户管理 (0)」+ 空表头，
@@ -134,26 +137,42 @@ export function UsersListPage() {
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
-              <td style={{ padding: 12 }}>{u.username}</td>
-              <td style={{ padding: 12 }}>{u.display_name}</td>
-              <td style={{ padding: 12 }}>
-                {u.enabled ? (
-                  <span style={{ padding: '2px 8px', background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>{t('usersList.statusEnabled')}</span>
-                ) : (
-                  <span style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>{t('usersList.statusDisabled')}</span>
-                )}
-              </td>
-              <td style={{ padding: 12, color: 'var(--color-text-disabled)' }}>{new Date(u.created_at).toLocaleString('zh-CN')}</td>
-              <td style={{ padding: 12, textAlign: 'right' }}>
-                <button
-                  onClick={() => toggleEnabledMutation.mutate({ id: u.id, enabled: !u.enabled })}
-                  style={{ padding: '4px 8px', background: u.enabled ? 'var(--color-error)' : 'var(--color-success)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                >
-                  {u.enabled ? t('usersList.toggleDisable') : t('usersList.toggleEnable')}
-                </button>
-              </td>
-            </tr>
+            <Fragment key={u.id}>
+              <tr style={{ borderTop: '1px solid var(--color-border-light)' }}>
+                <td style={{ padding: 12 }}>{u.username}</td>
+                <td style={{ padding: 12 }}>{u.display_name}</td>
+                <td style={{ padding: 12 }}>
+                  {u.enabled ? (
+                    <span style={{ padding: '2px 8px', background: 'rgba(var(--color-success-rgb, 16,185,129),0.2)', color: 'var(--color-success)', borderRadius: 4, fontSize: 12 }}>{t('usersList.statusEnabled')}</span>
+                  ) : (
+                    <span style={{ padding: '2px 8px', background: 'var(--color-error)', color: 'var(--color-error)', borderRadius: 4, fontSize: 12 }}>{t('usersList.statusDisabled')}</span>
+                  )}
+                </td>
+                <td style={{ padding: 12, color: 'var(--color-text-disabled)' }}>{new Date(u.created_at).toLocaleString('zh-CN')}</td>
+                <td style={{ padding: 12, textAlign: 'right' }}>
+                  <button
+                    onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                    aria-expanded={expandedUserId === u.id}
+                    style={{ padding: '4px 8px', marginRight: 8, background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                  >
+                    {t('usersList.viewPermissions')}
+                  </button>
+                  <button
+                    onClick={() => toggleEnabledMutation.mutate({ id: u.id, enabled: !u.enabled })}
+                    style={{ padding: '4px 8px', background: u.enabled ? 'var(--color-error)' : 'var(--color-success)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+                  >
+                    {u.enabled ? t('usersList.toggleDisable') : t('usersList.toggleEnable')}
+                  </button>
+                </td>
+              </tr>
+              {expandedUserId === u.id && (
+                <tr>
+                  <td colSpan={5} style={{ padding: 0, background: 'var(--color-bg-secondary)' }}>
+                    <PermissionPreview userId={u.id} />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>

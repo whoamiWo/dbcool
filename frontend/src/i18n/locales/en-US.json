@@ -73,7 +73,9 @@
     "description": "Description",
     "back": "Back",
     "submit": "Submit",
-    "submitting": "Submitting…"
+    "submitting": "Submitting…",
+    "error": "Operation failed",
+    "networkError": "Network error, please check connection"
   },
   "board": {
     "title": "Board",
@@ -804,7 +806,8 @@
     "statusEnabled": "Enabled",
     "statusDisabled": "Disabled",
     "toggleEnable": "Enable",
-    "toggleDisable": "Disable"
+    "toggleDisable": "Disable",
+    "viewPermissions": "View Permissions"
   },
   "rowAcl": {
     "pageTitle": "🛡️ Row-level ACL Management (ROW-level)",
@@ -1477,5 +1480,13 @@
     "rollBackSuccess": "Rolled back to version {version}",
     "rollBackFailed": "Rollback failed",
     "alert": "Conflict detected: current v{currentVersion}, base v{since}, {conflicts} new version(s)"
+  },
+  "permissionPreview": {
+    "title": "User Permissions Preview",
+    "roles": "Assigned Roles",
+    "policies": "Permission Policies",
+    "noRoles": "No roles assigned to this user",
+    "noPolicies": "No specific permission policies",
+    "rolePolicy": "Policies for {role}"
   }
 }
