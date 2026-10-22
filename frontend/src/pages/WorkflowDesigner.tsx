@@ -487,6 +487,27 @@ function NodeConfigEditor({ node, onChange, t }: { node: Node<WorkflowNodeData>;
           </select>
           <label style={lbl} htmlFor="w-lbl-9">{t('workflowDesigner.httpUrl')}</label>
           <input id="w-lbl-9" value={cfg.url || ''} onChange={(e) => setCfg('url', e.target.value)} style={inp} />
+          {/* PHASE132: US-409 HTTP 节点鉴权配置面板 */}
+          <label style={lbl} htmlFor="w-lbl-auth">{t('workflowDesigner.httpAuth')}</label>
+          <select id="w-lbl-auth" value={cfg.authType || 'none'} onChange={(e) => setCfg('authType', e.target.value)} style={inp}>
+            <option value="none">{t('workflowDesigner.httpAuthNone')}</option>
+            <option value="bearer">{t('workflowDesigner.httpAuthBearer')}</option>
+            <option value="basic">{t('workflowDesigner.httpAuthBasic')}</option>
+          </select>
+          {cfg.authType === 'bearer' && (
+            <>
+              <label style={lbl} htmlFor="w-lbl-token">{t('workflowDesigner.httpAuthToken')}</label>
+              <input id="w-lbl-token" type="password" value={cfg.authToken || ''} onChange={(e) => setCfg('authToken', e.target.value)} style={inp} placeholder="sk-..." />
+            </>
+          )}
+          {cfg.authType === 'basic' && (
+            <>
+              <label style={lbl} htmlFor="w-lbl-user">{t('workflowDesigner.httpAuthUsername')}</label>
+              <input id="w-lbl-user" value={cfg.authUsername || ''} onChange={(e) => setCfg('authUsername', e.target.value)} style={inp} />
+              <label style={lbl} htmlFor="w-lbl-pass">{t('workflowDesigner.httpAuthPassword')}</label>
+              <input id="w-lbl-pass" type="password" value={cfg.authPassword || ''} onChange={(e) => setCfg('authPassword', e.target.value)} style={inp} />
+            </>
+          )}
         </>
       )}
       {node.data.kind === 'CONDITION' && (
@@ -529,7 +550,7 @@ function NodeConfigEditor({ node, onChange, t }: { node: Node<WorkflowNodeData>;
 
 function defaultConfig(kind: NodeKind): Record<string, string> {
   if (kind === 'NOTIFICATION') return { title: 'Notification', message: '' };
-  if (kind === 'HTTP') return { method: 'GET', url: '' };
+  if (kind === 'HTTP') return { method: 'GET', url: '', authType: 'none', authToken: '', authUsername: '', authPassword: '' };
   if (kind === 'CONDITION') return { field: '', op: 'eq', value: '' };
   if (kind === 'DATA_UPDATE') return { collection: '', recordId: '', data: '' };
   return {};
