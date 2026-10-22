@@ -5,7 +5,7 @@
  * 测试验证：正常渲染、错误捕获后展示标题/消息/按钮。
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { ErrorBoundary } from './ErrorBoundary';
 
 class BoomError extends Error {
@@ -101,7 +101,7 @@ describe('ErrorBoundary', () => {
 
   it('非 Error 类型抛错时 String 化展示', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    function ThrowString() {
+    function ThrowString(): React.ReactElement {
       // eslint-disable-next-line @typescript-eslint/no-throw-literal
       throw 'plain string error';
     }

@@ -12,13 +12,16 @@ vi.mock('./client', () => ({
 import apiClient from './client';
 import { searchApi, SEARCH_FACET_COLORS, SEARCH_FACET_LABELS } from './search';
 
+/** TS: apiClient.get 为泛型函数，mock 后需断言为 vi.fn 才能调 mockResolvedValue。 */
+const mockedGet = apiClient.get as unknown as ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('searchApi', () => {
   it('search 调用 /search 并传递参数', async () => {
-    apiClient.get.mockResolvedValue({
+    mockedGet.mockResolvedValue({
       code: 0,
       message: 'ok',
       data: {
@@ -29,20 +32,20 @@ describe('searchApi', () => {
       },
     });
     await searchApi.search('test', ['record'], 10);
-    expect(apiClient.get).toHaveBeenCalledWith('/search', {
+    expect(mockedGet).toHaveBeenCalledWith('/search', {
       params: { keyword: 'test', types: 'record', limit: 10 },
     });
   });
 
   it('searchByFacets 调用 /search 但不传 types', async () => {
-    apiClient.get.mockResolvedValue({
+    mockedGet.mockResolvedValue({
       keyword: 'test',
       total: 0,
       results: [],
       facets: { wiki: 0, record: 0, im: 0, project: 0, automation: 0 },
     });
     await searchApi.searchByFacets('test', 5);
-    expect(apiClient.get).toHaveBeenCalledWith('/search', {
+    expect(mockedGet).toHaveBeenCalledWith('/search', {
       params: { keyword: 'test', limit: 5 },
     });
   });

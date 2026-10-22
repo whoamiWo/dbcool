@@ -35,8 +35,8 @@ mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ### 2.1 编译与测试
 ```bash
 cd frontend
-npx tsc --noEmit         # ✅ 0 errors
-npx vitest run           # ✅ 403/403 PASS
+npx tsc --noEmit         # ✅ 0 errors（PHASE132 修复补测类型错误后实测）
+npx vitest run           # ✅ 590/590 PASS（84 test files）
 npm run build            # ✅ dist/ 生成成功
 ```
 
@@ -298,11 +298,11 @@ docker compose up -d --no-build backend-java
 ```bash
 # Java 后端
 cd backend-java && mvn -o test
-# Tests run: 2263, Failures: 0, Errors: 0
+# Tests run: 2273, Failures: 0, Errors: 0
 
 # 前端单元
 cd frontend && npm run test:run
-# Test Files: 50 passed, Tests: 403 passed
+# Test Files: 84 passed, Tests: 590 passed
 
 # 前端类型检查
 cd frontend && npx tsc --noEmit
