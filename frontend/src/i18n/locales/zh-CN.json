@@ -938,6 +938,23 @@
     "footerHint": "多人同时编辑时支持字符级合并;改动会实时广播给同一文档的其他成员。",
     "cursorPosition": "位置：{{pos}}"
   },
+  "sharePanel": {
+    "title": "分享与权限",
+    "editShare": "编辑分享设置",
+    "saveShare": "保存",
+    "savingShare": "保存中…",
+    "addRow": "添加分享",
+    "typeLabel": "类型",
+    "nameLabel": "名称",
+    "userPlaceholder": "搜索用户名或邮箱",
+    "rolePlaceholder": "选择角色",
+    "none": "无",
+    "role": "角色",
+    "user": "用户",
+    "addUser": "+ 添加用户",
+    "addRole": "+ 添加角色",
+    "deleteConfirm": "确定移除该分享吗？"
+  },
   "viewDesigner": {
     "newView": "新视图",
     "saveFailed": "保存失败",

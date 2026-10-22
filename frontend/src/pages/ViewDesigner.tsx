@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import apiClient from '@/api/client';
+import { SharePanel, parseShares, serializeShares } from '@/components/SharePanel';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { CreateViewRequest, TableColumn, ViewFull, ViewType } from '@/types/view';
 
@@ -22,6 +23,7 @@ export function ViewDesignerPage() {
   const [pageSize, setPageSize] = useState(20);
   const [columns, setColumns] = useState<TableColumn[]>([]);
   const [detailFields, setDetailFields] = useState<string[]>([]);
+  const [sharedEntries, setSharedEntries] = useState<{ type: 'user' | 'role'; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const { data: collectionData } = useQuery({
@@ -67,6 +69,10 @@ export function ViewDesignerPage() {
       } else if (v.type === 'detail') {
         setDetailFields(fields.map((f) => f.name));
       }
+      // Parse shared_with_json
+      if (v.shared_with_json) {
+        setSharedEntries(parseShares(v.shared_with_json));
+      }
     }
   }, [viewData, defaultColumns, fields]);
 
@@ -92,12 +98,14 @@ export function ViewDesignerPage() {
       if (type === 'kanban') config.groupBy = groupBy;
       if (type === 'detail') config.fields = detailFields;
 
+      const sharedWithJson = serializeShares(sharedEntries);
       const body: CreateViewRequest = {
         collectionName: collection!,
         name,
         title,
         type,
         config: JSON.stringify(config),
+        sharedWith: sharedWithJson,
       };
       if (id) {
         return apiClient.put<ViewFull>(`/views/${id}`, body);
@@ -106,6 +114,7 @@ export function ViewDesignerPage() {
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['views', collection] });
+      queryClient.invalidateQueries({ queryKey: ['view', id] });
       const viewId = id ?? res.id;
       navigate(`/views/${viewId}/run`);
     },
@@ -207,6 +216,36 @@ export function ViewDesignerPage() {
         <div style={{ padding: 8, background: 'var(--color-text-primary)', borderRadius: 4, fontSize: 12, color: 'var(--color-text-disabled)' }}>
           💡 {t('runHint')}
         </div>
+
+        {/* Share Panel */}
+        <SharePanel
+          viewId={id}
+          initialShares={sharedEntries}
+          onChange={setSharedEntries}
+          onSave={async (shares) => {
+            const config: Record<string, unknown> = {};
+            if (type === 'table') {
+              config.pageSize = pageSize;
+              config.columns = columns.filter((c) => c.visible !== false);
+            }
+            if (type === 'kanban') config.groupBy = groupBy;
+            if (type === 'detail') config.fields = detailFields;
+            const body: CreateViewRequest = {
+              collectionName: collection!,
+              name,
+              title,
+              type,
+              config: JSON.stringify(config),
+              sharedWith: serializeShares(shares),
+            };
+            if (id) {
+              await apiClient.put(`/views/${id}`, body);
+            } else {
+              // 新建时无法单独保存分享，需先保存视图
+              await saveMutation.mutateAsync();
+            }
+          }}
+        />
 
         <button
           onClick={() => saveMutation.mutate()}
