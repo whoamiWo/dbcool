@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { CreateViewRequest, TableColumn, ViewFull, ViewType } from '@/types/view';
@@ -12,6 +13,7 @@ export function ViewDesignerPage() {
   const { collection, id } = useParams<{ collection: string; id?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const [name, setName] = useState('new_view');
   const [title, setTitle] = useState(t('newView'));
@@ -136,11 +138,11 @@ export function ViewDesignerPage() {
 
       <div
         style={{
-          padding: 16,
+          padding: isMobile ? 12 : 16,
           background: 'var(--color-text-primary)',
           borderRadius: 8,
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          maxWidth: 600,
+          maxWidth: isMobile ? '100%' : 600,
         }}
       >
         <div style={{ marginBottom: 12 }}>

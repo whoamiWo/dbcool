@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef, FieldType } from '@/types/collection';
 import type { FormFull, FormLayoutItem, FormRules, SubmitAction, ValidationRule } from '@/types/form';
@@ -45,6 +46,7 @@ export function FormDesignerPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -256,7 +258,8 @@ export function FormDesignerPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 280px', gap: 16 }}>
+      {/* US-108: 移动端单列堆叠,平板双列,桌面三列 */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '200px 1fr 280px', gap: isMobile ? 8 : 16 }}>
         {/* 字段面板(可拖源) */}
         <div style={{ padding: 12, background: 'var(--color-text-primary)', borderRadius: 8 }}>
           <h3 style={{ marginTop: 0 }}>{t('formDesigner.availableFields')}</h3>

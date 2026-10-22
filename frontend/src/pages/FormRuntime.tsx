@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import apiClient from '@/api/client';
 import { FormRuntime as FormRuntimeComponent } from '@/components/forms/FormRuntime';
 
@@ -12,6 +13,7 @@ export function FormRuntimePage() {
   const { t } = useTranslation();
   const { formId } = useParams<{ formId: string }>();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const { data: formData, isLoading } = useQuery({
     queryKey: ['form', formId],
@@ -96,16 +98,16 @@ export function FormRuntimePage() {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div style={{ maxWidth: isMobile ? '100%' : 720, margin: '0 auto', padding: isMobile ? '0 12px' : undefined }}>
       <button
         onClick={() => navigate(`/designer/collections/${formData.collection_name}`)}
-        style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16 }}
+        style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 16, minHeight: isMobile ? 44 : undefined }}
       >
         ← {t('formRuntime.back')}
       </button>
       <div
         style={{
-          padding: 24,
+          padding: isMobile ? 16 : 24,
           background: 'var(--color-text-primary)',
           borderRadius: 8,
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
