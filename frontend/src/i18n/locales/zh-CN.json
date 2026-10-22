@@ -73,7 +73,9 @@
     "description": "描述",
     "back": "返回",
     "submit": "提交",
-    "submitting": "提交中…"
+    "submitting": "提交中…",
+    "error": "操作失败",
+    "networkError": "网络错误，请检查连接"
   },
   "board": {
     "title": "看板",
@@ -804,7 +806,8 @@
     "statusEnabled": "启用",
     "statusDisabled": "禁用",
     "toggleEnable": "启用",
-    "toggleDisable": "禁用"
+    "toggleDisable": "禁用",
+    "viewPermissions": "查看权限"
   },
   "rowAcl": {
     "pageTitle": "🛡️ 行级 ACL 管理(ROW-level)",
@@ -1477,5 +1480,13 @@
     "rollBackSuccess": "已回滚到版本 {version}",
     "rollBackFailed": "回滚失败",
     "alert": "检测到冲突：当前 v{currentVersion}，基线 v{since}，{conflicts} 个新版本"
+  },
+  "permissionPreview": {
+    "title": "用户权限预览",
+    "roles": "所属角色",
+    "policies": "权限策略",
+    "noRoles": "该用户暂无角色分配",
+    "noPolicies": "暂无具体权限策略",
+    "rolePolicy": "{role} 的权限策略"
   }
 }
