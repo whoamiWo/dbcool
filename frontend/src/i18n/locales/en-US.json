@@ -30,7 +30,9 @@
     "project": "Project",
     "im": "IM",
     "settings": "Settings",
-    "profile": "Profile"
+    "profile": "Profile",
+    "tables": "Data Model",
+    "formTemplates": "Form Templates"
   },
   "home": {
     "welcome": "Welcome",
@@ -568,6 +570,9 @@
     "fieldAriaFormula": "Edit formula expression",
     "removeField": "Delete",
     "addField": "+ Add Field",
+    "importSchema": "📋 Import JSON Schema",
+    "import": "Import",
+    "importFailed": "Import failed",
     "saving": "Creating…",
     "saveCollection": "Save Collection",
     "type": {
@@ -1328,6 +1333,25 @@
     "actions": "Actions",
     "edit": "Edit",
     "fill": "Fill"
+  },
+  "formTemplates": {
+    "pageTitle": "Form Templates",
+    "loadFailed": "Failed to load templates",
+    "newTemplate": "New template",
+    "title": "Template title",
+    "titlePlaceholder": "e.g. Customer Registration",
+    "collection": "Collection",
+    "collectionPlaceholder": "e.g. customers",
+    "create": "Create",
+    "emptyTitle": "No form templates yet",
+    "emptyDesc": "Save frequently used forms as templates to reuse layouts and validation rules.",
+    "titleCol": "Template",
+    "createdAt": "Created at",
+    "actions": "Actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "saveAs": "Save as template",
+    "apply": "Apply template"
   },
   "messages": {
     "title": "Inbox",

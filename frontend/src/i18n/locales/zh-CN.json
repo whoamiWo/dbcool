@@ -30,7 +30,9 @@
     "project": "项目",
     "im": "即时通讯",
     "settings": "设置",
-    "profile": "个人中心"
+    "profile": "个人中心",
+    "tables": "数据模型",
+    "formTemplates": "表单模板"
   },
   "home": {
     "welcome": "欢迎",
@@ -568,6 +570,9 @@
     "fieldAriaFormula": "编辑公式表达式",
     "removeField": "删除",
     "addField": "+ 添加字段",
+    "importSchema": "📋 导入 JSON Schema",
+    "import": "导入",
+    "importFailed": "导入失败",
     "saving": "创建中…",
     "saveCollection": "保存 Collection",
     "type": {
@@ -1328,6 +1333,25 @@
     "actions": "操作",
     "edit": "编辑",
     "fill": "填表"
+  },
+  "formTemplates": {
+    "pageTitle": "表单模板",
+    "loadFailed": "模板列表加载失败",
+    "newTemplate": "新建模板",
+    "title": "模板名称",
+    "titlePlaceholder": "例如：客户登记表",
+    "collection": "Collection",
+    "collectionPlaceholder": "例如：customers",
+    "create": "创建",
+    "emptyTitle": "暂无表单模板",
+    "emptyDesc": "把常用表单另存为模板，下次可一键复用布局与校验规则。",
+    "titleCol": "模板名称",
+    "createdAt": "创建时间",
+    "actions": "操作",
+    "edit": "编辑",
+    "delete": "删除",
+    "saveAs": "另存为模板",
+    "apply": "应用模板"
   },
   "messages": {
     "title": "站内信",

@@ -66,6 +66,8 @@ export function SchemaDesignerPage() {
   const [error, setError] = useState<string | null>(null);
   /** US-107: 公式编辑器状态(仅 formula 字段触发)。 */
   const [formulaTarget, setFormulaTarget] = useState<number | null>(null);
+  /** US-007: JSON Schema 导入弹窗状态。 */
+  const [importOpen, setImportOpen] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -82,6 +84,26 @@ export function SchemaDesignerPage() {
     onError: (err: unknown) => {
       const e = err as { response?: { data?: { message?: string } } };
       setError(e.response?.data?.message ?? t('schemaDesigner.createFailed'));
+    },
+  });
+
+  /** US-007: 从 JSON Schema 导入建表。 */
+  const importMutation = useMutation({
+    mutationFn: async (payload: { name: string; title: string; schema: string }) => {
+      const res = await apiClient.post<CollectionMeta & { importedFieldCount?: number }>(
+        '/collections/import-schema',
+        { ...payload, description: '' },
+      );
+      return res;
+    },
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      setImportOpen(false);
+      navigate(`/designer/collections/${created.name}`);
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message ?? t('schemaDesigner.importFailed'));
     },
   });
 
@@ -171,6 +193,11 @@ export function SchemaDesignerPage() {
         </div>
 
         <h3 style={{ marginBottom: 8 }}>{t('schemaDesigner.fields')}</h3>
+        <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => setImportOpen(true)} style={{ padding: '4px 12px' }}>
+            {t('schemaDesigner.importSchema')}
+          </button>
+        </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
           <thead>
             <tr style={{ background: 'var(--color-bg-secondary)' }}>
@@ -292,7 +319,105 @@ export function SchemaDesignerPage() {
             initialValue={fields[formulaTarget]?.options?.formula as string | undefined}
           />
         )}
+
+        {/* US-007: JSON Schema 导入弹窗 */}
+        {importOpen && (
+          <ImportSchemaDialog
+            open={importOpen}
+            onClose={() => setImportOpen(false)}
+            onImport={(payload) => importMutation.mutate(payload)}
+            isPending={importMutation.isPending}
+          />
+        )}
       </div>
     </Screen>
+  );
+}
+
+/** US-007: JSON Schema 导入弹窗。 */
+function ImportSchemaDialog({
+  open,
+  onClose,
+  onImport,
+  isPending,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onImport: (payload: { name: string; title: string; schema: string }) => void;
+  isPending: boolean;
+}) {
+  const { t } = useTranslation();
+  const [importName, setImportName] = useState('');
+  const [importTitle, setImportTitle] = useState('');
+  const [schemaText, setSchemaText] = useState('');
+
+  if (!open) return null;
+
+  const handleImport = () => {
+    let schemaJson = schemaText.trim();
+    if (!schemaJson) return;
+    try {
+      JSON.parse(schemaJson);
+    } catch {
+      return;
+    }
+    onImport({ name: importName, title: importTitle, schema: schemaJson });
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+        display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--color-bg-primary)', padding: 24, borderRadius: 8,
+          minWidth: 480, maxWidth: 720, color: 'var(--color-text-primary)',
+        }}
+        onClick={(e) => e.stopPropagation()
+      }>
+        <h2>{t('schemaDesigner.importSchema')}</h2>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', marginBottom: 4 }}>{t('schemaDesigner.collectionName')}</label>
+          <input
+            value={importName}
+            onChange={(e) => setImportName(e.target.value)}
+            placeholder={t('schemaDesigner.collectionNamePlaceholder')}
+            style={{ padding: 6, width: '100%', fontFamily: 'monospace' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', marginBottom: 4 }}>{t('schemaDesigner.displayTitle')}</label>
+          <input
+            value={importTitle}
+            onChange={(e) => setImportTitle(e.target.value)}
+            placeholder={t('schemaDesigner.displayTitlePlaceholder')}
+            style={{ padding: 6, width: '100%' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', marginBottom: 4 }}>JSON Schema</label>
+          <textarea
+            value={schemaText}
+            onChange={(e) => setSchemaText(e.target.value)}
+            placeholder='{"type":"object","properties":{"name":{"type":"string"},...}}'
+            style={{ padding: 6, width: '100%', fontFamily: 'monospace', minHeight: 120 }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '6px 16px' }}>{t('common.cancel')}</button>
+          <button
+            onClick={handleImport}
+            disabled={!importName || !schemaText || isPending}
+            style={{ padding: '6px 16px', background: 'var(--color-primary-500)', color: 'var(--color-text-primary)', border: 'none', borderRadius: 4 }}
+          >
+            {isPending ? t('common.loading') : t('schemaDesigner.import')}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
