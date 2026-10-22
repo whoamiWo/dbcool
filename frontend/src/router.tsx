@@ -29,6 +29,9 @@ const FormRuntimePage = lazy(() =>
 const FormsListPage = lazy(() =>
   import('./pages/FormsList').then(m => ({ default: m.FormsListPage } as { default: React.ComponentType })),
 );
+const FormTemplatesListPage = lazy(() =>
+  import('./pages/FormTemplatesList').then(m => ({ default: m.FormTemplatesListPage } as { default: React.ComponentType })),
+);
 const TableViewPage = lazy(() =>
   import('./pages/TableView').then(m => ({ default: m.TableViewPage } as { default: React.ComponentType })),
 );
@@ -179,6 +182,8 @@ export const router = createBrowserRouter([
       { path: 'designer/forms/:collection/new', element: <Lazy><FormDesignerPage /></Lazy> },
       { path: 'designer/forms/:collection/:id/edit', element: <Lazy><FormDesignerPage /></Lazy> },
       { path: 'forms/:formId/fill', element: <Lazy><FormRuntimePage /></Lazy> },
+      // US-107: 表单模板
+      { path: 'designer/form-templates', element: <Lazy><FormTemplatesListPage /></Lazy> },
 
       // View
       { path: 'designer/views', element: <Lazy><ViewsListPage /></Lazy> },

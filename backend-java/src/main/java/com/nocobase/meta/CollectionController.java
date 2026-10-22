@@ -50,6 +50,8 @@ public class CollectionController {
     private final ApplicationEventPublisher eventPublisher;
     /** Week 41 D2:关联字段展开器 — 把 belongsTo/hasMany 替换为 {id, title}。 */
     private final RelationResolver relationResolver;
+    /** US-007:JSON Schema 导入器。 */
+    private final JsonSchemaImporter jsonSchemaImporter;
 
     public CollectionController(
             CollectionService service,
@@ -60,7 +62,8 @@ public class CollectionController {
             com.nocobase.acl.RowAclService rowAclService,
             com.nocobase.auth.RoleRepository roleRepository,
             ApplicationEventPublisher eventPublisher,
-            RelationResolver relationResolver
+            RelationResolver relationResolver,
+            JsonSchemaImporter jsonSchemaImporter
     ) {
         this.service = service;
         this.migrationService = migrationService;
@@ -71,6 +74,7 @@ public class CollectionController {
         this.roleRepository = roleRepository;
         this.eventPublisher = eventPublisher;
         this.relationResolver = relationResolver;
+        this.jsonSchemaImporter = jsonSchemaImporter;
     }
 
     /** 构建 RowAclService.Principal(从当前认证用户). */
@@ -110,6 +114,42 @@ public class CollectionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "code", 0, "message", "success",
                 "data", toDto(meta)
+        ));
+    }
+
+    /**
+     * US-007: 从 JSON Schema 导入并创建 Collection。
+     *
+     * <p>请求体: {@code {"name": "...", "title": "...", "description": "...", "schema": {...}}}
+     * <p>流程: 解析 schema → 校验字段 → 检测重名冲突 → 建表 + 写入 meta。
+     * 任一步失败整体回滚(service.create 带 @Transactional)。
+     */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/import-schema")
+    public ResponseEntity<Map<String, Object>> importFromSchema(
+            @RequestBody @Valid ImportSchemaRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        List<FieldDef> fields = jsonSchemaImporter.importFields(request.schema());
+        if (fields.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "schema 未解析出任何字段");
+        }
+        // 字段重名检测(同一 schema 内)
+        Set<String> seen = new java.util.HashSet<>();
+        for (FieldDef f : fields) {
+            if (!seen.add(f.name())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "schema 中存在重复字段名: " + f.name());
+            }
+        }
+        CollectionMetaEntity meta = service.create(
+                request.name(), request.title(), request.description(),
+                fields, user.tenantId(), user.userId());
+        Map<String, Object> dto = toDto(meta);
+        dto.put("fields", fields);
+        dto.put("importedFieldCount", fields.size());
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "code", 0, "message", "success",
+                "data", dto
         ));
     }
 
@@ -689,6 +729,16 @@ public class CollectionController {
     //  DTO
     // ============================================================
 
+    /** US-007: JSON Schema 导入请求。schema 为 JSON 字符串。 */
+    public record ImportSchemaRequest(
+            @NotBlank
+            @Pattern(regexp = "^[a-z][a-z0-9_]{0,63}$", message = "name 必须是小写字母开头")
+            String name,
+            String title,
+            String description,
+            @NotBlank
+            String schema
+    ) {}
     private Map<String, Object> toDto(CollectionMetaEntity meta) {
         Map<String, Object> dto = new java.util.HashMap<>();
         dto.put("id", meta.getId().toString());

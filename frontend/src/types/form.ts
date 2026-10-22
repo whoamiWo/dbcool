@@ -70,4 +70,24 @@ export interface CreateFormRequest {
   rules?: string;  // JSON 字符串
 }
 
+/** 表单模板 (US-107) */
+export interface FormTemplateMeta {
+  id: string;
+  title: string;
+  description?: string;
+  collection_name?: string;
+  schema_json?: string;
+  tenant_id: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface FormTemplateFull extends FormTemplateMeta {
+  schema: {
+    collectionName?: string;
+    layout?: unknown[];
+    rules?: Record<string, unknown>;
+  };
+}
+
 export type { FieldDef, FieldType };

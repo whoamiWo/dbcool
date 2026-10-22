@@ -40,6 +40,7 @@ export function AppLayout() {
   const navItems = [
     { path: '/home', labelKey: 'nav.home' },
     { path: '/designer/schemas', labelKey: 'nav.tables' },
+    { path: '/designer/form-templates', labelKey: 'nav.formTemplates' },
     { path: '/wiki/kb', labelKey: 'nav.wiki' },
     { path: '/im', labelKey: 'nav.im' },
     { path: '/projects', labelKey: 'nav.projects' },

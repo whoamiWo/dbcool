@@ -79,7 +79,7 @@ class CollectionControllerTest {
 
         controller = new CollectionController(service, migrationService, jobRepository,
                 aclEnforcer, auditService, rowAclService, roleRepository, eventPublisher,
-                relationResolver);
+                relationResolver, mock(JsonSchemaImporter.class));
 
         // 默认 ACL 全通过、ROW ACL 全允许
         doNothing().when(aclEnforcer).assertCan(any(), anyString(), anyString(), any());
