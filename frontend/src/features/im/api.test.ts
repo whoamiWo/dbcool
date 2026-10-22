@@ -1,76 +1,175 @@
-import { describe, expect, it, vi } from 'vitest';
-
 /**
- * 路径正确性回归:防止 /api 双重前缀复发。
- *
- * 背景:client.ts 的 baseURL 已是 '/api',此处若再写 '/api/im/...'
- * 会拼成 /api/api/im/... 导致全部 404(曾经的阻断缺陷)。
+ * PHASE 4.2 覆盖率补测：features/im/api.ts
  */
-
-const get = vi.fn().mockResolvedValue({ code: 0, data: [] });
-const post = vi.fn().mockResolvedValue({ code: 0, data: {} });
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/api/client', () => ({
   default: {
-    get: (...args: unknown[]) => get(...args),
-    post: (...args: unknown[]) => post(...args),
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
+import apiClient from '@/api/client';
 import {
   getJoinedChannels,
+  createChannel,
+  getChannelDetail,
+  joinChannel,
+  leaveChannel,
+  setPresenceHeartbeat,
+  getChannelMessages,
+  sendMessage,
+  editMessage,
+  deleteMessage,
+  getMessageThread,
+  sendReply,
+  searchMessages,
   getUnreadCount,
-  uploadAttachment,
+  markMessagesRead,
+  addReaction,
+  removeReaction,
+  getReactions,
+  listPins,
+  pinMessage,
+  unpinMessage,
   searchCrossChannel,
+  uploadAttachment,
   listSlashCommands,
+  markBurnRead,
 } from './api';
 
-describe('IM API 路径', () => {
-  it('频道列表路径不带 /api 前缀', async () => {
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('频道 API', () => {
+  it('getJoinedChannels / getChannelDetail', async () => {
     await getJoinedChannels();
-    expect(get).toHaveBeenCalledWith('/im/channels');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/channels');
+
+    await getChannelDetail('ch1');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/channels/ch1');
   });
 
-  it('未读路径不带 /api 前缀', async () => {
-    await getUnreadCount('c1');
-    expect(get).toHaveBeenCalledWith('/im/messages/unread?channelId=c1');
+  it('createChannel / joinChannel / leaveChannel', async () => {
+    await createChannel({ name: 'C', type: 'PUBLIC' });
+    expect(apiClient.post).toHaveBeenCalledWith('/im/channels', { name: 'C', type: 'PUBLIC' });
+
+    await joinChannel('ch1', 'u1', 'MEMBER');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/channels/ch1/members', { userId: 'u1', role: 'MEMBER' });
+
+    await leaveChannel('ch1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/im/channels/ch1/members/me');
   });
 
-  it('所有调用路径均不应出现 /api/api', async () => {
-    await getJoinedChannels();
-    await getUnreadCount('c1');
-    for (const call of [...get.mock.calls, ...post.mock.calls]) {
-      expect(String(call[0])).not.toContain('/api/');
-    }
+  it('setPresenceHeartbeat', async () => {
+    await setPresenceHeartbeat();
+    expect(apiClient.post).toHaveBeenCalledWith('/im/channels/presence/heartbeat');
   });
 });
 
-/**
- * 断链契约测试:前端调用路径必须与后端 Controller 真实端点一致。
- *
- * 背景:uploadAttachment 曾指向不存在的 /im/messages/attachments,
- * searchCrossChannel / listSlashCommands 也曾无对应后端端点。
- * 单测 mock 掩盖了这类问题,故在此显式锁定路径。
- */
-describe('IM API 与后端端点契约', () => {
-  it('上传走真实端点 /attachments/upload', async () => {
-    await uploadAttachment(new File(['x'], 'a.txt'));
-    expect(post).toHaveBeenCalledWith(
-      '/attachments/upload',
-      expect.any(FormData),
-      expect.objectContaining({ headers: expect.any(Object) }),
-    );
+describe('消息 API', () => {
+  it('getChannelMessages 支持 cursor 分页', async () => {
+    await getChannelMessages('ch1', 'cursor123', 30);
+    expect(apiClient.get).toHaveBeenCalledWith('/im/messages?limit=30&channelId=ch1&cursor=cursor123');
   });
 
-  it('跨频道搜索走 /im/messages/search/cross', async () => {
-    await searchCrossChannel('预算');
-    expect(get).toHaveBeenCalledWith(
-      expect.stringContaining('/im/messages/search/cross'),
-    );
+  it('sendMessage / editMessage / deleteMessage', async () => {
+    await sendMessage('ch1', 'Hello', 'TEXT');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/messages', {
+      channelId: 'ch1',
+      content: 'Hello',
+      contentType: 'TEXT',
+    });
+
+    await editMessage('msg1', 'Edited');
+    expect(apiClient.put).toHaveBeenCalledWith('/im/messages/msg1', { content: 'Edited' });
+
+    await deleteMessage('msg1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/im/messages/msg1');
   });
 
-  it('Slash 命令列表走 /im/slash/commands', async () => {
+  it('getMessageThread / sendReply', async () => {
+    await getMessageThread('ch1', 'msg1');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/messages/msg1/thread');
+
+    await sendReply('ch1', 'msg1', 'Reply', 'TEXT');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/messages', {
+      channelId: 'ch1',
+      parentId: 'msg1',
+      content: 'Reply',
+      contentType: 'TEXT',
+    });
+  });
+
+  it('searchMessages / getUnreadCount / markMessagesRead', async () => {
+    await searchMessages('ch1', 'keyword');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/messages/search?keyword=keyword&limit=50&channelId=ch1');
+
+    await getUnreadCount('ch1');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/messages/unread?channelId=ch1');
+
+    await markMessagesRead('ch1', 'lastMsgId');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/messages/read', {
+      channelId: 'ch1',
+      lastMessageId: 'lastMsgId',
+    });
+  });
+});
+
+describe('表情与置顶', () => {
+  it('addReaction / removeReaction / getReactions', async () => {
+    await addReaction('msg1', '👍');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/messages/msg1/reactions', { emoji: '👍' });
+
+    await removeReaction('msg1', '👍');
+    expect(apiClient.delete).toHaveBeenCalledWith('/im/messages/msg1/reactions?emoji=%F0%9F%91%8D');
+
+    await getReactions('msg1');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/messages/msg1/reactions');
+  });
+
+  it('listPins / pinMessage / unpinMessage', async () => {
+    await listPins('ch1');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/messages/pins?channelId=ch1');
+
+    await pinMessage('msg1');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/messages/msg1/pin');
+
+    await unpinMessage('msg1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/im/messages/msg1/pin');
+  });
+});
+
+describe('高级功能', () => {
+  it('searchCrossChannel', async () => {
+    await searchCrossChannel('query', 30);
+    expect(apiClient.get).toHaveBeenCalledWith('/im/messages/search/cross?keyword=query&limit=30');
+  });
+
+  it('uploadAttachment 构造 FormData', async () => {
+    const file = new File(['content'], 'test.txt', { type: 'text/plain' });
+    apiClient.post.mockResolvedValue({
+      code: 0,
+      message: 'ok',
+      data: { storageKey: 'key1', originalName: 'test.txt', contentType: 'text/plain', size: 100 },
+    });
+    const out = await uploadAttachment(file);
+    expect(apiClient.post).toHaveBeenCalledWith('/attachments/upload', expect.any(FormData), {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    expect(out.data.url).toBe('/api/attachments/key1/download');
+    expect(out.data.filename).toBe('test.txt');
+  });
+
+  it('listSlashCommands / markBurnRead', async () => {
     await listSlashCommands();
-    expect(get).toHaveBeenCalledWith('/im/slash/commands');
+    expect(apiClient.get).toHaveBeenCalledWith('/im/slash/commands');
+
+    await markBurnRead('msg1');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/messages/msg1/burn/read');
   });
 });

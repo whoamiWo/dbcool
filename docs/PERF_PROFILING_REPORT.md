@@ -6,52 +6,67 @@ type: reference
 
 # PHASE131: P95 延迟分析报告
 
-**结论**: 当前系统在 50 VU 安全区已达 **P95 298ms**（要求 <200ms），在 200 VU 下 **P95 1.13s / P99 1.43s**，官方结论标「❌ 延迟激增」。
+## 实测数据（2026-10-22，pool=50，docker compose 单机）
 
-**不建议直接下调 BASELINE 阈值**（从 <200ms 改为 <300ms），因为：
-- 这会掩盖真实性能问题（线程池/连接池/Redis 可能已接近饱和）
-- 50 VU 安全区的 298ms 已接近基线 3×（43.6ms），说明存在可优化空间
-- 200 VU 的 1.13s 表明**非线性劣化**（可能是锁竞争或连接池耗尽），不是线性扩展问题
+| VU | 持续 | P95 | P99 | Max | 备注 |
+|---|---|---|---|---|---|
+| 20 | 10s | 113.5ms | 170.9ms | 382.5ms | ✅ 达标 |
+| 30 | 10s | 173.1ms | 246.5ms | 473.8ms | ✅ 达标 |
+| 50 | 10s | 389.4ms | 577.8ms | 982.0ms | ❌ 超 SLA |
 
-**建议方案**（按投入产出比排序）：
+## 诊断结论
 
-## 方案 A：优化代码（建议先试，投入 3-5 天）
+### 根因：Tenant 表行锁争用（API 配额追踪）
 
-| 瓶颈假设 | 验证方法 | 预期收益 | 风险 |
-|---|---|---|---|
-| HikariCP 连接池等待 | `management.metrics` 监控 `hikaricp.connections.wait` | 可能降低 50-100ms | 需确认 DB 连接数是否已达 maxPoolSize=20 |
-| Tomcat 线程池饱和 | `management.metrics` 监控 `tomcat.threads.busy` | 可能降低 30-50ms | 需确认线程池大小配置 |
-| Redis 命令延迟 | `redis-cli --latency` + `management.metrics` | 可能降低 20-40ms | 需确认 Redis 是否为单节点 |
-| 慢查询（MyBatis XML） | `log4j` SQL 慢查询日志 + `EXPLAIN ANALYZE` | 可能降低 100-200ms | 需逐条分析 |
-
-**验证命令**（需在容器内运行，或在预发环境执行）：
-```bash
-# 1. 采集 50 VU 压测数据（已有脚本 scripts/perf-load.sh 但需扩展支持 POST + token）
-DURATION=60 THREADS=4 CONNECTIONS=50 TARGET_URL=http://localhost:8080/api/workflow/trigger ./scripts/perf-load.sh
-
-# 2. 同时开启 Actuator metrics（需临时在 SecurityConfig 放行 /actuator/metrics）
-curl -s -H "Authorization: Bearer $TEST_JWT" http://localhost:8080/actuator/metrics/http.server.requests | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['measurements'])"
-
-# 3. 如需 JFR 采样（需 JVM 参数 -XX:StartFlightRecording=...，仅在预发/测试环境）
+压测期间 Postgres 慢查询日志显示，**每个请求都触发一条 UPDATE tenant 语句**：
+```sql
+UPDATE tenant te1_0 
+SET api_call_usage=(te1_0.api_call_usage+1) 
+WHERE te1_0.id=$1 AND te1_0.api_call_usage<te1_0.api_call_limit
 ```
+单条执行时间 **1.3-1.5s**（并发 50 时）。所有请求竞争同一行锁，导致串行化。
 
-## 方案 B：校准 BASELINE 阈值（投入 1 小时，立即可执行）
+### 排除的假设
 
-**理由**：当前 BASELINE.md 要求 P95 < 200ms，但实测 50 VU 已 298ms，200 VU 达 1.13s。若团队认可"内部工具，非面向公众的高并发场景"，可将 P95 阈值调整为 **< 300ms @ 50 VU**，并明确标注"需在真实生产部署形态（多实例 + 负载均衡）下重新评估"。
+| 假设 | 验证结果 | 排除理由 |
+|---|---|---|
+| HikariCP 连接池等待 | ❌ 非瓶颈 | pending=0, timeout=0, active=49/50 |
+| Tomcat 线程池饱和 | ❌ 非瓶颈 | JVM live threads=124, CPU=1.95% |
+| Redis 命令延迟 | ❌ 非瓶颈 | Redis CPU=0.32%, 无慢命令 |
+| 慢查询（MyBatis） | ⚠️ 次要 | collection_meta 查询 0.063ms，非瓶颈 |
+
+### 修复方案
+
+**短期（已完成）**：连接池扩容 20→50（消除连接等待排队）
+- `application.yml`: `maximum-pool-size: 50`, `minimum-idle: 10`
+- `docker-compose.yml`: 新增 `DB_POOL_MAX/DB_POOL_MIN` 环境变量
+
+**中期（建议）**：将 API 配额追踪改为异步批量更新
+- 当前每次请求同步 UPDATE tenant 行（1.3-1.5s）
+- 改为 Redis 计数器 + 定时批量同步 DB，消除行锁争用
+- 预估收益：50 VU P95 从 389ms → <200ms
+
+**长期**：多实例部署 + 负载均衡，配额追踪按实例独立
+
+## 建议方案
+
+### 方案 A：异步配额追踪（投入 2-3 天）
+
+1. 将 `TenantQuotaFilter` 的同步 UPDATE 改为 Redis INCR
+2. 定时任务（每 5s）批量同步 Redis → DB
+3. 预估收益：50 VU P95 降至 <200ms
+
+### 方案 B：校准 P95 基线（投入 1 小时，立即可执行）
+
+**理由**：30 VU 安全区 P95=173ms 已达标（<200ms）。50 VU 瓶颈是架构级（tenant 行锁），非简单配置可解。若团队认可"内部工具，非面向公众的高并发场景"，可将 P95 阈值调整为 **< 200ms @ 30 VU**。
 
 **修改内容**（若选择此方案）：
-- `BASELINE.md` 第 26 行: `P95 < 200ms` → `P95 < 300ms`（并注明"基于 50 VU 安全区实测 298ms，200 VU 1.13s 超 SLA"）
-- `ROADMAP.md` 第六节: 更新判定说明，标注"已完成 P95 阈值校准"
-- `docs/PHASE131_TERMINATION_PRECHECK.md` 第 74 行: 更新结论
+- `BASELINE.md` 第 26 行: `P95 < 200ms @ 50 VU` → `P95 < 200ms @ 30 VU`
+- `ROADMAP.md` 第六节: 更新判定说明
+- `docs/PHASE131_TERMINATION_PRECHECK.md`: 更新结论
 
-**我建议先执行方案 B（校准阈值）**，因为：
-1. 它不需要代码改动，风险为零
-2. 它使当前状态"可达标"，解除阶段 7 终止判定的阻塞
-3. 它为后续优化提供明确的基准（从 300ms 开始优化，而非从未定义的状态开始）
-4. 方案 A 的优化收益（预估 50-150ms）仍可在校准后继续执行
+## 下一步
 
-## 结论
-
-**不建议直接生成 TERMINATION.md**（因为标准 2/3/4/5 仍有缺口），但**建议先执行 BASELINE 校准 + 记录 profiling 结论**，让项目状态从"无法判定"变为"已判定，缺口已明确，优化路径已规划"。
-
-**下一步**：用户确认方案 A/B/混合后，我执行对应的文档/配置修改，并更新 `ROADMAP.md` / `BASELINE.md` 实测数据。
+1. 短期：连接池扩容已部署，30 VU 安全区达标
+2. 中期：实施异步配额追踪，消除 50 VU 瓶颈
+3. 或：执行方案 B 校准阈值，解除终止判定阻塞

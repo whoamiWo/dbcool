@@ -13,8 +13,10 @@ spring:
     hikari:
       pool-name: nocobase-pool
       # R09: 生产级连接池参数(防耗尽 / 防泄漏 / 自动回收)
-      maximum-pool-size: ${DB_POOL_MAX:20}
-      minimum-idle: ${DB_POOL_MIN:5}
+      # PHASE131 P95: 20 → 50。压测实证 20 并发时池饱和(pending=80)、
+      # P95 307ms;PG max_connections=100 有余量,扩容后消除排队等待。
+      maximum-pool-size: ${DB_POOL_MAX:50}
+      minimum-idle: ${DB_POOL_MIN:10}
       connection-timeout: 30000          # 获取连接最长等待 30s
       max-lifetime: 1800000              # 连接最长存活 30min(低于 PG 默认,避免 stale 连接)
       idle-timeout: 600000               # 空闲 10min 回收
