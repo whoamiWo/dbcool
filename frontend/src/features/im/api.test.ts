@@ -13,6 +13,10 @@ vi.mock('@/api/client', () => ({
 }));
 
 import apiClient from '@/api/client';
+
+/** TS: apiClient.post 为泛型函数，mock 后需断言为 vi.fn 才能调 mockResolvedValue。 */
+const mockedPost = apiClient.post as unknown as ReturnType<typeof vi.fn>;
+
 import {
   getJoinedChannels,
   createChannel,
@@ -152,7 +156,7 @@ describe('高级功能', () => {
 
   it('uploadAttachment 构造 FormData', async () => {
     const file = new File(['content'], 'test.txt', { type: 'text/plain' });
-    apiClient.post.mockResolvedValue({
+    mockedPost.mockResolvedValue({
       code: 0,
       message: 'ok',
       data: { storageKey: 'key1', originalName: 'test.txt', contentType: 'text/plain', size: 100 },

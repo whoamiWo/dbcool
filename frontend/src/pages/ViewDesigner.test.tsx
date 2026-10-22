@@ -2,7 +2,7 @@
  * PHASE 4.2 覆盖率补测：pages/ViewDesigner.tsx
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ViewDesignerPage } from './ViewDesigner';

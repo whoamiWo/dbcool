@@ -2,7 +2,7 @@
  * PHASE 4.2 覆盖率补测：pages/DetailView.tsx
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { DetailViewPage } from './DetailView';
