@@ -53,7 +53,7 @@ npm run build            # ✅ dist/ 生成成功
 
 ### 2.4 性能指标
 - **首屏加载**: LCP < 2.5s, FID < 100ms
-- **Bundle 大小**: 主包 < 500KB, 懒加载 > 100KB 模块
+- **Bundle 大小**: 主包 < 500KB (PHASE133 实测: 293KB minified / 103.75 KB gzip), 懒加载 > 100KB 模块
 - **渲染性能**: 组件重渲染次数 < 3 次/交互
 
 ---

@@ -138,8 +138,9 @@ Cline 角色:
     其在 `USER_STORIES.md` 中定义为「强烈推荐、非必做」，移入后续版本）
 - ✅ **三栈 lint 0 错误**：前端 eslint ✅；Java checkstyle ✅（`checkstyle.xml` + pom 插件，2263/0E）；Python ruff ✅（61 passed, 1 skipped，精确豁免 B008/N815/raises-require-match-for）
 - ✅ **ADR 011 已索引**：补入 `ADR/README.md`，并增加 `IMPLEMENTED` 状态，011 回填
-- ❌ BASELINE 指标未全达标：前端覆盖率 **44.33%**（要求 >80%）、主包 **541KB**（要求 <500KB）、
-  API **P95 298ms**（要求 <200ms，即便 50VU 安全区也未达）
+- ⚠️ BASELINE 指标部分达标（PHASE133 更新）：主包 **293KB** ✅（原 541KB，要求 <500KB，构建无 >500kB 警告）；
+  前端覆盖率 **44.33%** ❌（要求 >80%，核心模块 forms 96.76%/views 99.31% 已达标，全量提升列入后续）；
+  API **P95 298ms** ⚠️（要求 <200ms，50VU 安全区未达，profiling 报告见 `docs/PERF_PROFILING_REPORT.md`）
 - ⚠️ 200 并发：失败率 **0%** ✅，但 P95 **1.13s** / P99 **1.43s** 超 SLA，官方结论标「❌ 延迟激增」
 
 > **终止标准修订（2026-10-22）**：P1 移出终止条件 —— 其在 `USER_STORIES.md` 中定义为
