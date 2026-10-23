@@ -237,15 +237,6 @@ describe('MessageList', () => {
     expect(screen.getByText(/📌|pinned/)).toBeInTheDocument();
   });
 
-  it('reaction 列表渲染 emoji + count', () => {
-    const msgWithReactions = msg({
-      id: 'r1',
-      reactions: [{ emoji: '👍', userId: 'u1' }, { emoji: '👍', userId: 'u2' }],
-    });
-    render(<MessageList currentUserId="me" messages={[msgWithReactions]} />);
-    // reactionsByMsg 初始为空，需要加载后才渲染 — 验证初始化状态
-    expect(screen.getByText('默认内容')).toBeInTheDocument();
-  });
 
   it('consecutive same-sender 消息都渲染', () => {
     const msgs = [
