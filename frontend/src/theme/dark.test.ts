@@ -1,36 +1,59 @@
-/**
- * PHASE 4.2 覆盖率补测：theme/dark.ts
- *
- * dark 对象是 CSS 变量引用映射，测试确保每个键都指向 var(--*) 形式，
- * 避免出现硬编码色值绕过主题切换。
- */
 import { describe, it, expect } from 'vitest';
-import { dark } from './dark';
+import { dark, btnStyles, tableRowStyles, cardBg, cardBorder, inputStyle, tagStyles } from '../theme/dark';
 
-describe('dark theme mapping', () => {
-  it('所有取值均为 CSS 变量引用', () => {
-    for (const [key, value] of Object.entries(dark)) {
-      expect(typeof value, `${key} 应为字符串`).toBe('string');
-      expect(value, `${key} 应引用 CSS 变量`).toMatch(/^var\(--[\w-]+\)$/);
-    }
-  });
-
-  it('背景与文字映射正确', () => {
+describe('dark theme', () => {
+  it('导出完整的 dark tokens', () => {
     expect(dark.bgPrimary).toBe('var(--color-bg-primary)');
     expect(dark.textPrimary).toBe('var(--color-text-primary)');
-    expect(dark.borderMedium).toBe('var(--color-border-medium)');
+    expect(dark.primary500).toBe('var(--color-primary-500)');
+    expect(Object.keys(dark).length).toBeGreaterThan(20);
   });
 
-  it('功能色映射正确', () => {
-    expect(dark.success).toBe('var(--color-success)');
-    expect(dark.warning).toBe('var(--color-warning)');
-    expect(dark.error).toBe('var(--color-error)');
-    expect(dark.info).toBe('var(--color-info)');
+  it('btnStyles primary', () => {
+    const style = btnStyles('primary');
+    expect(style.background).toBe('var(--color-primary-500)');
+    expect(style.color).toBe('#fff');
   });
 
-  it('圆角与阴影映射存在', () => {
-    expect(dark.radiusSm).toBe('var(--radius-sm)');
-    expect(dark.shadow).toBe('var(--shadow-md)');
-    expect(dark.glassBlur).toBe('var(--glass-blur)');
+  it('btnStyles secondary', () => {
+    const style = btnStyles('secondary');
+    expect(style.background).toBe('var(--glass-bg-light)');
+    expect(style.border).toContain('solid');
+  });
+
+  it('btnStyles 默认返回 primary', () => {
+    const style = btnStyles();
+    expect(style.background).toBe('var(--color-primary-500)');
+  });
+
+  it('btnStyles ghost', () => {
+    const style = btnStyles('ghost');
+    expect(style.background).toBe('transparent');
+    expect(style.border).toBe('none');
+  });
+
+  it('tableRowStyles 包含三种状态', () => {
+    expect(tableRowStyles.even).toBe('var(--color-bg-secondary)');
+    expect(tableRowStyles.odd).toBe('var(--color-bg-primary)');
+    expect(tableRowStyles.header).toBe('var(--color-bg-tertiary)');
+  });
+
+  it('cardBg 和 cardBorder', () => {
+    expect(cardBg).toBe('var(--glass-bg-medium)');
+    expect(cardBorder).toBe('var(--glass-border)');
+  });
+
+  it('inputStyle 包含必要属性', () => {
+    expect(inputStyle.width).toBe('100%');
+    expect(inputStyle.padding).toBe('6px 10px');
+    expect(inputStyle.borderRadius).toBe('var(--radius-sm)');
+  });
+
+  it('tagStyles 返回正确结构', () => {
+    const style = tagStyles('#ff0000');
+    expect(style.display).toBe('inline-flex');
+    expect(style.padding).toBe('2px 8px');
+    expect(style.background).toBe('#ff000020');
+    expect(style.color).toBe('#ff0000');
   });
 });

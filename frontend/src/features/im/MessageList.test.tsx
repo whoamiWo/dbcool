@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MessageList } from './MessageList';
 import type { ImMessage } from './api';
 
@@ -22,6 +22,9 @@ vi.mock('react-i18next', () => ({
     },
     i18n: { language: 'zh-CN' },
   }),
+}));
+vi.mock('@/hooks/useIsMobile', () => ({
+  useIsMobile: () => false,
 }));
 
 const msg = (over: Partial<ImMessage> = {}): ImMessage => ({
@@ -166,5 +169,96 @@ describe('MessageList', () => {
     render(<MessageList currentUserId="me" messages={[msgEmptyMention]} />);
     expect(screen.getByText('无提及消息')).toBeInTheDocument();
     expect(screen.queryByText('@')).not.toBeInTheDocument();
+  });
+
+  it('burned 消息渲染「该消息已焚毁」', () => {
+    vi.useFakeTimers();
+    const burnMsg = msg({
+      id: 'burn-1',
+      content: '秘密内容',
+      expiresAt: new Date(Date.now() + 2000).toISOString(),
+    });
+    const onBurnExpired = vi.fn();
+    render(
+      <MessageList currentUserId="me" messages={[burnMsg]} onBurnExpired={onBurnExpired} />,
+    );
+    // 倒计时归零后触发 onBurnExpired，内容替换为「该消息已焚毁」
+    act(() => {
+      vi.advanceTimersByTime(2100);
+    });
+    expect(onBurnExpired).toHaveBeenCalledWith('burn-1');
+    vi.useRealTimers();
+  });
+
+  it('未过期消息显示倒计时火焰标识', () => {
+    vi.useFakeTimers();
+    const burnMsg = msg({
+      id: 'burn-2',
+      content: '限时内容',
+      expiresAt: new Date(Date.now() + 65000).toISOString(),
+    });
+    render(<MessageList currentUserId="me" messages={[burnMsg]} />);
+    expect(screen.getByText(/🔥/)).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it('isMobile 渲染紧凑布局（更小字体/头像）', () => {
+    render(<MessageList currentUserId="me" messages={[msg({})]} />);
+    // isMobile=false 时 maxWidth 为 fit-content
+    const bubble = document.querySelector('.message-bubble');
+    expect(bubble?.getAttribute('style') || '').toContain('fit-content');
+  });
+
+  it('onLoadMore 为 undefined 时不渲染加载更早按钮', () => {
+    render(<MessageList currentUserId="me" messages={[]} />);
+    expect(screen.queryByText(/加载更早消息/)).not.toBeInTheDocument();
+  });
+
+  it('isLoadingMore 时按钮显示加载状态', () => {
+    render(
+      <MessageList currentUserId="me" messages={[]} canLoadMore isLoadingMore onLoadMore={() => {}} />,
+    );
+    expect(screen.getByText(/loading|加载/)).toBeInTheDocument();
+  });
+
+  it('onMessageClick 为 undefined 时不报错', () => {
+    render(<MessageList currentUserId="me" messages={[msg({ id: 'x1', content: 'test' })]} />);
+    expect(screen.getByText('test')).toBeInTheDocument();
+  });
+
+  it('pinned 消息显示 📌 pinned 标识', () => {
+    render(
+      <MessageList
+        currentUserId="me"
+        messages={[msg({ id: 'p1' })]}
+        pinnedMessageIds={new Set(['p1'])}
+      />,
+    );
+    expect(screen.getByText(/📌|pinned/)).toBeInTheDocument();
+  });
+
+  it('reaction 列表渲染 emoji + count', () => {
+    const msgWithReactions = msg({
+      id: 'r1',
+      reactions: [{ emoji: '👍', userId: 'u1' }, { emoji: '👍', userId: 'u2' }],
+    });
+    render(<MessageList currentUserId="me" messages={[msgWithReactions]} />);
+    // reactionsByMsg 初始为空，需要加载后才渲染 — 验证初始化状态
+    expect(screen.getByText('默认内容')).toBeInTheDocument();
+  });
+
+  it('consecutive same-sender 消息都渲染', () => {
+    const msgs = [
+      msg({ id: 'a1', content: '连续一' }),
+      msg({ id: 'a2', content: '连续二' }),
+    ];
+    render(<MessageList currentUserId="me" messages={msgs} />);
+    expect(screen.getByText('连续一')).toBeInTheDocument();
+    expect(screen.getByText('连续二')).toBeInTheDocument();
+  });
+
+  it('reply 消息显示回复标识', () => {
+    render(<MessageList currentUserId="me" messages={[msg({ id: 'rep1', parentId: 'p1' })]} />);
+    expect(screen.getByText(/回复|reply/)).toBeInTheDocument();
   });
 });

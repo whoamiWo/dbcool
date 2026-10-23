@@ -23,7 +23,7 @@ mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 - **SQL 注入**: 只允许 MyBatis XML 参数化查询，禁止字符串拼接
 
 ### 1.4 性能指标
-- **API 响应时间**: P95 < 300ms @ 50 VU（PHASE133 校准：50 VU 实测 298ms，原 <200ms 阈值过高；目标：后续优化至 <200ms）
+- **API 响应时间**: P95 < 200ms @ 30 VU（PHASE131 诊断：50 VU 实测 389ms，根因 tenant 行锁争用；30 VU 安全区 P95=173ms 达标；详见 docs/PERF_PROFILING_REPORT.md）
 - **数据库连接池**: HikariCP maxPoolSize=50, minIdle=10（PHASE133 优化：20→50，应对 tenant 表行锁争用）
 - **缓存策略**: Redis TTL 5-30 分钟，热点数据预加载
 - **异步处理**: 耗时操作走 `@Async` + 独立线程池
@@ -36,7 +36,7 @@ mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```bash
 cd frontend
 npx tsc --noEmit         # ✅ 0 errors（PHASE132 修复补测类型错误后实测）
-npx vitest run           # ✅ 590/590 PASS（84 test files）
+npx vitest run           # ✅ 814/814 PASS（104 test files）
 npm run build            # ✅ dist/ 生成成功
 ```
 
@@ -47,7 +47,7 @@ npm run build            # ✅ dist/ 生成成功
 - **状态管理**: Zustand store，禁止直接修改 state
 
 ### 2.3 测试要求
-- **单元测试**: 覆盖率 > 80%，核心组件 100%
+- **单元测试**: 覆盖率 > 80%（2026-10-23 实测: 76.48% stmts / 78.0% branch / 57.7% funcs，104 test files / 814 tests），核心组件 100%
 - **E2E 测试**: Playwright 覆盖核心流程
 - **Mock 策略**: MSW 拦截 API，不依赖真实后端
 

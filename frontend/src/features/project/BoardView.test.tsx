@@ -110,4 +110,5 @@ describe('BoardView', () => {
     const retryButtons = screen.getAllByRole('button');
     expect(retryButtons.length).toBeGreaterThan(0);
   });
+
 });
