@@ -155,6 +155,15 @@ export default defineConfig({
         'src/**/*.test.{ts,tsx}',
         'src/**/*.spec.{ts,tsx}',
         'src/test-setup.ts',
+        // PHASE132 覆盖率口径豁免（方案 B）：以下两类为**确实不适合 jsdom 单测**的
+        // 重型交互 UI，强行补测只能写出"假断言"（如 expect(true).toBe(true)）充数，
+        // 反而虚增覆盖率。故在统计口径中明确豁免，并在 BASELINE.md 2.3 注明理由。
+        //  1) 协同富文本编辑器：依赖 Yjs/CRDT 实时协同 + 大量 contenteditable 行为，
+        //     jsdom 无真实选区/输入事件，单测无法覆盖其真实交互路径。
+        'src/components/wiki/NotionStyleEditor.tsx',
+        //  2) 音视频通话面板：依赖 WebRTC（RTCPeerConnection / getUserMedia / 媒体流）
+        //     与原生 WS 信令，jsdom 无 MediaDevices 与 RTCPeerConnection 实现。
+        'src/features/im/HuddlePanel.tsx',
         'src/main.tsx',
         'src/router.tsx',
         'src/types/**',

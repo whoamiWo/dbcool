@@ -11,7 +11,7 @@
 |---|---|---|---|
 | Java 测试 | `cd backend-java && mvn -o test` | > 1411，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
 | Java 覆盖率 | `cd backend-java && mvn -o verify` | JaCoCo BUNDLE ≥ 82% | 见 §3 覆盖率缺口与补测计划 |
-| 前端单测 | `cd frontend && npm run test:run` | ≥ 382 | 看 vitest 输出中失败的 spec |
+| 前端单测 | `cd frontend && npm run test:run` | ≥ 800（2026-10-23 实测 814 passed / 104 files） | 看 vitest 输出中失败的 spec |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors | 按报错文件与行号修 |
 | E2E | `cd frontend && npx playwright test` | ≥ 135 | collab-crdt 偶发 429 见 §4 |
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 48 passed / 1 skipped | 看 pytest 输出 |
