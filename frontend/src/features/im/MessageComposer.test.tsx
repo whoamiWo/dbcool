@@ -7,6 +7,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MessageComposer } from './MessageComposer';
+
+/** onSent 为必填 prop，未提供交互断言的用例传此空实现。 */
+const noopSent = () => {};
 import { sendMessage, uploadAttachment, listSlashCommands } from './api';
 
 vi.mock('./api', () => ({
@@ -31,13 +34,13 @@ beforeEach(() => {
 
 describe('MessageComposer', () => {
   it('渲染输入框与发送按钮', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     await waitFor(() => expect(screen.getByLabelText('im.inputMessage')).toBeInTheDocument());
     expect(screen.getByLabelText('im.sendMessage')).toBeInTheDocument();
   });
 
   it('挂载后加载斜杠命令', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     await waitFor(() => expect(mockedCmds).toHaveBeenCalled());
   });
 
@@ -53,7 +56,7 @@ describe('MessageComposer', () => {
   });
 
   it('Enter 发送、Shift+Enter 不发送', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     const input = await screen.findByLabelText('im.inputMessage');
     fireEvent.change(input, { target: { value: 'enter send' } });
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
@@ -63,7 +66,7 @@ describe('MessageComposer', () => {
   });
 
   it('空白内容不发送', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     const input = await screen.findByLabelText('im.inputMessage');
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.click(screen.getByLabelText('im.sendMessage'));
@@ -71,7 +74,7 @@ describe('MessageComposer', () => {
   });
 
   it('disabled 时展示占位符且不发送', async () => {
-    render(<MessageComposer channelId="c1" disabled />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} disabled />);
     const input = await screen.findByLabelText('im.inputMessage');
     expect(input).toHaveAttribute('placeholder', 'im.selectChannelPlaceholder');
     fireEvent.change(input, { target: { value: 'x' } });
@@ -82,7 +85,7 @@ describe('MessageComposer', () => {
   it('发送失败时 alert im.sendFailed', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     mockedSend.mockRejectedValue(new Error('send fail'));
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     const input = await screen.findByLabelText('im.inputMessage');
     fireEvent.change(input, { target: { value: 'boom' } });
     fireEvent.click(screen.getByLabelText('im.sendMessage'));
@@ -90,14 +93,14 @@ describe('MessageComposer', () => {
   });
 
   it('输入 "/" 打开斜杠命令面板', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     const input = await screen.findByLabelText('im.inputMessage');
     fireEvent.change(input, { target: { value: '/' } });
     await waitFor(() => expect(screen.getByText('remind')).toBeInTheDocument());
   });
 
   it('选择斜杠命令写入内容并关闭面板', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     const input = await screen.findByLabelText('im.inputMessage');
     fireEvent.change(input, { target: { value: '/' } });
     await waitFor(() => expect(screen.getByText('remind')).toBeInTheDocument());
@@ -106,7 +109,7 @@ describe('MessageComposer', () => {
   });
 
   it('点击附件按钮弹出文件选择器', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     const fileBtn = screen.getByLabelText('im.uploadAttachment');
     expect(fileBtn).toBeInTheDocument();
     fileBtn.click();
@@ -115,8 +118,8 @@ describe('MessageComposer', () => {
 
   it('选择文件触发上传并回调 onAttachment', async () => {
     const onAttachment = vi.fn();
-    render(<MessageComposer channelId="c1" onAttachment={onAttachment} />);
-    const input = await screen.findByLabelText('im.inputMessage');
+    render(<MessageComposer channelId="c1" onSent={noopSent} onAttachment={onAttachment} />);
+    await screen.findByLabelText('im.inputMessage');
     // 找到隐藏的 file input
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
@@ -133,7 +136,7 @@ describe('MessageComposer', () => {
     Object.defineProperty(file, 'size', { value: 60 * 1024 * 1024, configurable: true });
     expect(file.size).toBeGreaterThan(50 * 1024 * 1024);
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     await screen.findByLabelText('im.inputAreaHint');
     const panel = document.querySelector('[aria-label="im.inputAreaHint"]')!;
     fireEvent.drop(panel, { dataTransfer: { files: [file] } });
@@ -142,7 +145,7 @@ describe('MessageComposer', () => {
   });
 
   it('拖拽文件触发上传', async () => {
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     const panel = await screen.findByLabelText('im.inputAreaHint');
     const file = new File(['x'], 'drag.txt', { type: 'text/plain' });
     fireEvent.drop(panel, { dataTransfer: { files: [file] } });
@@ -152,7 +155,7 @@ describe('MessageComposer', () => {
   it('上传失败时 alert im.uploadFailed', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     mockedUpload.mockRejectedValue(new Error('up fail'));
-    render(<MessageComposer channelId="c1" />);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
     await screen.findByLabelText('im.inputAreaHint');
     const panel = document.querySelector('[aria-label="im.inputAreaHint"]')!;
     const file = new File(['x'], 'fail.txt', { type: 'text/plain' });
