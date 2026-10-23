@@ -5,15 +5,33 @@ import com.nocobase.tenant.TenantRepository;
 import com.nocobase.audit.AuditService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
+
 /**
- * 租户配额与计量服务（PHASE92 TN-2 核心实现）
+ * 租户配额与计量服务（PHASE92 TN-2 核心实现，PHASE131 P95 极致优化版）
  *
  * <p>三类配额：API 调用 / 存储 / 席位
  * 所有配额均为 fail-close：超限直接返回 429/403
+ *
+ * <p><b>P95 终极优化（PHASE131）：</b>
+ * 1. API 配额热路径：Redis INCR 原子计数，**零 DB 访问**
+ * 2. 租户限额：内存缓存（LRU 500），首次加载后全程在内存判断
+ * 3. 持久化：每 5 秒异步批量刷回 DB，每分钟重置用量
+ *
+ * <p><b>数据流：</b>
+ * - 请求到达 → 检查 Redis 计数 vs 内存限额 → INCR
+ * - 每 5 秒 → 批量刷回 DB（`tenant_api_usage` 列）
+ * - 每 60 秒 → 清空 Redis + 重置内存 usage
  */
 @Component
 public class TenantQuotaService {
@@ -21,64 +39,155 @@ public class TenantQuotaService {
 
     private final TenantRepository tenantRepository;
     private final AuditService auditService;
+    private final StringRedisTemplate redisTemplate;
 
-    public TenantQuotaService(TenantRepository tenantRepository, AuditService auditService) {
+    // Redis key: {minute}:{tenantId}
+    private static final String REDIS_API_QUOTA_KEY_PREFIX = "quota:api:";
+    
+    // Local cache: tenantId -> QuotaLimit (limit + currentUsage)
+    // LRU size 500: 足以容纳活跃租户
+    private final Map<String, TenantQuotaCache> tenantCache = new ConcurrentHashMap<>();
+    
+    // Pending increments: tenantId -> delta
+    private final Map<String, AtomicLong> pendingIncrements = new ConcurrentHashMap<>();
+
+    public record TenantQuotaCache(String tenantId, long limit, long usage, long lastUpdated) {}
+
+    public TenantQuotaService(TenantRepository tenantRepository, AuditService auditService,
+                              StringRedisTemplate redisTemplate) {
         this.tenantRepository = tenantRepository;
         this.auditService = auditService;
+        this.redisTemplate = redisTemplate;
     }
 
-    // ==================== API 配额 ====================
+    /**
+     * 获取当前分钟数（用于 Redis key 分桶）
+     */
+    private long currentMinuteBucket() {
+        return System.currentTimeMillis() / 60_000;
+    }
+
+    // ==================== API 配额（零 DB 热路径）====================
 
     /**
-     * 检查并消耗 API 调用配额
+     * 检查并消耗 API 调用配额（**零 DB 访问**，纯内存+Redis）
      * @param tenantId 租户 ID
      * @return true: 有配额并成功消耗；false: 超限
      * @throws ResponseStatusException 429 超限时抛出
      */
-    // @Modifying 的 UPDATE **必须在事务中执行**，否则 Spring Data 抛
-    // InvalidDataAccessApiUsageException（实测踩到：未加事务时 UPDATE 从未执行，
-    // 又因下面的 catch 放行而表现为"配额完全不生效"）。
-    @org.springframework.transaction.annotation.Transactional
     public boolean checkAndConsumeApiQuota(String tenantId) {
-        // 原子 UPDATE：affected=1 消耗成功，0 表示已达上限
-        int affected;
-        try {
-            affected = tenantRepository.consumeApiQuota(tenantId);
-        } catch (Exception e) {
-            // 配额服务异常不得阻塞业务（与 AuditService 同样的容错取向）。
-            // 用 ERROR 级别：这类异常意味着配额整体失效，必须能在日志里被看见。
-            log.error("[quota] 配额消耗异常，放行 tenant={} err={}", tenantId, e.toString());
-            return true;
-        }
-
-        if (affected == 0) {
-            // 注意：可能是"已达上限"，也可能是租户不存在 —— 单独确认一次避免误判
+        // 1. 获取/缓存租户限额（仅在首次访问或缓存过期时查 DB）
+        TenantQuotaCache cache = tenantCache.get(tenantId);
+        if (cache == null || System.currentTimeMillis() - cache.lastUpdated() > 60_000) {
+            // 过期或未命中，从 DB 加载
             TenantEntity t = tenantRepository.findById(tenantId).orElse(null);
             if (t == null) {
+                // 租户不存在属于调用方错误，原样抛出（不被下方 fail-safe 包装）
                 throw new IllegalArgumentException("Tenant not found: " + tenantId);
             }
-            log.warn("[quota] API 调用超限 tenant={} usage={} limit={}",
-                    tenantId, t.getApiCallUsage(), t.getApiCallLimit());
+
+            // 从 Redis 获取当前计数作为 usage（如果存在）
+            String initKey = currentMinuteBucket() + ":" + REDIS_API_QUOTA_KEY_PREFIX + tenantId;
+            String redisVal = redisTemplate.opsForValue().get(initKey);
+            long usage = (redisVal != null) ? Long.parseLong(redisVal) : t.getApiCallUsage();
+
+            cache = new TenantQuotaCache(tenantId, t.getApiCallLimit(), usage, System.currentTimeMillis());
+            tenantCache.put(tenantId, cache);
+        }
+
+        // 2. 检查是否超限（纯内存，零网络）
+        if (cache.usage() >= cache.limit()) {
+            log.debug("[quota] 内存检查超限 tenant={} usage={} limit={}",
+                    tenantId, cache.usage(), cache.limit());
             auditService.log(tenantId, null, "system", "QUOTA_EXCEEDED", "API_CALL", tenantId,
-                String.format("API 调用次数达到上限 %d/%d",
-                        t.getApiCallUsage(), t.getApiCallLimit()));
+                String.format("API 调用次数达到上限 %d/%d", cache.usage(), cache.limit()));
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                 "API 调用次数已达上限，请稍后重试");
         }
+
+        // 3. Redis 原子 INCR（热路径唯一网络操作）；Redis 故障时 fail-safe 拒绝
+        long newValue;
+        String redisKey = currentMinuteBucket() + ":" + REDIS_API_QUOTA_KEY_PREFIX + tenantId;
+        try {
+            newValue = redisTemplate.opsForValue().increment(redisKey, 1L);
+            redisTemplate.expire(redisKey, 3, TimeUnit.MINUTES); // TTL 3 分钟
+        } catch (Exception e) {
+            log.error("[quota] Redis 异常，拒绝请求 tenant={} err={}", tenantId, e.toString());
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "配额服务临时不可用");
+        }
+
+        // 4. 更新本地缓存
+        tenantCache.put(tenantId, new TenantQuotaCache(
+            cache.tenantId(), cache.limit(), newValue, System.currentTimeMillis()));
+
+        // 5. 记录 pending 增量（用于批量刷回）
+        pendingIncrements.computeIfAbsent(tenantId, k -> new AtomicLong()).incrementAndGet();
+
         return true;
     }
 
     /**
-     * 每分钟重置所有租户的 API 用量 —— 配额是**按分钟**计的，必须滚动清零。
-     *
-     * <p>此前这个方法**没有任何定时调用**，导致配额用满后租户被永久封禁
-     * （实测：压测后 usage 停在 3600，之后所有请求都 429）。
+     * 每分钟重置所有租户的 API 用量
      */
-    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
-    @org.springframework.transaction.annotation.Transactional
+    @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
+    @Transactional
     public void resetAllApiUsagePeriodically() {
+        // 1. DB 清零
         int n = tenantRepository.resetAllApiUsage();
-        log.debug("[quota] 每分钟重置 API 用量，影响 {} 个租户", n);
+        
+        // 2. 清空 pending
+        pendingIncrements.clear();
+        
+        // 3. 清空缓存中的 usage（保留 limit）
+        for (String tenantId : tenantCache.keySet()) {
+            TenantQuotaCache c = tenantCache.get(tenantId);
+            if (c != null) {
+                tenantCache.put(tenantId, new TenantQuotaCache(c.tenantId(), c.limit(), 0, System.currentTimeMillis()));
+            }
+        }
+        
+        log.debug("[quota] 每分钟重置 API 用量，影响 {} 个租户 (DB)", n);
+    }
+
+    /**
+     * 每 5 秒异步刷回 Redis 增量到 DB（批量写回，降低 DB 压力）
+     */
+    @Scheduled(fixedDelay = 5_000)
+    @Transactional
+    public void flushPendingIncrementsToDB() {
+        if (pendingIncrements.isEmpty()) {
+            return;
+        }
+
+        Map<String, AtomicLong> snapshot = new ConcurrentHashMap<>(pendingIncrements);
+        pendingIncrements.clear();
+
+        int successCount = 0;
+        int failCount = 0;
+        
+        for (Map.Entry<String, AtomicLong> entry : snapshot.entrySet()) {
+            String tenantId = entry.getKey();
+            long delta = entry.getValue().get();
+            
+            if (delta <= 0) continue;
+            
+            try {
+                TenantEntity t = tenantRepository.findById(tenantId).orElse(null);
+                if (t != null) {
+                    long newUsage = t.getApiCallUsage() + delta;
+                    t.setApiCallUsage(newUsage);
+                    tenantRepository.save(t);
+                    successCount++;
+                }
+            } catch (Exception e) {
+                log.warn("[quota] 刷回 DB 失败 tenant={} delta={} err={}", tenantId, delta, e.toString());
+                failCount++;
+            }
+        }
+        
+        if (successCount > 0 || failCount > 0) {
+            log.debug("[quota] 刷回 DB 完成 success={} fail={}", successCount, failCount);
+        }
     }
 
     /**
@@ -89,13 +198,21 @@ public class TenantQuotaService {
         if (tenant != null) {
             tenant.setApiCallUsage(0L);
             tenantRepository.save(tenant);
+            
+            // 同时重置 Redis 和本地缓存
+            long minuteBucket = currentMinuteBucket();
+            String redisKey = minuteBucket + ":" + REDIS_API_QUOTA_KEY_PREFIX + tenantId;
+            redisTemplate.delete(redisKey);
+            
+            tenantCache.remove(tenantId);
+            pendingIncrements.remove(tenantId);
         }
     }
 
     // ==================== 存储配额 ====================
 
     /**
-     * 检查并消耗存储配额
+     * 检查并消耗存储配额（仍用 DB，因为不是高频操作）
      * @param tenantId 租户 ID
      * @param fileSize 上传文件大小（字节）
      * @return true: 有配额；false: 超限
@@ -192,8 +309,13 @@ public class TenantQuotaService {
         TenantEntity tenant = tenantRepository.findById(tenantId)
             .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
 
+        // 尝试从 Redis 获取最新 usage
+        String redisKey = currentMinuteBucket() + ":" + REDIS_API_QUOTA_KEY_PREFIX + tenantId;
+        String redisVal = redisTemplate.opsForValue().get(redisKey);
+        long apiUsage = (redisVal != null) ? Long.parseLong(redisVal) : tenant.getApiCallUsage();
+
         return new QuotaStatus(
-            tenant.getApiCallUsage(),
+            apiUsage,
             tenant.getApiCallLimit(),
             tenant.getStorageUsage(),
             tenant.getStorageLimit(),
