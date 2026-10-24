@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """PHASE92 TN-2 终止预演脚本"""
-import subprocess, os, sys, json
+import subprocess, os, sys, json, re
 from datetime import datetime
 
 BASE = "/home/who/multistack-project"
@@ -27,11 +27,11 @@ def get_token():
 print("🔍 PHASE92 TN-2 终止预演")
 print("="*60)
 
-# 1. 后端测试
+# 1. 后端测试（TenantQuotaServiceTest 15 个用例；不加 -q，避免 surefire 抑制 Tests run 行）
 print("\n[1/5] 后端单元测试...")
-out = run("cd backend-java && mvn test -Dtest=TenantQuotaServiceTest -q 2>&1 | grep 'Tests run'")
+out = run("cd backend-java && mvn test -Dtest=TenantQuotaServiceTest 2>&1 | grep -E 'Tests run:.*Failures'")
 print(f"  {out}")
-if "BUILD SUCCESS" not in out and "Failures: 0, Errors: 0" not in out:
+if "Failures: 0, Errors: 0" not in out:
     print("  ⚠️ 测试输出异常")
 
 # 2. 前端测试
@@ -45,13 +45,15 @@ try:
     token = get_token()
     cmd = f'timeout 60 python3 scripts/perf-load.py --url http://localhost:8080/api/collections --concurrency 30 --duration 10 --token "{token}"'
     out = run(cmd)
-    # 解析结果
+    # perf-load.py 输出多行 pretty-print JSON；用正则提取首 { 到末 } 子串再解析
     try:
-        d = json.loads(out.split('\n')[0]) if '\n' in out else json.loads(out.strip())
+        m = re.search(r'\{.*\}', out, re.DOTALL)
+        d = json.loads(m.group(0)) if m else {}
         p95 = d.get('p95_ms', 0)
-        print(f"  P95={p95}ms {'✅' if p95 <= 300 else '⚠️'}")
-    except:
-        print(f"  {out[:200]}...")
+        print(f"  P95={p95}ms {'✅' if p95 <= 300 else '⚠️'}（阈值 ≤300ms）")
+    except Exception as e:
+        print(f"  ⚠️ 压测结果解析失败 {e}")
+        print(f"  原始输出前 200 字符: {out[:200]}...")
 except Exception as e:
     print(f"  ⚠️ 压测无法执行：{e}")
 
