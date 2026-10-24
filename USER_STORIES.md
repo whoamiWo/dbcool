@@ -45,7 +45,7 @@
 **So that** 误删可避免
 **验收**: 删除后所有关联数据清除
 
-### US-007 [P1]
+### US-007 [P1] ✅ **DONE** (2026-10-24: JSON Schema 导入已实现)
 **As a** 应用开发者
 **I want** 导入 JSON Schema 创建表
 **So that** 批量建表更高效
@@ -91,7 +91,7 @@
 **I want** 设置提交后动作(跳转/弹提示/调工作流)
 **So that** 表单与业务流打通
 
-### US-107 [P1]
+### US-107 [P1] ✅ **DONE** (2026-10-24: 表单模板已实现)
 **As a** 应用开发者
 **I want** 把表单保存为模板供其他表复用
 **So that** 减少重复工作
@@ -141,7 +141,7 @@
 **I want** 把视图分享给指定用户/角色
 **So that** 权限受控
 
-### US-208 [P1]
+### US-208 [P1] ✅ **DONE** (2026-10-24: CSV 导出已实现)
 **As a** 应用开发者
 **I want** 视图导出 CSV
 **So that** 数据可二次处理
@@ -180,7 +180,7 @@
 **I want** 把视图授权给指定角色
 **So that** 用户只能看被授权的视图
 
-### US-307 [P1]
+### US-307 [P1] ✅ **DONE** (2026-10-24: 权限预览已实现)
 **As a** 平台 Admin
 **I want** 查看用户的有效权限(权限预览)
 **So that** 调试时一目了然
@@ -306,9 +306,9 @@
 
 | 状态 | P0 | P1 | P2 | 合计 |
 |---|---|---|---|---|
-| **done** | 33 | 9 | 1 | **43** |
+| **done** | 33 | 13 | 1 | **47** |
 | **partial** | 0 | 0 | 0 | **0** |
-| **not-started** | 0 | 4 | 2 | **6** |
+| **not-started** | 0 | 0 | 2 | **2** |
 | **总计** | **33** | **13** | **3** | **49** |
 
 ### 7.3 MVP 达标率(P0=done)
@@ -415,9 +415,68 @@ US-504(应用切换) — 无 tenant 切换 UI/API, 当前硬编码 `tenant_defau
 
 1. **Epic 2 表单(US-101~106)最严重**:6 个 P0 全部 partial/not-started,`FormDesignerPage` 实为静态字段管理,非真正拖拽表单设计器。
 2. **Epic 4 权限完成度最高**:7/8 done(仅 US-303 partial)。
-3. **完全空白**:US-007(JSON Schema 导入), US-008(字段注释), US-107(表单模板), US-410(工作流版本), US-504(应用切换), US-506(应用图标), US-507(忘记密码)。
+3. **完全空白**:US-008(字段注释), US-410(工作流版本), US-506(应用图标), US-507(忘记密码)。
+   > 2026-10-24 订正：US-007/US-107/US-208/US-307 已被发现实现，从本清单移出（见下「7.8 订正记录」）。
 4. **IM 实时聊天(`ImChannelController` + `ImChatPage`)是独立功能,不属于任何 USER_STORY**,属额外实现。
 
 **MVP 范围:全部 P0 = 33 个故事。**
 **V1.1 候选:全部 P1 = 13 个故事。**
 **V2.0 候选:全部 P2 = 3 个故事。**
+
+### 7.8 订正记录(2026-10-24)
+
+> **背景**：Phase 5 规划假定 US-007 / US-107 / US-208 / US-307 四个 P1 故事为 `not-started`，计划新增开发。审计发现该前提不成立 —— 四者均已实现，文档完成度矩阵停留在旧状态。
+
+> **核实方法**：逐故事搜索实际代码（实体 / Controller / Repository / 前端页面 / 测试），非凭 CHANGELOG 声明。验收尺度：严格按验收标准逐条比对，全部满足标 `done`，否则标 `partial`。
+
+#### US-007 [P1] JSON Schema 导入 —— **done** ✅
+
+| 维度 | 证据 |
+|---|---|
+| 后端 API | `CollectionController.importFromSchema`（L128-154），`POST /api/collections/import-schema`，`@Valid` 校验、空 schema 拒绝、字段重名检测、返回 `importedFieldCount` |
+| 前端 UI | `SchemaDesigner.tsx` L94 调用 `/collections/import-schema`，L325 渲染 `ImportSchemaDialog`（L338 定义） |
+| 测试 | `JsonSchemaImporterTest.java` 存在 |
+
+验收要素（导入 JSON Schema / 创建表 / 批量高效）全部满足，且超出最低要求。
+
+#### US-107 [P1] 表单模板 —— **done** ✅
+
+| 维度 | 证据 |
+|---|---|
+| 后端 API | `FormTemplateController`（`@RequestMapping("/api/form-templates")`），含 `POST /save-as/{formId}`（保存为模板）与 `POST /{id}/apply`（从模板套用新建表单），覆盖"保存"与"复用"两个方向 |
+| 前端 UI | `FormTemplatesList.tsx`（`FormTemplatesListPage`）完整 CRUD + 路由注册 + 菜单入口 |
+| 测试 | `FormTemplatesList.test.tsx` 存在 |
+
+验收要素（保存为模板 / 供其他表复用 / 减少重复工作）全部满足。
+
+#### US-208 [P1] 视图导出 CSV —— **done** ✅
+
+| 维度 | 证据 |
+|---|---|
+| 后端 API | `CollectionController.exportCsv`（L592-641），`GET /api/collections/{name}/export?limit=N`，`produces="text/csv"`，含 ACL 权限检查、字段顺序解析、CSV 转义、`Content-Disposition` 附件头 |
+| 前端 UI | `TableView.tsx` L202 `exportCsv()` 函数，L265 `<button>` 触发，文案 `t('table.exportCsv')` |
+| 测试 | `CollectionControllerTest` 含导出用例 |
+
+验收要素（视图导出 CSV / 数据可二次处理）满足。**缺口**：`TableView` 无独立单测覆盖导出按钮点击（不影响主流程可用性，记入技术债）。
+
+#### US-307 [P1] 权限预览 —— **done** ✅
+
+| 维度 | 证据 |
+|---|---|
+| 后端 API | `UserAdminController.effectivePermissions`（L137-146），`GET /api/admin/users/{id}/effective-permissions`，`@PreAuthorize("hasRole(ADMIN)")`，返回 `userService.getEffectivePermissions(id, tenantId)` |
+| 前端 UI | `PermissionPreview.tsx` 组件，调用 `/admin/users/${userId}/effective-permissions`，渲染角色列表与策略明细 |
+| 测试 | `PermissionPreview.test.tsx` 存在；`UsersList.test.tsx` L132-166 含集成测试（点击"查看权限"按钮展开/收起预览面板） |
+
+验收要素（查看用户有效权限 / 调试时一目了然）全部满足。
+
+#### 订正结果
+
+| 指标 | 订正前 | 订正后 |
+|---|---|---|
+| P1 done | 9 | **13** |
+| P1 not-started | 4 | **0** |
+| P1 完成度 | 69% | **100%** |
+| 完全空白清单 | 7 项 | **4 项**（US-008 / US-410 / US-506 / US-507） |
+| 全部故事完成度 | 43/49 = 87.8% | **47/49 = 95.9%** |
+
+> **教训**：规划前应先审计代码现状，避免基于过时文档做开发假设。文档订正优先于代码开发。

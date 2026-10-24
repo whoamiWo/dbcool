@@ -118,10 +118,10 @@ dbcool/
 
 ### 测试规模(PHASE117-121 最新实测)
 
-#### Java 后端（2263 tests）
+#### Java 后端（2277 tests）
 
 ```bash
-cd backend-java && mvn test   # ✅ 2263/2263 PASS
+cd backend-java && mvn test   # ✅ 2277/2277 PASS
 ```
 
 | 类型 | 数量 | 说明 |
@@ -287,17 +287,17 @@ add field → 同步 ALTER(小表秒过)
 ## 📈 进度数据
 
 - **后端 Java 源文件**:90+(12 个包)
-- **测试**:2666 全 PASS（Java 2263 + 前端 403）
+- **测试**:3154 全 PASS（Java 2277 + 前端 877）
 - **覆盖率**:83% bundle / 10 条 Jacoco 红线全达标
 - **文档**:30+（规划 ADR 设计 WEEK_*_HANDOFF）
 - **总 commits**:120+（本会话累计）
 
-## 🛡️ 门禁状态（2026-10-21 实测）
+## 🛡️ 门禁状态（2026-10-24 实测）
 
 | 门禁 | 结果 |
 |------|------|
-| Java `mvn test` | ✅ 2263/2263 PASS（0F/0E） |
-| 前端 `npx vitest run` | ✅ 403/403 PASS |
+| Java `mvn test` | ✅ 2277/2277 PASS（0F/0E） |
+| 前端 `npx vitest run` | ✅ 877/877 PASS（109 文件） |
 | 前端 `npx tsc --noEmit` | ✅ 0 errors |
 | 前端 `npx eslint src` | ✅ 0 warnings |
 | Playwright E2E | ✅ 159/159 PASS |
