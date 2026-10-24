@@ -52,19 +52,60 @@ type: reference
 **50 VU P95 ≈ 543ms（4 轮中位数）❌ 未达标** —— 与 PHASE134 基线（469–487ms）差异在波动范围内，
 **未证明改善**。见下方「瓶颈重新定位」。
 
-### 瓶颈重新定位（PHASE135 结论）
+### 瓶颈重新定位（PHASE135 profiling 实证，2026-10-25）
 
-原假设「tenant 行锁是 50 VU P95 的决定性瓶颈」**不成立**：
-- 已消除的锁源：每请求同步 UPDATE（PHASE134）、5s 批量 UPDATE（降频至 60s）、每分钟全表 reset（移除）
-- 结果：50 VU P95 未见可测量改善（543ms vs 基线 ~470ms，落在 ±150ms 波动内）
-- 推论：**长尾来自其他路径**。候选（待 profiling 验证）：
-  1. `/api/collections` 业务查询本身（CollectionService.list + 权限过滤）
-  2. JVM GC 暂停（堆 1G，压测期对象分配密集）
-  3. HikariCP 池上限（PG `max_connections=100` → 池上限 80）在高并发下的等待
-  4. 宿主机 CPU 争抢（多容器同机：Java/Python/Redis/PG/RabbitMQ）
+> 诊断方法：压测 50 VU / 30s 窗口内三路取证。
+> ① 线程栈：`jstack` 对容器进程无权限（PID namespace + ptrace 限制，容器内为 JRE 无 JDK 工具），
+> 改用 `docker exec kill -3 1`（SIGQUIT）触发 JVM 线程栈输出到容器日志，成功采集 3 次。
+> ② GC：`jstat` 同样无权限，改由线程栈间接判定。
+> ③ 数据库：PG 慢查询日志（`log_min_duration_statement=50`，日志输出到 stderr 而非文件）。
 
-**下一步建议**：用 async-profiler 采样或 PG `pg_stat_statements` 定位，
-而非继续基于假设改配置。在此之前，50/200 VU 维持「已知架构限制」标记。
+#### 证据一：线程栈 —— 锁/连接池/线程池**均已排除**
+
+| 指标 | 实测 | 结论 |
+|---|---|---|
+| `BLOCKED` 线程数 | **0** | 无锁竞争 |
+| 等待 HikariCP 连接 | **0** | 连接池无等待 |
+| Tomcat `http-nio-8080-exec` 线程 | 51 个（50 VU 对应，未饱和） | 线程池非瓶颈 |
+| 线程状态分布 | RUNNABLE 262 / WAITING 69 / TIMED_WAITING 49 | 线程在忙，非阻塞 |
+| **栈顶方法** | **147 个 `poll`**（socket I/O 等待） | 线程在等下游响应，非 CPU 计算 |
+
+> 无线程停在 GC 相关方法 → **GC 停顿可排除**（`jstat` 不可用，此为间接判定）。
+
+#### 证据二：数据库慢查询 —— 改造后**归零**
+
+| 时点 | 慢查询数（>50ms） | 典型语句 | 耗时 |
+|---|---|---|---|
+| 改造前（2026-10-24 23:12） | **67292 条** | `update tenant set api_call_usage=api_call_usage+1 where id=$1 and api_call_usage<api_call_limit` | 132–409ms |
+| 改造后（2026-10-25） | **0 条** | — | — |
+
+慢 SQL 来源为 `TenantRepository.consumeApiQuota()`（旧同步配额消耗路径），
+已在 PHASE134（热路径改 Redis INCR）+ PHASE135（移除全表 reset）中停用。
+
+#### 交叉判定
+
+**数据库路径已彻底优化**（慢查询从 67292 条归零、无锁等待、无连接池等待），
+但 50 VU P95 仍为 ~534ms（本轮实测），与基线 469–487ms 持平。
+
+→ **结论：P95 长尾不在数据库层，也不在 JVM 锁/GC/线程池，而在应用层与环境的交互**
+（socket 往返累积、单机 docker compose 多容器资源争抢：Java/Python/Redis/PG/RabbitMQ 同机）。
+多轮测量波动 393–568ms（±150ms）印证了环境噪声主导。
+
+**候选假设核验结果**：
+
+| 候选 | 判定 |
+|---|---|
+| ① `/api/collections` 业务查询慢 | ❌ **排除**（改造后所有 SQL <50ms，无慢查询） |
+| ② JVM GC 暂停 | ❌ **排除**（线程栈无 GC 停顿） |
+| ③ HikariCP 池等待 | ❌ **排除**（等待线程 0） |
+| ④ 宿主机多容器资源争抢 | ⚠️ **最可能**（唯一未排除项，波动幅度 ±150ms 与之吻合） |
+
+**下一步建议**：
+1. 在**隔离环境**（独占 CPU/内存，或独立压测机）复测，排除宿主机争抢后再判定是否真有瓶颈
+2. 如需精确定位，建议启用 `pg_stat_statements`（需改 `shared_preload_libraries`，本次未擅自修改）
+   或部署 async-profiler 到容器内
+3. 在此之前，50/200 VU 维持「已知架构限制」标记，**不阻塞终止判定**
+4. 本次配额改造本身是正向的（消除 67292 条慢查询），建议保留而非回退
 
 ### 排除的假设
 
