@@ -6,13 +6,14 @@
 
 | 故事 | 状态 | 说明 |
 |---|---|---|
-| US-007 JSON Schema 导入 | done ✅ | `CollectionController.importFromSchema()` + `SchemaDesigner.tsx` ImportSchemaDialog |
-| US-107 表单模板 | done ✅ | `FormTemplateService` + `FormTemplatesList.tsx` + 路由/菜单 |
-| US-208 CSV 导出 | done ✅ | `CollectionController.exportCsv()` + `TableView.exportCsv()` |
-| US-307 权限预览 | done ✅ | `UserAdminController.effectivePermissions()` + `PermissionPreview.tsx` |
+| US-007 JSON Schema 导入 | done ✅ | `CollectionController.importFromSchema()`（L128-154）+ `SchemaDesigner.tsx` L325 `ImportSchemaDialog`；测试 `JsonSchemaImporterTest.java` |
+| US-107 表单模板 | done ✅ | `FormTemplateController`（`/api/form-templates`，含 `save-as`/`apply`）+ `FormTemplateService` + `FormTemplatesList.tsx`；测试 `FormTemplatesList.test.tsx` |
+| US-208 CSV 导出 | done ✅ | `CollectionController.exportCsv()`（L592-641）+ `TableView.tsx` L202 `exportCsv()`；测试 `CollectionControllerTest` |
+| US-307 权限预览 | done ✅ | `UserAdminController.effectivePermissions()`（L137-146）+ `PermissionPreview.tsx`；测试 `PermissionPreview.test.tsx` + `UsersList.test.tsx` L132-166 |
 
 - 原文档矩阵停留旧状态（P1 9/13），经代码审计逐条核验后订正为 **13/13 = 100%**
 - 详见 `USER_STORIES.md` 第 426-482 行订正记录
+- **自纠**：终止报告初版误写 `FormDesignerController.saveAsTemplate()` / `FormTemplatePanel.tsx` / `AclEnforce.previewPermissions()` 三个符号（全仓检索确认不存在，仅出现在报告自身），已订正为上述真实符号并附行号
 
 ### 2. 前端 lint 清零（遗留 8 处警告修复）
 
