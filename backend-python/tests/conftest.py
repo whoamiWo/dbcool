@@ -1,20 +1,25 @@
 """Pytest fixtures for R11 tests."""
 
+import os
+
 import pytest
 
-# JWT 测试专用密钥（与 Java 侧 application-test.properties 的 ci_jwt_secret 对齐）。
-# 移除 config.py 的 dev 默认值后，测试环境必须由 conftest 显式注入，避免依赖公开密钥。
+# CI 专用密钥（与 Java 侧 application-test.properties 的 ci_jwt_secret 对齐）。
 _CI_JWT_SECRET = "ci_jwt_secret_at_least_32_chars_for_hs256_algorithm"
 
 
-@pytest.fixture(autouse=True)
-def _set_jwt_secret_for_tests(monkeypatch):
-    """为所有测试注入测试专用 JWT_SECRET（生产密钥不得进入测试上下文）。"""
-    monkeypatch.setenv("JWT_SECRET", _CI_JWT_SECRET)
-    # PHASE114: 备份服务 MinIO 凭据 —— 即使 MINIO_ENABLED 未开，提前设值可避免
-    # 未来测试意外启用 MinIO 时回落到弱口令（已移除）。
-    monkeypatch.setenv("MINIO_ROOT_PASSWORD", "ci_minio_root_password_for_tests")
-    return
+def pytest_configure(config):
+    """Early environment setup before any test collection.
+    
+    This hook runs before test collection starts, ensuring that Settings
+    can be instantiated during import time without validation errors.
+    See PHASE114 security fix: JWT_SECRET must be provided via env var.
+    """
+    # Inject test-only environment variables BEFORE any module import
+    if not os.environ.get("JWT_SECRET"):
+        os.environ["JWT_SECRET"] = _CI_JWT_SECRET
+    if not os.environ.get("MINIO_ROOT_PASSWORD"):
+        os.environ["MINIO_ROOT_PASSWORD"] = "ci_minio_root_password_for_tests"
 
 
 @pytest.fixture(autouse=True)

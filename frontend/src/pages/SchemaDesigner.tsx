@@ -366,23 +366,31 @@ function ImportSchemaDialog({
 
   return (
     <div
+      role="presentation"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
         display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000,
       }}
       onClick={onClose}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+      tabIndex={-1}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="schema-import-title"
         style={{
           background: 'var(--color-bg-primary)', padding: 24, borderRadius: 8,
           minWidth: 480, maxWidth: 720, color: 'var(--color-text-primary)',
         }}
-        onClick={(e) => e.stopPropagation()
-      }>
-        <h2>{t('schemaDesigner.importSchema')}</h2>
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="schema-import-title">{t('schemaDesigner.importSchema')}</h2>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>{t('schemaDesigner.collectionName')}</label>
+          <label htmlFor="schema-collection-name" style={{ display: 'block', marginBottom: 4 }}>{t('schemaDesigner.collectionName')}</label>
           <input
+            id="schema-collection-name"
             value={importName}
             onChange={(e) => setImportName(e.target.value)}
             placeholder={t('schemaDesigner.collectionNamePlaceholder')}
@@ -390,8 +398,9 @@ function ImportSchemaDialog({
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>{t('schemaDesigner.displayTitle')}</label>
+          <label htmlFor="schema-display-title" style={{ display: 'block', marginBottom: 4 }}>{t('schemaDesigner.displayTitle')}</label>
           <input
+            id="schema-display-title"
             value={importTitle}
             onChange={(e) => setImportTitle(e.target.value)}
             placeholder={t('schemaDesigner.displayTitlePlaceholder')}
@@ -399,8 +408,9 @@ function ImportSchemaDialog({
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', marginBottom: 4 }}>JSON Schema</label>
+          <label htmlFor="schema-json" style={{ display: 'block', marginBottom: 4 }}>JSON Schema</label>
           <textarea
+            id="schema-json"
             value={schemaText}
             onChange={(e) => setSchemaText(e.target.value)}
             placeholder='{"type":"object","properties":{"name":{"type":"string"},...}}'

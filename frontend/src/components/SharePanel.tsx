@@ -29,8 +29,15 @@ export function SharePanel({ viewId, initialShares = [], onChange, onSave }: Sha
   const [newName, setNewName] = useState('');
 
   // 外部数据回填(编辑已有视图时)
+   
   useEffect(() => {
-    setEntries(initialShares);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 回填初始 shares，guarded 比较避免无效渲染
+    setEntries((prev) =>
+      prev.length === initialShares.length &&
+        prev.every((p, i) => p.id === initialShares[i]?.id)
+        ? prev
+        : initialShares
+    );
   }, [initialShares]);
 
   const saveMutation = useMutation({
