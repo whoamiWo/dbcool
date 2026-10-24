@@ -134,17 +134,17 @@ cd backend-java && mvn test   # ✅ 2277/2277 PASS
 - **Jacoco 覆盖率**: 83% BUNDLE（10 条红线全达标，见下表）
 - **测试金字塔**: 单元 2225 / 安全 15 / E2E 8，顶层 E2E 抓集成层 bug，底层单元抓业务逻辑
 
-#### 前端 React（403 tests）
+#### 前端 React（877 tests / 109 files）
 
 ```bash
-cd frontend && npx vitest run   # ✅ 403/403 PASS
+cd frontend && npx vitest run   # ✅ 877/877 PASS（2026-10-24 实测）
 cd frontend && npx tsc --noEmit # ✅ 0 errors
 cd frontend && npx eslint src   # ✅ 0 warnings
 ```
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| vitest 单测 | 403 | DOM 交互、逻辑分支、i18n key 完整性 |
+| vitest 单测 | 877 | DOM 交互、逻辑分支、i18n key 完整性（覆盖率 80.06% lines） |
 | TypeScript 类型检查 | 0 error | 全量源码 tsc --noEmit 通过 |
 | ESLint 静态检查 | 0 warning | 遵循项目 ESLint 配置 |
 

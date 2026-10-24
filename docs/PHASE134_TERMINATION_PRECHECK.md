@@ -52,7 +52,7 @@
 
 | 指标 | 要求 | 实测 | 判定 |
 |---|---|---|---|
-| Java 测试 | > 1411 | **2263/2263 PASS** | ✅ |
+| Java 测试 | > 1411 | **2277/2277 PASS**（2026-10-24 实测） | ✅ |
 | Java 覆盖率 | > 82% | **84.07%** | ✅ |
 | 前端 tsc | 0 errors | **0** | ✅ |
 | 前端 vitest | ≥ 800 | **877/877 PASS** | ✅ |
@@ -230,7 +230,7 @@ cd frontend && CI=true npx vitest run --coverage
 
 # 后端测试
 cd backend-java && mvn -o test
-# 2263/2263 PASS, BUILD SUCCESS
+# 2277/2277 PASS, BUILD SUCCESS
 
 # 前端构建
 cd frontend && npm run build

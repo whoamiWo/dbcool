@@ -63,11 +63,13 @@
 
 **问题**：`USER_STORIES.md` 此前停留在"9/13 done"，实际 US-007/US-107/US-208/US-307 四个 P1 故事已实现，文档矩阵未及时更新。
 
-**订正过程**：
-1. **US-007**（JSON Schema 导入）：`FormDesignerController.saveAsTemplate()` + `FormDesigner.tsx` 导入模态框 ✅
-2. **US-107**（表单模板）：`FormTemplateService` + `FormTemplatePanel.tsx` ✅
-3. **US-208**（CSV 导出）：`CollectionController.exportCsv()` + `TableView.exportCsv()` ✅
-4. **US-307**（权限预览）：`AclEnforce.previewPermissions()` + `PermissionPreview.tsx` ✅
+**订正过程**（符号均经全仓检索确认存在，附路径与行号）：
+1. **US-007**（JSON Schema 导入）：`CollectionController.importFromSchema()`（`backend-java/src/main/java/com/nocobase/meta/CollectionController.java` L128-154）+ `SchemaDesigner.tsx` 的 `ImportSchemaDialog`（`frontend/src/pages/SchemaDesigner.tsx` L325 渲染 / L338 定义）；测试 `JsonSchemaImporterTest.java` ✅
+2. **US-107**（表单模板）：`FormTemplateController`（`@RequestMapping("/api/form-templates")`，含 `POST /save-as/{formId}` 与 `POST /{id}/apply`，`backend-java/src/main/java/com/nocobase/form/FormTemplateController.java`）+ `FormTemplatesList.tsx`（`frontend/src/pages/FormTemplatesList.tsx`）；测试 `FormTemplatesList.test.tsx` ✅
+3. **US-208**（CSV 导出）：`CollectionController.exportCsv()`（`CollectionController.java` L592-641）+ `TableView.tsx` L202 `exportCsv()` / L265 触发按钮；测试 `CollectionControllerTest` ✅
+4. **US-307**（权限预览）：`UserAdminController.effectivePermissions()`（`backend-java/src/main/java/com/nocobase/auth/UserAdminController.java` L137-146）+ `PermissionPreview.tsx`（`frontend/src/components/PermissionPreview.tsx`）；测试 `PermissionPreview.test.tsx` + `UsersList.test.tsx` L132-166 ✅
+
+> **审计订正记录**：本报告初版曾误写 `FormDesignerController.saveAsTemplate()`、`FormTemplatePanel.tsx`、`AclEnforce.previewPermissions()` 三处符号 —— 经全仓检索确认**代码中不存在**（仅出现在本报告自身），属虚假证据，已于 2026-10-24 订正为上述真实符号。结论（P1 13/13）不受影响，但证据引用必须可追溯。
 
 **结论**：P1 实为 **13/13 = 100%**，无需移出终止条件。
 
