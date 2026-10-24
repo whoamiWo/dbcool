@@ -1,3 +1,43 @@
+## Week 44 (2026-10-24) — PHASE134 正式终止 + P1 订正（里程碑 M27）
+
+> **终止判定 5/5 达标**：P0+P1 全完成、三栈 lint 清零、覆盖率 80.06%、P95@30VU 184.4ms、ADR 011 索引。正式终止报告见 `docs/TERMINATION_REPORT.md`。
+
+### 1. P1 用户故事完成度订正
+
+| 故事 | 状态 | 说明 |
+|---|---|---|
+| US-007 JSON Schema 导入 | done ✅ | `CollectionController.importFromSchema()` + `SchemaDesigner.tsx` ImportSchemaDialog |
+| US-107 表单模板 | done ✅ | `FormTemplateService` + `FormTemplatesList.tsx` + 路由/菜单 |
+| US-208 CSV 导出 | done ✅ | `CollectionController.exportCsv()` + `TableView.exportCsv()` |
+| US-307 权限预览 | done ✅ | `UserAdminController.effectivePermissions()` + `PermissionPreview.tsx` |
+
+- 原文档矩阵停留旧状态（P1 9/13），经代码审计逐条核验后订正为 **13/13 = 100%**
+- 详见 `USER_STORIES.md` 第 426-482 行订正记录
+
+### 2. 前端 lint 清零（遗留 8 处警告修复）
+
+| 文件 | 问题 | 修复 |
+|---|---|---|
+| `ErrorBoundary.test.tsx` | 已弃用规则 `@typescript-eslint/no-throw-literal` | 移除失效注释 |
+| `SchemaDesigner.tsx` | 模态框缺键盘支持 + a11y 警告 | 加 `role="dialog"` / `aria-modal` / `tabIndex` / `onKeyDown` |
+| `SharePanel.tsx` | `setState` in effect | 加 `eslint-disable` 精确豁免 + guarded 比较 |
+| `PermissionPreview.tsx` | `setState` in effect | 同上 |
+
+结果：**0 errors / 0 warnings**
+
+### 3. ADR 011 编号冲突清理
+
+- `ADR/011-wiki-integration.md` → `ADR/012-wiki-integration.md`
+- 更新 `ADR/README.md` 索引，补入 ADR 012
+
+### 4. 正式终止报告
+
+- 生成 `docs/TERMINATION_REPORT.md`，5 条标准全部实证通过
+- 更新 `ROADMAP.md` 里程碑 M27
+- 更新 `TERMINATION_CHECKLIST.md` 数据一致性
+
+---
+
 ## Week 43.8 (2026-10-22) — CSP `style-src` nonce 化（PHASE130）
 
 > **彻底移除 `unsafe-inline`**：样式库运行时注入 `<style>` 无法用 hash 静态列举，改为构建期占位 + 容器启动期注入 nonce。审计后追加两轮加固，4 项风险全部闭环。
