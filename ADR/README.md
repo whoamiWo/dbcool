@@ -31,3 +31,4 @@
 | [008](./008-plugin-system.md) | 插件系统采用 Java SPI + REST Hook | ACCEPTED | 全部 |
 | [010](./010-bugs-fixed.md) | Week 0~9 期间修复的真实 Bug 清单(8 个) | ACCEPTED | 全部 |
 | [011](./011-lint-tools-config.md) | 三栈 Lint 工具配置（Java Checkstyle + Python Ruff + ESLint） | IMPLEMENTED | 全部 |
+| [012](./012-wiki-integration.md) | Wiki 与知识库集成方案 | ACCEPTED | Java / JS/TS / PostgreSQL |

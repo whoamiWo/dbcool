@@ -32,6 +32,7 @@ export function PermissionPreview({ userId, tenantId }: PermissionPreviewProps) 
   useEffect(() => {
     if (!userId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 加载状态/错误标志必须在 effect 内设置
     setLoading(true);
     setError(null);
     apiClient

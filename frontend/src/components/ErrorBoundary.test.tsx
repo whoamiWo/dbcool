@@ -102,7 +102,6 @@ describe('ErrorBoundary', () => {
   it('非 Error 类型抛错时 String 化展示', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     function ThrowString(): React.ReactElement {
-      // eslint-disable-next-line @typescript-eslint/no-throw-literal
       throw 'plain string error';
     }
     render(

@@ -42,13 +42,14 @@
   | `raises-require-match-for` | 空列表 | 不强求 `pytest.raises` 必须带 `match`，改动既有测试有破坏风险 |
   | `DTZ003` | 全局 | `datetime.utcnow()` 是业务约定（"当前 UTC 毫秒时间戳"） |
   | `E501` | 全局 | 行长度由 formatter 管，且注释/URL 常有长行 |
-- **实测**: `ruff check .` → All checks passed!；`pytest tests/` → 61 passed, 1 skipped
+- **验证**: `PYTHONPATH=src pytest tests/` → 61 passed, 1 skipped（2026-10-24）；ruff 未安装（网络阻塞），待补充
 
 ### 前端 (ESLint)
 
 - **工具**: ESLint + `plugin:@typescript-eslint/recommended` + `plugin:jsx-a11y/recommended`
 - **PHASE128**: a11y 警告清零（15 处可访问性问题修复）
-- **实测**: `npm run lint` → 0 error / 0 warning
+- **PHASE134 修正**: 发现 `ErrorBoundary.test.tsx` 含已弃用规则 `@typescript-eslint/no-throw-literal` 导致 1 error；`SchemaDesigner.tsx` 模态框缺键盘支持 + `SharePanel.tsx`/`PermissionPreview.tsx` 违反 `set-state-in-effect`
+- **实测**: `npm run lint` → 0 error / 0 warning（2026-10-24 修正后）
 
 ## 后果
 
@@ -67,9 +68,9 @@
 
 ## 验证
 
-- **Java**: `mvn clean compile` → BUILD SUCCESS（2026-10-22）
-- **Python**: `ruff check .` + `pytest tests/` → 61 passed, 1 skipped（2026-10-22）
-- **前端**: `npm run lint` → 0 error / 0 warning（2026-10-21）
+- **Java**: `mvn checkstyle:check` → 0 violations, BUILD SUCCESS（2026-10-24）
+- **Python**: `PYTHONPATH=src pytest tests/` → 61 passed, 1 skipped（2026-10-24）；ruff 暂未安装（网络阻塞）
+- **前端**: `npm run lint` → 0 error / 0 warning（2026-10-24 修正后）
 
 ## 参考资料
 
