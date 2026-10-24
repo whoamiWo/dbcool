@@ -136,7 +136,7 @@ Cline 角色:
 - ✅ **33 个 P0 全完成（33/33 = 100%）—— 终止判定以此为准**
   - （P1 13 个当前 9 done / 0 partial / 4 not-started；**P1 非终止条件** ——
     其在 `USER_STORIES.md` 中定义为「强烈推荐、非必做」，移入后续版本）
-- ✅ **三栈 lint 0 错误**：前端 eslint ✅；Java checkstyle ✅（`checkstyle.xml` + pom 插件，2263/0E）；Python ruff ✅（61 passed, 1 skipped，精确豁免 B008/N815/raises-require-match-for）
+- ✅ **三栈 lint 0 错误**：前端 eslint ✅；Java checkstyle ✅（`checkstyle.xml` + pom 插件，2277/0E）；Python ruff ✅（61 passed, 1 skipped，精确豁免 B008/N815/raises-require-match-for）
 - ✅ **ADR 011 已索引**：补入 `ADR/README.md`，并增加 `IMPLEMENTED` 状态，011 回填
 - ⚠️ BASELINE 指标部分达标（PHASE134 更新）：主包 **293KB** ✅（原 541KB，要求 <500KB，构建无 >500kB 警告）；
   前端覆盖率 **80.06%** ✅（要求 >80%，PHASE134 从 44.33% 提升 +35.7pp；豁免 NotionStyleEditor/HuddlePanel 两类不适合 jsdom 单测的重型 UI，详见 BASELINE 2.3）；
@@ -198,7 +198,7 @@ Cline 角色:
 | M25 | PHASE132-133 | **异步配额追踪 + 前端覆盖率攻坚** | 2026-10-23 | 前端覆盖率 44.33% → 80.06%（`856c97d`）；`TenantQuotaService` 异步刷回 + 15 单测 |
 | M26 | PHASE134 | **质量收尾 + 终止判定** | 2026-10-24 | `db97196` / `4b03d60` / `c746ef1` / `661708b`；三栈 lint 清零、主包 541KB→293KB、P95@30VU 184.4ms；`docs/TERMINATION_CHECKLIST.md` 判定通过 |
 
-**当前门禁状态（2026-10-24 实测）**：Java **2263/0F/0E**、前端 vitest **877/877（109 文件）**、前端覆盖率 **80.06%**、E2E **159/159**、ESLint **0 error / 0 warning**、Python ruff **61 passed / 1 skipped**、CSP **`unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化 + `connect-src` 已收窄**、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、启动检查 **0 问题**、密钥轮换 **3/3**、P95 @30VU **184.4ms**。
+**当前门禁状态（2026-10-24 实测）**：Java **2277/0F/0E**、前端 vitest **877/877（109 文件）**、前端覆盖率 **80.06%**、E2E **159/159**、ESLint **0 error / 0 warning**、Python ruff **61 passed / 1 skipped**、CSP **`unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化 + `connect-src` 已收窄**、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、启动检查 **0 问题**、密钥轮换 **3/3**、P95 @30VU **184.4ms**。
 
 ---
 
