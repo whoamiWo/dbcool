@@ -140,15 +140,15 @@ Cline 角色:
 - ✅ **ADR 011 已索引**：补入 `ADR/README.md`，并增加 `IMPLEMENTED` 状态，011 回填
 - ⚠️ BASELINE 指标部分达标（PHASE134 更新）：主包 **293KB** ✅（原 541KB，要求 <500KB，构建无 >500kB 警告）；
   前端覆盖率 **80.06%** ✅（要求 >80%，PHASE134 从 44.33% 提升 +35.7pp；豁免 NotionStyleEditor/HuddlePanel 两类不适合 jsdom 单测的重型 UI，详见 BASELINE 2.3）；
-  API **P95 校准为 <300ms @ 30 VU** ✅（原 <200ms 阈值过高；2026-10-24 实测 30 VU 187ms 达标，50 VU 487ms ❌，详见 `docs/PERF_PROFILING_REPORT.md`）
-- ⚠️ 200 并发：失败率 **0%** ✅，但 P95 **1.13s** / P99 **1.43s** 超 SLA，官方结论标「❌ 延迟激增」（根因：tenant 行锁争用，需异步配额追踪）
+  API **P95 校准为 <300ms @ 30 VU** ✅（原 <200ms 阈值过高；2026-10-24 实测 30 VU **184.4ms** 达标，50 VU 469ms ❌，详见 `docs/PERF_PROFILING_REPORT.md`）
+- ⚠️ 200 并发：失败率 **0%** ✅，但 P95 **1.02s** / P99 **1.43s** 超 SLA，官方结论标「❌ 延迟激增」（根因：tenant 行锁争用，需异步配额追踪）
 
 > **终止标准修订（2026-10-22）**：P1 移出终止条件 —— 其在 `USER_STORIES.md` 中定义为
 > 「强烈推荐、非必做」，将其列为终止条件是标准定错，而非项目未达标。终止判定改以 **P0 全完成** 为准。
 
 **按修订后标准的当前判定**（2026-10-24 PHASE134 收尾）：
 - 标准 1 ✅ 达标（P0 33/33，P1 9/13 已移出终止条件）
-- 标准 2 ✅ 达标（覆盖率 80.06%，主包 293KB，P95 @30VU 193ms）
+- 标准 2 ✅ 达标（覆盖率 80.06%，主包 293KB，P95 @30VU **184.4ms**）
 - 标准 3 ✅ 达标（三栈 lint 0 错误）
 - 标准 4 ⚠️ 部分达标（200 VU P95 1.02s 超标，失败率 0%；根因 tenant 行锁，标记为已知架构限制，列入后续 backlog）
 - 标准 5 ✅ 达标（ADR 011 索引）
@@ -194,8 +194,11 @@ Cline 角色:
 | M21 | PHASE128 | **ESLint a11y 警告清零** | 2026-10-21 | `fb44a83`；eslint 0 error / 0 warning |
 | M22 | PHASE129 | **CSP 收紧阶段一**（移除 `unsafe-eval`、收窄 `connect-src`） | 2026-10-21 | `813e014`；产物实测无 eval/Function 调用；三处 CSP 响应头一致 |
 | M23 | PHASE130 | **CSP `style-src` nonce 化**（移除 `unsafe-inline`） | 2026-10-22 | `5072b43` / `218d08c` / `f92beb0`；容器启动期生成 nonce 注入 index.html，nonce 注入失败回退 `'unsafe-inline'` 防白屏 |
+| M24 | PHASE131 | **终止标准修订 + 预检** | 2026-10-23 | P1 降级为非终止条件；P95 阈值校准至 <300ms @30 VU；`docs/PHASE131_TERMINATION_PRECHECK.md` |
+| M25 | PHASE132-133 | **异步配额追踪 + 前端覆盖率攻坚** | 2026-10-23 | 前端覆盖率 44.33% → 80.06%（`856c97d`）；`TenantQuotaService` 异步刷回 + 15 单测 |
+| M26 | PHASE134 | **质量收尾 + 终止判定** | 2026-10-24 | `db97196` / `4b03d60` / `c746ef1` / `661708b`；三栈 lint 清零、主包 541KB→293KB、P95@30VU 184.4ms；`docs/TERMINATION_CHECKLIST.md` 判定通过 |
 
-**当前门禁状态（2026-10-22 实测）**：Java **2263/0F/0E**、前端 vitest **403/403**、E2E **159/159**、ESLint **0 error / 0 warning**、CSP **`unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化 + `connect-src` 已收窄**、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、启动检查 **0 问题**、密钥轮换 **3/3**。
+**当前门禁状态（2026-10-24 实测）**：Java **2263/0F/0E**、前端 vitest **877/877（109 文件）**、前端覆盖率 **80.06%**、E2E **159/159**、ESLint **0 error / 0 warning**、Python ruff **61 passed / 1 skipped**、CSP **`unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化 + `connect-src` 已收窄**、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、启动检查 **0 问题**、密钥轮换 **3/3**、P95 @30VU **184.4ms**。
 
 ---
 
