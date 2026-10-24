@@ -36,4 +36,15 @@ public interface TenantRepository extends JpaRepository<TenantEntity, String> {
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE TenantEntity t SET t.apiCallUsage = 0")
     int resetAllApiUsage();
+
+    /**
+     * 批量增加租户 API 用量（PHASE131 P95 优化）
+     *
+     * <p>用一条 UPDATE 完成 N 个租户的 usage 累加，避免逐租户 SELECT+UPDATE
+     * 引发的 N+1 查询与行锁串行化。
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(
+            "UPDATE TenantEntity t SET t.apiCallUsage = t.apiCallUsage + ?2 WHERE t.id = ?1")
+    int incrementApiUsage(String tenantId, long delta);
 }

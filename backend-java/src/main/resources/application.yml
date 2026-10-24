@@ -15,8 +15,13 @@ spring:
       # R09: 生产级连接池参数(防耗尽 / 防泄漏 / 自动回收)
       # PHASE131 P95: 20 → 50。压测实证 20 并发时池饱和(pending=80)、
       # P95 307ms;PG max_connections=100 有余量,扩容后消除排队等待。
-      maximum-pool-size: ${DB_POOL_MAX:50}
-      minimum-idle: ${DB_POOL_MIN:10}
+      # PHASE134 P95: 50 → 100。50 VU 下 P95=432ms(阈值<300ms),瓶颈仍在
+      # 配额路径的批量刷回+租户查找。扩容后测试 P95 降至 298ms。
+      # PHASE134 P95: 50→100→80(上限受限于 PG max_connections=100)。
+      # 实测 80 时 50VU P95=336ms(仍略超<300ms 阈值)。根因:flushPendingIncrementsToDB
+      # 在共享事务中逐租户 SELECT+UPDATE。PHASE135 改用异步批量写 + Redis Pipeline。
+      maximum-pool-size: ${DB_POOL_MAX:80}
+      minimum-idle: ${DB_POOL_MIN:20}
       connection-timeout: 30000          # 获取连接最长等待 30s
       max-lifetime: 1800000              # 连接最长存活 30min(低于 PG 默认,避免 stale 连接)
       idle-timeout: 600000               # 空闲 10min 回收
