@@ -9,7 +9,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
@@ -43,6 +42,14 @@ public class TenantQuotaService {
 
     // Redis key: {minute}:{tenantId}
     private static final String REDIS_API_QUOTA_KEY_PREFIX = "quota:api:";
+
+    /**
+     * 配额增量刷回数据库的间隔（PHASE135）。
+     *
+     * <p>与配额分钟窗口（{@link #currentMinuteBucket()}）对齐：配额窗口由 Redis
+     * 分钟桶 key 的 TTL 自然滚动，数据库侧只需做最终一致的累计快照，无需高频写入。
+     */
+    private static final long FLUSH_INTERVAL_MS = 60_000L;
     
     // Local cache: tenantId -> QuotaLimit (limit + currentUsage)
     // LRU size 500: 足以容纳活跃租户
@@ -87,9 +94,15 @@ public class TenantQuotaService {
             }
 
             // 从 Redis 获取当前计数作为 usage（如果存在）
+            //
+            // PHASE135 ⚠️ 关键修复：Redis 无值时回退 0，**不再回退 DB 的 apiCallUsage**。
+            // 数据库该字段已改为「累计调用快照」（移除了每分钟全表清零），若仍回退 DB 值，
+            // 累计值会持续 >= 每分钟的 apiCallLimit，导致 usage >= limit 恒成立、
+            // 所有请求被永久 429 —— 与 PHASE92 事故同一机理。
+            // Redis 是配额唯一权威源：无值即代表本分钟桶尚未计数，从 0 开始由 INCR 累加。
             String initKey = currentMinuteBucket() + ":" + REDIS_API_QUOTA_KEY_PREFIX + tenantId;
             String redisVal = redisTemplate.opsForValue().get(initKey);
-            long usage = (redisVal != null) ? Long.parseLong(redisVal) : t.getApiCallUsage();
+            long usage = (redisVal != null) ? Long.parseLong(redisVal) : 0L;
 
             cache = new TenantQuotaCache(tenantId, t.getApiCallLimit(), usage, System.currentTimeMillis());
             tenantCache.put(tenantId, cache);
@@ -105,7 +118,13 @@ public class TenantQuotaService {
                 "API 调用次数已达上限，请稍后重试");
         }
 
-        // 3. Redis 原子 INCR（热路径唯一网络操作）；Redis 故障时 fail-safe 拒绝
+        // 3. Redis 原子 INCR（热路径网络操作）；Redis 故障时 fail-safe 拒绝
+        //
+        // PHASE135 说明：曾评估用 Pipeline 把 INCR+EXPIRE 合并为一次往返，
+        // 但单次 RTT 仅约 0.2-0.5ms，相对 50 VU 下 487ms 的 P95 可忽略；
+        // 而 Pipeline 需引入 executePipelined/SessionCallback，会显著增加
+        // 单测 mock 复杂度。故保持两次调用的简洁实现 —— 本轮 P95 收益来自
+        // flush 降频（5s→60s）与移除每分钟全表 reset，而非此处往返合并。
         long newValue;
         String redisKey = currentMinuteBucket() + ":" + REDIS_API_QUOTA_KEY_PREFIX + tenantId;
         try {
@@ -127,42 +146,43 @@ public class TenantQuotaService {
     }
 
     /**
-     * 每分钟重置所有租户的 API 用量
+     * PHASE135：移除「每分钟全表重置」定时任务。
+     *
+     * <p>原实现 {@code resetAllApiUsagePeriodically()} 每分钟执行全表
+     * {@code UPDATE tenant SET api_call_usage = 0}，在压测期间与业务请求争抢
+     * tenant 行锁，是 P95 拉高的锁源之一。
+     *
+     * <p><b>为何可以安全移除</b>：配额窗口已由 Redis 分钟桶 key 承载 ——
+     * key 形如 {@code {minuteBucket}:quota:api:{tenantId}}（见
+     * {@link #currentMinuteBucket()}），每分钟自然进入新桶，旧桶 TTL 到期自动失效。
+     * 即配额窗口天然滚动，不再需要数据库侧清零来避免「只增不减导致永久封禁」。
+     *
+     * <p>⚠️ 连带影响（已同步处理）：原方法还负责把 {@code tenantCache} 中各租户的
+     * usage 清零。移除后，缓存重建时若仍回退读取数据库累计值，会命中
+     * {@code usage >= limit} 而永久 429（PHASE92 事故同一机理）。
+     * 因此 {@link #checkAndConsumeApiQuota(String)} 中缓存未命中的回退值已改为 0。
+     *
+     * <p>如需强制重置单个租户，改用 {@link #resetApiUsage(String)}（手动/管理用）。
      */
-    @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
-    @Transactional
-    public void resetAllApiUsagePeriodically() {
-        // 1. DB 清零
-        int n = tenantRepository.resetAllApiUsage();
-        
-        // 2. 清空 pending
-        pendingIncrements.clear();
-        
-        // 3. 清空缓存中的 usage（保留 limit）
-        for (String tenantId : tenantCache.keySet()) {
-            TenantQuotaCache c = tenantCache.get(tenantId);
-            if (c != null) {
-                tenantCache.put(tenantId, new TenantQuotaCache(c.tenantId(), c.limit(), 0, System.currentTimeMillis()));
-            }
-        }
-        
-        log.debug("[quota] 每分钟重置 API 用量，影响 {} 个租户 (DB)", n);
-    }
 
     /**
-     * 每 5 秒异步刷回 Redis 增量到 DB（批量写回，降低 DB 压力）
+     * 每 60 秒异步刷回 Redis 增量到 DB（最终一致快照）
      *
-     * <p><b>PHASE131 P95 优化：</b>改用单条原子 UPDATE（{@code usage = usage + delta}）
-     * 替代原先的「findById → setUsage → save」。原实现有两个问题：
-     * 1. 每租户 2 条 SQL（SELECT + UPDATE），N 个租户即 2N 次往返；
-     * 2. 方法级 {@code @Transactional} 让整个循环共用一个连接并长期持锁，
-     *    与业务请求争抢连接池（实测 50VU 下 P95 达 433ms）。
-     * 现改为无外层事务、每条 UPDATE 自带短事务，连接占用从「秒级」降到「毫秒级」。
+     * <p><b>PHASE131 优化：</b>改用单条原子 UPDATE（{@code usage = usage + delta}）
+     * 替代原先的「findById → setUsage → save」，避免 N+1 往返与方法级长事务。
+     *
+     * <p><b>PHASE135 优化：</b>间隔由 5 秒放宽到 60 秒，与配额分钟窗口对齐。
+     * 5 秒一次的批量 UPDATE 在持续压测下会周期性争抢 tenant 行锁，是 50 VU
+     * P95=487ms 的残余锁源；降频后数据库写频率降低 12 倍，锁竞争窗口大幅收窄。
+     *
+     * <p>语义说明：数据库 {@code api_call_usage} 由「每分钟用量」变为
+     * 「累计调用快照（最终一致，延迟 ≤60 秒）」，仅用于审计；配额强制（429 拦截）
+     * 仍以 Redis 计数为唯一权威，准确性不受影响。
      *
      * <p>失败补偿：刷回失败的租户其 delta 会重新计入 pendingIncrements，
      * 下一轮重试，避免计数静默丢失。
      */
-    @Scheduled(fixedDelay = 5_000)
+    @Scheduled(fixedDelay = FLUSH_INTERVAL_MS)
     public void flushPendingIncrementsToDB() {
         if (pendingIncrements.isEmpty()) {
             return;
@@ -315,10 +335,11 @@ public class TenantQuotaService {
         TenantEntity tenant = tenantRepository.findById(tenantId)
             .orElseThrow(() -> new IllegalArgumentException("Tenant not found: " + tenantId));
 
-        // 尝试从 Redis 获取最新 usage
+        // 从 Redis 获取最新 usage；无值回退 0（PHASE135：与热路径一致，
+        // DB 的 apiCallUsage 已改为累计快照，不可当作当前分钟用量回退）
         String redisKey = currentMinuteBucket() + ":" + REDIS_API_QUOTA_KEY_PREFIX + tenantId;
         String redisVal = redisTemplate.opsForValue().get(redisKey);
-        long apiUsage = (redisVal != null) ? Long.parseLong(redisVal) : tenant.getApiCallUsage();
+        long apiUsage = (redisVal != null) ? Long.parseLong(redisVal) : 0L;
 
         return new QuotaStatus(
             apiUsage,

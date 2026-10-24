@@ -28,20 +28,27 @@ public interface TenantRepository extends JpaRepository<TenantEntity, String> {
     int consumeApiQuota(java.lang.String id);
 
     /**
-     * 将所有租户的 API 用量清零（每分钟一次，配合 apiCallLimit 的"每分钟"语义）。
+     * PHASE135：移除「全表清零」方法 resetAllApiUsage()。
      *
-     * <p>必须有这条：配额是**按分钟**的，若计数只增不减，租户用完配额后
-     * 会被**永久封禁**（PHASE92 实测：压测后 usage 停在 3600，后续请求全部 429）。
+     * <p>原方法每分钟执行 {@code UPDATE tenant SET api_call_usage = 0}，
+     * 目的是配合「apiCallUsage 表示每分钟用量」的语义 —— 若只增不减，
+     * 租户用完配额后会被永久封禁（PHASE92 实测：usage 停在 3600，后续全部 429）。
+     *
+     * <p><b>移除依据</b>：配额权威源已迁移到 Redis，窗口由分钟桶 key
+     * （{@code {minuteBucket}:quota:api:{tenantId}}，TTL 3 分钟）自然滚动，
+     * 每分钟自动进入新桶，不存在「只增不减」风险，故不再需要数据库侧清零。
+     * 该全表 UPDATE 是压测期间 tenant 行锁的争抢源之一（50 VU P95=487ms）。
+     *
+     * <p>数据库 api_call_usage 现为「累计调用快照（最终一致，延迟 ≤60 秒）」，
+     * 仅供审计；需要归零单个租户时使用 TenantQuotaService.resetApiUsage(tenantId)。
      */
-    @org.springframework.data.jpa.repository.Modifying
-    @org.springframework.data.jpa.repository.Query("UPDATE TenantEntity t SET t.apiCallUsage = 0")
-    int resetAllApiUsage();
 
     /**
-     * 批量增加租户 API 用量（PHASE131 P95 优化）
+     * 批量增加租户 API 用量（PHASE131 P95 优化 / PHASE135 保留）
      *
      * <p>用一条 UPDATE 完成 N 个租户的 usage 累加，避免逐租户 SELECT+UPDATE
-     * 引发的 N+1 查询与行锁串行化。
+     * 引发的 N+1 查询与行锁串行化。由 TenantQuotaService.flushPendingIncrementsToDB()
+     * 每 60 秒调用一次（PHASE135 由 5 秒降频而来）。
      */
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query(

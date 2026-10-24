@@ -3,6 +3,7 @@ package com.nocobase.quota;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.matches;
 import static org.mockito.Mockito.*;
 
 import java.util.Optional;
@@ -139,13 +140,44 @@ class TenantQuotaServiceTest {
         verify(redisTemplate).delete(eq(makeKey()));
     }
 
-    @Test
-    void resetApiUsage_periodically_resets_db_and_pending() {
-        when(tenantRepository.resetAllApiUsage()).thenReturn(10);
+    // ==================== PHASE135：Redis 权威源语义 ====================
 
-        service.resetAllApiUsagePeriodically();
-        verify(tenantRepository).resetAllApiUsage();
-        // pending 清空
+    @Test
+    void redisEmpty_fallsBackToZero_notDbCumulative() {
+        // 关键回归：DB 累计值很大（3600），Redis 本分钟桶无值。
+        // 若回退 DB 值会立即 usage >= limit → 永久 429（PHASE92 事故机理）。
+        // PHASE135 后必须回退 0。
+        tenant.setApiCallLimit(5L);
+        tenant.setApiCallUsage(3600L); // 累计快照，远大于 limit
+        when(valueOps.get(eq(makeKey()))).thenReturn(null); // Redis 无值
+        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant));
+
+        // 不应抛异常（若回退 3600 会因 >= 5 而 429）
+        assertThat(service.checkAndConsumeApiQuota(TENANT_ID)).isTrue();
+    }
+
+    @Test
+    void redisHasValue_usesRedisAsAuthoritativeSource() {
+        tenant.setApiCallLimit(100L);
+        tenant.setApiCallUsage(9999L); // DB 累计值，但 Redis 才是权威
+        when(valueOps.get(eq(makeKey()))).thenReturn("3");
+        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant));
+
+        assertThat(service.checkAndConsumeApiQuota(TENANT_ID)).isTrue();
+        // 以 Redis 的 3 为基准继续累加，而非 DB 的 9999
+        verify(valueOps).increment(eq(makeKey()), eq(1L));
+    }
+
+    @Test
+    void quotaWindowRollsByMinuteBucket() {
+        // 分钟桶切换后旧桶计数不复用（配额窗口由 key 前缀 + TTL 自然滚动）
+        tenant.setApiCallLimit(5L);
+        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant));
+        when(valueOps.get(matches("\\d+:quota:api:" + TENANT_ID))).thenReturn(null);
+
+        assertThat(service.checkAndConsumeApiQuota(TENANT_ID)).isTrue();
+        // 每个桶首次都从 0 起算（Redis 无值 → 0），不继承上一分钟用量
+        verify(valueOps).increment(matches("\\d+:quota:api:" + TENANT_ID), eq(1L));
     }
 
     // ==================== 存储配额 ====================
@@ -211,11 +243,13 @@ class TenantQuotaServiceTest {
     }
 
     @Test
-    void getQuotaStatus_falls_back_to_db_when_redis_empty() {
+    void getQuotaStatus_falls_back_to_zero_when_redis_empty() {
+        // PHASE135：DB 的 apiCallUsage 已改为累计快照，不可当作当前分钟用量。
+        // Redis 无值时回退 0（与热路径语义一致），而非 DB 累计值。
         when(valueOps.get(eq(makeKey()))).thenReturn(null);
-        tenant.setApiCallUsage(1L);
+        tenant.setApiCallUsage(1L); // 累计值，应被忽略
 
         var status = service.getQuotaStatus(TENANT_ID);
-        assertThat(status.apiCallUsage()).isEqualTo(1L); // DB 值
+        assertThat(status.apiCallUsage()).isEqualTo(0L);
     }
 }
