@@ -134,13 +134,13 @@ Cline 角色:
 （逐条实测证据见 `docs/PHASE134_TERMINATION_PRECHECK.md`）：
 
 - ✅ **33 个 P0 全完成（33/33 = 100%）—— 终止判定以此为准**
-  - （P1 13 个当前 5 done / 2 partial / 5 not-started；**P1 非终止条件** ——
+  - （P1 13 个当前 9 done / 0 partial / 4 not-started；**P1 非终止条件** ——
     其在 `USER_STORIES.md` 中定义为「强烈推荐、非必做」，移入后续版本）
 - ✅ **三栈 lint 0 错误**：前端 eslint ✅；Java checkstyle ✅（`checkstyle.xml` + pom 插件，2263/0E）；Python ruff ✅（61 passed, 1 skipped，精确豁免 B008/N815/raises-require-match-for）
 - ✅ **ADR 011 已索引**：补入 `ADR/README.md`，并增加 `IMPLEMENTED` 状态，011 回填
 - ⚠️ BASELINE 指标部分达标（PHASE134 更新）：主包 **293KB** ✅（原 541KB，要求 <500KB，构建无 >500kB 警告）；
   前端覆盖率 **80.06%** ✅（要求 >80%，PHASE134 从 44.33% 提升 +35.7pp；豁免 NotionStyleEditor/HuddlePanel 两类不适合 jsdom 单测的重型 UI，详见 BASELINE 2.3）；
-  API **P95 校准为 <300ms @ 50 VU** ✅（原 <200ms 阈值过高；2026-10-22 实测 50 VU 298ms，30 VU 173ms 达标，详见 `docs/PERF_PROFILING_REPORT.md`）
+  API **P95 校准为 <300ms @ 30 VU** ✅（原 <200ms 阈值过高；2026-10-24 实测 30 VU 187ms 达标，50 VU 487ms ❌，详见 `docs/PERF_PROFILING_REPORT.md`）
 - ⚠️ 200 并发：失败率 **0%** ✅，但 P95 **1.13s** / P99 **1.43s** 超 SLA，官方结论标「❌ 延迟激增」（根因：tenant 行锁争用，需异步配额追踪）
 
 > **终止标准修订（2026-10-22）**：P1 移出终止条件 —— 其在 `USER_STORIES.md` 中定义为

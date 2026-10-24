@@ -151,9 +151,18 @@ public class TenantQuotaService {
 
     /**
      * 每 5 秒异步刷回 Redis 增量到 DB（批量写回，降低 DB 压力）
+     *
+     * <p><b>PHASE131 P95 优化：</b>改用单条原子 UPDATE（{@code usage = usage + delta}）
+     * 替代原先的「findById → setUsage → save」。原实现有两个问题：
+     * 1. 每租户 2 条 SQL（SELECT + UPDATE），N 个租户即 2N 次往返；
+     * 2. 方法级 {@code @Transactional} 让整个循环共用一个连接并长期持锁，
+     *    与业务请求争抢连接池（实测 50VU 下 P95 达 433ms）。
+     * 现改为无外层事务、每条 UPDATE 自带短事务，连接占用从「秒级」降到「毫秒级」。
+     *
+     * <p>失败补偿：刷回失败的租户其 delta 会重新计入 pendingIncrements，
+     * 下一轮重试，避免计数静默丢失。
      */
     @Scheduled(fixedDelay = 5_000)
-    @Transactional
     public void flushPendingIncrementsToDB() {
         if (pendingIncrements.isEmpty()) {
             return;
@@ -164,27 +173,24 @@ public class TenantQuotaService {
 
         int successCount = 0;
         int failCount = 0;
-        
+
         for (Map.Entry<String, AtomicLong> entry : snapshot.entrySet()) {
             String tenantId = entry.getKey();
             long delta = entry.getValue().get();
-            
+
             if (delta <= 0) continue;
-            
+
             try {
-                TenantEntity t = tenantRepository.findById(tenantId).orElse(null);
-                if (t != null) {
-                    long newUsage = t.getApiCallUsage() + delta;
-                    t.setApiCallUsage(newUsage);
-                    tenantRepository.save(t);
-                    successCount++;
-                }
+                tenantRepository.incrementApiUsage(tenantId, delta);
+                successCount++;
             } catch (Exception e) {
                 log.warn("[quota] 刷回 DB 失败 tenant={} delta={} err={}", tenantId, delta, e.toString());
+                // 失败补偿：把 delta 还回 pending，下一轮重试
+                pendingIncrements.computeIfAbsent(tenantId, k -> new AtomicLong()).addAndGet(delta);
                 failCount++;
             }
         }
-        
+
         if (successCount > 0 || failCount > 0) {
             log.debug("[quota] 刷回 DB 完成 success={} fail={}", successCount, failCount);
         }
