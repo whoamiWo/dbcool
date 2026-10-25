@@ -82,7 +82,8 @@ public class JsonSchemaImporter {
         JsonNode enumNode = prop.get("enum");
         if (enumNode != null && enumNode.isArray()) {
             return new FieldDef(name, "select", required, prop.has("title") ? prop.get("title").asText() : null,
-                    java.util.Map.of("options", enumNode), false, false, null);
+                    java.util.Map.of("options", enumNode), false, false, null,
+                    prop.has("description") ? prop.get("description").asText() : null);
         }
 
         String type = prop.has("type") ? prop.get("type").asText() : null;
@@ -109,7 +110,8 @@ public class JsonSchemaImporter {
         return new FieldDef(name, mappedType, required,
                 prop.has("title") ? prop.get("title").asText() : null,
                 options.isEmpty() ? null : options,
-                false, false, defaultValue);
+                false, false, defaultValue,
+                prop.has("description") ? prop.get("description").asText() : null);
     }
 
     /**

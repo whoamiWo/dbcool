@@ -13,6 +13,8 @@ export interface RoleMeta {
   id: string;
   name: string;
   description: string;
+  /** US-308: 父角色 ID（角色继承）；null = 顶层角色 */
+  parent_role_id?: string | null;
   tenant_id: string;
   created_at: string;
 }

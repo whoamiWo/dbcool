@@ -388,7 +388,23 @@
     "opContains": "contains",
     "opGt": "greater than gt",
     "opLt": "less than lt",
-    "triggerDataPlaceholder": "{\"record_id\":\"test-001\",\"name\":\"Test\"}"
+    "triggerDataPlaceholder": "{\"record_id\":\"test-001\",\"name\":\"Test\"}",
+    "versions": "Version history",
+    "publishVersion": "⬆ Publish version",
+    "publishing": "Publishing…",
+    "publishSuccess": "Published version v{{version}}",
+    "publishFailed": "Publish failed",
+    "noVersions": "No published versions",
+    "currentVersion": "Current version v{{version}}",
+    "versionLabel": "v{{version}}",
+    "nodeCount": "{{count}} nodes",
+    "rollback": "Rollback",
+    "rollbackConfirmTitle": "Confirm rollback",
+    "rollbackConfirmBody": "Roll back to v{{version}}? The current workflow definition will be overwritten by this snapshot. This cannot be undone.",
+    "rollbackSuccess": "Rolled back to v{{version}}",
+    "rollbackFailed": "Rollback failed",
+    "cancel": "Cancel",
+    "confirmRollback": "Confirm rollback"
   },
   "editor": {
     "block": {
@@ -535,9 +551,12 @@
     "colFieldName": "Field Name",
     "colType": "Type",
     "colRequired": "Required",
+    "colComment": "Comment",
     "colAction": "Actions",
     "fieldAriaFieldName": "Field name",
     "fieldAriaRequired": "Required",
+    "fieldAriaComment": "Field comment",
+    "commentPlaceholder": "Describe this field",
     "removeField": "Delete",
     "relationTargetLabel": "Related table (target):",
     "relationTargetAria": "Related table for field {{name}}",
@@ -1424,7 +1443,12 @@
     "noDescription": "(No description)",
     "aclConfig": "ACL Config",
     "deleteConfirm": "Delete role \"{{name}}\"?",
-    "createFailed": "Failed to create"
+    "createFailed": "Failed to create",
+    "parentRoleLabel": "Inherits from",
+    "parentAria": "Parent role for {{name}}",
+    "parentHint": "Child roles inherit all ACL policies from the parent role",
+    "parentUpdateFailed": "Failed to update parent role",
+    "none": "(None, standalone)"
   },
   "recycleBin": {
     "title": "Recycle Bin",

@@ -124,7 +124,8 @@ public class InverseRelationManager {
                 ),
                 false, // primaryKey
                 false, // unique
-                null   // defaultValue
+                null,  // defaultValue
+                null   // US-008 comment (反向字段无注释)
         );
 
         // 追加到 target

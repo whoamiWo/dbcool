@@ -142,4 +142,87 @@ describe('WorkflowDesignerPage', () => {
     const draggables = document.querySelectorAll('[draggable="true"]');
     expect(draggables.length).toBeGreaterThan(0);
   });
+
+  it('US-410: 编辑态渲染发布版本与版本历史按钮', async () => {
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'w1', name: 'my_flow', title: 'T', collection: 'customer', triggerType: 'manual', enabled: true, nodes: [], edges: [],
+    });
+    wrap('/workflows/designer/test/w1');
+    await waitFor(() => expect(screen.getByDisplayValue('my_flow')).toBeInTheDocument(), { timeout: 4000 });
+    // 发布按钮存在
+    expect(screen.getByText('workflowDesigner.publishVersion')).toBeInTheDocument();
+    // 版本历史入口
+    expect(screen.getByText('workflowDesigner.versions')).toBeInTheDocument();
+  });
+
+  it('US-410: 点击发布调用 POST /workflows/:id/versions/publish', async () => {
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'w1', name: 'my_flow', title: 'T', collection: 'customer', triggerType: 'manual', enabled: true, nodes: [], edges: [],
+    });
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { version: 1 } });
+    wrap('/workflows/designer/test/w1');
+    await waitFor(() => expect(screen.getByDisplayValue('my_flow')).toBeInTheDocument(), { timeout: 4000 });
+
+    // 点击发布按钮(非"版本历史"按钮)
+    const buttons = screen.getAllByText('workflowDesigner.publishVersion');
+    fireEvent.click(buttons[0]);
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled(), { timeout: 4000 });
+    const [url] = (apiClient.post as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe('/workflows/w1/versions/publish');
+  });
+
+  it('US-410: 打开版本侧栏拉取版本列表并展示空态', async () => {
+    (apiClient.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === '/workflows/w1/versions') {
+        return Promise.resolve({ workflow_id: 'w1', current_version: 0, versions: [] });
+      }
+      return Promise.resolve({ id: 'w1', name: 'my_flow', title: 'T', collection: 'customer', triggerType: 'manual', enabled: true, nodes: [], edges: [] });
+    });
+    wrap('/workflows/designer/test/w1');
+    await waitFor(() => expect(screen.getByDisplayValue('my_flow')).toBeInTheDocument(), { timeout: 4000 });
+
+    // 点击"版本历史"按钮
+    const versionsBtn = screen.getAllByText('workflowDesigner.versions')[0];
+    fireEvent.click(versionsBtn);
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/workflows/w1/versions'), { timeout: 4000 });
+    expect(screen.getByText('workflowDesigner.noVersions')).toBeInTheDocument();
+  });
+
+  it('US-410: 回滚确认弹窗调用 rollback API', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    (apiClient.get as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url === '/workflows/w1/versions') {
+        return Promise.resolve({
+          data: {
+            workflow_id: 'w1',
+            current_version: 2,
+            versions: [
+              { id: 'v1', workflow_id: 'w1', version: 2, node_count: 3, published_at: '2026-01-01T00:00:00Z' },
+              { id: 'v2', workflow_id: 'w1', version: 1, node_count: 2, published_at: '2025-12-01T00:00:00Z' },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ id: 'w1', name: 'my_flow', title: 'T', collection: 'customer', triggerType: 'manual', enabled: true, nodes: [], edges: [] });
+    });
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { rolled_back_to: 1 } });
+    wrap('/workflows/designer/test/w1');
+    await waitFor(() => expect(screen.getByDisplayValue('my_flow')).toBeInTheDocument(), { timeout: 4000 });
+
+    // 进入版本侧栏
+    const versionsBtn = screen.getAllByText('workflowDesigner.versions')[0];
+    fireEvent.click(versionsBtn);
+    // 等待版本列表加载完成,找到 v1 的回滚按钮
+    await waitFor(() => expect(screen.getByText('workflowDesigner.rollback')).toBeInTheDocument(), { timeout: 4000 });
+
+    // 点击 v1(非当前版本)的回滚按钮
+    const rollbackButtons = screen.getAllByText('workflowDesigner.rollback');
+    fireEvent.click(rollbackButtons[rollbackButtons.length - 1]);
+
+    // 点击确认回滚按钮
+    await waitFor(() => expect(screen.getByText('workflowDesigner.confirmRollback')).toBeEnabled(), { timeout: 4000 });
+    fireEvent.click(screen.getByText('workflowDesigner.confirmRollback'));
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/workflows/w1/versions/1/rollback', {}), { timeout: 4000 });
+  });
 });
