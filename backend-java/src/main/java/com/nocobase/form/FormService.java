@@ -28,10 +28,14 @@ public class FormService {
 
     private final FormRepository repository;
     private final ObjectMapper objectMapper;
+    /** PHASE10: 公开提交落库用（匿名链路）。 */
+    private final com.nocobase.meta.CollectionService collectionService;
 
-    public FormService(FormRepository repository, ObjectMapper objectMapper) {
+    public FormService(FormRepository repository, ObjectMapper objectMapper,
+                       com.nocobase.meta.CollectionService collectionService) {
         this.repository = repository;
         this.objectMapper = objectMapper;
+        this.collectionService = collectionService;
     }
 
     @Transactional
@@ -105,6 +109,76 @@ public class FormService {
             return objectMapper.readValue(form.getRulesJson(), new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
             throw new RuntimeException("rules 解析失败", e);
+        }
+    }
+
+    // ============================================================
+    //  PHASE10: 公开表单分享（免登录填写）
+    //  设计复用 WikiPageService.share/unshare 的既有模式：
+    //    token = UUID 前 32 位；置 null 即撤销
+    // ============================================================
+
+    /**
+     * 生成（或重新生成）公开填写分享 token。
+     *
+     * @param regenerate true 时强制重新生成（用于链接泄露后轮换）
+     */
+    @Transactional
+    public FormEntity share(UUID id, String tenantId, boolean regenerate) {
+        FormEntity form = get(id, tenantId);
+        if (regenerate || form.getShareToken() == null || form.getShareToken().isBlank()) {
+            form.setShareToken(UUID.randomUUID().toString().substring(0, 32));
+        }
+        return repository.save(form);
+    }
+
+    /** 撤销公开分享（token 置 null，原链接立即失效）。 */
+    @Transactional
+    public FormEntity unshare(UUID id, String tenantId) {
+        FormEntity form = get(id, tenantId);
+        form.setShareToken(null);
+        return repository.save(form);
+    }
+
+    /**
+     * 按分享 token 取表单（免登录入口）。
+     *
+     * <p>安全约定：token 无效或已撤销一律抛 404（而非 403），不泄露表单是否存在。
+     */
+    @Transactional(readOnly = true)
+    public FormEntity getByShareToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "表单不存在或链接已失效");
+        }
+        return repository.findByShareToken(token)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "表单不存在或链接已失效"));
+    }
+
+    /**
+     * 匿名提交：数据落入表单绑定的 collection。
+     *
+     * <p>租户取自表单自身的 tenantId —— 外部请求无 JWT，必须在调用
+     * CollectionService 前把 TenantContext 设为表单所属租户，
+     * 否则 insertRecord 内部的 get(name) 会用空上下文导致 403。
+     *
+     * @return 新建记录 id
+     */
+    @Transactional
+    public UUID submitPublic(String token, Map<String, Object> data) {
+        FormEntity form = getByShareToken(token);
+        if (data == null || data.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "提交数据为空");
+        }
+        // 注意：TenantContext.currentTenantId() 未设置时返回**默认租户**而非 null，
+        // 无法据此判断"提交前是否真的设置过"。公开提交属匿名入口（请求不经过
+        // JwtAuthFilter），用完后必须 clear()，否则线程复用会把表单租户
+        // 泄漏给后续请求（与 JwtAuthFilter 在 finally 中 clear() 同一原则）。
+        com.nocobase.tenant.TenantContext.set(form.getTenantId());
+        try {
+            return collectionService.insertRecord(form.getCollectionName(), data, form.getTenantId());
+        } finally {
+            com.nocobase.tenant.TenantContext.clear();
         }
     }
 }

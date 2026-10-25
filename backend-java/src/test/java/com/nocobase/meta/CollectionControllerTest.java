@@ -77,9 +77,11 @@ class CollectionControllerTest {
         org.springframework.context.ApplicationEventPublisher eventPublisher =
                 mock(org.springframework.context.ApplicationEventPublisher.class);
 
+        // PHASE10: 新增 exportFileService 依赖（Excel/PDF 导出编排）
         controller = new CollectionController(service, migrationService, jobRepository,
                 aclEnforcer, auditService, rowAclService, roleRepository, eventPublisher,
-                relationResolver, mock(JsonSchemaImporter.class));
+                relationResolver, mock(JsonSchemaImporter.class),
+                mock(com.nocobase.export.ExportFileService.class));
 
         // 默认 ACL 全通过、ROW ACL 全允许
         doNothing().when(aclEnforcer).assertCan(any(), anyString(), anyString(), any());

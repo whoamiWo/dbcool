@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from nocobase_py import __version__
 from nocobase_py.config import get_settings
-from nocobase_py.routers import ai, alerts, backup, connectors, health, integration, tasks
+from nocobase_py.routers import ai, alerts, backup, connectors, export, health, integration, tasks
 
 logger = logging.getLogger("nocobase_py")
 
@@ -202,6 +202,9 @@ def create_app() -> FastAPI:
 
     # PHASE104 T7.3: AlertManager webhook 接收
     app.include_router(alerts.router)
+
+    # PHASE10: 报表导出（Excel / PDF）—— 供 Java ExportFileService 内部调用
+    app.include_router(export.router)
 
     return app
 

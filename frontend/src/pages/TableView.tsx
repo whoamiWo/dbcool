@@ -199,19 +199,34 @@ export function TableViewPage() {
     enabled: shouldVirtualize,
   });
 
-  const exportCsv = async () => {
+  /** PHASE10: 通用导出 —— 支持 csv(原端点) / xlsx / pdf(新 export-file 端点)。 */
+  const [exporting, setExporting] = React.useState(false);
+  const runExport = async (format: 'csv' | 'xlsx' | 'pdf') => {
     const token = (useAuthStore.getState().user as { accessToken?: string } | null)?.accessToken ?? '';
-    const res = await fetch('/api/collections/' + collectionName + '/export?limit=5000', {
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    if (!res.ok) { alert('导出失败：' + res.status); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = collectionName + '_' + new Date().toISOString().slice(0, 10) + '.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    // csv 走原 /export 端点；xlsx / pdf 走新增的 /export-file
+    const url = format === 'csv'
+      ? '/api/collections/' + collectionName + '/export?limit=5000'
+      : '/api/collections/' + collectionName + '/export-file?format=' + format + '&limit=5000';
+    setExporting(true);
+    try {
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) {
+        const msg = res.status === 503 ? '导出服务暂不可用（Python 导出服务未启用）' : '导出失败：' + res.status;
+        alert(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = collectionName + '_' + new Date().toISOString().slice(0, 10) + '.' + format;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      alert('导出失败：网络错误');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const [importResult, setImportResult] = React.useState<{ total: number; success: number; failed: number } | null>(null);
@@ -262,9 +277,33 @@ export function TableViewPage() {
       <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{view.title}</h1>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button onClick={exportCsv} className="glass-button-primary" style={{ padding: '4px 12px', fontSize: 12 }}>
-          📥 {t('table.exportCsv')}
-        </button>
+        {/* PHASE10: 导出格式三选（CSV 原有 + Excel/PDF 新增） */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => runExport('csv')}
+            disabled={exporting}
+            className="glass-button-primary"
+            style={{ padding: '4px 12px', fontSize: 12, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'not-allowed' : 'pointer' }}
+          >
+            📥 {t('table.exportCsv')}
+          </button>
+          <button
+            onClick={() => runExport('xlsx')}
+            disabled={exporting}
+            className="glass-button-primary"
+            style={{ padding: '4px 12px', fontSize: 12, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'not-allowed' : 'pointer' }}
+          >
+            📊 Excel
+          </button>
+          <button
+            onClick={() => runExport('pdf')}
+            disabled={exporting}
+            className="glass-button-primary"
+            style={{ padding: '4px 12px', fontSize: 12, opacity: exporting ? 0.6 : 1, cursor: exporting ? 'not-allowed' : 'pointer' }}
+          >
+            📄 PDF
+          </button>
+        </div>
         <label style={{ padding: '4px 12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-text-primary)', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
           📤 {t('table.importCsv')}
           <input type="file" accept=".csv" onChange={handleImport} style={{ display: 'none' }} />

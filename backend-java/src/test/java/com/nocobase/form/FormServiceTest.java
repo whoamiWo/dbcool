@@ -30,7 +30,8 @@ class FormServiceTest {
     @BeforeEach
     void setUp() {
         repo = mock(FormRepository.class);
-        service = new FormService(repo, mapper);
+        // PHASE10: FormService 新增 collectionService 依赖（公开提交落库用）
+        service = new FormService(repo, mapper, mock(com.nocobase.meta.CollectionService.class));
         when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
