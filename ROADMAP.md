@@ -17,7 +17,7 @@
 阶段 4  🧪 MVP 实现          Week 7~16      [⏳ 进行中 - 截至 Week 43]
 阶段 5  📏 基线建立          Week 17~43     [⏳ 进行中]
 阶段 6  🔄 迭代优化          Week 44~74     [ ]
-阶段 7  ✨ 终止判定          Week 75+       [ ]
+阶段 7  ✨ 终止判定          Week 75+       [x 已完成 — PHASE136 终止判定 5/5 达标，TERMINATION_REPORT.md]
 ```
 
 ---
@@ -206,6 +206,7 @@ Cline 角色:
 | M26 | PHASE134 | **质量收尾 + 终止判定** | 2026-10-24 | `db97196` / `4b03d60` / `c746ef1` / `661708b`；三栈 lint 清零、主包 541KB→293KB、P95@30VU 184.4ms；`docs/TERMINATION_CHECKLIST.md` 判定通过 |
 | M27 | PHASE134 最终 | **正式终止报告 + P1 订正** | 2026-10-24 | `e1c0c89`；P1 9/13→13/13（代码审计订正 US-007/US-107/US-208/US-307）、三栈 lint 最终清零、`docs/TERMINATION_REPORT.md` 出具、终止判定 5/5 达标 |
 | M28 | PHASE136 | **性能根因修复（Caffeine 本地缓存）** | 2026-10-25 | `44d7de7` / `3ef9f67` / `9c99746`；`CollectionService.list()` 引入 Caffeine 5s TTL 本地缓存，50 VU P95 534ms→**68.1ms**（-87%），P99 803ms→**86.2ms**（-89%），吞吐量 354→**1084.5 rps**（+207%）；标准 4 解除阻塞，终止判定 5/5 全部达标 |
+| M29 | PHASE136 最终 | **终止报告定稿 + 项目宣告终止** | 2026-10-25 | `71a8cb6`；`docs/TERMINATION_REPORT.md` 更新为 PHASE136 终态（标准 4 由「阈值校准降级」改写为「Caffeine 根因修复达标」、压测三档数据、Post-Termination 待办与 Q1 路线图同步），**终止判定 5/5 全部达标，项目进入终止状态** |
 
 **当前门禁状态（2026-10-25 实测）**：Java **2279/0F/0E**、前端 vitest **877/877（109 文件）**、前端覆盖率 **80.06%**、E2E **159/159**、ESLint **0 error / 0 warning**、Python ruff **61 passed / 1 skipped**、CSP **`unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化 + `connect-src` 已收窄**、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、启动检查 **0 问题**、密钥轮换 **3/3**、**P95 @30VU 184.4ms / P95 @50VU 68.1ms ✅**。
 
