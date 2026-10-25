@@ -65,6 +65,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- PHASE136: 本地缓存 (Caffeine) 消除高并发下 collection_meta 重复查询 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
         <!-- PHASE 55 P0 可观测性：Prometheus 指标导出（/actuator/prometheus） -->
         <dependency>
             <groupId>io.micrometer</groupId>
