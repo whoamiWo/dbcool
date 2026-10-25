@@ -67,6 +67,15 @@ public class FormEntity {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /**
+     * PHASE10: 公开填写分享 token（复用 WikiPageEntity 的 share_token 设计）。
+     *
+     * <p>非 null 表示表单已分享，外部用户凭 /forms/public/{token} 免登录填写；
+     * 置 null 即撤销分享。由 V65__form_share_token.sql 建列 + 唯一索引。
+     */
+    @Column(name = "share_token", length = 64, unique = true)
+    private String shareToken;
+
     public FormEntity() {}
 
     public UUID getId() { return id; }
@@ -98,4 +107,7 @@ public class FormEntity {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getShareToken() { return shareToken; }
+    public void setShareToken(String shareToken) { this.shareToken = shareToken; }
 }

@@ -44,6 +44,8 @@ class FormControllerTest {
     @MockBean private SecurityConfig securityConfig;
     @MockBean private JwtAuthFilter jwtAuthFilter;
     @MockBean private FormService service;
+    // PHASE10: FormController 新增 share/unshare 审计依赖
+    @MockBean private com.nocobase.audit.AuditService auditService;
 
     @AfterEach
     void clearSecurity() { SecurityContextHolder.clearContext(); }

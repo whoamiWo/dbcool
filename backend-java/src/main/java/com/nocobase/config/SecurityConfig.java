@@ -40,13 +40,19 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://localhost}")
     private String allowedOriginsRaw;
 
+    /** PHASE10: OIDC 登录成功处理器（未启用 OIDC 时为 null，不参与装配）。 */
+    private final com.nocobase.auth.oidc.OidcLoginSuccessHandler oidcSuccessHandler;
+
     public SecurityConfig(JwtAuthFilter jwtAuthFilter, ApiKeyFilter apiKeyFilter,
                           GlobalRateLimitFilter globalRateLimitFilter,
-                          com.nocobase.quota.TenantQuotaFilter tenantQuotaFilter) {
+                          com.nocobase.quota.TenantQuotaFilter tenantQuotaFilter,
+                          @org.springframework.beans.factory.annotation.Autowired(required = false)
+                                  com.nocobase.auth.oidc.OidcLoginSuccessHandler oidcSuccessHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.apiKeyFilter = apiKeyFilter;
         this.globalRateLimitFilter = globalRateLimitFilter;
         this.tenantQuotaFilter = tenantQuotaFilter;
+        this.oidcSuccessHandler = oidcSuccessHandler;
     }
 
     @Bean
@@ -111,6 +117,12 @@ public class SecurityConfig {
                         // Huddle WebRTC 信令:原生 WS,同样无法携带 Authorization 头,
                         // 握手鉴权由 StompHandshakeInterceptor 统一完成。
                         .requestMatchers("/ws/huddle").permitAll()
+                        // PHASE10: 公开表单填写（免登录）—— 外部用户凭 share_token 访问。
+                        // 安全防线不在链路放行，而在 FormService.getByShareToken 的
+                        // token 查表校验：无效/已撤销一律 404（不返回 403，
+                        // 避免泄露表单是否存在）。与钉钉/飞书回调同一放行原则。
+                        .requestMatchers(HttpMethod.GET, "/api/forms/public/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/forms/public/*/submit").permitAll()
                         // Swagger / OpenAPI — 仅 dev profile 放行，生产默认关闭
                         // PHASE95 R4: /v3/api-docs 在 docker/profile 已关闭
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html",
@@ -146,6 +158,18 @@ public class SecurityConfig {
                 // PHASE 56 P1-1: MDC 必须在 JWT 鉴权之后,才能从 SecurityContext
                 // 读到 AuthenticatedUser 并注入 tenantId/userId 到日志 MDC。
                 .addFilterAfter(new MdcFilter(), JwtAuthFilter.class);
+
+        // PHASE10: OIDC 通用 SSO —— 仅在已配置且处理器可用时启用。
+        // 未配置（app.oidc.enabled=false 或缺少 client-id）时完全不注册，
+        // 保证既有账密 / 钉钉 / 飞书登录链路不受影响。
+        if (oidcSuccessHandler != null) {
+            http.oauth2Login(oauth2 -> oauth2
+                    .successHandler(oidcSuccessHandler)
+                    // 登录入口：/oauth2/authorization/{registrationId}
+                    .loginPage("/oauth2/authorization/nocobase-oidc"));
+            org.slf4j.LoggerFactory.getLogger(SecurityConfig.class)
+                    .info("[SecurityConfig] OIDC 登录已启用（授权码流程 → 签发本地 JWT）");
+        }
 
         return http.build();
     }

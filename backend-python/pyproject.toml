@@ -40,6 +40,10 @@ dependencies = [
     "python-multipart>=0.0.9",
     # MinIO 对象存储客户端（PHASE 68 备份媒体资产）
     "minio>=7.2.0",
+    # PHASE10: 报表导出（企业门槛三件套 —— Excel / PDF）
+    # 由 Java 侧编排取数后调用本服务生成文件；Python 不直连业务库。
+    "openpyxl>=3.1.0",
+    "reportlab>=4.0.0",
 ]
 
 [project.optional-dependencies]

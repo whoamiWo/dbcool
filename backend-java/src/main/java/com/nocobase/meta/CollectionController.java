@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -52,6 +53,8 @@ public class CollectionController {
     private final RelationResolver relationResolver;
     /** US-007:JSON Schema 导入器。 */
     private final JsonSchemaImporter jsonSchemaImporter;
+    /** PHASE10: Excel / PDF 文件导出编排（内部调 Python）。 */
+    private final com.nocobase.export.ExportFileService exportFileService;
 
     public CollectionController(
             CollectionService service,
@@ -63,7 +66,8 @@ public class CollectionController {
             com.nocobase.auth.RoleRepository roleRepository,
             ApplicationEventPublisher eventPublisher,
             RelationResolver relationResolver,
-            JsonSchemaImporter jsonSchemaImporter
+            JsonSchemaImporter jsonSchemaImporter,
+            com.nocobase.export.ExportFileService exportFileService
     ) {
         this.service = service;
         this.migrationService = migrationService;
@@ -75,6 +79,7 @@ public class CollectionController {
         this.eventPublisher = eventPublisher;
         this.relationResolver = relationResolver;
         this.jsonSchemaImporter = jsonSchemaImporter;
+        this.exportFileService = exportFileService;
     }
 
     /** 构建 RowAclService.Principal(从当前认证用户). */
@@ -638,6 +643,87 @@ public class CollectionController {
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
                 .body(csv.toString());
+    }
+
+    /**
+     * PHASE10: Excel / PDF 导出。
+     *
+     * <p>取数链路与 {@link #exportCsv} 完全一致（ACL 权限 → 字段级过滤 → 行级过滤 →
+     * 解析表头 → 审计），仅最后一步改为把数据交给 Python 渲染成 xlsx / pdf。
+     *
+     * <p>Python 不可用时降级为 503 + 明确提示（不静默返回空文件）。
+     */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{name}/export-file")
+    public ResponseEntity<?> exportFile(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "xlsx") String format,
+            @RequestParam(defaultValue = "1000") int limit,
+            @AuthenticationPrincipal com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user
+    ) {
+        // 1. ACL 权限校验（与 exportCsv 一致）
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+
+        // 2. 取 meta + records
+        CollectionMetaEntity meta = service.get(name, user.tenantId());
+        List<Map<String, Object>> records = service.listRecords(name, user.tenantId(), limit);
+
+        // 3. 字段级过滤 + 行级过滤（与 exportCsv 一致）
+        records = records.stream()
+                .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
+                .toList();
+        records = rowAclService.filterReadable(
+                user.tenantId(), name, records, rowAclPrincipal(user));
+
+        // 4. 解析表头（fields_json 顺序；失败记 WARN 而非静默）
+        List<String> headers = new java.util.ArrayList<>();
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> fields = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(meta.getFieldsJson(), List.class);
+            for (Map<String, Object> f : fields) {
+                headers.add((String) f.get("name"));
+            }
+        } catch (Exception e) {
+            log.warn("[文件导出] 表头解析失败，导出将只有空表头：collection={}, err={}",
+                    name, e.getMessage());
+        }
+
+        // 5. 组装二维数据（列顺序严格按 headers）
+        List<List<Object>> rows = new java.util.ArrayList<>();
+        for (Map<String, Object> r : records) {
+            List<Object> row = new java.util.ArrayList<>();
+            for (String h : headers) {
+                row.add(r.get(h));
+            }
+            rows.add(row);
+        }
+
+        // 6. 调 Python 生成文件；失败明确返回 503（不返回空/损坏文件）
+        String filename = name + "_" + java.time.LocalDate.now()
+                + com.nocobase.export.ExportFileService.extensionOf(format);
+        byte[] data = exportFileService.build(format, headers, rows, name);
+        if (data == null) {
+            log.error("[文件导出] 生成失败 collection={} format={} —— Python 导出服务不可用",
+                    name, format);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("code", 5003, "message",
+                            "导出服务暂不可用，请确认 Python 导出服务已启用", "data", Map.of()));
+        }
+
+        // 7. 审计（与 exportCsv 一致，额外记录 format）
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "collection.export_file", "collection", name,
+                Map.of("collection_name", name, "exported_rows", records.size(),
+                        "format", format, "filter", "limit=" + limit));
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE,
+                        com.nocobase.export.ExportFileService.mediaTypeOf(format))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .body(data);
     }
 
     @PreAuthorize("isAuthenticated()")
