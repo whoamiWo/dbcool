@@ -152,6 +152,42 @@ type: reference
 2. ✅ 中期：Redis INCR + 内存缓存限额 + 批量刷回 DB
 3. ✅ 或：执行方案 B 校准阈值，解除终止判定阻塞
 
+---
+
+## PHASE136 最终定位与结果（2026-10-25）
+
+> 本节取代上文「瓶颈待定位」的中间状态。上文的 tenant 行锁假设在本阶段被证伪——
+> 真正根因是 `collection_meta` 表读放大，已用 Caffeine 本地缓存修复。
+
+### 根因修正
+
+此前 4 轮压测（393/568/553/535ms）归因于「tenant 行锁争用」，但压测端点
+`GET /api/collections` 的链路中 **并无 tenant 行写**（PHASE135 已把配额 flush 降频到
+60s、移除全表 reset，压测窗口内不触发）。jstack 线程栈实测显示 http 线程全部阻塞在
+`org.postgresql.core.v3.QueryExecutorImpl.processResults`（等 PG 响应），而单请求串行仅
+5.5ms——50 并发时 `CollectionService.list()` 每次查 `collection_meta`，读放大 + 表锁排队
+才是 P95 长尾来源。
+
+### 修复
+
+- `CollectionService.list()` 引入 Caffeine 本地缓存（`expireAfterAccess=5s`，`maximumSize=1000`）
+- 写入路径（create/updateMeta/addField/removeField/renameField）加 `@CacheEvict` 保证一致性
+- Dockerfile 构建阶段改为宿主机预打 jar，避免 Alpine 拉 OpenJDK 阻塞构建
+
+### 实测结果（`scripts/perf-load.py`，2026-10-25）
+
+| VU | P95（修复前） | P95（修复后） | 降幅 | 达标（<300ms） |
+|---|---|---|---|---|
+| 50 | ~543ms（4 轮中位） | **68.1ms** | -87% | ✅ |
+| 50 | P99 803ms | **86.2ms** | -89% | ✅ |
+| 50 | 吞吐 354 rps | **1084.5 rps** | +207% | — |
+
+### 结论
+
+- **标准 4 阻塞解除**：P95 @50VU 68.1ms < 300ms
+- 200 VU P95 1.02s 仍标记为已知架构限制（超出当前终止标准范围），列入后续版本
+- 终止判定 5/5 全部达标，进入阶段 7
+
 ## PHASE134 优化完成
 
 | 指标 | PHASE131 | PHASE134 | 改进 |
