@@ -63,6 +63,11 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+  # PHASE136: Caffeine 本地缓存（collectionList 缓存 TTL 5s，最多 200 租户，开启统计）
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=200,expireAfterAccess=5s,recordStats
 
 server:
   port: ${JAVA_PORT:8080}

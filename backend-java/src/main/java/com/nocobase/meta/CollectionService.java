@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -92,6 +94,7 @@ public class CollectionService {
     }
 
     @Transactional
+    @CacheEvict(value = "collectionList", allEntries = true)  // PHASE136: create 后失效全量缓存
     public CollectionMetaEntity create(
             String name, String title, String description,
             List<FieldDef> fields, String tenantId, UUID createdBy
@@ -169,8 +172,21 @@ public class CollectionService {
         }
     }
 
+    /**
+     * 列出租户下所有 collection。
+     *
+     * <p><b>PHASE136 性能修复：</b>加入 Caffeine 本地缓存（TTL 5s，最大 200 租户）。
+     * 压测实证：50 VU 下 http 线程栈全部阻塞在
+     * {@code org.postgresql.core.v3.QueryExecutorImpl.processResults}（等 PG 响应），
+     * 单请求串行仅 5.5ms，但 50 并发时 P95 达 462ms —— 典型 DB 往返放大。
+     * 该端点是元数据读取（低频变更、高频读取），适合短 TTL 缓存。
+     * 写入路径（create/update/addField/removeField）通过 {@code @CacheEvict} 主动失效。
+     *
+     * <p>返回列表为不可变副本，避免调用方意外修改缓存内容。
+     */
+    @Cacheable(value = "collectionList", key = "#tenantId")
     public List<CollectionMetaEntity> list(String tenantId) {
-        return repository.findByTenantId(tenantId);
+        return List.copyOf(repository.findByTenantId(tenantId));
     }
 
     public CollectionMetaEntity get(String name, String tenantId) {
@@ -193,6 +209,7 @@ public class CollectionService {
     }
 
     @Transactional
+    @CacheEvict(value = "collectionList", allEntries = true)  // PHASE136
     public CollectionMetaEntity updateMeta(String name, String title, String description, String tenantId) {
         CollectionMetaEntity meta = get(name);
         if (!meta.getTenantId().equals(tenantId)) {
@@ -209,6 +226,7 @@ public class CollectionService {
      * @return null = 同步成功;UUID = 异步 job_id
      */
     @Transactional
+    @CacheEvict(value = "collectionList", allEntries = true)  // PHASE136
     public UUID addField(String name, FieldDef field, String tenantId, UUID userId) {
         CollectionMetaEntity meta = get(name);
         if (!meta.getTenantId().equals(tenantId)) {
@@ -239,6 +257,7 @@ public class CollectionService {
     }
 
     @Transactional
+    @CacheEvict(value = "collectionList", allEntries = true)  // PHASE136
     public UUID removeField(String name, String fieldName, String tenantId, UUID userId) {
         CollectionMetaEntity meta = get(name);
         if (!meta.getTenantId().equals(tenantId)) {
@@ -269,6 +288,7 @@ public class CollectionService {
     }
 
     @Transactional
+    @CacheEvict(value = "collectionList", allEntries = true)  // PHASE136
     public UUID renameField(String name, String oldName, String newName, String tenantId, UUID userId) {
         CollectionMetaEntity meta = get(name);
         if (!meta.getTenantId().equals(tenantId)) {

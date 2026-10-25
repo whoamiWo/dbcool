@@ -5,6 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cache.annotation.EnableCaching;
 
 /**
  * NocoBase 核心引擎入口.
@@ -17,6 +18,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 @SpringBootApplication
 @ConfigurationPropertiesScan
 @EnableConfigurationProperties(MinioStorageProperties.class)
+@EnableCaching  // PHASE136: 启用 @Cacheable/@CacheEvict
 public class NocoBaseApplication {
 
     public static void main(String[] args) {
