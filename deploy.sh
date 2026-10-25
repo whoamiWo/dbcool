@@ -25,6 +25,7 @@ log() { echo -e "${CYAN}[$(date '+%H:%M:%S')]${RESET} $*" | tee -a /tmp/nocobase
 ok()  { echo -e "${GREEN}✅${RESET} $*"; }
 warn(){ echo -e "${YELLOW}⚠️${RESET}  $*"; }
 err() { echo -e "${RED}❌${RESET} $*"; exit 1; }
+error() { echo -e "${RED}❌${RESET} $*"; }
 
 # ============================================================
 #  检查环境
@@ -263,9 +264,196 @@ show_logs() {
 }
 
 # ============================================================
+#  初始化环境变量
+# ============================================================
+init_env() {
+    log "检查 .env 文件..."
+    cd "$PROJECT_ROOT"
+
+    if [ ! -f .env ]; then
+        log ".env 不存在，从 .env.example 生成..."
+        python3 scripts/init-env.py
+        if [ $? -ne 0 ]; then
+            error ".env 生成失败"
+            return 1
+        fi
+        ok ".env 已生成"
+    else
+        log ".env 已存在，跳过生成"
+        if grep -q "CHANGEME" .env; then
+            warn "发现 CHANGEME 占位符，建议重新生成: python3 scripts/init-env.py --force"
+        else
+            ok ".env 配置完整"
+        fi
+    fi
+}
+
+# ============================================================
+#  部署前自检
+# ============================================================
+preflight_check() {
+    log "运行部署前自检..."
+    cd "$PROJECT_ROOT"
+
+    python3 scripts/preflight.py
+    local rc=$?
+
+    if [ $rc -eq 0 ]; then
+        ok "自检通过"
+        return 0
+    else
+        error "自检失败，请修复问题后重试"
+        return 1
+    fi
+}
+
+# ============================================================
+#  生成自签名证书
+# ============================================================
+gen_cert() {
+    log "检查证书..."
+    cd "$PROJECT_ROOT"
+
+    bash scripts/gen-selfsigned-cert.sh
+    if [ $? -ne 0 ]; then
+        error "证书生成失败"
+        return 1
+    fi
+    ok "证书就绪"
+}
+
+# ============================================================
+#  准备构建产物
+# ============================================================
+prepare_build_artifacts() {
+    log "检查构建产物..."
+    cd "$PROJECT_ROOT"
+
+    if [ ! -f "backend-java/target/nocobase-backend-0.0.1-SNAPSHOT.jar" ]; then
+        log "Java jar 不存在，执行 Maven 构建..."
+        make build-java || { error "Maven 构建失败"; return 1; }
+        ok "Maven 构建完成"
+    else
+        log "Java jar 已存在"
+    fi
+
+    if [ ! -d "frontend/dist" ] || [ -z "$(ls -A frontend/dist 2>/dev/null)" ]; then
+        log "前端 dist 为空，执行构建..."
+        make build-frontend || { error "前端构建失败"; return 1; }
+        ok "前端构建完成"
+    else
+        log "前端 dist 已存在"
+    fi
+}
+
+# ============================================================
+#  Docker 构建与启动
+# ============================================================
+docker_up() {
+    log "构建 Docker 镜像..."
+    cd "$PROJECT_ROOT"
+
+    docker_cmd compose build
+    if [ $? -ne 0 ]; then
+        error "Docker 构建失败"
+        return 1
+    fi
+    ok "Docker 构建完成"
+
+    log "启动服务..."
+    docker_cmd compose up -d
+    if [ $? -ne 0 ]; then
+        error "Docker 启动失败"
+        return 1
+    fi
+    ok "服务已启动"
+
+    log "等待 Java 后端就绪..."
+    local retries=45
+    while [ $retries -gt 0 ]; do
+        if curl -sf http://localhost:8080/api/health/ready >/dev/null 2>&1; then
+            ok "Java 后端就绪"
+            return 0
+        fi
+        retries=$((retries - 1))
+        sleep 2
+    done
+
+    error "Java 后端在 90 秒内未就绪"
+    return 1
+}
+
+# ============================================================
+#  部署验证
+# ============================================================
+verify_deploy() {
+    log "运行部署验证..."
+    cd "$PROJECT_ROOT"
+
+    if [ -f "scripts/verify-deploy.py" ]; then
+        python3 scripts/verify-deploy.py
+        return $?
+    fi
+
+    log "verify-deploy.py 不存在，执行基本健康检查"
+    docker_cmd compose ps --format "table {{.Name}}\t{{.Status}}"
+
+    if curl -sf http://localhost:8080/api/health/ready >/dev/null 2>&1; then
+        ok "Java 后端健康"
+    else
+        error "Java 后端不健康"
+        return 1
+    fi
+
+    if curl -sf http://localhost:8000/api/health >/dev/null 2>&1; then
+        ok "Python 后端健康"
+    else
+        warn "Python 后端未响应"
+    fi
+
+    ok "基本健康检查通过"
+    return 0
+}
+
+# ============================================================
+#  一键部署（从零开始）
+# ============================================================
+deploy_from_scratch() {
+    log "=========================================="
+    log "  一键部署（从零开始）"
+    log "=========================================="
+
+    init_env || return 1
+    preflight_check || return 1
+    gen_cert || return 1
+    prepare_build_artifacts || return 1
+    docker_up || return 1
+    verify_deploy || return 1
+
+    echo ""
+    ok "=========================================="
+    ok "  部署成功"
+    ok "=========================================="
+    echo ""
+    echo -e "${CYAN}访问地址:${RESET}"
+    echo "  前端:      http://localhost:5173"
+    echo "  Java:      http://localhost:8080"
+    echo "  Python:    http://localhost:8000"
+    echo "  MinIO:     http://localhost:9001"
+    echo ""
+    echo -e "${CYAN}账号:${RESET} admin / admin123"
+}
+
+# ============================================================
 #  入口
 # ============================================================
 case "${1:-}" in
+    init-env)    init_env ;;
+    preflight)   preflight_check ;;
+    gen-cert)    gen_cert ;;
+    up)          docker_up ;;
+    verify)      verify_deploy ;;
+    from-scratch) deploy_from_scratch ;;
     prod)  deploy_prod ;;
     demo)  deploy_demo ;;
     stop)  stop_all ;;

@@ -24,6 +24,21 @@ import apiClient from '@/api/client';
 
 type NodeKind = 'APPROVAL' | 'NOTIFICATION' | 'CONDITION' | 'HTTP' | 'DATA_UPDATE';
 
+/** US-410: 工作流版本条目 */
+interface WorkflowVersionItem {
+  version: number;
+  node_count?: number;
+  published_at: string;
+  published_by?: string;
+}
+
+/** US-410: 版本列表响应体 */
+interface WorkflowVersionList {
+  workflow_id: string;
+  current_version: number;
+  versions: WorkflowVersionItem[];
+}
+
 interface WorkflowNodeData {
   kind: NodeKind;
   config: Record<string, string>;
@@ -129,8 +144,52 @@ export function WorkflowDesignerPage() {
   const [showSimulate, setShowSimulate] = useState(false);
   const [simulateData, setSimulateData] = useState('{\n  "record_id": "test-001"\n}');
   const [simulateResult, setSimulateResult] = useState<{ instanceId?: string; error?: string } | null>(null);
+  // US-410: 版本管理
+  const [showVersions, setShowVersions] = useState(false);
+  const [rollbackTarget, setRollbackTarget] = useState<number | null>(null);
+  const [versionNotice, setVersionNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { project } = useReactFlow();
+
+  // US-410: 版本列表(仅编辑态且有 id 时拉取)
+  const { data: versionData } = useQuery({
+    queryKey: ['workflow-versions', id],
+    queryFn: async () => {
+      const r = await apiClient.get<{ data: WorkflowVersionList }>(`/workflows/${id}/versions`);
+      return (r as { data: WorkflowVersionList }).data;
+    },
+    enabled: isEdit && showVersions,
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: () => apiClient.post<{ data: { version: number } }>(`/workflows/${id}/versions/publish`, {}),
+    onSuccess: (r) => {
+      const v = (r as { data?: { version?: number } }).data?.version;
+      setVersionNotice({ kind: 'ok', text: t('workflowDesigner.publishSuccess', { version: v }) });
+      qc.invalidateQueries({ queryKey: ['workflow-versions', id] });
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string } } };
+      setVersionNotice({ kind: 'err', text: e.response?.data?.message ?? t('workflowDesigner.publishFailed') });
+    },
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: (version: number) =>
+      apiClient.post<{ data: { rolled_back_to: number } }>(`/workflows/${id}/versions/${version}/rollback`, {}),
+    onSuccess: (_r, version) => {
+      setRollbackTarget(null);
+      setVersionNotice({ kind: 'ok', text: t('workflowDesigner.rollbackSuccess', { version }) });
+      qc.invalidateQueries({ queryKey: ['workflow-versions', id] });
+      // 重新加载工作流定义(覆盖后的快照)
+      qc.invalidateQueries({ queryKey: ['workflow', id] });
+    },
+    onError: (err: unknown) => {
+      setRollbackTarget(null);
+      const e = err as { response?: { data?: { message?: string } } };
+      setVersionNotice({ kind: 'err', text: e.response?.data?.message ?? t('workflowDesigner.rollbackFailed') });
+    },
+  });
 
   const { data: existing } = useQuery({
     queryKey: ['workflow', id],
@@ -388,19 +447,100 @@ export function WorkflowDesignerPage() {
         </ReactFlow>
       </div>
 
-      {/* 右:配置面板 */}
-      <aside style={{ width: 280, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', overflowY: 'auto' }}>
-        <h3 style={{ marginTop: 0 }}>{t('workflowDesigner.nodeConfig')}</h3>
-        {!selectedNode ? (
-          <p style={{ color: 'var(--color-text-disabled)' }}>{t('workflowDesigner.selectNode')}</p>
-        ) : (
-          <NodeConfigEditor
-            node={selectedNode}
-            onChange={(patch) => updateNodeData(selectedNode.id, patch)}
-            t={t}
-          />
-        )}
-      </aside>
+      {/* 右:配置面板 + 版本侧栏 */}
+      {showVersions ? (
+        /* US-410: 版本侧栏 */
+        <aside style={{ width: 280, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', overflowY: 'auto' }}>
+          <button onClick={() => setShowVersions(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-text-disabled)', cursor: 'pointer', marginBottom: 8 }}>
+            ← {t('workflowDesigner.backToList')}
+          </button>
+          <h3 style={{ marginTop: 0 }}>{t('workflowDesigner.versions')}</h3>
+          {versionNotice && (
+            <div style={{ padding: 8, marginBottom: 12, borderRadius: 4, fontSize: 13,
+                            background: versionNotice.kind === 'ok' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                            color: versionNotice.kind === 'ok' ? 'var(--color-success)' : 'var(--color-error)' }}>
+              {versionNotice.text}
+            </div>
+          )}
+          {(!versionData?.versions?.length || versionData.versions.length === 0) ? (
+            <p style={{ color: 'var(--color-text-disabled)' }}>{t('workflowDesigner.noVersions')}</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {versionData?.versions.map((v) => (
+                <li key={v.version} style={{ padding: 8, marginBottom: 6, background: 'var(--color-bg-secondary)', borderRadius: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 500 }}>{t('workflowDesigner.versionLabel', { version: v.version })}</span>
+                    {v.version === (versionData.current_version ?? 0) && (
+                      <span style={{ fontSize: 11, color: 'var(--color-text-disabled)' }}>{t('workflowDesigner.currentVersion', { version: v.version })}</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-disabled)', marginTop: 4 }}>
+                    {t('workflowDesigner.nodeCount', { count: v.node_count ?? 0 })} • {new Date(v.published_at).toLocaleString()}
+                  </div>
+                  {v.version < (versionData.current_version ?? 0) && (
+                    <button onClick={() => setRollbackTarget(v.version)}
+                            style={{ marginTop: 4, padding: '4px 8px', background: 'var(--color-error)',
+                                     color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}>
+                      {t('workflowDesigner.rollback')}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button onClick={() => {
+            if (rollbackTarget !== null) {
+              if (window.confirm(t('workflowDesigner.rollbackConfirmBody', { version: rollbackTarget }))) {
+                rollbackMutation.mutate(rollbackTarget);
+              }
+            }
+          }}
+                  disabled={rollbackMutation.isPending || rollbackTarget === null}
+                  style={{ marginTop: 12, width: '100%', padding: 8,
+                           background: rollbackMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-error)',
+                           color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+            {rollbackMutation.isPending ? t('workflowDesigner.running') : t('workflowDesigner.confirmRollback')}
+          </button>
+          <button onClick={() => setShowVersions(false)}
+                  style={{ marginTop: 8, width: '100%', padding: 8, background: 'var(--color-bg-secondary)',
+                           color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+            {t('workflowDesigner.cancel')}
+          </button>
+        </aside>
+      ) : (
+        <aside style={{ width: 280, background: 'var(--color-text-primary)', padding: 12, borderRadius: 8, boxShadow: '0 1px 3px var(--color-bg-primary)', overflowY: 'auto' }}>
+          <h3 style={{ marginTop: 0 }}>{t('workflowDesigner.nodeConfig')}</h3>
+
+          {/* US-410: 发布版本 + 版本历史按钮（仅编辑态） */}
+          {isEdit && id && (
+            <div style={{ marginTop: 16, marginBottom: 12 }}>
+              <button onClick={() => publishMutation.mutate()}
+                      disabled={publishMutation.isPending}
+                      style={{ width: '100%', padding: 8,
+                               background: publishMutation.isPending ? 'var(--color-text-muted)' : 'var(--color-info)',
+                               color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                {publishMutation.isPending ? t('workflowDesigner.publishing') : t('workflowDesigner.publishVersion')}
+              </button>
+              <button onClick={() => setShowVersions(true)}
+                      style={{ width: '100%', marginTop: 8, padding: 8, background: 'var(--color-bg-secondary)',
+                               color: 'var(--color-text-primary)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                {t('workflowDesigner.versions')}
+              </button>
+            </div>
+          )}
+
+          {!selectedNode ? (
+            <p style={{ color: 'var(--color-text-disabled)' }}>{t('workflowDesigner.selectNode')}</p>
+          ) : (
+            <NodeConfigEditor
+              node={selectedNode}
+              onChange={(patch) => updateNodeData(selectedNode.id, patch)}
+              t={t}
+            />
+          )}
+        </aside>
+      )}
 
       {/* US-406 测试运行弹窗 */}
       {showSimulate && (

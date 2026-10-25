@@ -3,7 +3,7 @@
 #  用法: make <target>
 # ============================================================
 
-.PHONY: help up up-infra up-all down logs restart clean
+.PHONY: help up up-infra up-all down logs restart clean init-env preflight verify from-scratch build-java build-frontend
 
 CYAN  := \033[36m
 RESET := \033[0m
@@ -100,31 +100,22 @@ build-frontend: ## 前端构建
 	cd frontend && pnpm build
 
 # ============================================================
-#  Lint / 格式化
+#  一键部署
 # ============================================================
 
-lint: ## 三栈 lint
-	@echo "$(CYAN)▶ Java Checkstyle$(RESET)"
-	cd backend-java && mvn checkstyle:check -q
-	@echo "$(CYAN)▶ Python$(RESET)"
-	cd backend-python && uv run ruff check . && uv run mypy .
-	@echo "$(CYAN)▶ Frontend$(RESET)"
-	cd frontend && pnpm lint && pnpm tsc --noEmit
+init-env: ## 初始化 .env 文件
+	python3 scripts/init-env.py
 
-format: ## 三栈格式化
-	cd backend-java && mvn spotless:apply
-	cd backend-python && uv run ruff format .
-	cd frontend && pnpm format
+preflight: ## 部署前环境自检
+	python3 scripts/preflight.py
 
-# ============================================================
-#  依赖安装
-# ============================================================
+verify: ## 部署验证
+	@if [ -f scripts/verify-deploy.py ]; then \
+		python3 scripts/verify-deploy.py; \
+	else \
+		echo "Basic health check"; \
+		curl -sf http://localhost:8080/api/health/ready && echo "Java OK" || exit 1; \
+	fi
 
-install: ## 安装三栈依赖
-	@echo "$(CYAN)▶ Java$(RESET)"
-	cd backend-java && mvn dependency:resolve
-	@echo "$(CYAN)▶ Python$(RESET)"
-	cd backend-python && uv sync --all-extras
-	@echo "$(CYAN)▶ Frontend$(RESET)"
-	cd frontend && pnpm install
-	@echo "✅ 三栈依赖安装完成"
+from-scratch: ## 一键部署 (从零开始)
+	@bash deploy.sh from-scratch

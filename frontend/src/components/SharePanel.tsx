@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
  * 支持添加用户或角色共享，并保存 shared_with_json
  */
 export interface ShareEntry {
+  id?: string;
   type: 'user' | 'role';
   name: string;
 }

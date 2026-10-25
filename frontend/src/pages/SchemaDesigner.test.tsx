@@ -117,6 +117,23 @@ describe('SchemaDesignerPage', () => {
     expect(apiClient.post).not.toHaveBeenCalled();
   });
 
+  it('US-008: 字段注释输入可录入并在提交时透传', async () => {
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ name: 'orders' });
+    wrap();
+    fireEvent.change(screen.getByLabelText(/schemaDesigner.collectionName/), { target: { value: 'orders' } });
+    fireEvent.click(screen.getByText('schemaDesigner.addField'));
+
+    // 找到注释输入框（aria-label = schemaDesigner.fieldAriaComment）
+    const commentInput = screen.getByLabelText('schemaDesigner.fieldAriaComment') as HTMLInputElement;
+    fireEvent.change(commentInput, { target: { value: '客户名称（主数据）' } });
+
+    fireEvent.click(screen.getByText('schemaDesigner.saveCollection'));
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+    const [, body] = (apiClient.post as ReturnType<typeof vi.fn>).mock.calls[0];
+    const fields = (body as { fields: Array<{ comment?: string }> }).fields;
+    expect(fields[0].comment).toBe('客户名称（主数据）');
+  });
+
   it('提交成功：POST /collections 携带名称与字段', async () => {
     (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ name: 'orders' });
     wrap();

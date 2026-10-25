@@ -70,7 +70,8 @@ public class WorkflowTemplateService {
                                 null,
                                 false, // primaryKey
                                 false, // unique
-                                null   // defaultValue
+                                null,  // defaultValue
+                                (String) f.get("comment") // US-008 字段注释
                         ))
                         .toList();
                 collectionService.create(c.name(), c.title(), c.description(),

@@ -35,7 +35,8 @@ public record FieldDef(
         Map<String, Object> options,
         boolean primaryKey,
         boolean unique,
-        String defaultValue
+        String defaultValue,
+        String comment
 ) {
     /** Canonical 构造器(8 参数) — 含字段合法性校验。 */
     public FieldDef {
@@ -51,11 +52,20 @@ public record FieldDef(
     }
 
     /**
-     * 5 参数便捷构造器(兼容既有调用):缺省 primaryKey=false, unique=false, defaultValue=null。
+     * 5 参数便捷构造器(兼容既有调用):缺省 primaryKey=false, unique=false, defaultValue=null, comment=null。
      * 委托给 canonical 构造器,校验逻辑一致生效。
      */
     public FieldDef(String name, String type, boolean required, String label, Map<String, Object> options) {
-        this(name, type, required, label, options, false, false, null);
+        this(name, type, required, label, options, false, false, null, null);
+    }
+
+    /**
+     * 8 参数便捷构造器(兼容既有调用):缺省 comment=null。
+     * US-008 新增 comment 字段后,保留此重载以便既有的 8 参数调用方无需修改。
+     */
+    public FieldDef(String name, String type, boolean required, String label,
+                    Map<String, Object> options, boolean primaryKey, boolean unique, String defaultValue) {
+        this(name, type, required, label, options, primaryKey, unique, defaultValue, null);
     }
 
     /** 验证字段类型是否合法。 */

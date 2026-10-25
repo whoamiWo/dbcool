@@ -1,3 +1,39 @@
+## v2.0.0 (2026-10-25) — 首个正式版本（Production Ready）
+
+> **正式发布**：NocoBase 级低代码平台 v2.0.0。三栈全功能闭环、终止判定 5/5 达标、一键部署链路打通，具备生产就绪能力。
+
+### 1. 版本号统一
+
+| 组件 | 原版本 | 新版本 |
+|---|---|---|
+| `frontend/package.json` | 0.0.1 | **2.0.0** |
+| `backend-java/pom.xml` | 0.0.1-SNAPSHOT | **2.0.0** |
+
+### 2. 一键部署闭环（PHASE9）
+
+- 新增 `scripts/init-env.py`：自动生成强密钥 `.env`，免手工配置
+- 新增 `scripts/gen-selfsigned-cert.sh`：占位自签证书生成，IP 直连模式开箱可用
+- 新增 `scripts/preflight.py`：环境自检（Docker / 资源 / 端口 / 镜像源 / 构建产物）输出 PASS/FAIL 表
+- 新增 `scripts/verify-deploy.py`：聚合健康状态 + 六链路冒烟验收
+- 扩展 `deploy.sh` / `Makefile`：新增 `init-env`、`preflight`、`up`、`verify`、`from-scratch` 子命令
+- 部署运维指南见 `docs/PHASE9_ONE_CLICK_DEPLOY.md`
+
+### 3. 性能优化（PHASE136）
+
+| 指标 | 优化前 | 优化后 | 变化 |
+|---|---|---|---|
+| P95 @50VU | 389ms | **68.1ms** | **-87%** |
+
+- 缓存层优化落地，高并发下 P95 大幅下降
+- 详见 `docs/PERF_PROFILING_REPORT.md`
+
+### 4. 终止判定
+
+- 5/5 标准全部实证通过，正式终止报告见 `docs/TERMINATION_REPORT.md`
+- 里程碑 M28 / M29 归档
+
+---
+
 ## Week 44 (2026-10-24) — PHASE134 正式终止 + P1 订正（里程碑 M27）
 
 > **终止判定 5/5 达标**：P0+P1 全完成、三栈 lint 清零、覆盖率 80.06%、P95@30VU 184.4ms、ADR 011 索引。正式终止报告见 `docs/TERMINATION_REPORT.md`。

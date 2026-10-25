@@ -40,6 +40,8 @@ export interface FieldDef {
   primaryKey?: boolean;
   unique?: boolean;
   defaultValue?: string;
+  /** US-008: 字段中文注释（工具提示/文档用途） */
+  comment?: string;
 }
 
 export interface CollectionMeta {
@@ -91,4 +93,20 @@ export interface MigrationJob {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+}
+
+/** US-410: 工作流版本 */
+export interface WorkflowVersionItem {
+  id: string;
+  workflow_id: string;
+  version: number;
+  node_count?: number;
+  published_by?: string | null;
+  published_at: string;
+}
+
+export interface WorkflowVersionList {
+  workflow_id: string;
+  current_version?: number | null;
+  versions: WorkflowVersionItem[];
 }

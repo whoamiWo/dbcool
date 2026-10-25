@@ -388,7 +388,23 @@
     "opContains": "包含 contains",
     "opGt": "大于 gt",
     "opLt": "小于 lt",
-    "triggerDataPlaceholder": "{\"record_id\":\"test-001\",\"name\":\"测试\"}"
+    "triggerDataPlaceholder": "{\"record_id\":\"test-001\",\"name\":\"测试\"}",
+    "versions": "版本历史",
+    "publishVersion": "⬆ 发布版本",
+    "publishing": "发布中…",
+    "publishSuccess": "已发布版本 v{{version}}",
+    "publishFailed": "发布失败",
+    "noVersions": "暂无发布版本",
+    "currentVersion": "当前版本 v{{version}}",
+    "versionLabel": "v{{version}}",
+    "nodeCount": "{{count}} 个节点",
+    "rollback": "回滚",
+    "rollbackConfirmTitle": "确认回滚",
+    "rollbackConfirmBody": "确定要回滚到 v{{version}} 吗？当前工作流定义将被该版本快照覆盖，此操作不可撤销。",
+    "rollbackSuccess": "已回滚到 v{{version}}",
+    "rollbackFailed": "回滚失败",
+    "cancel": "取消",
+    "confirmRollback": "确认回滚"
   },
   "editor": {
     "block": {
@@ -535,9 +551,12 @@
     "colFieldName": "字段名",
     "colType": "类型",
     "colRequired": "必填",
+    "colComment": "注释",
     "colAction": "操作",
     "fieldAriaFieldName": "字段名",
     "fieldAriaRequired": "是否必填",
+    "fieldAriaComment": "字段注释",
+    "commentPlaceholder": "字段含义说明",
     "removeField": "删除",
     "relationTargetLabel": "关联表 (target):",
     "relationTargetAria": "字段 {{name}} 关联表",
@@ -1424,7 +1443,12 @@
     "noDescription": "(无描述)",
     "aclConfig": "权限配置",
     "deleteConfirm": "删除角色 \"{{name}}\"?",
-    "createFailed": "创建失败"
+    "createFailed": "创建失败",
+    "parentRoleLabel": "继承自父角色",
+    "parentAria": "角色 {{name}} 的父角色",
+    "parentHint": "子角色将自动继承父角色的全部 ACL 策略",
+    "parentUpdateFailed": "父角色修改失败",
+    "none": "（无，独立角色）"
   },
   "recycleBin": {
     "title": "回收站",

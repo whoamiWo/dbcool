@@ -2,6 +2,9 @@
 
 > 一个 NocoBase 风格的可视化低代码平台 · Java + Python + React 三栈 · 单机即可演示
 
+**当前版本：v2.0.0（Production Ready）**
+
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](../../releases)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-green)](https://spring.io/)
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://python.org/)
@@ -280,9 +283,10 @@ add field → 同步 ALTER(小表秒过)
 | 5 依赖升级(PHASE117) | ✅ Spring Boot 3.4.7 + SpEL 回归修复 |
 | 5 i18n 接入(PHASE118) | ✅ 5 批次 / 53 文件 / 250+ key |
 | 5 文档同步(PHASE119-123) | ✅ 门禁刷新 + 版本对齐 |
-| 6 迭代优化(Prime 协作) | ⏳ |
-| 6 CRDT 身份归属补全(PHASE127) | ⏳ 版本快照 user_id/tenant_id 写入修复 |
-| 7 终止判定 | ⏳ |
+| 6 迭代优化(Prime 协作) | ✅ PHASE127-136 |
+| 6 CRDT 身份归属补全(PHASE127) | ✅ 版本快照 user_id/tenant_id 写入修复 |
+| 6 一键部署闭环(PHASE9) | ✅ init-env / preflight / verify / from-scratch |
+| 7 终止判定 | ✅ 5/5 达标 · **v2.0.0 正式发布** |
 
 ## 📈 进度数据
 
@@ -308,6 +312,7 @@ add field → 同步 ALTER(小表秒过)
 | SaaS 就绪 | ✅ 11/11 |
 | 启动检查 | ✅ 0 问题 |
 | 密钥轮换 | ✅ 3/3 |
+| 一键部署 | ✅ init-env / preflight / verify / from-scratch |
 
 ## 🐛 排错
 

@@ -204,6 +204,7 @@ export function SchemaDesignerPage() {
               <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaDesigner.colFieldName')}</th>
               <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaDesigner.colType')}</th>
               <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaDesigner.colRequired')}</th>
+              <th style={{ padding: 8, textAlign: 'left' }}>{t('schemaDesigner.colComment')}</th>
               <th style={{ padding: 8 }} aria-label={t('schemaDesigner.colAction')}></th>
             </tr>
           </thead>
@@ -266,6 +267,16 @@ export function SchemaDesignerPage() {
                     aria-label={t('schemaDesigner.fieldAriaRequired')}
                     checked={f.required}
                     onChange={(e) => updateField(i, { required: e.target.checked })}
+                  />
+                </td>
+                <td style={{ padding: 8 }}>
+                  {/* US-008: 字段中文注释 */}
+                  <input
+                    aria-label={t('schemaDesigner.fieldAriaComment')}
+                    value={f.comment ?? ''}
+                    onChange={(e) => updateField(i, { comment: e.target.value })}
+                    placeholder={t('schemaDesigner.commentPlaceholder')}
+                    style={{ padding: 4, width: '100%' }}
                   />
                 </td>
                 <td style={{ padding: 8, textAlign: 'center' }}>

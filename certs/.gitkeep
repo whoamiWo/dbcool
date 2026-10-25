@@ -1,0 +1,14 @@
+# 证书目录占位
+#
+# 该目录存放 nginx TLS 证书（docker-compose.yml 中 frontend 服务挂载）:
+#   - fullchain.pem : 证书链
+#   - privkey.pem   : 私钥
+#
+# 生成方式（二选一）:
+#   1. 自签名占位（IP 直连模式 / 内部 POC）:
+#        bash scripts/gen-selfsigned-cert.sh
+#   2. 正式证书（域名模式）:
+#        将 CA 签发的 fullchain.pem / privkey.pem 放入本目录
+#
+# 注意：即使 IP 直连模式下 nginx 不引用证书，也必须存在这两个文件，
+#       否则 Docker 会将挂载源当作目录创建，导致 nginx 启动失败。
