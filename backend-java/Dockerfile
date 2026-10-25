@@ -2,18 +2,11 @@
 #  NocoBase Java 后端 — 多阶段构建
 # ============================================================
 
-# Build stage
-FROM eclipse-temurin:21-jdk-alpine AS build
+# Build stage (PHASE136: 宿主机打包，避免 Alpine 构建阶段下载 OpenJDK)
+FROM alpine:3.19 AS build
 WORKDIR /workspace
-
-# 先复制 POM 利用 Docker 缓存
-COPY pom.xml .
-RUN apk add --no-cache maven && \
-    mvn dependency:go-offline -B
-
-# 复制源码并构建
-COPY src ./src
-RUN mvn clean package -DskipTests -B
+# jar 由宿主机 `mvn clean package -DskipTests` 预先产出
+COPY target/nocobase-backend-0.0.1-SNAPSHOT.jar .
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
@@ -23,7 +16,7 @@ WORKDIR /app
 RUN apk add --no-cache curl
 
 # 复制构建产物
-COPY --from=build /workspace/target/*.jar app.jar
+COPY --from=build /workspace/nocobase-backend-0.0.1-SNAPSHOT.jar app.jar
 
 # 创建非 root 用户
 RUN addgroup -S nocobase && adduser -S nocobase -G nocobase
