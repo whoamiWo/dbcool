@@ -1,6 +1,6 @@
-## Unreleased — PHASE10-H1 记录级评论
+## Unreleased — PHASE10-H1 记录级评论 + H3 IM 线程视图
 
-> **协作深度补齐**：对标 Notion / Airtable 的记录级评论能力落地，填补平台在协作维度的核心差距。
+> **协作深度补齐**：对标 Notion / Airtable 的记录级评论能力落地，填补平台在协作维度的核心差距；同时补齐 Slack/RocketChat 的线程对话体验。
 
 ### 1. 记录级评论（H1）
 
@@ -25,9 +25,33 @@
 - `DetailView` 改造为双栏自适应布局，右侧接入评论面板（窄屏自动收起）
 - 测试：Hook + 组件共 **11 tests 全部通过**
 
-### 2. 文档
+### 2. IM 线程视图（H3）✅ DONE
+
+**后端**（`backend-java/src/main/java/com/nocobase/im/`）：
+
+- `ImMessageEntity.parentId` 字段已存在，支持线程回复
+- `ImMessageRepository.findByParentIdOrderByCreatedAtAsc` 查询方法
+- `ImMessageController.GET /{id}/thread` 端点返回线程回复列表
+- 测试：`ImMessageServiceTest` 包含线程测试用例
+
+**前端**（`frontend/src/features/im/`）：
+
+- `getMessageThread()` + `sendReply()` API 封装（L113-130）
+- [`ThreadPanel.tsx`](/home/who/multistack-project/frontend/src/features/im/ThreadPanel.tsx)（207 行）：
+  - 获取并渲染线程回复列表
+  - 显示父消息预览
+  - 发送回复（复用 `MessageComposer`）
+  - 关闭按钮 + 关闭回调
+- [`ImLayout.tsx`](/home/who/multistack-project/frontend/src/features/im/ImLayout.tsx) 三栏布局集成（L371-375）：
+  - 点击非回复消息打开线程面板
+  - 再次点击同一消息关闭面板
+  - 移动端自动调整布局
+- 测试：[`ThreadPanel.test.tsx`](/home/who/multistack-project/frontend/src/features/im/ThreadPanel.test.tsx) + [`ImLayout.test.tsx`](/home/who/multistack-project/frontend/src/features/im/ImLayout.test.tsx) = **34 tests 全部通过**
+
+### 3. 文档
 
 - 新增 `docs/PLATFORM_GAP_ANALYSIS_2026-10-26.md`：对标 NocoDB / NocoBase / Slack / RocketChat / Trello / Airtable / Notion 的能力矩阵与差距量化，输出 Phase A/B/C 优先实施路线
+- [`USER_STORIES.md`](/home/who/multistack-project/USER_STORIES.md) 第八章新增 H1 评论功能 + 待办能力清单
 
 ---
 
