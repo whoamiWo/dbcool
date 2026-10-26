@@ -15,6 +15,7 @@ import {
   ListItemText,
   Chip,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   FormatBold,
@@ -53,6 +54,12 @@ SyntaxHighlighter.registerLanguage('python', python);
 SyntaxHighlighter.registerLanguage('css', css);
 import { useTranslation } from 'react-i18next';
 import type { WikiPage } from '@/types/wiki';
+import {
+  useWikiLinkAutocomplete,
+  detectWikiLinkTrigger,
+  buildWikiLink,
+  type WikiLinkCandidate,
+} from '@/hooks/useWikiLinkAutocomplete';
 
 // ============================================================
 //  块类型枚举
@@ -285,6 +292,8 @@ export function NotionStyleEditor({
   const [backlinksLoading, setBacklinksLoading] = useState(false);
   const [templates, setTemplates] = useState<Array<{ id: string; title: string; kbId?: string }>>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
+  // H2：`[[` 双向链接自动补全浮层的定位信息（相对视口）
+  const [wikiLinkAnchor, setWikiLinkAnchor] = useState<{ blockId: string; top: number; left: number } | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   // G2-R：标记 blocks 变更来源。仅当用户在编辑器内操作（updateBlock/addBlock/deleteBlock/输入）
@@ -508,6 +517,100 @@ export function NotionStyleEditor({
   );
 
   // ============================================================
+  //  `[[` 双向链接自动补全
+  // ============================================================
+  const wikiLink = useWikiLinkAutocomplete({ kbId });
+
+  /**
+   * 依据当前块文本与光标位置刷新补全状态。
+   * 命中 `[[` 时更新浮层定位，否则关闭浮层。
+   */
+  const syncWikiLink = useCallback(
+    (blockId: string, el: HTMLElement) => {
+      const selection = window.getSelection();
+      const text = el.textContent || '';
+      // contentEditable 下用 Range 偏移换算纯文本光标位置
+      let caret = text.length;
+      if (selection && selection.rangeCount > 0 && el.contains(selection.anchorNode)) {
+        const range = selection.getRangeAt(0).cloneRange();
+        range.selectNodeContents(el);
+        range.setEnd(selection.anchorNode!, selection.anchorOffset);
+        caret = range.toString().length;
+      }
+
+      const next = detectWikiLinkTrigger(text, caret);
+      if (next) {
+        const rect = el.getBoundingClientRect();
+        setWikiLinkAnchor({ blockId, top: rect.bottom + 4, left: rect.left });
+      } else {
+        setWikiLinkAnchor(null);
+      }
+      wikiLink.detect(next);
+    },
+    [wikiLink],
+  );
+
+  /** 把选中候选写入块文本，替换 `[[query` 片段并补上 `]]` */
+  const applyWikiLinkCandidate = useCallback(
+    (blockId: string, candidate: WikiLinkCandidate) => {
+      const trigger = wikiLink.trigger;
+      if (!trigger) return;
+      const block = blocks.find((b) => b.id === blockId);
+      if (!block) return;
+
+      const snippet = buildWikiLink(candidate);
+      const before = block.content.slice(0, trigger.start);
+      const after = block.content.slice(trigger.end);
+      const nextContent = `${before}${snippet}${after}`;
+
+      userEditedRef.current = true;
+      setBlocks((prev) => prev.map((b) => (b.id === blockId ? { ...b, content: nextContent } : b)));
+
+      // 关闭浮层，并把光标移到插入片段之后
+      setWikiLinkAnchor(null);
+      wikiLink.close();
+
+      requestAnimationFrame(() => {
+        const el = blockRefs.current.get(blockId)?.querySelector<HTMLElement>('[data-editable]');
+        if (!el) return;
+        el.focus();
+        const caretPos = before.length + snippet.length;
+        const range = document.createRange();
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let acc = 0;
+        let node = walker.nextNode();
+        while (node) {
+          const len = node.textContent?.length ?? 0;
+          if (acc + len >= caretPos) {
+            range.setStart(node, caretPos - acc);
+            break;
+          }
+          acc += len;
+          node = walker.nextNode();
+        }
+        if (!node) {
+          range.selectNodeContents(el);
+          range.collapse(false);
+        } else {
+          range.collapse(true);
+        }
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      });
+    },
+    [blocks, wikiLink],
+  );
+
+  // 浮层关闭时同步清掉定位状态
+  useEffect(() => {
+    if (!wikiLink.open && wikiLinkAnchor) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 清理逻辑，不会引发级联渲染
+      setWikiLinkAnchor(null);
+    }
+  }, [wikiLink.open, wikiLinkAnchor]);
+
+  // ============================================================
   //  渲染单个块
   // ============================================================
   const renderBlock = (block: Block) => {
@@ -642,9 +745,46 @@ export function NotionStyleEditor({
               setSlashAnchor(null);
               setSlashFilter('');
             }
+            // 实时检测 `[[` 双向链接补全
+            syncWikiLink(block.id, e.currentTarget);
+          }}
+          onKeyUp={(e) => {
+            // 方向键移动光标后需重新计算 `[[` 触发位置
+            if (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End') {
+              syncWikiLink(block.id, e.currentTarget);
+            }
           }}
           onKeyDown={(e) => {
             const target = e.target as HTMLElement;
+
+            // `[[` 补全浮层打开时接管导航键
+            if (wikiLinkAnchor && wikiLink.open) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                wikiLink.moveActive(1);
+                return;
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                wikiLink.moveActive(-1);
+                return;
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                const candidate = wikiLink.activeCandidate;
+                if (candidate) {
+                  e.preventDefault();
+                  applyWikiLinkCandidate(block.id, candidate);
+                  return;
+                }
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setWikiLinkAnchor(null);
+                wikiLink.close();
+                return;
+              }
+            }
+
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               // Enter → 创建新段落块
@@ -694,6 +834,12 @@ export function NotionStyleEditor({
     if (!md) return '';
     let html = md
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      // `[[slug|text]]` / `[[slug]]` 双向链接（须在普通链接之前处理）
+      .replace(/\[\[([^\]|\n]+?)(?:\|([^\]\n]+?))?\]\]/g, (_m, slug: string, text?: string) => {
+        const label = (text ?? slug).trim();
+        const target = slug.trim();
+        return `<a href="#" data-wiki-link="${target}" style="color:var(--color-info);text-decoration:none;border-bottom:1px dashed var(--color-info);cursor:pointer;">${label}</a>`;
+      })
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/~~(.+?)~~/g, '<del>$1</del>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
@@ -947,6 +1093,49 @@ export function NotionStyleEditor({
             {filteredCommands.length === 0 && (
               <Typography variant="body2" sx={{ p: 2, color: 'text.secondary' }}>
                 {t('editor.ui.noMatches')}
+              </Typography>
+            )}
+          </List>
+        </Box>
+      </Popover>
+
+      {/* H2：`[[` 双向链接自动补全浮层 */}
+      <Popover
+        open={wikiLinkAnchor !== null && wikiLink.open}
+        anchorReference="anchorPosition"
+        anchorPosition={wikiLinkAnchor ? { top: wikiLinkAnchor.top, left: wikiLinkAnchor.left } : undefined}
+        onClose={() => { setWikiLinkAnchor(null); wikiLink.close(); }}
+        slotProps={{ paper: { sx: { maxHeight: 320, width: 320 } } }}
+      >
+        <Box sx={{ p: 1 }}>
+          <List dense sx={{ maxHeight: 248, overflow: 'auto' }}>
+            {wikiLink.candidates.map((opt, idx) => (
+              <ListItemButton
+                key={opt.id}
+                selected={idx === wikiLink.activeIndex}
+                onMouseEnter={() => wikiLink.setActiveIndex(idx)}
+                onClick={() => {
+                  if (wikiLinkAnchor) applyWikiLinkCandidate(wikiLinkAnchor.blockId, opt);
+                }}
+              >
+                <ListItemText
+                  primary={opt.title}
+                  secondary={opt.slug}
+                  slotProps={{
+                    primary: { variant: 'body2' },
+                    secondary: { variant: 'caption', sx: { color: 'text.secondary' } },
+                  }}
+                />
+              </ListItemButton>
+            ))}
+            {wikiLink.loading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                <CircularProgress size={18} />
+              </Box>
+            )}
+            {!wikiLink.loading && wikiLink.candidates.length === 0 && (
+              <Typography variant="body2" sx={{ p: 2, color: 'text.secondary' }}>
+                {t('editor.ui.noWikiLinkMatches')}
               </Typography>
             )}
           </List>
