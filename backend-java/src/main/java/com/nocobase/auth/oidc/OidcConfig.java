@@ -1,7 +1,5 @@
 package com.nocobase.auth.oidc;
 
-import java.util.ArrayList;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -37,8 +35,6 @@ public class OidcConfig {
 
     @Bean
     public ClientRegistrationRepository clientRegistrationRepository(OidcProperties props) {
-        List<ClientRegistration> registrations = new ArrayList<>();
-
         if (props.isConfigured()) {
             try {
                 // issuer-uri 自动发现：授权端点 / 令牌端点 / JWKS 均从
@@ -53,9 +49,9 @@ public class OidcConfig {
                         .issuerUri(props.getIssuerUri())
                         .clientName("企业身份源 (OIDC)")
                         .build();
-                registrations.add(registration);
                 log.info("[OIDC] 已注册客户端 registrationId={} issuer={}",
                         REGISTRATION_ID, props.getIssuerUri());
+                return new InMemoryClientRegistrationRepository(registration);
             } catch (Exception e) {
                 // 配置有误（如 issuer 不可达）时记录错误但不阻断启动
                 log.error("[OIDC] 客户端注册失败，OIDC 登录将不可用：{}", e.getMessage());
@@ -65,6 +61,16 @@ public class OidcConfig {
                     + "不影响既有账密/钉钉/飞书登录");
         }
 
-        return new InMemoryClientRegistrationRepository(registrations);
+        // 未配置时返回空仓库 —— Spring Security 的 InMemoryClientRegistrationRepository
+        // 构造函数校验 registrations 非空，故不能直接传空列表（会破坏 Spring 上下文）。
+        return new EmptyClientRegistrationRepository();
+    }
+
+    /** 空仓库实现，避免 InMemoryClientRegistrationRepository 的非空校验。 */
+    private static final class EmptyClientRegistrationRepository implements ClientRegistrationRepository {
+        @Override
+        public ClientRegistration findByRegistrationId(String registrationId) {
+            return null;
+        }
     }
 }

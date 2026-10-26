@@ -39,6 +39,10 @@ public class ExportFileService {
     @Value("${export.python-url:${ai.python-url:http://localhost:8000}}")
     private String pythonUrl;
 
+    /** 服务间调用令牌（Python 侧 internal_service_token）。 */
+    @Value("${export.internal-token:${export.internal-token:${AI_INTERNAL_TOKEN:${EXPORT_INTERNAL_TOKEN:}}}}")
+    private String internalToken;
+
     /** 导出开关：false 时直接返回空，避免无谓的外部调用。 */
     @Value("${export.enabled:true}")
     private boolean enabled;
@@ -76,6 +80,10 @@ public class ExportFileService {
 
         HttpHeaders headers0 = new HttpHeaders();
         headers0.setContentType(MediaType.APPLICATION_JSON);
+        // Python 侧 /api/export/* 需要鉴权：优先携带服务间令牌，避免 401
+        if (internalToken != null && !internalToken.isBlank()) {
+            headers0.set(HttpHeaders.AUTHORIZATION, "Bearer " + internalToken);
+        }
 
         try {
             ResponseEntity<byte[]> resp = rest.exchange(

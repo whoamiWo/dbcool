@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from nocobase_py.security import AuthUser, get_current_user
+from nocobase_py.security import AuthUser, get_service_or_user
 from nocobase_py.services import export_service
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class ExportRequest(BaseModel):
 @router.post("/xlsx")
 async def export_xlsx(
     body: ExportRequest,
-    user: AuthUser = Depends(get_current_user),
+    user: AuthUser = Depends(get_service_or_user),
 ) -> Response:
     """生成 Excel（xlsx）文件。"""
     data = export_service.build_xlsx(body.headers, body.rows, body.title)
@@ -65,7 +65,7 @@ async def export_xlsx(
 @router.post("/pdf")
 async def export_pdf(
     body: ExportRequest,
-    user: AuthUser = Depends(get_current_user),
+    user: AuthUser = Depends(get_service_or_user),
 ) -> Response:
     """生成 PDF 文件（含中文支持）。"""
     data = export_service.build_pdf(body.headers, body.rows, body.title)
