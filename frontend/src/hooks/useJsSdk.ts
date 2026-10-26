@@ -2,29 +2,37 @@ import { useEffect, useState } from 'react';
 import apiClient from '@/api/client';
 
 /**
- * 工作台嵌入 JS-SDK 注入（钉钉 / 企业微信 / 飞书）。
+ * 工作台嵌入 JS-SDK 注入（钉钉 / 企业微信 / 微信 / 飞书）。
  *
- * <p>用途：页面在钉钉 / 企微 / 飞书内置浏览器打开时，注入各平台 config 完成鉴权，
+ * <p>用途：页面在钉钉 / 企微 / 微信 / 飞书内置浏览器打开时，注入各平台 config 完成鉴权，
  * 之后才能调用原生能力（选人、拍照、定位、分享）。普通浏览器不执行任何逻辑。
  *
  * <p>流程：检测 UA → 加载平台 SDK 脚本 → 拉签名（GET /api/js-signature）→ 调用 config。
  */
 
-export type JsPlatform = 'dingtalk' | 'wecom' | 'feishu';
+export type JsPlatform = 'dingtalk' | 'wecom' | 'wechat' | 'feishu';
 
 /** 各平台 JS-SDK 脚本地址（可由调用方覆盖，便于内网/CDN 替换）。 */
 const SDK_URLS: Record<JsPlatform, string> = {
   dingtalk: 'https://g.alicdn.com/dingding/open-develop/1.9.0/dingtalk.open.js',
   wecom: 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js',
+  wechat: 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js',
   feishu: 'https://lf1-cdn-tos.bytegoofy.com/goofy/ee/ee-sdk/current/h5-js-sdk.js',
 };
 
-/** 通过 UA 判断当前所处工作台；非三平台返回 null（普通浏览器不注入）。 */
+/**
+ * 通过 UA 判断当前所处工作台；非四平台返回 null（普通浏览器不注入）。
+ *
+ * <p>注意顺序：企微 UA 含 `wxwork`，微信 UA 含 `MicroMessenger`，
+ * 二者都加载 jweixin SDK，故 <b>必须先判 `wxwork` 再判 `MicroMessenger`</b>，
+ * 否则企微环境会被误判为微信公众号。
+ */
 export function detectPlatform(): JsPlatform | null {
   if (typeof navigator === 'undefined') return null;
   const ua = navigator.userAgent;
   if (/DingTalk/i.test(ua)) return 'dingtalk';
   if (/wxwork/i.test(ua)) return 'wecom';
+  if (/MicroMessenger/i.test(ua)) return 'wechat';
   if (/Lark/i.test(ua) || /Feishu/i.test(ua)) return 'feishu';
   return null;
 }
@@ -121,9 +129,9 @@ export function useJsSdk(options: UseJsSdkOptions = {}): UseJsSdkResult {
             signature: sig.signature,
             type: 0,
           });
-        } else if (platform === 'wecom' && anyWin.wx) {
+        } else if ((platform === 'wecom' || platform === 'wechat') && anyWin.wx) {
           if (sig.type === 'agent') {
-            // 应用级能力（选人、打开会话）走 agentConfig
+            // 企微应用级能力（选人、打开会话）走 agentConfig
             anyWin.wx.agentConfig({
               corpid: sig.appId,
               agentid: (sig as any).agentId ?? '',
@@ -133,6 +141,7 @@ export function useJsSdk(options: UseJsSdkOptions = {}): UseJsSdkResult {
               jsApiList: ['selectExternalContact', 'openEnterpriseChat'],
             });
           } else {
+            // 微信公众号 / 企微 corp 权限 → wx.config
             anyWin.wx.config({
               beta: true,
               appId: sig.appId,
