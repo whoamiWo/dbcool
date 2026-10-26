@@ -487,3 +487,55 @@ US-504(应用切换) — 无 tenant 切换 UI/API, 当前硬编码 `tenant_defau
 | 全部故事完成度 | 43/49 = 87.8% | **48/49 = 98.0%** |
 
 > **教训**：规划前应先审计代码现状，避免基于过时文档做开发假设。文档订正优先于代码开发。
+
+---
+
+## 八、Phase 10+ 增量能力（对标竞品补齐）
+
+> 来源：`docs/PLATFORM_GAP_ANALYSIS_2026-10-26.md` 对标 NocoDB / NocoBase / Slack / RocketChat / Trello / Airtable / Notion 后确定的缺口清单。
+> 这些能力不在原 49 个 MVP 故事范围内，属**上线后迭代增强**。
+
+### 8.1 已完成
+
+#### US-601 [P1] ✅ **DONE** (2026-10-26) 记录级评论（对标 Notion / Airtable）
+
+**As a** 团队成员
+**I want** 在任意数据记录的详情页直接发表评论、回复讨论
+**So that** 业务讨论与数据本身放在一起，不用跳出系统去 IM 里对账
+
+**验收标准与实证**：
+
+| 验收项 | 实现 | 证据 |
+|---|---|---|
+| 任意 Collection 记录可挂评论 | ✅ | `RecordCommentEntity`（`collection_name` + `record_id` 锚点） |
+| 线程回复（父子结构） | ✅ | `parent_id` 自引用 + 服务层树组装 |
+| 评论列表分页 | ✅ | 游标分页（`created_at` + `id` 二级排序），上限 50 条 |
+| 编辑（仅作者） | ✅ | `RecordCommentService.update` + `assertAuthor` 校验 |
+| 软删除保留占位 | ✅ | `deleted_at` 打标，前端渲染「该评论已被删除」维持线程上下文 |
+| @提及解析 | ✅ | 复用 `RichTextParser`，落 `mentions` JSON + 派发 `CommentMentionedEvent` |
+| 权限跟随记录 | ✅ | `AclEnforcer.assertCan(..., READ)` 前置校验 |
+| 多租户隔离 | ✅ | 所有查询带 `tenant_id`，Repository 方法强制该条件 |
+| 审计留痕 | ✅ | `record.comment.create/update/delete` 三类动作 |
+| 前端双栏布局 | ✅ | `DetailView` 右侧 `CommentsPanel`，窄屏降级纵向堆叠 |
+| 乐观更新 + 失败回滚 | ✅ | `useComments` Hook 的 `onMutate` / `onError` 快照回滚 |
+
+**测试**：后端 21（Service 13 + Controller 8）、前端 11（Hook 6 + 组件 5），全部通过。
+**迁移**：`V66__record_comment.sql`
+
+### 8.2 待办（按 ROI 排序）
+
+| 编号 | 能力 | 优先级 | 预估 | 对标 |
+|---|---|---|---|---|
+| H2 | 双向链接（Wiki backlink） | 高 | 5-8 人日 | Notion |
+| H3 | IM 线程视图（前端） | 高 | 3-5 人日 | Slack / RocketChat |
+| H4 | Trello Checklist | 高 | 4-6 人日 | Trello |
+| H5 | 微信 JS-SDK 嵌入 | 高 | 5-8 人日 | 企业微信 |
+| H6 | 钉钉消息推送 | 高 | 3-5 人日 | 钉钉 |
+| H7 | 批量编辑 | 高 | 5-8 人日 | Airtable |
+| H8 | 看板状态机/提醒 | 高 | 2-4 人日 | Trello |
+| M1 | IM @提及通知 | 中 | 3-5 人日 | Slack |
+| M2 | 看板 Label | 中 | 2-3 人日 | Trello |
+| M3 | 外部数据源连接器 | 中 | 10-15 人日 | NocoBase |
+| M7 | BI 可视化建模 | 中 | 8-12 人日 | Airtable |
+
+> 完整清单与详细方案见 `docs/PLATFORM_GAP_ANALYSIS_2026-10-26.md` 第三节。

@@ -1,3 +1,36 @@
+## Unreleased — PHASE10-H1 记录级评论
+
+> **协作深度补齐**：对标 Notion / Airtable 的记录级评论能力落地，填补平台在协作维度的核心差距。
+
+### 1. 记录级评论（H1）
+
+**后端**（`backend-java/src/main/java/com/nocobase/comment/`）：
+
+- 新增 `RecordCommentEntity` + `RecordCommentRepository`，支持任意 Collection 记录挂载评论
+- 迁移脚本 `V66__record_comment.sql`：建表 + 复合索引（`tenant_id, collection_name, record_id, created_at`）+ 线程父指针
+- `RecordCommentService`：线程树组装、@提及解析与事件派发、软删除占位（保留结构不塌陷）、租户隔离与权限校验、审计留痕
+- `RecordCommentController` 提供四类 REST 端点：
+  | 方法 | 路径 | 说明 |
+  |---|---|---|
+  | `GET` | `/api/comments?collection=&recordId=&cursor=&size=` | 游标分页列表（线程树） |
+  | `POST` | `/api/comments` | 创建评论 / 回复 |
+  | `PUT` | `/api/comments/{id}` | 编辑（仅作者） |
+  | `DELETE` | `/api/comments/{id}` | 软删除 |
+- 测试：`RecordCommentServiceTest`(13) + `RecordCommentControllerTest`(8) = **21 tests 全部通过**，全量 2322 tests 零回归
+
+**前端**（`frontend/src/features/comments/`）：
+
+- `commentsApi` 客户端 + `useComments` Hook：缓存键按 `(collection, recordId)` 维度设计，支持乐观更新与失败回滚
+- `CommentPanel` / `CommentItem` 组件：Markdown 预览、附件拖拽、线程折叠、@提及高亮
+- `DetailView` 改造为双栏自适应布局，右侧接入评论面板（窄屏自动收起）
+- 测试：Hook + 组件共 **11 tests 全部通过**
+
+### 2. 文档
+
+- 新增 `docs/PLATFORM_GAP_ANALYSIS_2026-10-26.md`：对标 NocoDB / NocoBase / Slack / RocketChat / Trello / Airtable / Notion 的能力矩阵与差距量化，输出 Phase A/B/C 优先实施路线
+
+---
+
 ## v2.0.0 (2026-10-25) — 首个正式版本（Production Ready）
 
 > **正式发布**：NocoBase 级低代码平台 v2.0.0。三栈全功能闭环、终止判定 5/5 达标、一键部署链路打通，具备生产就绪能力。

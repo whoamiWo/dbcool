@@ -208,6 +208,7 @@ Cline 角色:
 | M28 | PHASE136 | **性能根因修复（Caffeine 本地缓存）** | 2026-10-25 | `44d7de7` / `3ef9f67` / `9c99746`；`CollectionService.list()` 引入 Caffeine 5s TTL 本地缓存，50 VU P95 534ms→**68.1ms**（-87%），P99 803ms→**86.2ms**（-89%），吞吐量 354→**1084.5 rps**（+207%）；标准 4 解除阻塞，终止判定 5/5 全部达标 |
 | M29 | PHASE136 最终 | **终止报告定稿 + 项目宣告终止** | 2026-10-25 | `71a8cb6`；`docs/TERMINATION_REPORT.md` 更新为 PHASE136 终态（标准 4 由「阈值校准降级」改写为「Caffeine 根因修复达标」、压测三档数据、Post-Termination 待办与 Q1 路线图同步），**终止判定 5/5 全部达标，项目进入终止状态** |
 | M30 | v2.0.0 发布 | **首个正式版本发布** | 2026-10-25 | 本次发布；版本号统一 2.0.0、一键部署链路闭环（init-env/preflight/verify/from-scratch）、文档同步、GitHub Release 创建 |
+| M31 | PHASE10-H1 | **记录级评论功能完成** | 2026-10-26 | `c172979`；后端 21 tests（Service 13 + Controller 8）全绿 / 前端 11 tests 全绿；新增 `RecordCommentEntity` + REST 四端点（游标列表/创建/编辑/软删）+ 前端双栏评论面板；对标 Notion/Airtable 协作能力补齐；`docs/PLATFORM_GAP_ANALYSIS_2026-10-26.md` 更新 |
 
 **当前门禁状态（2026-10-25 实测）**：Java **2279/0F/0E**、前端 vitest **877/877（109 文件）**、前端覆盖率 **80.06%**、E2E **159/159**、ESLint **0 error / 0 warning**、Python ruff **61 passed / 1 skipped**、CSP **`unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化 + `connect-src` 已收窄**、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、启动检查 **0 问题**、密钥轮换 **3/3**、**P95 @30VU 184.4ms / P95 @50VU 68.1ms ✅**。
 

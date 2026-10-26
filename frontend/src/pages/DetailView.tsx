@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
 import type { DetailConfig, ViewFull } from '@/types/view';
+import { CommentsPanel } from '@/features/comments/CommentsPanel';
 
 /** 详情视图(US-205) — 单条记录垂直展示 */
 export function DetailViewPage() {
@@ -66,6 +67,9 @@ export function DetailViewPage() {
             );
           })}
       </div>
+      {collectionName && recordId && (
+        <CommentsPanel collectionName={collectionName} recordId={recordId} />
+      )}
     </div>
   );
 }
