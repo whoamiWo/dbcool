@@ -129,4 +129,117 @@ class WikiBacklinkServiceTest {
         service.syncBacklinks(UUID.randomUUID(), "tenant_default", null);
         verify(backlinkRepository, times(0)).deleteBySourcePageId(any());
     }
+
+    // ============================================================
+    //  PHASE130：锚文本 [[slug|anchor]] 与上下文摘录
+    // ============================================================
+
+    @Test
+    void parseBacklinkRefs_extractsAnchorText() {
+        List<WikiPageService.LinkRef> refs = service.parseBacklinkRefs("见 [[page-b|页面 B]] 详情");
+        assertEquals(1, refs.size());
+        assertEquals("page-b", refs.get(0).slug());
+        assertEquals("页面 B", refs.get(0).anchorText());
+    }
+
+    @Test
+    void parseBacklinkRefs_anchorIsNullForLegacySyntax() {
+        List<WikiPageService.LinkRef> refs = service.parseBacklinkRefs("见 [[page-b]] 详情");
+        assertEquals(1, refs.size());
+        assertEquals("page-b", refs.get(0).slug());
+        assertTrue(refs.get(0).anchorText() == null, "旧语法锚文本应为 null");
+    }
+
+    @Test
+    void parseBacklinkRefs_trimsAnchorWhitespace() {
+        List<WikiPageService.LinkRef> refs = service.parseBacklinkRefs("[[ page-b | 页面 B ]]");
+        assertEquals("page-b", refs.get(0).slug());
+        assertEquals("页面 B", refs.get(0).anchorText());
+    }
+
+    @Test
+    void parseBacklinkRefs_handlesMixedSyntax() {
+        List<WikiPageService.LinkRef> refs =
+                service.parseBacklinkRefs("[[a|甲]] 与 [[b]] 以及 [[c|丙]]");
+        assertEquals(3, refs.size());
+        assertEquals("甲", refs.get(0).anchorText());
+        assertTrue(refs.get(1).anchorText() == null);
+        assertEquals("丙", refs.get(2).anchorText());
+    }
+
+    @Test
+    void parseBacklinks_stillReturnsDistinctSlugsWithAnchorSyntax() {
+        // 旧签名必须继续工作：锚文本语法下也应只返回 slug
+        assertEquals(List.of("a", "b"),
+                service.parseBacklinks("[[a|甲]] 与 [[b|乙]] 与 [[a|甲二]]"));
+    }
+
+    @Test
+    void extractContext_returnsSurroundingTextWithoutMarkdown() {
+        String content = "# 标题\n\n这里是一段 **重要** 的正文，见 [[page-b|页面 B]] 了解详情。";
+        List<WikiPageService.LinkRef> refs = service.parseBacklinkRefs(content);
+        String ctx = service.extractContext(content, refs.get(0).matchStart(), refs.get(0).matchEnd());
+
+        assertTrue(ctx.contains("页面 B"), "上下文应包含链接显示文本: " + ctx);
+        assertTrue(ctx.contains("重要"), "上下文应包含周边文字: " + ctx);
+        assertTrue(!ctx.contains("#"), "应剥离 Markdown 标题标记: " + ctx);
+        assertTrue(!ctx.contains("*"), "应剥离 Markdown 强调标记: " + ctx);
+        assertTrue(!ctx.contains("[["), "不应残留原始链接语法: " + ctx);
+    }
+
+    @Test
+    void extractContext_addsEllipsisWhenTruncatedAtBothEnds() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 300; i++) sb.append("前");
+        sb.append("[[page-b]]");
+        for (int i = 0; i < 300; i++) sb.append("后");
+        String content = sb.toString();
+
+        List<WikiPageService.LinkRef> refs = service.parseBacklinkRefs(content);
+        String ctx = service.extractContext(content, refs.get(0).matchStart(), refs.get(0).matchEnd());
+
+        assertTrue(ctx.startsWith("…"), "左侧被截断应加省略号: " + ctx);
+        assertTrue(ctx.endsWith("…"), "右侧被截断应加省略号: " + ctx);
+        assertTrue(ctx.length() <= 900, "上下文长度应受控: " + ctx.length());
+    }
+
+    @Test
+    void extractContext_handlesNullAndEmpty() {
+        assertTrue(service.extractContext(null, 0, 0) == null);
+        assertTrue(service.extractContext("", 0, 0) == null);
+    }
+
+    @Test
+    void syncBacklinks_persistsAnchorTextAndContext() {
+        UUID sourceId = UUID.randomUUID();
+        when(pageRepository.findBySlugAndTenantId(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+
+        service.syncBacklinks(sourceId, "tenant_default", "参见 [[page-b|页面 B]] 的说明");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<WikiBacklinkEntity> captor = ArgumentCaptor.forClass(WikiBacklinkEntity.class);
+        verify(backlinkRepository, times(1)).save(captor.capture());
+
+        WikiBacklinkEntity saved = captor.getValue();
+        assertEquals("页面 B", saved.getAnchorText());
+        assertTrue(saved.getContext() != null && saved.getContext().contains("页面 B"),
+                "上下文应落库: " + saved.getContext());
+    }
+
+    @Test
+    void syncBacklinks_deduplicatesSameSlugKeepingFirstOccurrence() {
+        UUID sourceId = UUID.randomUUID();
+        when(pageRepository.findBySlugAndTenantId(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+
+        service.syncBacklinks(sourceId, "tenant_default",
+                "第一次 [[page-b|首个锚文本]] 第二次 [[page-b|第二个锚文本]]");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<WikiBacklinkEntity> captor = ArgumentCaptor.forClass(WikiBacklinkEntity.class);
+        verify(backlinkRepository, times(1)).save(captor.capture());
+        assertEquals("首个锚文本", captor.getValue().getAnchorText(),
+                "同一 slug 多次引用应保留首次出现的锚文本");
+    }
 }

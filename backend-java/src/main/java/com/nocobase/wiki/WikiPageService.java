@@ -2,10 +2,15 @@ package com.nocobase.wiki;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +30,19 @@ import org.springframework.web.server.ResponseStatusException;
  */
 @Service
 public class WikiPageService {
+
+    private static final Logger log = LoggerFactory.getLogger(WikiPageService.class);
+
+    // 支持 [[slug|anchor]] 语法的正则：第二捕获组可选，兼容旧语法
+    private static final Pattern WIKI_LINK_PATTERN = Pattern.compile("\\[\\[([^\\]\\|]+)(?:\\|([^\\]]+))?\\]\\]");
+    
+    // 上下文提取窗口大小（前后各取字符数）
+    private static final int CONTEXT_WINDOW_SIZE = 80;
+    // 上下文最大长度（含省略号）
+    private static final int MAX_CONTEXT_LENGTH = 1024;
+
+    /** 链接引用信息：包含 slug 与锚文本。 */
+    public record LinkRef(String slug, String anchorText, int matchStart, int matchEnd) {}
 
     private final WikiPageRepository pageRepository;
     private final WikiVersionRepository versionRepository;
@@ -94,20 +112,29 @@ public class WikiPageService {
     }
 
     /**
-     * 双向链接同步：解析内容中的 [[slug]] → 查目标页 → 写入 wiki_backlink。
+     * 双向链接同步：解析内容中的 [[slug]] / [[slug|anchor]] → 查目标页 → 写入 wiki_backlink。
      *
      * <p>P0-4a 接真：parseBacklinks 解析方法已存在但从未被调用，导致 wiki_backlink 表
      * 永远为空，反向链接查询恒返空。先清旧再插新（幂等）。
+     *
+     * <p>PHASE130：同时落库锚文本与引用处上下文摘录，供反向链接面板展示。
+     * 同一 slug 多次引用时取首次出现的锚文本与上下文。
      */
     @Transactional
     public void syncBacklinks(UUID sourcePageId, String tenantId, String content) {
         if (sourcePageId == null || content == null) return;
         backlinkRepository.deleteBySourcePageId(sourcePageId);
-        List<String> slugs = parseBacklinks(content);
-        if (slugs.isEmpty()) return;
-        java.util.Set<String> uniq = new java.util.LinkedHashSet<>(slugs);
+        List<LinkRef> refs = parseBacklinkRefs(content);
+        if (refs.isEmpty()) return;
+        // 按 slug 去重，保留首次出现的锚文本与上下文
+        Map<String, LinkRef> uniq = new LinkedHashMap<>();
+        for (LinkRef ref : refs) {
+            uniq.putIfAbsent(ref.slug(), ref);
+        }
         Instant now = Instant.now();
-        for (String slug : uniq) {
+        for (Map.Entry<String, LinkRef> entry : uniq.entrySet()) {
+            String slug = entry.getKey();
+            LinkRef ref = entry.getValue();
             UUID targetId = pageRepository.findBySlugAndTenantId(slug, tenantId)
                     .map(WikiPageEntity::getId).orElse(null);
             WikiBacklinkEntity link = new WikiBacklinkEntity();
@@ -115,6 +142,14 @@ public class WikiPageService {
             link.setSourcePageId(sourcePageId);
             link.setTargetPageId(targetId); // null 表示目标尚未创建
             link.setTargetSlug(slug);
+            link.setAnchorText(ref.anchorText());
+            try {
+                link.setContext(extractContext(content, ref.matchStart(), ref.matchEnd()));
+            } catch (RuntimeException ex) {
+                // 仅记录页面与 slug，不打印正文，避免日志膨胀与敏感信息泄漏
+                log.warn("提取反向链接上下文失败 pageId={} slug={}", sourcePageId, slug, ex);
+                link.setContext(null);
+            }
             link.setTenantId(tenantId);
             link.setCreatedAt(now);
             backlinkRepository.save(link);
@@ -258,14 +293,64 @@ public class WikiPageService {
     //  Notion 剩余能力（Week 46）
     // ============================================================
 
-    /** 解析内容中的 [[页面名]] 双向链接，返回链接目标列表。 */
+    /** 解析内容中的 [[页面名]] 双向链接，返回链接目标 slug 列表（旧签名，保留供其他调用点使用）。 */
     public List<String> parseBacklinks(String content) {
+        return parseBacklinkRefs(content).stream()
+                .map(LinkRef::slug)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * 结构化解析：返回每个 [[slug]] 或 [[slug|anchor]] 的 slug、锚文本与匹配区间。
+     * 第二捕获组可选，天然兼容旧语法；锚文本缺省时回落为 null。
+     */
+    public List<LinkRef> parseBacklinkRefs(String content) {
         if (content == null) return List.of();
-        java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\[\\[([^\\]]+)\\]\\]");
-        java.util.regex.Matcher m = p.matcher(content);
-        List<String> result = new ArrayList<>();
-        while (m.find()) result.add(m.group(1).trim());
+        Matcher m = WIKI_LINK_PATTERN.matcher(content);
+        List<LinkRef> result = new ArrayList<>();
+        while (m.find()) {
+            String slug = m.group(1).trim();
+            String anchor = m.group(2) != null ? m.group(2).trim() : null;
+            result.add(new LinkRef(slug, anchor, m.start(), m.end()));
+        }
         return result;
+    }
+
+    /**
+     * 上下文摘录提取：以链接匹配区间为中心，向前后各取 CONTEXT_WINDOW_SIZE 字符，
+     * 剥离 Markdown 标记与换行，压缩连续空白，超长截断并按需加省略号。
+     */
+    String extractContext(String content, int matchStart, int matchEnd) {
+        if (content == null || content.isEmpty()) return null;
+        int start = Math.max(0, matchStart - CONTEXT_WINDOW_SIZE);
+        int end = Math.min(content.length(), matchEnd + CONTEXT_WINDOW_SIZE);
+        String raw = content.substring(start, end);
+        // 先将 [[slug|anchor]] / [[slug]] 替换为可读显示文本，避免暴露原始语法
+        String display = WIKI_LINK_PATTERN.matcher(raw)
+                .replaceAll(mr -> Matcher.quoteReplacement(
+                        mr.group(2) != null ? mr.group(2).trim() : mr.group(1).trim()));
+        // 剥离 Markdown 标记：标题 #、代码 `、引用 >、链接/强调符号
+        String cleaned = display
+                .replaceAll("[#`>\\[\\]()]", "")    // 移除标题/代码/引用/括号
+                .replaceAll("[*_~]", "")            // 移除强调/删除线
+                .replaceAll("\\s+", " ")            // 压缩连续空白
+                .trim();
+        if (cleaned.isEmpty()) return null;
+        // 未超长：首尾按需加省略号
+        if (cleaned.length() <= MAX_CONTEXT_LENGTH) {
+            if (start > 0) cleaned = "…" + cleaned;
+            if (end < content.length()) cleaned = cleaned + "…";
+            return cleaned;
+        }
+        // 超长：以链接位置为中心截取窗口
+        int linkCenter = Math.max(0, Math.min(matchStart - start, cleaned.length()));
+        int cs = Math.max(0, Math.min(linkCenter - MAX_CONTEXT_LENGTH / 2, cleaned.length() - MAX_CONTEXT_LENGTH));
+        int ce = Math.min(cleaned.length(), cs + MAX_CONTEXT_LENGTH);
+        String truncated = cleaned.substring(cs, ce);
+        if (cs > 0) truncated = "…" + truncated;
+        if (ce < cleaned.length()) truncated = truncated + "…";
+        return truncated;
     }
 
     /** 反向引用查询：找出所有引用了指定 slug 的页面。 */
