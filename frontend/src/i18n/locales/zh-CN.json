@@ -77,7 +77,9 @@
     "submit": "提交",
     "submitting": "提交中…",
     "error": "操作失败",
-    "networkError": "网络错误，请检查连接"
+    "networkError": "网络错误，请检查连接",
+    "copy": "复制",
+    "close": "关闭"
   },
   "board": {
     "title": "看板",
@@ -94,7 +96,22 @@
     "refresh": "刷新",
     "inputCardTitle": "输入卡片标题:",
     "addCard": "添加卡片",
-    "loadError": "看板数据加载失败"
+    "loadError": "看板数据加载失败",
+    "checklist": {
+      "title": "检查清单",
+      "addChecklist": "添加清单",
+      "addItem": "添加项",
+      "addItemPlaceholder": "输入检查项...",
+      "done": "完成",
+      "notDone": "未完成",
+      "completed": "已完成 {{count}}/{{total}}",
+      "progressBar": "进度",
+      "noChecklists": "暂无清单",
+      "deleteChecklist": "删除清单",
+      "deleteItem": "删除项",
+      "renameChecklist": "重命名清单",
+      "moreItems": "+{{count}} 项"
+    }
   },
   "task": {
     "title": "任务",
@@ -1536,5 +1553,25 @@
     "noRoles": "该用户暂无角色分配",
     "noPolicies": "暂无具体权限策略",
     "rolePolicy": "{role} 的权限策略"
+  },
+  "formPublic": {
+    "defaultTitle": "未命名表单",
+    "loading": "加载表单中…",
+    "invalidToken": "链接无效",
+    "formNotFound": "表单不存在或已撤销",
+    "submit": "提交",
+    "submitting": "提交中…",
+    "submitSuccess": "提交成功！感谢填写",
+    "submitFailed": "提交失败",
+    "poweredBy": "由 NocoBase 驱动",
+    "shareBtn": "分享",
+    "shareDialogTitle": "公开分享链接",
+    "shareRegenerate": "重新生成链接",
+    "shareRevoke": "撤销分享",
+    "shareCopySuccess": "链接已复制到剪贴板",
+    "shareNotEnabled": "该表单尚未开启公开分享",
+    "shareUrlLabel": "分享链接",
+    "shareToggleOn": "开启分享",
+    "shareToggleOff": "关闭分享"
   }
 }

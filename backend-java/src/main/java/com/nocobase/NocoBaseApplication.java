@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * NocoBase 核心引擎入口.
@@ -19,6 +20,7 @@ import org.springframework.cache.annotation.EnableCaching;
 @ConfigurationPropertiesScan
 @EnableConfigurationProperties(MinioStorageProperties.class)
 @EnableCaching  // PHASE136: 启用 @Cacheable/@CacheEvict
+@EnableScheduling  // 看板 OverdueTaskScheduler 等 @Scheduled 定时任务
 public class NocoBaseApplication {
 
     public static void main(String[] args) {

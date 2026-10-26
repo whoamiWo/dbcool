@@ -77,7 +77,9 @@
     "submit": "Submit",
     "submitting": "Submitting…",
     "error": "Operation failed",
-    "networkError": "Network error, please check connection"
+    "networkError": "Network error, please check connection",
+    "copy": "Copy",
+    "close": "Close"
   },
   "board": {
     "title": "Board",
@@ -94,7 +96,22 @@
     "refresh": "Refresh",
     "inputCardTitle": "Enter card title:",
     "addCard": "Add Card",
-    "loadError": "Failed to load board"
+    "loadError": "Failed to load board",
+    "checklist": {
+      "title": "Checklist",
+      "addChecklist": "Add Checklist",
+      "addItem": "Add Item",
+      "addItemPlaceholder": "Enter item...",
+      "done": "Done",
+      "notDone": "Not done",
+      "completed": "{{count}}/{{total}} completed",
+      "progressBar": "Progress",
+      "noChecklists": "No checklists",
+      "deleteChecklist": "Delete Checklist",
+      "deleteItem": "Delete Item",
+      "renameChecklist": "Rename Checklist",
+      "moreItems": "+{{count}} items"
+    }
   },
   "task": {
     "title": "Task",
@@ -1536,5 +1553,25 @@
     "noRoles": "No roles assigned to this user",
     "noPolicies": "No specific permission policies",
     "rolePolicy": "Policies for {role}"
+  },
+  "formPublic": {
+    "defaultTitle": "Untitled Form",
+    "loading": "Loading form…",
+    "invalidToken": "Invalid link",
+    "formNotFound": "Form not found or sharing revoked",
+    "submit": "Submit",
+    "submitting": "Submitting…",
+    "submitSuccess": "Submitted! Thanks for filling",
+    "submitFailed": "Submit failed",
+    "poweredBy": "Powered by NocoBase",
+    "shareBtn": "Share",
+    "shareDialogTitle": "Public Share Link",
+    "shareRegenerate": "Regenerate Link",
+    "shareRevoke": "Revoke Share",
+    "shareCopySuccess": "Link copied to clipboard",
+    "shareNotEnabled": "Public sharing not enabled for this form",
+    "shareUrlLabel": "Share link",
+    "shareToggleOn": "Enable sharing",
+    "shareToggleOff": "Disable sharing"
   }
 }

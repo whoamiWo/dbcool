@@ -16,6 +16,18 @@ interface Column {
   type: string;
 }
 
+interface ChecklistItem {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+interface Checklist {
+  id: string;
+  title: string;
+  items: ChecklistItem[];
+}
+
 interface Card {
   id: string;
   title: string;
@@ -25,6 +37,9 @@ interface Card {
   progress: number;
   dueDate?: string;
   labels?: string[];
+  checklists?: Checklist[];
+  assigneeId?: string;
+  endDate?: string;
 }
 
 /**
@@ -62,7 +77,39 @@ export function BoardView({ projectId }: { projectId: string }) {
         apiClient.get(`/project-boards/${projectId}/tasks`) as Promise<{ data: Card[] }>,
       ]);
       setColumns(colsRes.data);
-      setCards(cardsRes.data);
+
+      const rawCards = cardsRes.data;
+      // 批量拉取清单，避免逐卡 N+1 请求
+      const taskIds = rawCards.map(c => c.id).filter(Boolean);
+      let mergedCards = rawCards;
+      if (taskIds.length > 0) {
+        const clRes = (await apiClient.post('/project-boards/checklists/batch', { taskIds })) as {
+          data: Record<string, Array<{ id: string; title: string; sortOrder: number }>>;
+        };
+        const grouped = clRes.data ?? {};
+        // 汇总所有清单 id，一次性拉取清单项
+        const allChecklistIds = Object.values(grouped).flat().map(c => c.id);
+        let itemsByChecklist: Record<string, ChecklistItem[]> = {};
+        if (allChecklistIds.length > 0) {
+          const itemsRes = (await apiClient.post('/project-boards/checklist-items/batch', {
+            checklistIds: allChecklistIds,
+          })) as { data: Record<string, ChecklistItem[]> };
+          itemsByChecklist = itemsRes.data ?? {};
+        }
+        mergedCards = rawCards.map(card => {
+          const cls = grouped[card.id];
+          if (!cls || cls.length === 0) return card;
+          return {
+            ...card,
+            checklists: cls.map(cl => ({
+              id: cl.id,
+              title: cl.title,
+              items: itemsByChecklist[cl.id] ?? [],
+            })),
+          };
+        });
+      }
+      setCards(mergedCards);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : t('board.loadError'));
     } finally {
