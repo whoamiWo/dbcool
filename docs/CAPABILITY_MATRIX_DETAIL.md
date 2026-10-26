@@ -15,7 +15,7 @@
 | 1 | 数据模型 | Airtable / NocoDB | ✅ | ✅ | ✅ | **已达标** | `meta/CollectionService`、`FieldDef`、`FormulaEngine` |
 | 2 | 表单设计器 | Airtable / NocoBase | ✅ | ✅ | ✅ | **已达标** | `FormDesigner`、`FormRuntime`、公开表单 `/forms/public/:token` |
 | 3 | 视图引擎 | Trello / Airtable | ✅ | ✅ | 🟡 | **部分** | 表格/看板/日历/画廊/时间线均路由注册；**甘特图缺失** |
-| 4 | 权限体系 | NocoBase | ✅ | ✅ | 🟡 | **部分** | 记录级/操作级/角色继承已实现；**字段级权限缺失** |
+| 4 | 权限体系 | NocoBase | ✅ | ✅ | ✅ | **已达标** | 字段级/记录级/操作级/角色继承均已实现且接线 |
 | 5 | 工作流 | NocoBase / Zapier | ✅ | ✅ | ✅ | **已达标** | 8 节点 + `NestedTriggerGuard` 死循环防护 |
 | 6 | IM 协作 | Slack / RocketChat | ✅ | ✅ | 🟡 | **部分** | 频道/私信/表情/已读/在线/Huddle 齐全；**无 @全体、消息引用** |
 | 7 | Wiki / 知识库 | Notion | ✅ | ✅ | ✅ | **已达标** | 版本快照/对比/反向链接/双向链接/PHASE130 锚文本 |
@@ -113,18 +113,24 @@
 |---|---|---|
 | 角色 CRUD + 树形 | ✅ | `auth/RoleAclController.java`，`GET /admin/roles/tree` |
 | 角色继承 + 循环检测 | ✅ | `parent_role_id`、`assertNoCycle`、`findSelfAndAncestors` |
-| 策略 CRUD（record/operation） | ✅ | `RoleAclController.java:151-212` |
+| 策略 CRUD（field/row/action） | ✅ | `RoleAclController.java:151-212`；`AclPolicyEntity.Type = {FIELD, ROW, ACTION}` |
 | 行级 ACL（记录级） | ✅ | `acl/RowAclController.java` + `RowAclService` |
 | 操作级权限 | ✅ | ACL 策略 `action` 字段 |
-| **字段级权限** | ❌ | **实证缺失**：`grep -rn "fieldLevel\|FieldPermission"` → 0 命中 |
+| **字段级权限（hidden/readonly）** | ✅ | `AclPolicyEntity.java:19,28-29`（`type=field, config={"hidden":["ssn"],"readonly":["salary"]}`）；`AclEnforcer` 提供 `filterReadableFields`(L112)/`filterRecord`(L144)/`filterWritableFields`(L165,181)/`parseHidden`(L272) |
+| 字段级接线 | ✅ | `CollectionController` 4 处调用 `filterRecord`（L351、L418、L609、L674） |
+| 前端配置 | ✅ | `AclEditor.tsx` 默认 `FIELD` 类型，支持 hidden 字段输入（L13/L15/L33-35/L91/L102-103） |
 
-**差距**
+> ⚠️ **订正说明**：本域上一版曾误判为「字段级权限缺失」，原因是检索关键词不当
+> （用 `fieldLevel|FieldPermission` 搜索 0 命中即判定缺失）。
+> 本项目实际命名为 `Type.FIELD` + `filterReadableFields/filterRecord/filterWritableFields`，
+> 经实证复核**已完整实现且已接线**（见上表证据）。
+
+**差距（剩余）**
 
 | 缺口 | 对标 | 优先级 | 说明 |
 |---|---|---|---|
-| **字段级权限** | NocoBase | 🔴 高 | 企业敏感数据（薪资/身份证）刚需，需 `FieldPolicy` 细化到字段读写可见 |
-| `PermissionEvaluator` 抽象 | NocoBase | 🟡 中 | 无统一评估器接口，权限判定散落各处 |
-| 字段级权限测试 | — | 🟡 中 | `RowAclControllerTest` 存在，但缺字段级与继承边界用例 |
+| `PermissionEvaluator` 抽象 | NocoBase | 🟢 低 | 无统一评估器接口；但 `AclEnforcer` 已承担同等职责，仅属重构优化非功能缺口 |
+| 字段级权限测试 | — | 🟡 中 | `RowAclControllerTest` 存在，但缺字段级与继承边界用例（功能已可用，测试可补） |
 
 ---
 
@@ -275,6 +281,7 @@
 | "反向链接 is not a function"（综合评估） | `WikiPageService.syncBacklinks` 正确落库 | ✅ 已修复 |
 | "CRDT 整篇替换"（综合评估） | `CollabEditor.tsx:47-89` 已改为 LCS 字符级 | ✅ 已修复 |
 | "CRDT 服务部署了没人调"（综合评估） | **docker-compose 已配**；**k8s 仍未配** → 仅 K8s 环境成立 | 🔴 仍成立（限 K8s） |
+| **"字段级权限缺失"（本文上一版）** | `AclPolicyEntity.Type=FIELD` + `AclEnforcer` 4 方法 + `CollectionController` 4 处接线 + `AclEditor` 前端 → **已实现** | ❌ **自我订正**（上版检索关键词不当） |
 
 ---
 
@@ -284,9 +291,10 @@
 | # | 缺口 | 域 | 说明 |
 |---|---|---|---|
 | 1 | **k8s CRDT_SERVICE_URL 缺失** | 协同 | K8s 部署下协同静默降级为整篇替换，后写覆盖先写 |
-| 2 | **字段级权限缺失** | 权限 | 敏感数据（薪资/证件）无法按字段授权 |
-| 3 | **看板无拖拽** | 视图 | Trello 核心交互缺失 |
-| 4 | **JS-SDK 签名全平台缺失** | 嵌入 | 前端嵌入钉钉/企微的必备能力 |
+| 2 | **看板无拖拽** | 视图 | Trello 核心交互缺失（只读展示） |
+| 3 | **JS-SDK 签名全平台缺失** | 嵌入 | 前端嵌入钉钉/企微的必备能力 |
+
+> ⚠️ 本表已移除上一版的「字段级权限缺失」项——经实证复核该能力**已实现**（见 §5 订正说明）。
 
 ### 🟡 P1 — 国内企业刚需 / 规模化前必补
 | # | 缺口 | 域 |
@@ -322,10 +330,11 @@
 
 | 优先级 | 项数 | 估算 |
 |---|---|---|
-| P0 | 4 | 15–22 人日 |
+| P0 | 3 | 9.5–14.5 人日 |
 | P1 | 6 | 40–60 人日 |
 | P2 | 6 | 30–45 人日 |
 | P3 | 4 | 25–40 人日 |
-| **合计** | **20** | **110–167 人日** |
+| **合计** | **19** | **104.5–159.5 人日** |
 
 > 说明：P0 修完即达企业级内部上线标准；P0+P1 完成可对标主流产品核心体验。
+> P0 由 4 项减为 3 项（字段级权限经复核已实现，非缺口）。

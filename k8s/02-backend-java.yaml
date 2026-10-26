@@ -54,6 +54,12 @@ spec:
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+            # CRDT 服务端合并服务地址（RealtimeService 的 @Value("${crdt.service.url:}") 注入）。
+            # 未配置时 RealtimeService 静默降级为"增量透传"（整篇替换），协同将后写覆盖先写。
+            # 注意端口差异：docker-compose 直连容器用 3100；k8s 经 Service 暴露为 80
+            # （crdt-service Service: port 80 → targetPort 3100，与 backend-java 同 namespace）。
+            - name: CRDT_SERVICE_URL
+              value: "http://crdt-service:80"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
