@@ -29,6 +29,12 @@ const FormRuntimePage = lazy(() =>
 const FormsListPage = lazy(() =>
   import('./pages/FormsList').then(m => ({ default: m.FormsListPage } as { default: React.ComponentType })),
 );
+
+// PHASE10: 公开表单填写（免登录）
+const FormPublicFillPage = lazy(() =>
+  import('./pages/FormPublicFill').then(m => ({ default: m.FormPublicFillPage } as { default: React.ComponentType })),
+);
+
 const FormTemplatesListPage = lazy(() =>
   import('./pages/FormTemplatesList').then(m => ({ default: m.FormTemplatesListPage } as { default: React.ComponentType })),
 );
@@ -162,6 +168,8 @@ const DingTalkLoginPage = lazy(() =>
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/auth/dingtalk', element: <DingTalkLoginPage /> },
+  // PHASE10: 公开表单填写 —— 免登录，独立于 AppLayout（不渲染导航栏/侧边栏）
+  { path: '/forms/public/:token', element: <Lazy><FormPublicFillPage /></Lazy> },
   {
     path: '/',
     element: <AppLayout />,

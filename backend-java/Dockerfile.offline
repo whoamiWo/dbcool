@@ -23,7 +23,8 @@
 FROM nocobase-backend-java:latest
 
 # 覆盖为新构建的 jar（主机 target/ 下由 mvn package 产出）
-COPY target/*.jar /app/app.jar
+# 注意：只匹配主 jar（不含 *.jar.original），否则通配符匹配多个文件会报错。
+COPY target/nocobase-backend-*.jar /app/app.jar
 
 # 覆盖 base 镜像继承的健康检查: /actuator/health 未暴露, 会让容器永远 unhealthy
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

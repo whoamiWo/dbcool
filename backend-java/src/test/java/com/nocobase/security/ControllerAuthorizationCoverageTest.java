@@ -81,7 +81,10 @@ class ControllerAuthorizationCoverageTest {
         // 健康检查探针 /api/health/** 在 SecurityConfig permitAll。
         // 若补 @PreAuthorize 会让负载均衡与容器 healthcheck 拿不到 200 → 服务被摘除，故必须白名单。
         "health/HealthController.java:52 -> ready (reason: 健康检查探针，SecurityConfig permitAll + 负载均衡/容器探活)",
-        "health/HealthController.java:82 -> poolStats (reason: 健康检查与连接池监控端点，SecurityConfig permitAll + 运维监控)"
+        "health/HealthController.java:82 -> poolStats (reason: 健康检查与连接池监控端点，SecurityConfig permitAll + 运维监控)",
+        // PHASE10: 公开表单端点（免登录，无租户上下文）—— SecurityConfig permitAll，不加 @PreAuthorize
+        "com/nocobase/form/FormController.java:140 -> getPublic (reason: 免登录填写，SecurityConfig permitAll)",
+        "com/nocobase/form/FormController.java:153 -> submitPublic (reason: 免登录填写，SecurityConfig permitAll)"
     );
 
     /** 白名单理由中出现这些词，说明该端点其实需要鉴权，是偷渡。 */

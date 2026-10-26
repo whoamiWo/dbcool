@@ -6,7 +6,10 @@
 FROM alpine:3.19 AS build
 WORKDIR /workspace
 # jar 由宿主机 `mvn clean package -DskipTests` 预先产出
-COPY target/nocobase-backend-0.0.1-SNAPSHOT.jar .
+# 注意：不要写死版本号 —— pom.xml 的 version 变更（如 0.0.1-SNAPSHOT → 2.0.0）
+# 会让固定文件名失效，导致 "failed to calculate checksum ... not found"。
+# 用通配符只匹配主 jar（.jar.original 不会被 *.jar 命中）。
+COPY target/nocobase-backend-*.jar .
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
@@ -15,8 +18,8 @@ WORKDIR /app
 # 安装 curl 用于健康检查
 RUN apk add --no-cache curl
 
-# 复制构建产物
-COPY --from=build /workspace/nocobase-backend-0.0.1-SNAPSHOT.jar app.jar
+# 复制构建产物（同样用通配符，避免版本号写死）
+COPY --from=build /workspace/nocobase-backend-*.jar app.jar
 
 # 创建非 root 用户
 RUN addgroup -S nocobase && adduser -S nocobase -G nocobase

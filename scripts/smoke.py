@@ -293,6 +293,75 @@ def step11_audit(token):
     return len(records)
 
 
+def step12_public_form(token):
+    """公开表单：创建表单 → 开启分享 → 匔名填充 → 验证数据入库。"""
+    # 0) 先建一个集合（表单必须绑定 collection）
+    coll_name = SMOKE_PREFIX + "_form"
+    status, _ = req("POST", "/api/collections", {
+        "name": coll_name,
+        "title": coll_name,
+        "schema": {"type": "object", "properties": {"msg": {"type": "string"}}}
+    }, token=token)
+    assert status in (200, 201), f"create collection 返 {status}"
+
+    # 1) 创建表单，必须传 collectionName（不是 name）
+    name = SMOKE_PREFIX
+    status, body = req("POST", "/api/forms", {
+        "collectionName": coll_name,
+        "title": name,
+        "description": "public form test",
+        "layout": "[{\"type\":\"input\",\"field\":\"msg\"}]",
+        "rules": "{}"
+    }, token=token)
+    assert status in (200, 201), f"createForm 返 {status}: {body}"
+    fid = body.get("id") or body.get("data", {}).get("id")
+    assert fid, f"createForm={body}"
+
+    # 2) 开启公开分享
+    share_status, share_body = req("POST", f"/api/forms/{fid}/share", {}, token=token)
+    assert share_status in (200, 201), f"share 返 {share_status}: {share_body}"
+    token_val = (share_body.get("data") or {}).get("share_token") \
+        or share_body.get("token") or share_body.get("share_token")
+    assert token_val, f"share={share_body}"
+
+    # 3) 匿名填充（无需 token）
+    body = json.dumps({"msg": "hello public"}).encode("utf-8")
+    resp = urllib.request.Request(
+        f"{BASE_URL}/api/forms/public/{token_val}/submit",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+    with urllib.request.urlopen(resp, timeout=TIMEOUT) as r:
+        assert r.status in (200, 201)
+
+    # 4) 用认证 token 查回记录（记录落在表单绑定的 collection 上）
+    list_status, list_body = req("GET", f"/api/collections/{coll_name}/records?pageSize=10", token=token)
+    assert list_status == 200, f"list records 返 {list_status}: {list_body}"
+    records = list_body.get("data") or list_body.get("records") or list_body.get("items") or []
+    if isinstance(records, dict):
+        records = records.get("records") or records.get("items") or []
+    assert len(records) >= 1, f"no record after public submit: {list_body}"
+    return fid
+
+
+def step13_export(token, collection_name):
+    """导出链路：导出 Excel → 检查 content-type 与文件有效性。"""
+    url = f"{BASE_URL}/api/collections/{collection_name}/export-file?format=xlsx"
+    resp = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    with urllib.request.urlopen(resp, timeout=TIMEOUT) as r:
+        assert r.status == 200, f"export 返 {r.status}"
+        ct = r.headers.get("content-type", "")
+        assert "vnd.openxmlformats" in ct.lower() or "excel" in ct.lower(), f"unexpected content-type: {ct}"
+        # 简单校验文件头（Excel 应为 ZIP 开头）
+        raw = r.read()
+        assert raw.startswith(b"PK"), "xlsx 文件头不是 ZIP"
+    return collection_name
+
+
 def main():
     print("=" * 70)
     print(f"PHASE89 跨模块端到端冒烟（真调后端，禁止 mock）")
@@ -330,6 +399,12 @@ def main():
     run_step(10, "工作流 POST /api/workflows/{id}/trigger",
              lambda: step10_workflow(token, collection_name))
     run_step(11, "审计回查 GET /api/audit", lambda: step11_audit(token))
+
+    # PHASE10: 公开表单与导出
+    run_step(12, "公开表单 POST /api/forms + share + public submit",
+             lambda: step12_public_form(token))
+    run_step(13, "导出 GET /api/collections/{name}/export-file?format=xlsx",
+             lambda: step13_export(token, collection_name))
 
     finish()
 

@@ -140,7 +140,9 @@ public final class TenantIsolationAuditor {
      */
     private static final Set<String> AUTH_ENTRY_METHODS = Set.of(
             "login", "logout", "refresh", "register", "authenticate",
-            "forgotPassword", "resetPassword", "verify");
+            "forgotPassword", "resetPassword", "verify",
+            // PHASE10: 公开表单端点（免登录，无租户上下文）
+            "getPublic", "submitPublic");
 
     /** 明显的纯包装方法，不参与审计（降低误报）。 */
     private static final Set<String> IGNORED_METHOD_NAMES = Set.of(
@@ -270,7 +272,11 @@ public final class TenantIsolationAuditor {
 
     /** [T2-A] 认证入口：类名含 Auth + 方法名在白名单内 → 无法校验归属，豁免。 */
     private static boolean isAuthEntry(String className, String methodName) {
-        return className.contains("Auth") && AUTH_ENTRY_METHODS.contains(methodName);
+        if (className.contains("Auth") && AUTH_ENTRY_METHODS.contains(methodName)) {
+            return true;
+        }
+        // PHASE10: 公开表单端点（免登录，无租户上下文）—— 方法名以 Public 结尾即豁免
+        return methodName.endsWith("Public") && AUTH_ENTRY_METHODS.contains(methodName);
     }
 
     /** 提取源码中所有方法（签名 + 花括号配平后的 body）。 */
