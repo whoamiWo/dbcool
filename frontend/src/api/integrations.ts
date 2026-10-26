@@ -170,11 +170,50 @@ export const wecomApi = {
 };
 
 // ============================================================
+//  微信公众号 / 小程序集成 API
+// ============================================================
+
+export interface WeChatAuthUrlResponse {
+  code: number;
+  message: string;
+  data: {
+    authUrl: string;
+  };
+}
+
+export interface WeChatLoginResponse {
+  code: number;
+  message: string;
+  data: {
+    userId: string;
+    username: string;
+    displayName: string;
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+
+export const wechatApi = {
+  /** 获取微信公众号授权 URL */
+  getAuthUrl: (): Promise<WeChatAuthUrlResponse> =>
+    client.get('/wechat/auth-url'),
+
+  /** 公众号 OAuth 回调登录 */
+  login: (code: string, state?: string): Promise<WeChatLoginResponse> =>
+    client.post('/wechat/callback', { code, state }),
+
+  /** 小程序 code2Session 登录 */
+  miniProgramLogin: (jsCode: string): Promise<WeChatLoginResponse> =>
+    client.post('/wechat/mini-program/login', { jsCode }),
+};
+
+// ============================================================
 //  统一 API 入口
 // ============================================================
 
 export const integrationsApi = {
   dingtalk: dingtalkApi,
   wecom: wecomApi,
+  wechat: wechatApi,
   integration: integrationApi,
 };

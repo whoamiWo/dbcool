@@ -1,3 +1,60 @@
+## Unreleased — Phase B：微信嵌入集群（B1 + B2 + B6）
+
+> **微信嵌入集群**：Phase B Wave 1，让 DBCool 页面可在微信公众平台 / 小程序内置浏览器内完成鉴权、登录与订阅消息推送，直接延续 Phase A 已落地的通用 JS-SDK 签名框架。
+
+### B1. 微信 JS-SDK 签名
+
+**后端**（`backend-java/src/main/java/com/nocobase/integration/common/`）：
+
+- 新增 `WeChatJsSignatureProvider`（`provider="wechat"`）：接入 `GET /api/js-signature?provider=wechat`
+- 流程：`access_token`（`/cgi-bin/token`）→ `jsapi_ticket`（`/cgi-bin/ticket/getticket?type=jsapi`）→ `JsSignatureUtil.sha1Sign` 生成 SHA1 签名
+- 复用：`JsSignatureUtil`（算法）、`JsTicketCache`（Redis 7000s 缓存，防频率限流）、`TenantCredentialService`（租户级凭证 `wechat`/`app-id`/`app-secret`）
+- 测试：`WeChatJsSignatureProviderTest` **6/6 通过**（provider 标识 / 凭证缺失抛错 / 缓存命中跳 HTTP / 缓存未命中拉取+写入 / errcode 失败 / default 重载）
+
+**前端**（`frontend/src/hooks/useJsSdk.ts`）：
+
+- `JsPlatform` 扩展 `wechat`，`detectPlatform()` 识别微信 UA（`MicroMessenger`，且判定顺序在企微 `wxwork` 之后避免误判）
+- 复用 jweixin SDK（与企微同一脚本），`wx.config` 注入分支支持微信公众号
+
+### B2. 微信公众号 / 小程序 OAuth 登录
+
+**后端**（`backend-java/src/main/java/com/nocobase/integration/wechat/`）：
+
+- 新增 `WeChatAppService` + `WeChatController`（`/api/wechat/*`）：
+  | 方法 | 路径 | 说明 |
+  |---|---|---|
+  | `GET` | `/auth-url` | 生成公众号网页授权链接（state 绑定 Redis 防 CSRF） |
+  | `POST` | `/callback` | code 换 openid + 用户信息，按 openid 建立 `ExternalUserMapping` 并签发 JWT |
+  | `POST` | `/mini-program/login` | 小程序 code2Session，openid 映射 + 签发 JWT |
+- openid 作为微信身份唯一真相，优先走 `ExternalUserMapping`（幂等），兼容按用户名 `wechat_<openid摘要>` 的历史数据并补建映射
+- 复用 `JwtService.issueAccessToken` + `RefreshTokenService`（与企微/钉钉对称），零新增签发路径
+- 测试：`WeChatAppServiceTest` **9/9 通过**（isConfigured / 映射命中幂等 / 补建映射 / 建号+建映射 / 未配置抛错 / openid 缺失抛错 / 小程序建号 / 小程序 openid 缺失）
+
+**前端**（`frontend/src/pages/auth/WeChatLoginPage.tsx`）：
+
+- 新增微信公众号登录页 + `wechatApi`（对称 `wecomApi`）
+- 测试：`WeChatLoginPage.test.tsx` **5/5 通过**
+
+### B6. 微信订阅消息分发
+
+**后端**（`backend-java/src/main/java/com/nocobase/notification/`）：
+
+- 新增 `WeChatSubscribeDispatcher`（`Type.WECHAT_PERSONAL`）：调用 `/cgi-bin/message/subscribe/send`，payload 支持 `template_id`/`page`/`data`
+- 复用 `access_token` 获取逻辑（带 10min 缓存）
+
+### 验证
+
+| 检查项 | 结果 |
+|---|---|
+| 后端新增单测 | `WeChatJsSignatureProviderTest` 6 + `WeChatAppServiceTest` 9 = **15 项全部通过** |
+| 前端新增单测 | `WeChatLoginPage.test.tsx` 5 + `integrations.test.ts` 7 = **12 项全部通过** |
+| `tsc --noEmit` | 0 错误 |
+| `mvn compile` | 通过（Checkstyle 无新增违规） |
+
+> **依赖外部服务**：`NotificationService` 构造器依赖 Redis/DB，全量 `@SpringBootTest` 集成测试存在既有环境性失败（与本次改动无关，已确认基线）。
+
+---
+
 ## v2.1.0 (2026-10-26) — 协作深度补齐（评论 + 线程 + 双向链接 + 表单分享）
 
 > **协作深度补齐**：对标 Notion / Airtable 的记录级评论能力落地，填补平台在协作维度的核心差距；同时补齐 Slack/RocketChat 的线程对话体验。
