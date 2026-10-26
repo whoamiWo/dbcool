@@ -288,7 +288,7 @@ export function NotionStyleEditor({
   const [slashFilter, setSlashFilter] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [backlinks, setBacklinks] = useState<Array<{ id: string; sourcePageId: string; sourceTitle?: string; sourceSlug?: string; targetPageId?: string; targetSlug?: string; createdAt: string }>>([]);
+  const [backlinks, setBacklinks] = useState<Array<{ id: string; sourcePageId: string; sourceTitle?: string; sourceSlug?: string; targetPageId?: string; targetSlug?: string; anchorText?: string; context?: string; createdAt: string }>>([]);
   const [backlinksLoading, setBacklinksLoading] = useState(false);
   const [templates, setTemplates] = useState<Array<{ id: string; title: string; kbId?: string }>>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -1178,6 +1178,26 @@ export function NotionStyleEditor({
               >
                 <Box>
                   <Typography variant="body2">{bl.sourceTitle || t('editor.ui.unknownPage')}</Typography>
+                  {bl.anchorText && (
+                    <Typography variant="caption" sx={{ color: 'primary.main', fontStyle: 'italic' }}>
+                      {t('editor.ui.backlinkAnchorPrefix', { anchor: bl.anchorText })}
+                    </Typography>
+                  )}
+                  {bl.context && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: 'text.secondary',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        mt: 0.25,
+                      }}
+                    >
+                      {bl.context}
+                    </Typography>
+                  )}
                   <Typography variant="caption" sx={{ color: 'text.disabled' }}>
                     {bl.sourceSlug ? `/${bl.sourceSlug}` : ''}
                   </Typography>

@@ -12,6 +12,7 @@ import java.util.UUID;
  *   <li>高效反向链接查询 (target_page_id 索引)</li>
  *   <li>目标页删除后仍保留 target_slug 兼容显示</li>
  *   <li>租户隔离</li>
+ *   <li>锚文本 ([[slug|anchor]]) 与引用上下文摘录展示</li>
  * </ul>
  */
 @Entity
@@ -30,6 +31,14 @@ public class WikiBacklinkEntity {
 
     @Column(name = "target_slug", length = 256)
     private String targetSlug;
+
+    /** 自定义锚文本 ([[slug|anchor]] 中的 anchor)，缺省为 null 时前端回落为页面标题。 */
+    @Column(name = "anchor_text", length = 512)
+    private String anchorText;
+
+    /** 引用处上下文摘录，以链接为中心向前后取窗并剥离 Markdown 标记。 */
+    @Column(name = "context", length = 1024)
+    private String context;
 
     @Column(name = "tenant_id", nullable = false, length = 64)
     private String tenantId;
@@ -50,6 +59,12 @@ public class WikiBacklinkEntity {
 
     public String getTargetSlug() { return targetSlug; }
     public void setTargetSlug(String targetSlug) { this.targetSlug = targetSlug; }
+
+    public String getAnchorText() { return anchorText; }
+    public void setAnchorText(String anchorText) { this.anchorText = anchorText; }
+
+    public String getContext() { return context; }
+    public void setContext(String context) { this.context = context; }
 
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }

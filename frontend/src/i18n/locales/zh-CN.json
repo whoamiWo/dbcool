@@ -460,6 +460,7 @@
       "backlinksLoading": "加载中...",
       "noBacklinks": "暂无页面引用本页",
       "unknownPage": "未知页面",
+      "backlinkAnchorPrefix": "“{{anchor}}”",
       "templates": "模板",
       "templatesLoading": "加载模板中...",
       "noTemplates": "暂无可用模板，可在页面详情中将页面标记为模板",

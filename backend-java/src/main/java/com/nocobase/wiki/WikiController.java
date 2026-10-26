@@ -757,6 +757,8 @@ public class WikiController {
                     m.put("targetPageId", bl.getTargetPageId() != null ? 
                         bl.getTargetPageId().toString() : null);
                     m.put("targetSlug", bl.getTargetSlug());
+                    m.put("anchorText", bl.getAnchorText());
+                    m.put("context", bl.getContext());
                     m.put("createdAt", bl.getCreatedAt().toString());
                     
                     // 获取源页面信息

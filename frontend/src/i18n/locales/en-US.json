@@ -460,6 +460,7 @@
       "backlinksLoading": "Loading...",
       "noBacklinks": "No pages reference this page yet",
       "unknownPage": "Unknown page",
+      "backlinkAnchorPrefix": "\"{{anchor}}\"",
       "templates": "Templates",
       "templatesLoading": "Loading templates...",
       "noTemplates": "No templates available. You can mark a page as a template in the page details.",
