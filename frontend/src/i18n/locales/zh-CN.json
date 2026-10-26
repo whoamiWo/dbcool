@@ -473,7 +473,9 @@
       "openSlashMenu": "输入 / 打开块菜单",
       "slashCommand": "/ 命令",
       "searchBlocks": "搜索块类型...",
-      "noMatches": "无匹配结果"
+      "noMatches": "无匹配结果",
+      "searchWikiLinks": "搜索页面链接...",
+      "noWikiLinkMatches": "未找到相关页面"
     },
     "placeholder": {
       "bold": "粗体文本",

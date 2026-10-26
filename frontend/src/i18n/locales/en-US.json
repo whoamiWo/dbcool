@@ -473,7 +473,9 @@
       "openSlashMenu": "Type / to open the block menu",
       "slashCommand": "/ Command",
       "searchBlocks": "Search block types...",
-      "noMatches": "No matching results"
+      "noMatches": "No matching results",
+      "searchWikiLinks": "Search pages to link...",
+      "noWikiLinkMatches": "No matching pages found"
     },
     "placeholder": {
       "bold": "bold text",
