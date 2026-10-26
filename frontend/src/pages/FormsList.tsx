@@ -1,15 +1,19 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyState } from '@/components/EmptyState';
+import { FormShareDialog } from '@/components/forms/FormShareDialog';
 import type { } from '@/types/collection';
 import type { FormMeta } from '@/types/form';
 
 export function FormsListPage() {
   const { t } = useTranslation();
   const { collection } = useParams<{ collection?: string }>();
+  // PHASE128: 分享弹窗状态
+  const [shareTarget, setShareTarget] = useState<FormMeta | null>(null);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['forms', collection ?? 'all'],
     queryFn: async () => {
@@ -111,6 +115,21 @@ export function FormsListPage() {
                     >
                       {t('forms.fill')}
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => setShareTarget(f)}
+                      style={{
+                        marginLeft: 12,
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-info)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        font: 'inherit',
+                      }}
+                    >
+                      {t('formPublic.shareBtn')}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -118,6 +137,11 @@ export function FormsListPage() {
           </table>
         </div>
       )}
+      <FormShareDialog
+        open={!!shareTarget}
+        onClose={() => setShareTarget(null)}
+        formId={shareTarget?.id ?? ''}
+      />
     </div>
   );
 }

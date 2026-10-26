@@ -209,6 +209,50 @@ function markdownToBlocks(md: string): Block[] {
 }
 
 // ============================================================
+//  内联格式辅助
+// ============================================================
+/**
+ * 把选中文本包裹为对应 Markdown 内联语法。
+ * link 特殊：需要占位 URL，用户随后自行替换。
+ */
+function wrapSelection(format: 'bold' | 'italic' | 'strikethrough' | 'code' | 'link', selected: string): string {
+  switch (format) {
+    case 'bold': return `**${selected}**`;
+    case 'italic': return `*${selected}*`;
+    case 'strikethrough': return `~~${selected}~~`;
+    case 'code': return `\`${selected}\``;
+    case 'link': return `[${selected}](url)`;
+  }
+}
+
+/**
+ * 计算当前选区起点相对于 contentEditable 纯文本内容的字符偏移。
+ *
+ * contentEditable 内部可能含 `<strong>`/`<code>` 等元素节点，
+ * 因此不能用简单的 textContent 前缀长度，必须遍历 DOM 累计文本长度
+ * 直到命中选区起点所在的文本节点。
+ *
+ * @returns 偏移量；无法定位时返回 -1（调用方回退到首次匹配策略）。
+ */
+function getCaretTextOffset(root: Element, sel: Selection | null): number {
+  if (!sel || sel.rangeCount === 0) return -1;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer)) return -1;
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let offset = 0;
+  let node = walker.nextNode();
+  while (node) {
+    if (node === range.startContainer) {
+      return offset + range.startOffset;
+    }
+    offset += (node.textContent || '').length;
+    node = walker.nextNode();
+  }
+  return -1;
+}
+
+// ============================================================
 //  NotionStyleEditor 组件
 // ============================================================
 interface NotionStyleEditorProps {
@@ -583,12 +627,20 @@ export function NotionStyleEditor({
           onBlur={(e) => {
             const text = e.currentTarget.textContent || '';
             updateBlock(block.id, { content: text });
-            // 检测斜杠命令
+          }}
+          onInput={(e) => {
+            const text = e.currentTarget.textContent || '';
+            updateBlock(block.id, { content: text });
+            // 实时检测斜杠命令：输入 '/' 时弹出菜单，继续输入 '/' 后续字符时过滤
             if (text === '/') {
               const rect = e.currentTarget.getBoundingClientRect();
               handleSlashKey(block.id, text, rect);
             } else if (text.startsWith('/')) {
               handleSlashFilterChange(text);
+            } else if (slashAnchor && !text.startsWith('/')) {
+              // 输入内容不再以 '/' 开头时，关闭菜单
+              setSlashAnchor(null);
+              setSlashFilter('');
             }
           }}
           onKeyDown={(e) => {
@@ -643,6 +695,7 @@ export function NotionStyleEditor({
     let html = md
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/~~(.+?)~~/g, '<del>$1</del>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code style="background:var(--color-bg-tertiary);padding:0.2em 0.4em;border-radius:3px;font-family:monospace;">$1</code>')
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--color-info);">$1</a>')
@@ -721,13 +774,18 @@ export function NotionStyleEditor({
     let newContent = block.content;
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      // 基于选区偏移精确替换：文本相同多次出现时也能替换正确的位置
+      // （旧实现 block.content.replace(selected, …) 会命中第一处，见 PHASE133 回归说明）
       const selected = sel.toString();
-      switch (format) {
-        case 'bold': newContent = block.content.replace(selected, `**${selected}**`); break;
-        case 'italic': newContent = block.content.replace(selected, `*${selected}*`); break;
-        case 'strikethrough': newContent = block.content.replace(selected, `~~${selected}~~`); break;
-        case 'code': newContent = block.content.replace(selected, `\`${selected}\``); break;
-        case 'link': newContent = block.content.replace(selected, `[${selected}](url)`); break;
+      const offset = getCaretTextOffset(activeEl, sel);
+      if (offset >= 0 && offset + selected.length <= block.content.length) {
+        newContent =
+          block.content.slice(0, offset) +
+          wrapSelection(format, selected) +
+          block.content.slice(offset + selected.length);
+      } else {
+        // 回退：偏移不可用时退回首次匹配
+        newContent = block.content.replace(selected, wrapSelection(format, selected));
       }
     } else {
       // 无选中文本 → 在光标位置插入格式标记
@@ -740,7 +798,16 @@ export function NotionStyleEditor({
         link: ['[', '](url)'],
       };
       const [before, after] = markers[format];
-      newContent = block.content + `${before}${placeholder}${after}`;
+      const offset = getCaretTextOffset(activeEl, sel);
+      if (offset >= 0) {
+        newContent =
+          block.content.slice(0, offset) +
+          `${before}${placeholder}${after}` +
+          block.content.slice(offset);
+      } else {
+        // 回退：追加到末尾
+        newContent = block.content + `${before}${placeholder}${after}`;
+      }
     }
     updateBlock(blockId, { content: newContent });
   };

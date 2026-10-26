@@ -1,7 +1,9 @@
 package com.nocobase.project;
 
+import com.nocobase.notification.TaskStatusChangedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +30,13 @@ public class ProjectService {
 
     private final ProjectTaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ProjectService(ProjectTaskRepository taskRepository, ProjectRepository projectRepository) {
+    public ProjectService(ProjectTaskRepository taskRepository, ProjectRepository projectRepository,
+                          ApplicationEventPublisher eventPublisher) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /** 创建任务。 */
@@ -109,6 +114,7 @@ public class ProjectService {
                                     Instant startDate, Instant endDate,
                                     UUID updatedBy, String tenantId) {
         ProjectTaskEntity task = get(id, tenantId);
+        String oldStatus = task.getStatus();
         if (title != null) task.setTitle(title);
         if (description != null) task.setDescription(description);
         if (status != null) task.setStatus(status);
@@ -119,7 +125,25 @@ public class ProjectService {
         if (endDate != null) task.setEndDate(endDate);
         task.setUpdatedBy(updatedBy);
         task.setUpdatedAt(Instant.now());
-        return taskRepository.save(task);
+        ProjectTaskEntity saved = taskRepository.save(task);
+
+        // 状态发生变更时发布事件，触发通知
+        if (status != null && !status.equals(oldStatus)) {
+            String projectName = projectRepository.findById(saved.getProjectId())
+                    .map(ProjectEntity::getName)
+                    .orElse(null);
+            eventPublisher.publishEvent(new TaskStatusChangedEvent(
+                    saved.getId().toString(),
+                    saved.getTitle(),
+                    oldStatus,
+                    saved.getStatus(),
+                    saved.getAssigneeId() == null ? null : saved.getAssigneeId().toString(),
+                    saved.getProjectId() == null ? null : saved.getProjectId().toString(),
+                    projectName,
+                    tenantId
+            ));
+        }
+        return saved;
     }
 
     /** 删除任务。 */

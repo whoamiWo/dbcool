@@ -11,4 +11,7 @@ public interface CardChecklistRepository extends JpaRepository<CardChecklistEnti
 
     /** 卡片下的清单（按排序）。 */
     List<CardChecklistEntity> findByTenantIdAndTaskIdOrderBySortOrderAsc(String tenantId, UUID taskId);
+
+    /** 批量查询多个任务的清单 */
+    List<CardChecklistEntity> findByTenantIdAndTaskIdIn(String tenantId, List<UUID> taskIds);
 }

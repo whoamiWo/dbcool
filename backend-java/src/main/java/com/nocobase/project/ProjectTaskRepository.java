@@ -32,4 +32,8 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTaskEntity, 
     /** 项目下处于某个时间窗口内的任务(甘特图区间筛选用)。 */
     List<ProjectTaskEntity> findByTenantIdAndProjectIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
             String tenantId, UUID projectId, java.time.Instant windowEnd, java.time.Instant windowStart);
+
+    /** 过期任务：endDate < now 且 status != DONE */
+    List<ProjectTaskEntity> findByTenantIdAndEndDateBeforeAndStatusNotOrderByEndDateAsc(
+            String tenantId, java.time.Instant now, String status);
 }

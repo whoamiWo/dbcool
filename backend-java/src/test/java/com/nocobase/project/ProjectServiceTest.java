@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -26,7 +27,7 @@ class ProjectServiceTest {
         repo = mock(ProjectTaskRepository.class);
         projectRepo = mock(ProjectRepository.class);
         when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        service = new ProjectService(repo, projectRepo);
+        service = new ProjectService(repo, projectRepo, mock(ApplicationEventPublisher.class));
     }
 
     private UUID pid = UUID.randomUUID();

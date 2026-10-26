@@ -208,6 +208,34 @@ public class ProjectBoardController {
         return Map.of("code", 0, "message", "success", "data", data, "total", data.size());
     }
 
+    /** 批量查询多个任务的清单（避免 N+1） */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/checklists/batch")
+    public Map<String, Object> batchChecklists(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        @SuppressWarnings("unchecked")
+        List<String> taskIdsStr = (List<String>) body.get("taskIds");
+        if (taskIdsStr == null || taskIdsStr.isEmpty()) {
+            return Map.of("code", 0, "message", "success", "data", Map.of(), "total", 0);
+        }
+        List<UUID> taskIds = taskIdsStr.stream().map(UUID::fromString).toList();
+        List<CardChecklistEntity> checklists = checklistRepository.findByTenantIdAndTaskIdIn(user.tenantId(), taskIds);
+        
+        // 按 taskId 分组返回
+        Map<String, List<Map<String, Object>>> grouped = new HashMap<>();
+        for (CardChecklistEntity c : checklists) {
+            String tid = c.getTaskId().toString();
+            grouped.computeIfAbsent(tid, k -> new ArrayList<>()).add(Map.of(
+                    "id", c.getId().toString(),
+                    "title", c.getTitle(),
+                    "sortOrder", c.getSortOrder()
+            ));
+        }
+        return Map.of("code", 0, "message", "success", "data", grouped, "total", checklists.size());
+    }
+
     /** 更新清单 */
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/checklists/{checklistId}")
@@ -292,6 +320,34 @@ public class ProjectBoardController {
             data.add(m);
         }
         return Map.of("code", 0, "message", "success", "data", data, "total", data.size());
+    }
+
+    /** 批量查询多个清单的清单项 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/checklist-items/batch")
+    public Map<String, Object> batchChecklistItems(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        @SuppressWarnings("unchecked")
+        List<String> checklistIdsStr = (List<String>) body.get("checklistIds");
+        if (checklistIdsStr == null || checklistIdsStr.isEmpty()) {
+            return Map.of("code", 0, "message", "success", "data", Map.of(), "total", 0);
+        }
+        List<UUID> checklistIds = checklistIdsStr.stream().map(UUID::fromString).toList();
+        List<CardChecklistItemEntity> items = checklistItemRepository.findByTenantIdAndChecklistIdIn(user.tenantId(), checklistIds);
+        
+        Map<String, List<Map<String, Object>>> grouped = new HashMap<>();
+        for (CardChecklistItemEntity i : items) {
+            String cid = i.getChecklistId().toString();
+            grouped.computeIfAbsent(cid, k -> new ArrayList<>()).add(Map.of(
+                    "id", i.getId().toString(),
+                    "title", i.getTitle(),
+                    "done", i.getDone(),
+                    "sortOrder", i.getSortOrder()
+            ));
+        }
+        return Map.of("code", 0, "message", "success", "data", grouped, "total", items.size());
     }
 
     /** 更新清单项（标记完成） */
