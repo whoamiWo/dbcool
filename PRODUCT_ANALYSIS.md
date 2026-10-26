@@ -1,5 +1,21 @@
 # 产品差距分析报告
 
+> ⚠️ **本文已被后续实证复核大幅推翻（2026-10-26，基线 `f752535` v2.1.0）**
+>
+> 权威结论请以 **[`docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md`](./docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md)** 为准。
+> 主要推翻项：
+> - "文档/Wiki ❌ 缺失" → ✅ 已完整实现（版本快照/对比/双向链接/锚文本/混合检索）
+> - "知识库 ❌ 缺失" → ✅ 已实现
+> - "实时协作 CRDT ❌ 缺失" → ✅ 已实现（字符级），仅 K8s 配置缺失
+> - "IM 协作 ⚠️ 部分" → ✅ 已达标（频道/私信/线程/表情/已读/在线/Huddle）
+> - "集成市场 ❌ 缺失" → ✅ 已实现（`integration/market/`）
+> - "平台嵌入 ⚠️ 部分" → 🟡 仍部分（JS-SDK 签名全平台缺失，微信 OAuth 缺失）
+>
+> 详细证据见 [`docs/CAPABILITY_MATRIX_DETAIL.md`](./docs/CAPABILITY_MATRIX_DETAIL.md) §12。
+>
+> ⚠️ 另注：本文 §2.4 的 NocoBase 许可合规说明**仍然有效**（Apache-2.0 + 补充条款禁止 SaaS 化），
+> 本项目保持代码独立、不 fork。
+
 > 创建日期: 2026-09-17
 > 更新日期: 2026-09-17（修正许可合规性、时间估算、产品命名）
 > 关联: PRODUCT_ROADMAP.md, USER_STORIES.md, MVP_SCOPE.md

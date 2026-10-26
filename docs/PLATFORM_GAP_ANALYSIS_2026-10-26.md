@@ -1,5 +1,16 @@
 # 平台能力对标分析 — 2026-10-26 更新版
 
+> ⚠️ **本文已被后续实证复核部分推翻（2026-10-26，基线 `f752535` v2.1.0）**
+>
+> 权威结论请以 **[`ENTERPRISE_PLATFORM_MASTER_PLAN.md`](./ENTERPRISE_PLATFORM_MASTER_PLAN.md)** 为准。
+> 已确认的推翻项：
+> - "Slack / RocketChat 缺" → ❌ 错，`integration/slack/`、`integration/mattermost/` **均已实现**
+> - "微信完全未实现" → 🟡 部分错，推送层（`WeChatWorkDispatcher`/`WeChatPersonalDispatcher`）存在，**缺 OAuth/JS-SDK**
+> - "Gallery 待验证" → ❌ 错，已注册路由
+> - "线程视图/双向链接/记录级评论缺" → ✅ 已于 PHASE10-H1/H3 + PHASE130 补齐
+>
+> 详细证据见 [`CAPABILITY_MATRIX_DETAIL.md`](./CAPABILITY_MATRIX_DETAIL.md) §12「历史结论冲突」。
+
 > 评估基线：`c172979` (PHASE10 企业门槛三件套刚合并)  
 > 比对对象：NocoDB / NocoBase / Slack / RocketChat / Mattermost / Trello / Airtable / Notion  
 > 目标场景：面向中国企业（200-500 人），可嵌入钉钉/企微/飞书，SaaS 化部署
