@@ -1,5 +1,20 @@
 # 综合企业协作平台 — 上线就绪度与竞品差距评估
 
+> ⚠️ **本文部分结论已被 2026-10-26 实证复核推翻（基线 `f752535` v2.1.0）**
+>
+> 权威结论请以 **[`docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md`](./docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md)** 为准。
+> 已确认修复（不再成立）：
+> - "块编辑器自动保存打到不存在端点（404）" → ✅ 已修复（`WikiController:478-500`）
+> - "模板列表端点不匹配（404）" → ✅ 已修复（`WikiController:660-694`）
+> - "反向链接渲染 `is not a function`" → ✅ 已修复（`WikiPageService.syncBacklinks`）
+> - "CRDT 整篇替换" → ✅ 已修复（`CollabEditor.tsx:47-89` LCS 字符级）
+> - "IM 高级搜索是死代码" → ✅ 已修复（接入 `ImMessageController:244,280`）
+>
+> **仍成立（限 K8s）**：`CRDT_SERVICE_URL` 在 `docker-compose.yml:182` 已配置，
+> 但 `k8s/*.yaml` 未配置 → K8s 环境下 CRDT 服务部署了没人调，协同降级。
+>
+> 详细证据见 [`docs/CAPABILITY_MATRIX_DETAIL.md`](./docs/CAPABILITY_MATRIX_DETAIL.md) §12。
+
 > 评估时间：2026-09-29
 > 评估基线：`origin/main` = `79be8d3`
 > 评估对象：DBCool（Java Spring Boot + Python FastAPI + React + Node CRDT；PostgreSQL/pgvector + Redis + RabbitMQ + MinIO）

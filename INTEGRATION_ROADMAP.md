@@ -1,5 +1,14 @@
 # DBCool 综合平台整合方案
 
+> ⚠️ **本文的整合目标大部分已落地（2026-10-26 复核，基线 `f752535` v2.1.0）**
+>
+> 权威结论请以 **[`docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md`](./docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md)** 为准。
+> 落地情况：数据模型 / 表单 / 视图 / 权限 / 工作流 / IM / Wiki / 集成市场 **均已实现**；
+> 剩余缺口为：JS-SDK 签名、微信 OAuth、外部数据源、计费商业化。
+>
+> 架构蓝图（§1.1）仍可作为**模块划分参考**，但各模块完成度请以
+> [`docs/CAPABILITY_MATRIX_DETAIL.md`](./docs/CAPABILITY_MATRIX_DETAIL.md) 为准。
+
 > 创建日期: 2026-09-18
 > 关联: ROADMAP.md, PRODUCT_ANALYSIS.md, USER_STORIES.md, ARCHITECTURE.md
 > 基于: Phase 1-7 已完成验证（后端 936 PASS / 前端 233 PASS / 构建 OK）
