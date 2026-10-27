@@ -100,6 +100,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/mattermost/webhook/incoming").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/wecom/callback").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/events").permitAll()
+                        // B4 钉钉 AI 卡片按钮回调：钉钉服务器发起，无 JWT，靠 HMAC 验签兜底
+                        .requestMatchers(HttpMethod.POST, "/api/dingtalk/ai-card/callback").permitAll()
                         // Actuator: 生产 profile 下仅 health 匿名，其他需要认证
                         .requestMatchers("/actuator/health").permitAll()
                         // PHASE104 审计修正：Prometheus 的 scrape 是匿名 HTTP GET，无法携带 JWT。

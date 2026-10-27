@@ -271,47 +271,22 @@ public class DingTalkController {
     }
     
     /**
-     * 验证钉钉回调签名。
-     * sign = Base64(HmacSHA256(appSecret, timestamp))
+     * 验证钉钉回调签名。委托 {@link DingTalkSignatureUtil}(提取共用,
+     * 与 {@link DingTalkAiCardController} 卡片回调共用同一套算法)。
+     *
+     * <p>{@code sign = Base64(HmacSHA256(appSecret, timestamp))},常量时间比较,5 分钟窗口。
      */
     private boolean verifySignature(String timestamp, String signature, Map<String, Object> payload) {
-        try {
-            String appSecret = appService.getAppSecret();
-            if (appSecret == null || appSecret.isBlank()) {
-                log.warn("[DingTalk] 审批回调：appSecret 未配置");
-                return false;
-            }
-            
-            // 检查时间戳有效性（5 分钟窗口）
-            long ts;
-            try {
-                ts = Long.parseLong(timestamp);
-            } catch (NumberFormatException e) {
-                log.warn("[DingTalk] 审批回调：timestamp 格式错误");
-                return false;
-            }
-            
-            long now = System.currentTimeMillis();
-            if (Math.abs(now - ts) > 300_000) {
-                log.warn("[DingTalk] 审批回调：timestamp 过期 {} vs {}", ts, now);
-                return false;
-            }
-            
-            // 计算签名：HmacSHA256(appSecret, timestamp)
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] digest = mac.doFinal(timestamp.getBytes(StandardCharsets.UTF_8));
-            String expectedSig = Base64.getEncoder().encodeToString(digest);
-            
-            // 常量时间比较防时序攻击
-            return MessageDigest.isEqual(
-                signature.getBytes(StandardCharsets.UTF_8),
-                expectedSig.getBytes(StandardCharsets.UTF_8)
-            );
-        } catch (Exception e) {
-            log.error("[DingTalk] 审批回调签名验证异常", e);
+        String appSecret = appService.getAppSecret();
+        if (appSecret == null || appSecret.isBlank()) {
+            log.warn("[DingTalk] 审批回调：appSecret 未配置");
             return false;
         }
+        if (!DingTalkSignatureUtil.verify(appSecret, timestamp, signature)) {
+            log.warn("[DingTalk] 审批回调：签名校验失败 ts={}", timestamp);
+            return false;
+        }
+        return true;
     }
 
     /**

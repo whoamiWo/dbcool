@@ -36,7 +36,7 @@ public class WeChatSubscribeDispatcher implements NotificationDispatcher {
 
     @Override
     public NotificationChannelEntity.Type supportedType() {
-        return NotificationChannelEntity.Type.WECHAT_PERSONAL;
+        return NotificationChannelEntity.Type.WECHAT_SUBSCRIBE;
     }
 
     /**
