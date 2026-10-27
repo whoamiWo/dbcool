@@ -6,6 +6,10 @@ import com.nocobase.ai.AiAssistantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -29,15 +33,33 @@ public class DingTalkAiCardService {
 
     private final DingTalkAppService appService;
     private final AiAssistantService aiService;
-    private final RestTemplate restTemplate = new RestTemplate();
+    /** 注入池化 RestTemplate（RestTemplateConfig Bean），不再 new RestTemplate()。
+     *  修复前 new 出来的实例无连接池/超时配置，且被错误用于传 header。 */
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${dingtalk.callback-base-url:http://localhost:8080}")
     private String callbackBaseUrl;
 
-    public DingTalkAiCardService(DingTalkAppService appService, AiAssistantService aiService) {
+    /** 卡片模板 ID（原硬编码 standard_ai_card，现可配置）。 */
+    @Value("${dingtalk.card-template-id:standard_ai_card}")
+    private String cardTemplateId;
+
+    /** 卡片实例投递端点（默认钉钉官方 /v1.0/card/instances；可切换为机器人
+     *  /v1.0/im/robots/{robotCode}/sendInteractiveCard 等）。 */
+    @Value("${dingtalk.card-instance-url:https://api.dingtalk.com/v1.0/card/instances}")
+    private String cardInstanceUrl;
+
+    /** 接收人字段名：钉钉给单人投放卡片可用 userId，群会话用 openConversationId。
+     *  原代码把 targetUserId 填进 openConversationId（语义错），现可通过配置切换。 */
+    @Value("${dingtalk.card-recipient-field:userId}")
+    private String cardRecipientField;
+
+    public DingTalkAiCardService(DingTalkAppService appService, AiAssistantService aiService,
+                                 RestTemplate restTemplate) {
         this.appService = appService;
         this.aiService = aiService;
+        this.restTemplate = restTemplate;
     }
 
     /** 投递结果。 */
@@ -82,25 +104,63 @@ public class DingTalkAiCardService {
             return SendCardResult.fail("钉钉应用未配置或获取 token 失败");
         }
 
-        // 4. 投递(钉钉机器人卡片:POST /v1.0/im/robots/{robotCode}/sendInteractiveCard,
-        //    此处以 cardTemplateId + cardData 简化投递,实际可替换为 send_message + interactive card)
+        // 4. 投递
+        //    修复前：把 headers 塞进 postForObject 的 request body 参数
+        //    （第二参是 body 不是 header）→ x-acs-dingtalk-access-token 从未发出，
+        //    且 readTree 后直接 ok() 不校验 errcode → 失败也报成功（B4 假完成）。
+        //    现改为 HttpHeaders + HttpEntity + postForEntity 正确传 header，并校验响应。
         try {
-            String url = "https://api.dingtalk.com/v1.0/card/instances";
+            // @Value 在未配置/非 Spring 上下文时为 null，此处做兜底，
+            // 避免请求体出现 null key/value 与 null URL（既防配置缺失，也让单测可运行）
+            final String defaultUrl = "https://api.dingtalk.com/v1.0/card/instances";
+            final String defaultTpl = "standard_ai_card";
+            final String defaultField = "userId";
+            String url = (cardInstanceUrl == null || cardInstanceUrl.isBlank())
+                    ? defaultUrl : cardInstanceUrl;
+            String tpl = (cardTemplateId == null || cardTemplateId.isBlank())
+                    ? defaultTpl : cardTemplateId;
+            String field = (cardRecipientField == null || cardRecipientField.isBlank())
+                    ? defaultField : cardRecipientField;
+
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("cardTemplateId", "standard_ai_card");
+            body.put("cardTemplateId", tpl);
             body.put("outTrackId", outTrackId);
-            body.put("openConversationId", targetUserId);
+            // 接收人字段按配置写入（默认 userId，修正原 openConversationId 语义错）
+            body.put(field, targetUserId);
             body.put("cardData", cardData);
             body.put("callbackRouteKey", "nocobase_ai_card");
 
-            Map<String, String> headers = Map.of(
-                    "x-acs-dingtalk-access-token", token,
-                    "Content-Type", "application/json");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("x-acs-dingtalk-access-token", token);
 
-            String resp = restTemplate.postForObject(url,
-                    Map.of("payload", objectMapper.writeValueAsString(body), "headers", headers),
-                    String.class);
-            JsonNode json = objectMapper.readTree(resp == null ? "{}" : resp);
+            ResponseEntity<String> resp = restTemplate.postForEntity(
+                    url, new HttpEntity<>(body, headers), String.class);
+
+            // 校验 HTTP 状态码
+            if (!resp.getStatusCode().is2xxSuccessful()) {
+                String detail = "钉钉卡片投递失败: HTTP " + resp.getStatusCode().value()
+                        + " body=" + resp.getBody();
+                log.error("[DingTalkAiCard] {}", detail);
+                return SendCardResult.fail(detail);
+            }
+
+            // 校验业务 errcode（钉钉部分接口在 200 响应体内返回 errmsg/errcode）
+            String respBody = resp.getBody();
+            JsonNode json = objectMapper.readTree(respBody == null ? "{}" : respBody);
+            if (json.hasNonNull("errcode") && json.path("errcode").asInt(0) != 0) {
+                String detail = "钉钉卡片投递失败: errcode=" + json.path("errcode").asInt()
+                        + " errmsg=" + json.path("errmsg").asText("");
+                log.error("[DingTalkAiCard] {}", detail);
+                return SendCardResult.fail(detail);
+            }
+            if (json.hasNonNull("errmsg")
+                    && !"ok".equalsIgnoreCase(json.path("errmsg").asText(""))) {
+                String detail = "钉钉卡片投递失败: errmsg=" + json.path("errmsg").asText("");
+                log.error("[DingTalkAiCard] {}", detail);
+                return SendCardResult.fail(detail);
+            }
+
             log.info("[DingTalkAiCard] 投递成功 outTrackId={} target={}", outTrackId, targetUserId);
             return SendCardResult.ok(outTrackId, json.toString());
         } catch (Exception e) {

@@ -69,15 +69,24 @@ public class WeChatSubscribeDispatcher implements NotificationDispatcher {
             String url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send" +
                     "?access_token=" + accessToken;
 
-            JsonNode payloadJson = objectMapper.valueToTree(payload);
-            String body = restTemplate.postForObject(url, payloadJson.toString(), String.class);
+            // 组装请求体：touser 必须由入参 recipient(openid) 显式写入。
+            // 修复前直接把 payload 原样当 body 发送，recipient 从未写入 touser
+            // → 微信缺少 touser 必然返回 errcode 非 0，消息实际发不出去（B6 假完成）。
+            com.fasterxml.jackson.databind.node.ObjectNode bodyJson = objectMapper.createObjectNode();
+            bodyJson.put("touser", recipient == null ? "" : recipient);
+            if (payload != null) {
+                payload.forEach((k, v) -> bodyJson.set(k, objectMapper.valueToTree(v)));
+            }
+            String body = restTemplate.postForObject(url, bodyJson.toString(), String.class);
 
             JsonNode json = objectMapper.readTree(body == null ? "{}" : body);
             int errcode = json.path("errcode").asInt(-1);
             if (errcode != 0) {
                 String errmsg = json.path("errmsg").asText(body);
-                log.warn("[WeChatSubscribe] 发送失败：{}", errmsg);
-                return SendResult.error("发送失败：" + errmsg);
+                // 失败详情带上 errcode，便于诊断（此前只带 errmsg，无法定位错误码）
+                String detail = "发送失败：errcode=" + errcode + " errmsg=" + errmsg;
+                log.warn("[WeChatSubscribe] {}", detail);
+                return SendResult.error(detail);
             }
 
             log.info("[WeChatSubscribe] 发送成功：openid={}, template_id={}",
