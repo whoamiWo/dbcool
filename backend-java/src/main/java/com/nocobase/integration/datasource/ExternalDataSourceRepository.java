@@ -20,4 +20,7 @@ public interface ExternalDataSourceRepository extends JpaRepository<ExternalData
     Optional<ExternalDataSourceEntity> findByIdAndTenantId(UUID id, String tenantId);
 
     boolean existsByTenantIdAndName(String tenantId, String name);
+
+    /** B3 返工(V72): 查询启用定时同步的数据源。 */
+    List<ExternalDataSourceEntity> findBySyncEnabledTrue();
 }

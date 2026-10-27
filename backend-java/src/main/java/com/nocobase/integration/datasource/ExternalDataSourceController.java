@@ -55,7 +55,9 @@ public class ExternalDataSourceController {
             @NotNull Integer port,
             @NotBlank String databaseName,
             @NotBlank String username,
-            @NotBlank String password) {}
+            @NotBlank String password,
+            /** 可选：显式 JDBC 驱动类名（不填则按 vendor 推断） */
+            String driverClassName) {}
 
     /** 创建虚拟 Collection 请求体 */
     public record CreateVirtualCollectionRequest(
@@ -73,10 +75,32 @@ public class ExternalDataSourceController {
                 "data", list.stream().map(this::toView).toList());
     }
 
+    /**
+     * 创建外部数据源（B3 返工：修复前无此端点，CreateDataSourceRequest 是死 record，
+     * 数据源只能靠手工插密文入库）。
+     *
+     * <p>Body: {@code {name, vendor, host, port, databaseName, username, password, driverClassName?}}
+     * 密码在 Service 内加密存储，响应不返回任何密码字段（复用 toView）。
+     */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreateDataSourceRequest body) {
+        String tenantId = TenantContext.requireTenantId();
+        ExternalDataSourceEntity saved = service.createDataSource(
+                tenantId, body.name(), body.vendor(), body.host(), body.port(),
+                body.databaseName(), body.username(), body.password(),
+                body.driverClassName(), null);
+        auditService.log(tenantId, null, null, "CREATE_DATASOURCE", "datasource/create",
+                String.valueOf(saved.getId()), Map.of("name", body.name(), "vendor", body.vendor()));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("code", 0, "message", "ok", "data", toView(saved)));
+    }
+
         @PreAuthorize("isAuthenticated()")
 @GetMapping("/{id}")
     public Map<String, Object> get(@PathVariable UUID id) {
-        return service.getDataSource(id, "system")
+        String tenantId = TenantContext.requireTenantId();
+        return service.getDataSource(id, tenantId)
                 .map(d -> {
                     Map<String, Object> view = toView(d);
                     return Map.of("code", 0, "message", "ok", "data", view);
@@ -87,22 +111,25 @@ public class ExternalDataSourceController {
         @PreAuthorize("isAuthenticated()")
 @PostMapping("/{id}/test")
     public Map<String, Object> testConnection(@PathVariable UUID id) {
-        auditService.log(TenantContext.requireTenantId(), null, null, "TEST_DATASOURCE", "datasource/test", String.valueOf(id), null);
-        boolean ok = service.testConnection(id, "system");
+        String tenantId = TenantContext.requireTenantId();
+        auditService.log(tenantId, null, null, "TEST_DATASOURCE", "datasource/test", String.valueOf(id), null);
+        boolean ok = service.testConnection(id, tenantId);
         return Map.of("code", 0, "message", "ok", "data", Map.of("connected", ok));
     }
 
         @PreAuthorize("isAuthenticated()")
 @GetMapping("/{id}/tables")
     public Map<String, Object> listTables(@PathVariable UUID id) {
-        List<String> tables = service.listTables(id, "system");
+        String tenantId = TenantContext.requireTenantId();
+        List<String> tables = service.listTables(id, tenantId);
         return Map.of("code", 0, "message", "ok", "data", tables);
     }
 
         @PreAuthorize("isAuthenticated()")
 @GetMapping("/{id}/tables/{tableName}/columns")
     public Map<String, Object> readColumns(@PathVariable UUID id, @PathVariable String tableName) {
-        List<com.nocobase.meta.FieldDef> columns = service.readTableColumns(id, "system", tableName);
+        String tenantId = TenantContext.requireTenantId();
+        List<com.nocobase.meta.FieldDef> columns = service.readTableColumns(id, tenantId, tableName);
         return Map.of("code", 0, "message", "ok", "data", columns);
     }
 
@@ -122,8 +149,9 @@ public class ExternalDataSourceController {
         @PreAuthorize("isAuthenticated()")
 @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id) {
-        auditService.log(TenantContext.requireTenantId(), null, null, "DELETE_DATASOURCE", "datasource/delete", String.valueOf(id), null);
-        service.deleteDataSource(id, "system");
+        String tenantId = TenantContext.requireTenantId();
+        auditService.log(tenantId, null, null, "DELETE_DATASOURCE", "datasource/delete", String.valueOf(id), null);
+        service.deleteDataSource(id, tenantId);
         return Map.of("code", 0, "message", "ok");
     }
 

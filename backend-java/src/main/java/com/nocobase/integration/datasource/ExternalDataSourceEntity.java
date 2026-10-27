@@ -69,6 +69,30 @@ public class ExternalDataSourceEntity {
     @Column(name = "last_synced_at")
     private Instant lastSyncedAt;
 
+    // ============================================================
+    //  B3 返工：定时同步字段（V72 迁移）
+    // ============================================================
+
+    /** 同步模式：MANUAL（手动）/ FULL（定时全量）/ INCREMENTAL（定时增量）。 */
+    @Column(name = "sync_mode", length = 16)
+    private String syncMode = "MANUAL";
+
+    /** 定时同步 cron 表达式（syncEnabled=true 时生效）。 */
+    @Column(name = "sync_cron", length = 64)
+    private String syncCron;
+
+    /** 是否启用定时同步。 */
+    @Column(name = "sync_enabled")
+    private Boolean syncEnabled = false;
+
+    /** 增量同步水位字段名（如 updated_at / id）。 */
+    @Column(name = "incremental_key", length = 128)
+    private String incrementalKey;
+
+    /** 上次增量同步的水位值。 */
+    @Column(name = "last_sync_cursor", length = 255)
+    private String lastSyncCursor;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -112,6 +136,17 @@ public class ExternalDataSourceEntity {
     public void setStatus(String status) { this.status = status; }
 
     public Instant getLastSyncedAt() { return lastSyncedAt; }
+    public String getSyncMode() { return syncMode; }
+    public void setSyncMode(String syncMode) { this.syncMode = syncMode; }
+    public String getSyncCron() { return syncCron; }
+    public void setSyncCron(String syncCron) { this.syncCron = syncCron; }
+    public Boolean getSyncEnabled() { return syncEnabled; }
+    public void setSyncEnabled(Boolean syncEnabled) { this.syncEnabled = syncEnabled; }
+    public String getIncrementalKey() { return incrementalKey; }
+    public void setIncrementalKey(String incrementalKey) { this.incrementalKey = incrementalKey; }
+    public String getLastSyncCursor() { return lastSyncCursor; }
+    public void setLastSyncCursor(String lastSyncCursor) { this.lastSyncCursor = lastSyncCursor; }
+
     public void setLastSyncedAt(Instant lastSyncedAt) { this.lastSyncedAt = lastSyncedAt; }
 
     public Instant getCreatedAt() { return createdAt; }
