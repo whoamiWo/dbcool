@@ -11,15 +11,15 @@
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
-[![Backend CI](https://img.shields.io/badge/CI-passing-brightgreen)](./.github/workflows/backend-ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-83%25-brightgreen)](./backend-java/target/site/jacoco/index.html)
-[![Tests](https://img.shields.io/badge/tests-2666%20passing-brightgreen)](#-测试)
+[![Backend CI](https://img.shields.io/badge/CI-failing%20(JaCoCo%2074%25%20%3C%2082%25)-red)](./.github/workflows/backend-ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-74%25-yellow)](./backend-java/target/site/jacoco/index.html)
+[![Tests](https://img.shields.io/badge/tests-3322%20(backend%202401%20%2F%20frontend%20921)-yellow)](#-测试)
 
 ## ✨ 核心能力
 
 - 🗂️ **数据模型引擎** (meta):运行时增删改 Collection 和字段,JSONB 存动态字段
 - 📝 **表单设计器** (form):三栏拖拽,实时预览,7 种校验规则
-- 📊 **视图设计器** (view):表格 / 看板 / 详情,客户端筛选/排序
+- 📊 **视图设计器** (view):表格 / 看板 / 画廊 / 日历 / 时间线 / 甘特图 / 详情,客户端筛选/排序/分组
 - 🔐 **认证 & 权限** (auth + acl):JWT 认证 + RBAC + 行级权限
 - ⚡ **工作流引擎** (workflow):节点执行 + 审批 + 条件分支 + HTTP 回调
 - 🔔 **多渠道通知** (notification):邮件 / 钉钉 / 企业微信 / Webhook
@@ -100,56 +100,69 @@ dbcool/
 └── WEEK_*_HANDOFF.md            # 各周交接文档(Week 4-34)
 ```
 
-## 📊 后端模块结构(Week 34 末)
+## 📊 后端模块结构
 
-| 包 | 职责 | 端点数 | 测试覆盖 |
+> 覆盖率来源：`mvn -o jacoco:report` → `target/site/jacoco/jacoco.xml`，统计口径 **LINE**，实测于 2026-10-28（基线 `28d0e23`）。
+
+| 包 | 职责 | 端点数 | 测试覆盖(实测 LINE) |
 |---|---|---|---|
-| `auth` | JWT 认证 / RBAC | 4 controllers | 92% |
-| `meta` | Collection Engine | 2 controllers | 58% |
-| `form` | Form Engine | 1 controller | 99% |
-| `view` | View Engine | 1 controller | 98% |
-| `acl` | 字段/行级权限 | 1 controller | 89% |
-| `workflow` | 工作流引擎 | 3 controllers | 96% |
-| `notification` | 多渠道通知 | 1 controller | 94% |
-| `audit` | 审计日志 | 1 controller | 99% |
+| `auth` | JWT 认证 / RBAC | 4 controllers | 85.4% |
+| `meta` | Collection Engine | 2 controllers | 74.1% |
+| `form` | Form Engine | 1 controller | 42.5% |
+| `view` | View Engine | 1 controller | 100% |
+| `acl` | 字段/行级权限 | 1 controller | 93.8% |
+| `workflow` | 工作流引擎 | 3 controllers | 94.7% |
+| `notification` | 多渠道通知 | 1 controller | 84.0% |
+| `audit` | 审计日志 | 1 controller | 100% |
 | `api` | User 端点 | 1 controller | 100% |
-| `health` | 健康检查 | 1 controller | 100% |
-| `config` | Security/OpenAPI/异常处理 | - | 100%(handler) |
-| **BUNDLE** | **总覆盖** | **15 controllers / 78 endpoints** | **83%** |
+| `health` | 健康检查 | 1 controller | 79.1% |
+| `config` | Security/OpenAPI/异常处理 | - | 24.6% |
+| `wiki` | 知识库 | - | 63.3% |
+| `im` | 即时通讯 | - | 74.1% |
+| `integration/dingtalk` | 钉钉集成 | - | 65.9% |
+| `integration/datasource` | 外部数据源 | - | 45.9% |
+| `bi/jobs` | 报表定时任务 | - | **0.0%** |
+| **BUNDLE** | **总覆盖** | **15 controllers / 78 endpoints** | **74.0%** |
+
+> ⚠️ BUNDLE 74.0% **未达** JaCoCo 红线 0.82，`mvn verify` 当前会 BUILD FAILURE。
+> 未达标项：BUNDLE(74.0<82)、form(42.5<95)、notification(84.0<90)、auth(85.4<90)、workflow(94.7<95)。详见 [阶段2 修复](#-jacoco-红线)。
 
 ## 🧪 测试
 
-### 测试规模(PHASE117-121 最新实测)
+### 测试规模(2026-10-28 实测，基线 `28d0e23`)
 
-#### Java 后端（2277 tests）
+#### Java 后端（2401 tests）
 
 ```bash
-cd backend-java && mvn test   # ✅ 2277/2277 PASS
+cd backend-java && mvn test
+# 实测: Tests run: 2401, Failures: 1, Errors: 96, Skipped: 0
+# 其中 96 Errors 全部为 @SpringBootTest 集成测试的环境性失败
+# (NotificationService 构造器依赖 Redis/DB 未就绪)，非代码缺陷，已确认为基线
 ```
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| 单元测试 | 2225 | mock-based，覆盖核心业务逻辑 |
-| E2E 集成测试 | 8 | SpringBootTest + H2（绕过 Flyway PG-specific） |
+| 单元测试 | ~2304 | mock-based，覆盖核心业务逻辑（**0 失败**） |
+| `@SpringBootTest` 集成测试 | 16 个类 | 环境依赖（Redis/DB），当前 96 errors |
 | 安全审计测试 | 15 | SQL注入 / XSS / null / 大 body 拒绝用例 |
 | 门禁回归 | 94 | 鉴权棘轮（0缺口）、权限矩阵、SpEL 语法 |
 
-- **Jacoco 覆盖率**: 83% BUNDLE（10 条红线全达标，见下表）
-- **测试金字塔**: 单元 2225 / 安全 15 / E2E 8，顶层 E2E 抓集成层 bug，底层单元抓业务逻辑
+- **Jacoco 覆盖率**: **74.0%** BUNDLE（红线 0.82 **未达标**，见下表）
+- **说明**：此前记录的 "83% BUNDLE 全达标" 为 Week 33 旧值，新代码（wiki/im/integration/project/plugin/ai/realtime）拉低整体覆盖但未同步文档，已于 2026-10-28 实测订正。
 
-#### 前端 React（877 tests / 109 files）
+#### 前端 React（921 tests / 114 files）
 
 ```bash
-cd frontend && npx vitest run   # ✅ 877/877 PASS（2026-10-24 实测）
+cd frontend && npm run test:run
+# 实测: Tests 2 failed | 919 passed (921)；Test Files 2 failed | 112 passed (114)
 cd frontend && npx tsc --noEmit # ✅ 0 errors
-cd frontend && npx eslint src   # ✅ 0 warnings
 ```
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| vitest 单测 | 877 | DOM 交互、逻辑分支、i18n key 完整性（覆盖率 80.06% lines） |
+| vitest 单测 | 921 | DOM 交互、逻辑分支、i18n key 完整性 |
+| 失败用例 | 2 | `AttachmentPreview.test.tsx`、`BoardView.test.tsx`（与 Wave3 改动无关，待修） |
 | TypeScript 类型检查 | 0 error | 全量源码 tsc --noEmit 通过 |
-| ESLint 静态检查 | 0 warning | 遵循项目 ESLint 配置 |
 
 #### Playwright E2E（159 tests）
 
@@ -173,22 +186,33 @@ Push 到 main / 任何 PR → GitHub Actions 自动跑 `mvn verify` → 检查 J
 
 配置文件: `.github/workflows/backend-ci.yml`
 
-### Jacoco 红线(Week 33 饱和上限)
+> 🔴 **当前 CI 为红**（2026-10-28 实测）：`java-test` job 执行 `mvn verify`，
+> JaCoCo check 因 BUNDLE 74.0% < 0.82 红线 及 form/notification/auth/workflow 未达标而 **BUILD FAILURE**。
+> 历史上曾以「PHASE95 legacy 豁免」记录在 `reports/gate-95-closeout.txt:46`，但**该豁免未落到 pom.xml 或 CI 配置**，
+> 故 CI 实际仍会拒绝合并。修复方案见 Wave5 阶段 2。
 
-| 模块 | 红线 | 实绩 |
-|---|---|---|
-| BUNDLE | 0.82 | 83% |
-| auth | 0.90 | 92% |
-| workflow | 0.95 | 96% |
-| audit | 0.97 | 99% |
-| view | 0.97 | 98% |
-| notification | 0.90 | 94% |
-| form | 0.95 | 99% |
-| api | 0.95 | 100% |
-| acl | 0.85 | 89% |
-| meta | 0.50 | 58% |
+### Jacoco 红线(2026-10-28 实测，口径 LINE)
+
+| 模块 | 红线(min) | 实绩 | 达标 |
+|---|---|---|---|
+| **BUNDLE** | 0.82 | **74.0%** | ❌ |
+| auth | 0.90 | 85.4% | ❌ |
+| workflow | 0.95 | 94.7% | ❌ |
+| audit | 0.97 | 100% | ✅ |
+| view | 0.97 | 100% | ✅ |
+| notification | 0.90 | 84.0% | ❌ |
+| form | 0.95 | 42.5% | ❌ |
+| api | 0.95 | 100% | ✅ |
+| acl | 0.85 | 93.8% | ✅ |
+| meta | 0.50 | 74.1% | ✅ |
 
 修改任何模块代码若让红线失守,CI 会拒绝合并。
+
+> 🔴 **当前状态**：`mvn verify` 因上述 5 项未达标而 **BUILD FAILURE**，
+> 而 `.github/workflows/ci.yml` 的 `java-test` job 执行的正是 `mvn verify`
+> → **CI Java job 当前为红**。修复方案见 Wave5 计划阶段 2
+> （优先补 `form`(42.5%)、`notification`(84.0%)、`auth`(85.4%) 单测；
+> 或显式下调阈值至实测值并在 `pom.xml` 注释留痕）。
 
 ### H2 测试基础设施(Week 35)
 
@@ -307,7 +331,7 @@ add field → 同步 ALTER(小表秒过)
 | Playwright E2E | ✅ 159/159 PASS |
 | 冒烟测试 | ✅ 11/11 PASS |
 | 编排测试 | ✅ 8/8 PASS |
-| 依赖漏洞扫描 | ✅ 0 高危（1 MEDIUM，已登记可忽略） |
+| 依赖漏洞扫描 | ⚠️ 前端 `npm audit` 2 moderate（react-router，**未修**）；Java 侧 `config/known-vulnerabilities.json` 仅 6 条手写条目（含占位假 CVE），**无真实 CVE 库**，OWASP Dependency Check 未集成（2026-10-28 订正） |
 | 跨栈契约 | ✅ 0 漂移 |
 | SaaS 就绪 | ✅ 11/11 |
 | 启动检查 | ✅ 0 问题 |
