@@ -25,7 +25,12 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedGet.mockResolvedValue({ code: 0, data: { remaining: 42 } });
+  mockedGet.mockImplementation((url: string) => {
+    if (url === '/ai/status') {
+      return Promise.resolve({ code: 0, data: { enabled: true, model: 'gpt-4o', models: ['gpt-4o', 'qwen-max'] } });
+    }
+    return Promise.resolve({ code: 0, data: { remaining: 42 } });
+  });
   mockedPost.mockResolvedValue({ code: 0, data: { result: 'AI 回答内容' } });
 });
 
@@ -57,10 +62,16 @@ describe('AgentChatPage', () => {
     await waitFor(() =>
       expect(mockedPost).toHaveBeenCalledWith(
         '/ai/chat',
-        expect.objectContaining({ prompt: '你好', model: 'gpt-4', max_tokens: 1024 }),
+        expect.objectContaining({ prompt: '你好', model: 'gpt-4o', max_tokens: 1024 }),
       ),
     );
     await waitFor(() => expect(screen.getByText('AI 回答内容')).toBeInTheDocument());
+  });
+
+  it('status 返回多个模型时渲染模型选择器', async () => {
+    renderPage();
+    await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('/ai/status'));
+    await waitFor(() => expect(screen.getByLabelText('agentChat.modelSelectorAria')).toBeInTheDocument());
   });
 
   it('wiki tool 发送走 /ai/wiki 专用端点', async () => {

@@ -73,14 +73,18 @@ public class AiController {
         return aiService.generateCode(instruction, language, auth);
     }
 
-    /** AI 能力状态(供前端判断是否展示入口)。 */
+    /** AI 能力状态(供前端判断是否展示入口) */
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> status() {
         return ResponseEntity.ok(Map.of(
                 "code", 0,
                 "message", "success",
-                "data", Map.of("enabled", aiService.isEnabled(), "model", aiService.getModel())
+                "data", Map.of(
+                        "enabled", aiService.isEnabled(),
+                        "model", aiService.getModel(),
+                        "models", aiService.getModels()
+                )
         ));
     }
 

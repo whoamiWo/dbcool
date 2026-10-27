@@ -102,4 +102,59 @@ class BiReportControllerTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("code")).isEqualTo(0);
     }
+
+    // ============================================================
+    //  导出端点 (Wave 4 C1)
+    // ============================================================
+
+    @Test
+    void exportReport_missingCollection_returns400() {
+        ResponseEntity<byte[]> resp = controller.exportReport(Map.of("format", "xlsx"), USER);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void exportReport_pivotExcel_returnsAttachment() {
+        when(reportService.executePivot(eq("orders"), eq(USER.tenantId()),
+                any(List.class), any(List.class), any(List.class), any(List.class)))
+                .thenReturn(Map.of("rows", List.of("dept"), "data", List.of()));
+        when(reportService.exportPivotToExcel(any(), any())).thenReturn(new byte[]{1, 2, 3});
+
+        ResponseEntity<byte[]> resp = controller.exportReport(
+                Map.of("collection", "orders", "type", "pivot", "format", "xlsx", "name", "月度报表"), USER);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).hasSize(3);
+        assertThat(resp.getHeaders().getFirst("Content-Disposition")).contains("attachment");
+        assertThat(resp.getHeaders().getContentType().toString()).contains("spreadsheetml");
+    }
+
+    @Test
+    void exportReport_pivotPdf_returnsPdfContentType() {
+        when(reportService.executePivot(eq("orders"), eq(USER.tenantId()),
+                any(List.class), any(List.class), any(List.class), any(List.class)))
+                .thenReturn(Map.of("rows", List.of("dept"), "data", List.of()));
+        when(reportService.exportPivotToPdf(any(), any())).thenReturn(new byte[]{9, 9});
+
+        ResponseEntity<byte[]> resp = controller.exportReport(
+                Map.of("collection", "orders", "type", "pivot", "format", "pdf"), USER);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getHeaders().getContentType().toString()).contains("application/pdf");
+    }
+
+    @Test
+    void exportReport_flatExcel_usesListRecords() {
+        when(reportService.listFlatRecords(eq("orders"), eq(USER.tenantId()), any(List.class)))
+                .thenReturn(List.of(Map.of("id", 1)));
+        when(reportService.exportFlatToExcel(any(List.class), any())).thenReturn(new byte[]{7});
+
+        ResponseEntity<byte[]> resp = controller.exportReport(
+                Map.of("collection", "orders", "type", "flat", "format", "xlsx"), USER);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).hasSize(1);
+        verify(reportService).listFlatRecords(eq("orders"), eq(USER.tenantId()), any(List.class));
+    }
 }

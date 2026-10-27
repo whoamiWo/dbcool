@@ -48,6 +48,10 @@ public class AiAssistantService {
     @Value("${ai.max-tokens:1024}")
     private int maxTokens;
 
+    /** C4: 可用模型清单(逗号分隔)。首个为默认模型。 */
+    @Value("${ai.models:gpt-4o}")
+    private String modelsCsv;
+
     /**
      * 生成 Wiki 文档内容。
      *
@@ -84,6 +88,12 @@ public class AiAssistantService {
 
     /** 调用 Python LLM 网关;未启用或失败时降级为提示文案。 */
     private Map<String, Object> callLlm(String prompt, String bearerToken,
+                                         Function<String, Map<String, Object>> mapper) {
+        return callLlm(prompt, bearerToken, this.model, this.maxTokens, mapper);
+    }
+
+    /** 调用 Python LLM 网关（支持指定 model/maxTokens）。 */
+    private Map<String, Object> callLlm(String prompt, String bearerToken, String model, int maxTokens,
                                          Function<String, Map<String, Object>> mapper) {
         if (!enabled) {
             log.warn("[AI] ai.enabled=false, AI 助手未启用。需配置 ai.enabled=true 与 ai.python-url;当前 pythonUrl={}", pythonUrl);
@@ -147,13 +157,18 @@ public class AiAssistantService {
     public String getModel() { return model; }
     public int getMaxTokens() { return maxTokens; }
 
+    /** C4: 获取可用模型列表。 */
+    public java.util.List<String> getModels() {
+        return java.util.Arrays.asList(modelsCsv.split(","));
+    }
+
     /**
      * 统一对话入口 — 转发至 Python /api/ai/chat，复用限流/缓存/配额。
      *
      * @return {code, message, data:{result, cached, tokensUsed, quota}}
      */
     public Map<String, Object> chat(String prompt, String model, int maxTokens, String bearerToken) {
-        return callLlm(prompt, bearerToken, text -> {
+        return callLlm(prompt, bearerToken, model, maxTokens, text -> {
             Map<String, Object> data = new java.util.HashMap<>();
             data.put("result", text);
             return data;

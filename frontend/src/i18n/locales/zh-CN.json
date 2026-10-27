@@ -1093,7 +1093,8 @@
     "inputPlaceholder": "选择工具后输入... ({{tool}})",
     "sendTooltip": "发送 ({{tool}})",
     "sendAria": "发送消息",
-    "quotaRemaining": "LLM 配额剩余: {{count}} 次"
+    "quotaRemaining": "LLM 配额剩余: {{count}} 次",
+    "modelSelectorAria": "选择 AI 模型"
   },
   "integrations": {
     "title": "集成市场",
@@ -1240,7 +1241,11 @@
     "loading": "加载中…",
     "recordCount": "共 {{count}} 条记录",
     "sortedBy": "按 <code>{{field}}</code> 排列",
-    "today": "回到今天"
+    "today": "回到今天",
+    "expandDay": "展开 {{day}} 日记录",
+    "expand": "展开",
+    "collapse": "收起",
+    "noRecords": "当日无记录"
   },
   "auditLogs": {
     "title": "🔍 审计日志",

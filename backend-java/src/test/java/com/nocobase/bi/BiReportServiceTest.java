@@ -36,7 +36,9 @@ class BiReportServiceTest {
         redis = mock(StringRedisTemplate.class);
         when(redis.opsForValue()).thenReturn(valueOps);
         objectMapper = new ObjectMapper();
-        service = new BiReportService(collectionService, reportRepo, objectMapper, redis);
+        service = new BiReportService(collectionService, reportRepo, objectMapper, redis,
+                new com.nocobase.bi.export.ReportExcelExporter(),
+                new com.nocobase.bi.export.ReportPdfExporter());
     }
 
     private String tid = "tenant_default";
