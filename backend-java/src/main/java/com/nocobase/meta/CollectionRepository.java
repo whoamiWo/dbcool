@@ -19,4 +19,7 @@ public interface CollectionRepository extends JpaRepository<CollectionMetaEntity
 
     /** Week 41 B3:删除 collection 元数据(配合 CollectionService.deleteMeta 调用)。 */
     long deleteByName(String name);
+
+    /** B3 返工(V72):查询某外部数据源已映射的虚拟 Collection。 */
+    List<CollectionMetaEntity> findByDatasourceId(UUID datasourceId);
 }
