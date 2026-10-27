@@ -80,6 +80,9 @@ public final class TenantIsolationAuditor {
             Pattern.compile("query.*tenant_id|tenant_id\\s*=|setTenantId\\s*\\("),
             // [PHASE78 R1] TenantContext 模式：通过 ThreadLocal 获取当前租户（JWT 过滤器写入）
             Pattern.compile("TenantContext\\.currentTenantId\\s*\\(\\s*\\)"),
+            // [PHASE84-B7] 等价防护：requireTenantId() 强制获取当前租户（JWT 过滤器写入），
+            // 归属校验语义上等价于 currentTenantId()：取不到当前租户直接抛异常。
+            Pattern.compile("TenantContext\\.requireTenantId\\s*\\(\\s*\\)"),
             // [PHASE78 R1] Principal 提取租户：AuthenticatedUser.tenantId() 被调用（Controller 层委托给 Service）
             Pattern.compile("\\w+\\.tenantId\\s*\\(\\s*\\)"),
             // [PHASE79 T2] ACL 校验即防护：aclEnforcer.assertCan/checkCan 等显式权限校验带 tenantId

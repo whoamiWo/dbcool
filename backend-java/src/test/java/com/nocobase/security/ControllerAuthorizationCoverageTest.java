@@ -84,7 +84,13 @@ class ControllerAuthorizationCoverageTest {
         "health/HealthController.java:82 -> poolStats (reason: 健康检查与连接池监控端点，SecurityConfig permitAll + 运维监控)",
         // PHASE10: 公开表单端点（免登录，无租户上下文）—— SecurityConfig permitAll，不加 @PreAuthorize
         "com/nocobase/form/FormController.java:140 -> getPublic (reason: 免登录填写，SecurityConfig permitAll)",
-        "com/nocobase/form/FormController.java:153 -> submitPublic (reason: 免登录填写，SecurityConfig permitAll)"
+        "com/nocobase/form/FormController.java:153 -> submitPublic (reason: 免登录填写，SecurityConfig permitAll)",
+        // PHASE113: 微信公众号登录回调（OAuth2 code 换用户信息 + 签发 JWT），认证入口无租户上下文
+        "integration/wechat/WeChatController.java:76 -> callback (reason: OAuth2 登录入口，SecurityConfig permitAll + code 换 token)",
+        // PHASE113: 微信小程序 code2Session 登录（认证入口，无租户上下文）
+        "integration/wechat/WeChatController.java:125 -> miniProgramLogin (reason: code2Session 登录入口，SecurityConfig permitAll + code 换 token)",
+        // B4: 钉钉 AI 卡片按钮回调（钉钉服务器发起，无 JWT，HMAC 验签 + 幂等兜底）
+        "integration/dingtalk/DingTalkAiCardController.java:106 -> callback (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)"
     );
 
     /** 白名单理由中出现这些词，说明该端点其实需要鉴权，是偷渡。 */
