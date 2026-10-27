@@ -85,6 +85,23 @@ export const dingtalkApi = {
   /** 获取同步状态 */
   getSyncStatus: (): Promise<{ code: number; message: string; data: { lastSyncTime: number; syncEnabled: boolean; cron: string } }> =>
     client.get('/dingtalk/sync-status'),
+
+  /**
+   * 投递钉钉 AI 卡片（B4）。
+   *
+   * 后端 `POST /api/dingtalk/ai-card/send`：生成 AI 摘要 → 投递互动卡片，
+   * 卡片按钮回调会触发工作流任务同意/拒绝。
+   * 修复前前端全仓无 ai-card 调用入口（B4 假完成的一部分）。
+   */
+  sendAiCard: (body: {
+    title: string;
+    content: string;
+    targetUserId: string;
+    openUrl?: string;
+    workflowTaskId?: string;
+    workflowAction?: 'APPROVE' | 'REJECT';
+  }): Promise<{ code: number; message: string; data: { outTrackId: string } }> =>
+    client.post('/dingtalk/ai-card/send', body),
 };
 
 // ============================================================

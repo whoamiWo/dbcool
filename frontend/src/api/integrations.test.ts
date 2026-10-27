@@ -54,6 +54,23 @@ describe('dingtalkApi', () => {
     });
   });
 
+  it('sendAiCard 投递钉钉 AI 卡片（B4 前端调用入口）', async () => {
+    await dingtalkApi.sendAiCard({
+      title: '审批提醒',
+      content: '有一笔报销待审批',
+      targetUserId: 'user1',
+      workflowTaskId: 'task-1',
+      workflowAction: 'APPROVE',
+    });
+    expect(apiClient.post).toHaveBeenCalledWith('/dingtalk/ai-card/send', {
+      title: '审批提醒',
+      content: '有一笔报销待审批',
+      targetUserId: 'user1',
+      workflowTaskId: 'task-1',
+      workflowAction: 'APPROVE',
+    });
+  });
+
   it('getUserMappings / getSyncStatus', async () => {
     await dingtalkApi.getUserMappings('t1');
     expect(apiClient.get).toHaveBeenCalledWith('/dingtalk/user-mappings', { params: { tenantId: 't1' } });
