@@ -1,6 +1,6 @@
 /** 视图(Week 9 Epic 3)类型定义. */
 
-export type ViewType = 'table' | 'kanban' | 'detail' | 'gallery' | 'calendar' | 'timeline';
+export type ViewType = 'table' | 'kanban' | 'detail' | 'gallery' | 'calendar' | 'timeline' | 'gantt';
 
 export interface TableColumn {
   field: string;

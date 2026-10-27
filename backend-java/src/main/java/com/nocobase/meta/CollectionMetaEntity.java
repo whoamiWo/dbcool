@@ -46,7 +46,32 @@ public class CollectionMetaEntity {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    // ============================================================
+    //  PHASE B B3: 外部数据源映射字段（nullable，不影响存量 Collection）
+    // ============================================================
+
+    /** 外部数据源 ID；非空表示该 Collection 由外部库映射而来（快照同步）。 */
+    @Column(name = "datasource_id")
+    private UUID datasourceId;
+
+    /** 外部库中的物理表名。 */
+    @Column(name = "external_table_name", length = 255)
+    private String externalTableName;
+
+    /** 外部映射 Collection 默认只读（快照同步模式，不可在平台内修改）。 */
+    @Column(name = "read_only", nullable = false)
+    private Boolean readOnly = false;
+
     public CollectionMetaEntity() {}
+
+    public UUID getDatasourceId() { return datasourceId; }
+    public void setDatasourceId(UUID datasourceId) { this.datasourceId = datasourceId; }
+
+    public String getExternalTableName() { return externalTableName; }
+    public void setExternalTableName(String externalTableName) { this.externalTableName = externalTableName; }
+
+    public Boolean getReadOnly() { return readOnly; }
+    public void setReadOnly(Boolean readOnly) { this.readOnly = readOnly; }
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }

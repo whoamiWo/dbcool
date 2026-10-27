@@ -53,6 +53,9 @@ const KanbanViewPage = lazy(() =>
 const DetailViewPage = lazy(() =>
   import('./pages/DetailView').then(m => ({ default: m.DetailViewPage } as { default: React.ComponentType })),
 );
+const GanttViewPage = lazy(() =>
+  import('./pages/GanttView').then(m => ({ default: m.GanttViewPage } as { default: React.ComponentType })),
+);
 const ViewDesignerPage = lazy(() =>
   import('./pages/ViewDesigner').then(m => ({ default: m.ViewDesignerPage } as { default: React.ComponentType })),
 );
@@ -217,6 +220,7 @@ export const router = createBrowserRouter([
       { path: 'views/:id/kanban', element: <Lazy><KanbanViewPage /></Lazy> },
       { path: 'views/:id/gallery', element: <Lazy><GalleryViewPage /></Lazy> },
       { path: 'views/:id/calendar', element: <Lazy><CalendarViewPage /></Lazy> },
+      { path: 'views/:id/gantt', element: <Lazy><GanttViewPage /></Lazy> },
       { path: 'views/:id/detail/:recordId', element: <Lazy><DetailViewPage /></Lazy> },
       { path: 'views/:id/timeline', element: <Lazy><TimelineViewPage /></Lazy> },
       { path: 'workbench', element: <Lazy><WorkbenchPage /></Lazy> },
