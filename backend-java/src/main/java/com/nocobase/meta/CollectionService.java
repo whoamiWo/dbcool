@@ -53,6 +53,8 @@ public class CollectionService {
      * 留痕失败/缺失不得影响业务主流程。
      */
     private final RecordVersionService recordVersionService;
+    /** Wave 4 C2: 集合元数据版本管理。 */
+    private final CollectionVersionRepository versionRepository;
 
     /** 兼容既有测试：自建无状态依赖实例。 */
     public CollectionService(
@@ -65,7 +67,7 @@ public class CollectionService {
                 new ExpressionEvaluator(),
                 new RelationResolver(repository, tableManager, objectMapper),
                 new InverseRelationManager(repository, objectMapper),
-                null, null, null);
+                null, null, null, null);
     }
 
     @Autowired
@@ -79,7 +81,8 @@ public class CollectionService {
             InverseRelationManager inverseManager,
             RoleRepository roleRepository,
             AclPolicyRepository aclPolicyRepository,
-            RecordVersionService recordVersionService
+            RecordVersionService recordVersionService,
+            CollectionVersionRepository versionRepository
     ) {
         this.repository = repository;
         this.tableManager = tableManager;
@@ -91,6 +94,7 @@ public class CollectionService {
         this.roleRepository = roleRepository;
         this.aclPolicyRepository = aclPolicyRepository;
         this.recordVersionService = recordVersionService;
+        this.versionRepository = versionRepository;
     }
 
     @Transactional
@@ -200,6 +204,133 @@ public class CollectionService {
         return get(name, TenantContext.currentTenantId());
     }
 
+    /** Wave 4 C2: 保存字段变更版本。 */
+    private void saveVersion(CollectionMetaEntity meta, UUID userId, String changeDesc) {
+        if (versionRepository == null || meta.getId() == null) {
+            return;
+        }
+        try {
+            Integer maxVer = versionRepository.findMaxVersionByCollectionId(meta.getId());
+            Integer nextVersion = (maxVer != null ? maxVer : 0) + 1;
+            CollectionVersionEntity ver = new CollectionVersionEntity();
+            ver.setCollectionId(meta.getId());
+            ver.setVersion(nextVersion);
+            ver.setFieldsJson(meta.getFieldsJson());
+            ver.setChangeDesc(changeDesc);
+            ver.setTenantId(meta.getTenantId());
+            ver.setCreatedAt(Instant.now());
+            ver.setCreatedBy(userId);
+            versionRepository.save(ver);
+        } catch (Exception e) {
+            log.warn("保存版本失败 collectionId={} desc={}", meta.getId(), changeDesc, e);
+        }
+    }
+
+    // ============================================================
+    //  Wave 4 C2: 集合元数据版本管理 — 查询 / 对比 / 回滚
+    // ============================================================
+
+    /**
+     * 列出指定 collection 的所有版本 (摘要，不含字段详情)。
+     *
+     * @param name collection 名称
+     * @param tenantId 租户 ID
+     * @return 版本摘要列表,按版本号降序
+     */
+    public List<Map<String, Object>> listVersions(String name, String tenantId) {
+        CollectionMetaEntity meta = get(name);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问");
+        }
+        if (versionRepository == null) {
+            return List.of();
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (CollectionVersionEntity v : versionRepository.findByCollectionIdOrderByVersionDesc(meta.getId())) {
+            Map<String, Object> m = new java.util.HashMap<>();
+            m.put("version", v.getVersion());
+            m.put("changeDesc", v.getChangeDesc());
+            m.put("createdAt", v.getCreatedAt() == null ? null : v.getCreatedAt().toString());
+            m.put("createdBy", v.getCreatedBy());
+            result.add(m);
+        }
+        return result;
+    }
+
+    /**
+     * 获取指定版本的完整字段定义。
+     */
+    public List<FieldDef> getVersionFields(String name, int version, String tenantId) {
+        CollectionMetaEntity meta = get(name);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问");
+        }
+        if (versionRepository == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在");
+        }
+        CollectionVersionEntity v = versionRepository.findByCollectionIdAndVersion(meta.getId(), version);
+        if (v == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在: " + version);
+        }
+        try {
+            return objectMapper.readValue(v.getFieldsJson(), new TypeReference<List<FieldDef>>() {});
+        } catch (Exception e) {
+            throw new RuntimeException("版本 fields 解析失败", e);
+        }
+    }
+
+    /**
+     * 对比两个版本的字段差异。
+     *
+     * @return 差异列表:[{op: "added"|"removed"|"changed", field, detail}]
+     */
+    public List<Map<String, Object>> diffVersions(String name, int fromVersion, int toVersion, String tenantId) {
+        List<FieldDef> from = getVersionFields(name, fromVersion, tenantId);
+        List<FieldDef> to = getVersionFields(name, toVersion, tenantId);
+        Map<String, FieldDef> fromMap = new java.util.HashMap<>();
+        from.forEach(f -> fromMap.put(f.name(), f));
+        Map<String, FieldDef> toMap = new java.util.HashMap<>();
+        to.forEach(f -> toMap.put(f.name(), f));
+
+        List<Map<String, Object>> diffs = new ArrayList<>();
+        for (FieldDef f : to) {
+            if (!fromMap.containsKey(f.name())) {
+                diffs.add(Map.of("op", "added", "field", f.name(), "detail", f.type()));
+            } else if (!fromMap.get(f.name()).equals(f)) {
+                diffs.add(Map.of("op", "changed", "field", f.name(), "detail", fromMap.get(f.name()).type() + " -> " + f.type()));
+            }
+        }
+        for (FieldDef f : from) {
+            if (!toMap.containsKey(f.name())) {
+                diffs.add(Map.of("op", "removed", "field", f.name(), "detail", f.type()));
+            }
+        }
+        return diffs;
+    }
+
+    /**
+     * 回滚到指定版本 — 将历史版本的字段定义写回 collection（同时生成新版本记录）。
+     *
+     * @return 回滚后的 meta
+     */
+    @Transactional
+    @CacheEvict(value = "collectionList", allEntries = true)
+    public CollectionMetaEntity rollbackToVersion(String name, int version, String tenantId, UUID userId) {
+        CollectionMetaEntity meta = get(name);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权操作");
+        }
+        List<FieldDef> target = getVersionFields(name, version, tenantId);
+        try {
+            meta.setFieldsJson(objectMapper.writeValueAsString(target));
+        } catch (Exception e) {
+            throw new RuntimeException("fields 序列化失败", e);
+        }
+        repository.save(meta);
+        saveVersion(meta, userId, "rollbackTo: v" + version);
+        return meta;
+    }
+
     public List<FieldDef> parseFields(CollectionMetaEntity meta) {
         try {
             return objectMapper.readValue(meta.getFieldsJson(), new TypeReference<List<FieldDef>>() {});
@@ -243,6 +374,8 @@ public class CollectionService {
             throw new RuntimeException("fields 序列化失败", e);
         }
         repository.save(meta);
+        // Wave 4 C2: 记录字段变更版本
+        saveVersion(meta, userId, "addField: " + field.name());
         // Week 42 D2.2: 自动反向关系 — belongsTo 在 target collection 加 hasMany
         inverseManager.handleAddedField(meta, field);
         try {
@@ -274,6 +407,8 @@ public class CollectionService {
             throw new RuntimeException("fields 序列化失败", e);
         }
         repository.save(meta);
+        // Wave 4 C2: 记录字段变更版本
+        saveVersion(meta, userId, "removeField: " + fieldName);
         // Week 42 D2.2: 清理反向关系 — 删源 belongsTo 时一并清理 target 的 hasMany
         inverseManager.handleRemovedField(meta, fieldName);
         try {
@@ -323,6 +458,8 @@ public class CollectionService {
             throw new RuntimeException("fields 序列化失败", e);
         }
         repository.save(meta);
+        // Wave 4 C2: 记录字段变更版本
+        saveVersion(meta, userId, "renameField: " + oldName + " -> " + newName);
         try {
             migrationService.executeSync(name, MigrationJobEntity.Operation.RENAME_FIELD,
                     Map.of("oldName", oldName, "newName", newName));

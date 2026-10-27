@@ -256,3 +256,12 @@ app:
       bucket: ${MINIO_BUCKET:nocobase}
       max-file-size: ${MINIO_MAX_FILE_SIZE_MB:100}
       allowed-content-types: ${MINIO_ALLOWED_CONTENT_TYPES:image/png,image/jpeg,image/gif,application/pdf,text/plain}
+
+# C4: AI 多模型支持 — 可用模型列表(逗号分隔,第一个为默认模型)
+# Python LLM 网关侧按需扩展新模型时,仅需在此追加
+ai:
+  enabled: ${AI_ENABLED:false}
+  python-url: ${AI_PYTHON_URL:http://localhost:8000}
+  model: ${AI_MODEL:gpt-4o}
+  max-tokens: ${AI_MAX_TOKENS:1024}
+  models: ${AI_MODELS:gpt-4o,gpt-4o-mini,claude-3-5-sonnet,qwen-max,deepseek-chat}

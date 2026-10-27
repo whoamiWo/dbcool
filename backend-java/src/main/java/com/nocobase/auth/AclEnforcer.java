@@ -245,6 +245,47 @@ public class AclEnforcer {
                 .stream().map(ur -> ur.getId().getRoleId()).toList();
     }
 
+    // ============================================================
+    //  Wave3 B7: 数据范围过滤
+    // ============================================================
+
+    /**
+     * 根据角色数据范围配置生成 SQL 过滤条件片段。
+     *
+     * <p>CUSTOM 类型:解析 dataScopeConfigJson 中的自定义规则,返回可直接拼接到 SQL WHERE 的片段。
+     *
+     * @param roleId        用户直接持有的角色 ID
+     * @param tenantId      租户隔离
+     * @param creatorField  创建者字段(默认 "created_by")
+     */
+    public String buildDataScopeCondition(UUID roleId, String tenantId, String creatorField) {
+        List<AclPolicyEntity> policies = policyRepository.findByRoleIdAndTenantId(roleId, tenantId);
+        AclPolicyEntity scopePolicy = policies.stream()
+                .filter(p -> p.getDataScopeType() != null)
+                .findFirst()
+                .orElse(null);
+
+        if (scopePolicy == null || scopePolicy.getDataScopeConfigJson() == null) {
+            return null;
+        }
+
+        try {
+            Map<String, Object> cfg = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(scopePolicy.getDataScopeConfigJson(), Map.class);
+            Object sql = cfg.get("sql");
+            if (sql instanceof String s && !s.isBlank()) {
+                return s;
+            }
+            Object userExpr = cfg.get("userExpression");
+            if (userExpr instanceof String expr) {
+                return expr.replace("${userId}", "'${userId}'");
+            }
+        } catch (Exception ex) {
+            log.error("[acl] 数据范围配置解析失败 roleId={}", roleId, ex);
+        }
+        return null;
+    }
+
     /**
      * US-308: 加载 user 持有角色 + 所有祖先角色(通过 parent_role_id 链)。
      * 用 visited set 防自循环 + 用 CTE 一次 SQL 查全树。

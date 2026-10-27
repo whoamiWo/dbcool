@@ -33,6 +33,20 @@ public class AclPolicyEntity {
         CREATE, READ, UPDATE, DELETE
     }
 
+    /**
+     * 数据范围类型 (Wave3 B7)。
+     *
+     * <ul>
+     *   <li>{@link #ALL}    —— 全部数据(管理员)</li>
+     *   <li>{@link #DEPT}   —— 本部门及下级部门</li>
+     *   <li>{@link #SELF}   —— 仅本人创建的数据</li>
+     *   <li>{@link #CUSTOM} —— 自定义规则(见 dataScopeConfig)</li>
+     * </ul>
+     */
+    public enum DataScopeType {
+        ALL, DEPT, SELF, CUSTOM
+    }
+
     @Id
     @Column(name = "id", nullable = false)
     private UUID id;
@@ -54,6 +68,14 @@ public class AclPolicyEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "config", columnDefinition = "jsonb", nullable = false)
     private String configJson = "{}";
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "data_scope_type", length = 16)
+    private DataScopeType dataScopeType = DataScopeType.ALL;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "data_scope_config", columnDefinition = "jsonb")
+    private String dataScopeConfigJson;
 
     @Column(name = "tenant_id", nullable = false, length = 64)
     private String tenantId;
@@ -80,6 +102,12 @@ public class AclPolicyEntity {
 
     public String getConfigJson() { return configJson; }
     public void setConfigJson(String configJson) { this.configJson = configJson; }
+
+    public DataScopeType getDataScopeType() { return dataScopeType; }
+    public void setDataScopeType(DataScopeType dataScopeType) { this.dataScopeType = dataScopeType; }
+
+    public String getDataScopeConfigJson() { return dataScopeConfigJson; }
+    public void setDataScopeConfigJson(String dataScopeConfigJson) { this.dataScopeConfigJson = dataScopeConfigJson; }
 
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }

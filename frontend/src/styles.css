@@ -640,3 +640,23 @@ button {
 .sheet-bottom {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
 }
+
+/* ============================================
+   BI 数据透视表 — 响应式（移动端紧凑字号/内边距）
+   ============================================ */
+.bi-pivot-table th,
+.bi-pivot-table td {
+  border: 1px solid var(--color-border-light);
+  padding: 8px;
+  text-align: left;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+  .bi-pivot-table th,
+  .bi-pivot-table td {
+    padding: 4px 6px;
+    font-size: 0.72rem;
+  }
+}

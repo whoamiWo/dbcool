@@ -1093,7 +1093,8 @@
     "inputPlaceholder": "Select a tool then type... ({{tool}})",
     "sendTooltip": "Send ({{tool}})",
     "sendAria": "Send message",
-    "quotaRemaining": "LLM quota remaining: {{count}}"
+    "quotaRemaining": "LLM quota remaining: {{count}}",
+    "modelSelectorAria": "Select AI model"
   },
   "integrations": {
     "title": "Integration Marketplace",
@@ -1240,7 +1241,11 @@
     "loading": "Loading…",
     "recordCount": "{{count}} records total",
     "sortedBy": "sorted by <code>{{field}}</code>",
-    "today": "Back to today"
+    "today": "Back to today",
+    "expandDay": "Expand day {{day}} records",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "noRecords": "No records this day"
   },
   "auditLogs": {
     "title": "🔍 Audit Logs",

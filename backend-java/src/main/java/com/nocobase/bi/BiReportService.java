@@ -2,6 +2,8 @@ package com.nocobase.bi;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocobase.bi.export.ReportExcelExporter;
+import com.nocobase.bi.export.ReportPdfExporter;
 import com.nocobase.meta.CollectionService;
 import com.nocobase.meta.DynamicTableManager;
 import org.slf4j.Logger;
@@ -34,15 +36,21 @@ public class BiReportService {
     private final BiReportRepository reportRepository;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redis;
+    private final ReportExcelExporter excelExporter;
+    private final ReportPdfExporter pdfExporter;
 
     public BiReportService(CollectionService collectionService,
                            BiReportRepository reportRepository,
                            ObjectMapper objectMapper,
-                           StringRedisTemplate redis) {
+                           StringRedisTemplate redis,
+                           ReportExcelExporter excelExporter,
+                           ReportPdfExporter pdfExporter) {
         this.collectionService = collectionService;
         this.reportRepository = reportRepository;
         this.objectMapper = objectMapper;
         this.redis = redis;
+        this.excelExporter = excelExporter;
+        this.pdfExporter = pdfExporter;
     }
 
     // ============================================================
@@ -111,6 +119,133 @@ public class BiReportService {
         if (json == null || json.isBlank()) return Map.of();
         try { return objectMapper.readValue(json, Map.class); }
         catch (Exception ex) { return Map.of(); }
+    }
+
+    // ============================================================
+    //  报表导出 (Excel/PDF)
+    // ============================================================
+
+    /** 导出透视报表为 Excel 二进制。 */
+    public byte[] exportPivotToExcel(Map<String, Object> pivotResult, String title) {
+        return excelExporter.exportPivot(pivotResult, title);
+    }
+
+    /** 导出扁平列表为 Excel 二进制。 */
+    public byte[] exportFlatToExcel(List<Map<String, Object>> records, String title) {
+        return excelExporter.exportFlat(records, title);
+    }
+
+    /** 导出透视报表为 PDF 二进制。 */
+    public byte[] exportPivotToPdf(Map<String, Object> pivotResult, String title) {
+        return pdfExporter.exportPivot(pivotResult, title);
+    }
+
+    /** 导出扁平列表为 PDF 二进制。 */
+    public byte[] exportFlatToPdf(List<Map<String, Object>> records, String title) {
+        return pdfExporter.exportFlat(records, title);
+    }
+
+    /** 列出扁平记录 (用于导出明细)。 */
+    public List<Map<String, Object>> listFlatRecords(String collectionName, String tenantId,
+                                                     List<CollectionService.FilterRule> filters) {
+        // 默认限制 1000 条，不排序
+        return collectionService.listRecords(collectionName, tenantId, 1000, null, filters);
+    }
+
+    // ============================================================
+    //  按报表 ID 导出 (Wave3 B7)
+    // ============================================================
+
+    /**
+     * 按报表 ID 导出为 Excel 二进制。
+     *
+     * @param reportId 报表定义 id
+     * @param tenantId 租户隔离
+     * @return xlsx 文件字节数组
+     */
+    public byte[] exportToExcel(UUID reportId, String tenantId) {
+        ExportContext ctx = buildExportContext(reportId, tenantId);
+        if (ctx.flat()) {
+            return excelExporter.exportFlat(ctx.records(), ctx.title());
+        }
+        return excelExporter.exportPivot(ctx.pivotResult(), ctx.title());
+    }
+
+    /**
+     * 按报表 ID 导出为 PDF 二进制。
+     *
+     * @param reportId 报表定义 id
+     * @param tenantId 租户隔离
+     * @return pdf 文件字节数组
+     */
+    public byte[] exportToPdf(UUID reportId, String tenantId) {
+        ExportContext ctx = buildExportContext(reportId, tenantId);
+        if (ctx.flat()) {
+            return pdfExporter.exportFlat(ctx.records(), ctx.title());
+        }
+        return pdfExporter.exportPivot(ctx.pivotResult(), ctx.title());
+    }
+
+    /** 导出上下文：预解析报表配置并执行查询。 */
+    private record ExportContext(boolean flat, List<Map<String, Object>> records,
+                                 Map<String, Object> pivotResult, String title) {}
+
+    private ExportContext buildExportContext(UUID reportId, String tenantId) {
+        BiReportEntity e = reportRepository.findByIdAndTenantId(reportId, tenantId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND,
+                        "报表不存在或不属于当前租户: " + reportId));
+        String title = e.getTitle() != null && !e.getTitle().isBlank() ? e.getTitle() : e.getName();
+        Map<String, Object> cfg = asMap(parseJson(e.getConfigJson()));
+
+        // config.filters 若配置了过滤条件，导出时同样生效
+        List<CollectionService.FilterRule> filters = parseCfgFilters(cfg.get("filters"));
+
+        if (Boolean.TRUE.equals(cfg.get("flat")) || "flat".equalsIgnoreCase((String) cfg.get("mode"))) {
+            List<Map<String, Object>> records =
+                    collectionService.listRecords(e.getCollectionName(), tenantId, 1000, null, filters);
+            return new ExportContext(true, records, null, title);
+        }
+
+        List<String> rows = castStrList(cfg.get("rows"));
+        List<String> columns = castStrList(cfg.get("columns"));
+        List<Map<String, String>> values = castMeasureList(cfg.get("values"));
+        Map<String, Object> pivotResult = executePivot(
+                e.getCollectionName(), tenantId, rows, columns, values, filters);
+        return new ExportContext(false, null, pivotResult, configTitle(cfg, title));
+    }
+
+    private String configTitle(Map<String, Object> cfg, String fallback) {
+        Object t = cfg.get("title");
+        return t instanceof String s && !s.isBlank() ? s : fallback;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asMap(Object o) {
+        return o instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
+    private List<CollectionService.FilterRule> parseCfgFilters(Object raw) {
+        List<CollectionService.FilterRule> out = new ArrayList<>();
+        if (!(raw instanceof List<?> list)) return out;
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m)) continue;
+            String field = (String) m.get("field");
+            if (field == null || field.isBlank()) continue;
+            out.add(new CollectionService.FilterRule(
+                    field, (String) m.get("op"), m.get("value")));
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> castStrList(Object raw) {
+        return raw instanceof List<?> l ? (List<String>) l : List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, String>> castMeasureList(Object raw) {
+        return raw instanceof List<?> l ? (List<Map<String, String>>) l : List.of();
     }
 
     /**

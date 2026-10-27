@@ -118,17 +118,17 @@ export default function BiReportPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: { xs: 1.5, sm: 2 }, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
         {t('biReport.title')}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: { xs: 2, sm: 3 } }}>
         {t('biReport.subtitle')}
       </Typography>
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2}>
+      <Card sx={{ mb: { xs: 2, sm: 3 } }}>
+        <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+          <Grid container spacing={{ xs: 1.5, sm: 2 }}>
             <Grid size={{ xs: 12, md: 3 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>{t('biReport.dataset')}</InputLabel>
@@ -139,6 +139,7 @@ export default function BiReportPage() {
                     setCollection(e.target.value);
                     setSubmitted(false);
                   }}
+                  sx={{ fontSize: { xs: '0.875rem', sm: '0.875rem' } }}
                 >
                   {collections.map((c) => (
                     <MenuItem key={c.name} value={c.name}>
@@ -156,10 +157,11 @@ export default function BiReportPage() {
                   value={rows[0] ?? ''}
                   label={t('biReport.rowDimension')}
                   onChange={(e) => setRows(e.target.value ? [e.target.value] : [])}
+                  sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                 >
-                  <MenuItem value="">{t('biReport.none')}</MenuItem>
+                  <MenuItem value="" sx={{ fontSize: '0.8rem' }}>{t('biReport.none')}</MenuItem>
                   {fields.map((f) => (
-                    <MenuItem key={f.name} value={f.name}>{f.name}</MenuItem>
+                    <MenuItem key={f.name} value={f.name} sx={{ fontSize: '0.8rem' }}>{f.name}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -172,10 +174,11 @@ export default function BiReportPage() {
                   value={columns[0] ?? ''}
                   label={t('biReport.colDimension')}
                   onChange={(e) => setColumns(e.target.value ? [e.target.value] : [])}
+                  sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                 >
-                  <MenuItem value="">{t('biReport.none')}</MenuItem>
+                  <MenuItem value="" sx={{ fontSize: '0.8rem' }}>{t('biReport.none')}</MenuItem>
                   {fields.map((f) => (
-                    <MenuItem key={f.name} value={f.name}>{f.name}</MenuItem>
+                    <MenuItem key={f.name} value={f.name} sx={{ fontSize: '0.8rem' }}>{f.name}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -188,9 +191,10 @@ export default function BiReportPage() {
                   value={measureField}
                   label={t('biReport.measure')}
                   onChange={(e) => setMeasureField(e.target.value)}
+                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                 >
                   {(numericFields.length ? numericFields : fields).map((f) => (
-                    <MenuItem key={f.name} value={f.name}>{f.name}</MenuItem>
+                    <MenuItem key={f.name} value={f.name} sx={{ fontSize: '0.75rem' }}>{f.name}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -200,40 +204,45 @@ export default function BiReportPage() {
               <FormControl fullWidth size="small">
                 <InputLabel>{t('biReport.aggregation')}</InputLabel>
                 <Select value={agg} label={t('biReport.aggregation')}
-                  onChange={(e) => setAgg(e.target.value as BiMeasure['agg'])}>
-                  {AGGS.map((a) => <MenuItem key={a} value={a}>{a}</MenuItem>)}
+                  onChange={(e) => setAgg(e.target.value as BiMeasure['agg'])}
+                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                  {AGGS.map((a) => <MenuItem key={a} value={a} sx={{ fontSize: '0.75rem' }}>{a}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
 
             <Grid size={{ xs: 12 }}>
               <Divider sx={{ my: 1 }} />
-              <Stack direction="row" spacing={2}
-                sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 2 }}
+                sx={{ alignItems: { xs: 'stretch', sm: 'center' }, flexWrap: 'wrap' }}>
                 <Typography variant="body2" color="text.secondary">{t('biReport.filterLabel')}</Typography>
-                <FormControl size="small" sx={{ minWidth: 140 }}>
+                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 140 } }}>
                   <InputLabel>{t('biReport.field')}</InputLabel>
                   <Select value={filterField} label={t('biReport.field')}
-                    onChange={(e) => setFilterField(e.target.value)}>
-                    <MenuItem value="">{t('biReport.none')}</MenuItem>
+                    onChange={(e) => setFilterField(e.target.value)}
+                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    <MenuItem value="" sx={{ fontSize: '0.75rem' }}>{t('biReport.none')}</MenuItem>
                     {fields.map((f) => (
-                      <MenuItem key={f.name} value={f.name}>{f.name}</MenuItem>
+                      <MenuItem key={f.name} value={f.name} sx={{ fontSize: '0.75rem' }}>{f.name}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
+                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 } }}>
                   <InputLabel>{t('biReport.condition')}</InputLabel>
                   <Select value={filterOp} label={t('biReport.condition')}
-                    onChange={(e) => setFilterOp(e.target.value as BiFilter['op'])}>
+                    onChange={(e) => setFilterOp(e.target.value as BiFilter['op'])}
+                    sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     {['eq', 'neq', 'contains', 'gt', 'lt', 'empty', 'notEmpty'].map((op) => (
-                      <MenuItem key={op} value={op}>{op}</MenuItem>
+                      <MenuItem key={op} value={op} sx={{ fontSize: '0.75rem' }}>{op}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
                 <TextField size="small" label={t('biReport.value')} value={filterValue}
                   onChange={(e) => setFilterValue(e.target.value)}
-                  disabled={filterOp === 'empty' || filterOp === 'notEmpty'} />
-                <Button variant="contained" onClick={run} disabled={!canQuery}>
+                  disabled={filterOp === 'empty' || filterOp === 'notEmpty'}
+                  sx={{ width: { xs: '100%', sm: 'auto' }, fontSize: { xs: '0.75rem', sm: '0.875rem' } }} />
+                <Button variant="contained" onClick={run} disabled={!canQuery}
+                  sx={{ width: { xs: '100%', sm: 'auto' }, fontSize: { xs: '0.875rem', sm: '0.875rem' } }}>
                   {t('biReport.query')}
                 </Button>
               </Stack>
@@ -243,7 +252,7 @@ export default function BiReportPage() {
       </Card>
 
       {!canQuery && (
-        <Alert severity="info">
+        <Alert severity="info" sx={{ fontSize: '0.875rem' }}>
           {t('biReport.selectHint')}
         </Alert>
       )}
@@ -255,27 +264,27 @@ export default function BiReportPage() {
       )}
 
       {pivotQ.isError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, fontSize: '0.875rem' }}>
           {t('biReport.pivotQueryFailed')}: {(pivotQ.error as Error)?.message}
         </Alert>
       )}
 
       {pivotQ.data && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+        <Card sx={{ mb: { xs: 2, sm: 3 } }}>
+          <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+            <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: { xs: '1rem', sm: '1.1rem' } }}>
                 {t('biReport.pivotResult')}
               </Typography>
               <Chip size="small" label={t('biReport.pivotSize', { rows: pivotQ.data.totalRows, cols: pivotQ.data.totalCols })} />
             </Stack>
-            <Box sx={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 14 }}>
+            <Box sx={{ overflowX: 'auto', '-webkit-overflow-scrolling': 'touch' }}>
+              <table className="bi-pivot-table" style={{ borderCollapse: 'collapse', width: '100%', minWidth: 560 }}>
                 <thead>
                   <tr>
-                    <th style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>{t('biReport.dimension')}</th>
+                    <th>{t('biReport.dimension')}</th>
                     {pivotQ.data.columns.map((c) => (
-                      <th key={c} style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>
+                      <th key={c}>
                         {c || t('biReport.empty')}
                       </th>
                     ))}
@@ -284,11 +293,11 @@ export default function BiReportPage() {
                 <tbody>
                   {pivotQ.data.data.map((row, i) => (
                     <tr key={i}>
-                      <td style={{ border: '1px solid var(--color-border-light)', padding: 8, fontWeight: 500 }}>
+                      <td style={{ fontWeight: 500 }}>
                         {String(row.row ?? '') || t('biReport.empty')}
                       </td>
                       {pivotQ.data!.columns.map((c) => (
-                        <td key={c} style={{ border: '1px solid var(--color-border-light)', padding: 8 }}>
+                        <td key={c}>
                           {String(row[`${c}|${measureField}`] ?? 0)}
                         </td>
                       ))}
@@ -303,15 +312,16 @@ export default function BiReportPage() {
 
       {chartQ.data && chartData.length > 0 && (
         <Card>
-          <CardContent>
-            <Stack direction="row" spacing={2} sx={{ mb: 2, alignItems: 'center' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{t('biReport.chart')}</Typography>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
+          <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2, alignItems: { xs: 'stretch', sm: 'center' } }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: { xs: '1rem', sm: '1.1rem' } }}>{t('biReport.chart')}</Typography>
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 } }}>
                 <InputLabel>{t('biReport.type')}</InputLabel>
                 <Select value={chartType} label={t('biReport.type')}
-                  onChange={(e) => setChartType(e.target.value as 'bar' | 'line')}>
+                  onChange={(e) => setChartType(e.target.value as 'bar' | 'line')}
+                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                   {CHART_TYPES.map((ct) => (
-                    <MenuItem key={ct} value={ct}>{ct === 'bar' ? t('biReport.barChart') : t('biReport.lineChart')}</MenuItem>
+                    <MenuItem key={ct} value={ct} sx={{ fontSize: '0.75rem' }}>{ct === 'bar' ? t('biReport.barChart') : t('biReport.lineChart')}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -320,10 +330,10 @@ export default function BiReportPage() {
               {chartType === 'bar' ? (
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
                   {chartQ.data.series.map((s, i) => (
                     <Bar key={s.name} dataKey={s.name}
                       fill={['var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-warning)'][i % 4]} />
@@ -332,10 +342,10 @@ export default function BiReportPage() {
               ) : (
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
                   {chartQ.data.series.map((s, i) => (
                     <Line key={s.name} type="monotone" dataKey={s.name}
                       stroke={['var(--color-info)', 'var(--color-warning)', 'var(--color-success)', 'var(--color-warning)'][i % 4]} />

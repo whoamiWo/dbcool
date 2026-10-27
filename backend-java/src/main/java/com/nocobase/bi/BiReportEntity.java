@@ -47,6 +47,18 @@ public class BiReportEntity {
     @Column(name = "config", columnDefinition = "jsonb", nullable = false)
     private String configJson = "{}";
 
+    @Column(name = "schedule_cron", length = 32)
+    private String scheduleCron;
+
+    @Column(name = "schedule_enabled")
+    private Boolean scheduleEnabled = false;
+
+    @Column(name = "last_run_at")
+    private Instant lastRunAt;
+
+    @Column(name = "next_run_at")
+    private Instant nextRunAt;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -75,6 +87,14 @@ public class BiReportEntity {
     public void setType(Type type) { this.type = type; }
     public String getConfigJson() { return configJson; }
     public void setConfigJson(String configJson) { this.configJson = configJson; }
+    public String getScheduleCron() { return scheduleCron; }
+    public void setScheduleCron(String scheduleCron) { this.scheduleCron = scheduleCron; }
+    public Boolean getScheduleEnabled() { return scheduleEnabled; }
+    public void setScheduleEnabled(Boolean scheduleEnabled) { this.scheduleEnabled = scheduleEnabled; }
+    public Instant getLastRunAt() { return lastRunAt; }
+    public void setLastRunAt(Instant lastRunAt) { this.lastRunAt = lastRunAt; }
+    public Instant getNextRunAt() { return nextRunAt; }
+    public void setNextRunAt(Instant nextRunAt) { this.nextRunAt = nextRunAt; }
     public UUID getCreatedBy() { return createdBy; }
     public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
     public UUID getUpdatedBy() { return updatedBy; }

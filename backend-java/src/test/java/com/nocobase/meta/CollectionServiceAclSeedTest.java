@@ -44,12 +44,12 @@ class CollectionServiceAclSeedTest {
     private CollectionService service;
 
 @BeforeEach
-    void setUp() throws Exception {
-        MockitoAnnotations.openMocks(this);
-        // PHASE125:末位 null 为 RecordVersionService(本测试不覆盖版本留痕)
-        service = new CollectionService(
-                collectionRepository, tableManager, migrationService, objectMapper,
-                null, null, null, roleRepository, aclPolicyRepository, null);
+void setUp() throws Exception {
+    MockitoAnnotations.openMocks(this);
+    // Wave 4 C2:末位 null 为 CollectionVersionRepository(本测试不覆盖版本管理)
+    service = new CollectionService(
+            collectionRepository, tableManager, migrationService, objectMapper,
+            null, null, null, roleRepository, aclPolicyRepository, null, null);
 
         when(objectMapper.writeValueAsString(any())).thenReturn("[]");
     }

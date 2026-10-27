@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,11 +6,26 @@ import apiClient from '@/api/client';
 import type { CollectionMeta } from '@/types/collection';
 import type { ViewFull } from '@/types/view';
 
+/** 移动端断点检测 hook（<=768px 视为移动端） */
+function useIsMobile(breakpoint = 768): boolean {
+  const [isMobile, setIsMobile] = useState<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
+  );
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 /** 日历视图 — 按日期字段分组展示记录 (T3: 支持翻月) */
 export function CalendarViewPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const isMobile = useIsMobile();
+  const [expandedDay, setExpandedDay] = useState<number | null>(null);
 
   const { data: viewData } = useQuery({
     queryKey: ['view', id],
@@ -66,17 +81,17 @@ export function CalendarViewPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: '24px 0' }}>
-      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0' }}>{viewData.title}</h1>
-      
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <button onClick={goToPrevMonth} className="glass-button" style={{ padding: '4px 12px', fontSize: 12 }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: isMobile ? '12px' : '24px 0' }}>
+      <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0', fontSize: isMobile ? 20 : 28 }}>{viewData.title}</h1>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, marginBottom: 12, flexWrap: 'wrap' }}>
+        <button onClick={goToPrevMonth} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
           {t('calendarView.prevMonth')}
         </button>
-        <button onClick={goToNextMonth} className="glass-button" style={{ padding: '4px 12px', fontSize: 12 }}>
+        <button onClick={goToNextMonth} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
           {t('calendarView.nextMonth')}
         </button>
-        <button onClick={goToToday} className="glass-button" style={{ padding: '4px 12px', fontSize: 12 }}>
+        <button onClick={goToToday} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
           {t('calendarView.today')}
         </button>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
@@ -84,58 +99,135 @@ export function CalendarViewPage() {
         </span>
       </div>
 
-      <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>
+      <p style={{ color: 'var(--color-text-muted)', marginBottom: isMobile ? 12 : 24, fontSize: isMobile ? 12 : 14 }}>
         {t('calendarView.recordCount', { count: allRecords.length })} · {t('calendarView.sortedBy', { field: dateField })}
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--color-border-light)', borderRadius: 8, overflow: 'hidden' }}>
-        {(JSON.parse(t('calendarView.dayWeeks')) as string[]).map((day) => (
-          <div key={day} style={{ background: 'rgba(255,255,255,0.02)', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-text-muted)' }}>
-            {day}
-          </div>
-        ))}
-
-        {weeks.length === 0 ? (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
-            {t('calendarView.noData')}
-          </div>
-        ) : (
-          weeks.map((week, wi) =>
-            week.map((day, di) => (
-              <div
-                key={wi + '-' + di}
-                className="glass-card"
-                style={{ minHeight: 120, padding: 8, border: '1px solid var(--color-border-light)' }}
-              >
-                <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                  {day.day > 0 && (
-                    <>
-                      {day.records.some(() => isToday(day.day, currentMonth)) && (
-                        <span style={{ marginRight: 4, color: 'var(--color-info)' }}>●</span>
-                      )}
-                      {day.day}
-                    </>
-                  )}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {day.records.slice(0, 3).map((r) => (
-                    <div
-                      key={r.id}
-                      style={{ background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid var(--color-info)', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: 'var(--color-primary-200)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                      title={r.title}
+      {isMobile ? (
+        /* 移动端：单列日期列表，点击展开当天全部记录 */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {weeks.flat().filter((d) => d.day > 0).length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
+              {t('calendarView.noData')}
+            </div>
+          ) : (
+            weeks
+              .flat()
+              .filter((d) => d.day > 0)
+              .map((day) => {
+                const isOpen = expandedDay === day.day;
+                const today = isToday(day.day, currentMonth);
+                return (
+                  <div
+                    key={day.day}
+                    className="glass-card"
+                    style={{ padding: 12, border: '1px solid var(--color-border-light)', borderRadius: 8 }}
+                  >
+                    <button
+                      onClick={() => setExpandedDay(isOpen ? null : day.day)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        width: '100%', background: 'transparent', border: 'none', cursor: 'pointer',
+                        padding: 0, color: 'var(--color-text-primary)',
+                      }}
+                      aria-expanded={isOpen}
+                      aria-label={t('calendarView.expandDay', { day: day.day })}
                     >
-                      {r.title}
-                    </div>
-                  ))}
-                  {day.records.length > 3 && (
-                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{t('calendarView.moreRecords', { count: day.records.length - 3 })}</div>
-                  )}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
+                        {today && <span style={{ color: 'var(--color-info)' }}>●</span>}
+                        {day.day}
+                        {day.records.length > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--color-text-muted)' }}>
+                            ({day.records.length})
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                        {isOpen ? t('calendarView.collapse') : t('calendarView.expand')}
+                      </span>
+                    </button>
+                    {day.records.length === 0 ? (
+                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>
+                        {t('calendarView.noRecords')}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                        {(isOpen ? day.records : day.records.slice(0, 2)).map((r) => (
+                          <div
+                            key={r.id}
+                            style={{
+                              background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid var(--color-info)',
+                              padding: '4px 8px', borderRadius: 2, fontSize: 12,
+                              color: 'var(--color-primary-200)', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}
+                            title={r.title}
+                          >
+                            {r.title}
+                          </div>
+                        ))}
+                        {!isOpen && day.records.length > 2 && (
+                          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                            {t('calendarView.moreRecords', { count: day.records.length - 2 })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+          )}
+        </div>
+      ) : (
+        /* 桌面端：7 列网格 */
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--color-border-light)', borderRadius: 8, overflow: 'hidden' }}>
+          {(JSON.parse(t('calendarView.dayWeeks')) as string[]).map((day) => (
+            <div key={day} style={{ background: 'rgba(255,255,255,0.02)', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-text-muted)' }}>
+              {day}
+            </div>
+          ))}
+
+          {weeks.length === 0 ? (
+            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
+              {t('calendarView.noData')}
+            </div>
+          ) : (
+            weeks.map((week, wi) =>
+              week.map((day, di) => (
+                <div
+                  key={wi + '-' + di}
+                  className="glass-card"
+                  style={{ minHeight: 120, padding: 8, border: '1px solid var(--color-border-light)' }}
+                >
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                    {day.day > 0 && (
+                      <>
+                        {day.records.some(() => isToday(day.day, currentMonth)) && (
+                          <span style={{ marginRight: 4, color: 'var(--color-info)' }}>●</span>
+                        )}
+                        {day.day}
+                      </>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {day.records.slice(0, 3).map((r) => (
+                      <div
+                        key={r.id}
+                        style={{ background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid var(--color-info)', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: 'var(--color-primary-200)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        title={r.title}
+                      >
+                        {r.title}
+                      </div>
+                    ))}
+                    {day.records.length > 3 && (
+                      <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{t('calendarView.moreRecords', { count: day.records.length - 3 })}</div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
-          )
-        )}
-      </div>
+              ))
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 }

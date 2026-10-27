@@ -591,6 +591,56 @@ public class CollectionController {
     }
 
     // ============================================================
+    //  Wave 4 C2: 集合元数据版本管理
+    // ============================================================
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{name}/meta-versions")
+    public Map<String, Object> listMetaVersions(
+            @PathVariable String name,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return Map.of("code", 0, "data", service.listVersions(name, user.tenantId()));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{name}/meta-versions/{version}")
+    public Map<String, Object> getMetaVersion(
+            @PathVariable String name,
+            @PathVariable int version,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return Map.of("code", 0, "data", service.getVersionFields(name, version, user.tenantId()));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{name}/meta-versions/diff")
+    public Map<String, Object> diffMetaVersions(
+            @PathVariable String name,
+            @RequestParam int from,
+            @RequestParam int to,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return Map.of("code", 0, "data", service.diffVersions(name, from, to, user.tenantId()));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{name}/meta-versions/{version}/rollback")
+    public Map<String, Object> rollbackMetaVersion(
+            @PathVariable String name,
+            @PathVariable int version,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        service.rollbackToVersion(name, version, user.tenantId(), user.userId());
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "ROLLBACK_META_VERSION", name, null, Map.of("version", version));
+        return Map.of("code", 0, "message", "rolled back",
+                "data", Map.of("version", version));
+    }
+
+    // ============================================================
     //  CSV Import / Export (Week 14.5)
     // ============================================================
 
