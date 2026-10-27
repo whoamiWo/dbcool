@@ -55,6 +55,75 @@
 
 ---
 
+## Unreleased — Wave 2：B3 外部数据源 + B5 甘特图视图
+
+> 基线 `62f5193`。⚠️ 本节经 2026-10-28 实证审计复核，**部分能力为"假完成"**（文件存在但未接线），已在下方逐项标注实际可用状态。
+
+### B3 外部数据源集成
+
+**新增**（`backend-java/src/main/java/com/nocobase/integration/datasource/`）：
+`ExternalDataSourceEntity` / `ExternalDataSourceRepository` / `ExternalDataSourceService` / `ExternalDataSourceConnectionFactory` / `ExternalDataSourceController`；迁移 `V68__external_data_source.sql`。
+
+- 真实可用：JDBC 连接池（HikariCP，`ExternalDataSourceConnectionFactory:49-68`）、读 `information_schema.columns`（`Service:127-135`）、创建虚拟 Collection（`Service:155-197`）
+- 🔴 **实测不可用项**（见 Wave5 返工）：
+  - **无 `POST /api/datasources` 端点** —— `CreateDataSourceRequest`（`Controller:51-58`）是死 record，数据源只能通过手工插密文创建
+  - **`cryptoService.encrypt()` 无调用点** —— 仅 `TenantCredentialService:46/59` 使用，与 datasource 无关，"密码加密存储"无生产路径
+  - **无定时/增量同步** —— 仅一次性快照，`lastSyncedAt` 只在创建 Collection 时赋值一次
+  - **租户硬编码** `Controller:79,91,98,105,126` 全为 `"system"`；**MySQL 分支 schema 硬编码 `'public'`**（`:104,:129`，MySQL 实际库名非 public → 读表返回空）
+
+### B5 通用集合甘特图
+
+- 新增 `pages/GanttView.tsx`（284 行）+ 路由 `views/:id/gantt`（`router.tsx:223`）+ `ViewType` 扩展 `gantt`
+- 真实可用：自动探测 start/end 日期字段、时间轴计算、区间条渲染、按月精确查询（规避 `limit=500` 截断）
+- 🟡 **缺失**：无依赖线（dependency 连线）、无 progress 进度条
+
+### 验证
+
+后端 `mvn compile` 通过；`ExternalDataSourceServiceTest` + `ExternalDataSourceConnectionFactoryTest` **12/12 通过**；`GanttView.test.tsx` **4/4 通过**。
+
+---
+
+## Unreleased — Wave 3：B4 钉钉 AI 卡片 + B7 数据治理 + B8 移动端适配
+
+> 基线 `28d0e23`。⚠️ 经 2026-10-28 实证审计，**B4 出站投递与 B7 定时分发为假完成**，已标注。
+
+### B4 钉钉 AI 卡片
+
+**新增**：`DingTalkAiCardService` + `DingTalkAiCardController`（`/api/dingtalk/ai-card/send`、`/callback`）+ `DingTalkSignatureUtil`。
+
+- ✅ **入站回调真实可用**：`DingTalkSignatureUtil.verify()` 真 HmacSHA256 + `MessageDigest.isEqual` 常量时间比较 + 5 分钟时间戳窗口（`:46`）；`external_message_log` 幂等（`:128-132`）；真触发工作流任务状态变更（`:149-184`，含租户校验 `:169`）
+- ✅ AI 摘要真实调用 `AiAssistantService.chat()`，失败降级原文截断
+- 🔴 **出站投递实测不可用**（最严重）：
+  - `DingTalkAiCardService:100-102` —— `restTemplate.postForObject(url, Map.of("payload",...,"headers",headers), String.class)`，第二参是 **request body 不是 header**，`x-acs-dingtalk-access-token` 从未发出
+  - `:88` URL 为占位（应为 `/v1.0/im/robots/{robotCode}/sendInteractiveCard`）；`:90` `cardTemplateId` 硬编码
+  - `:104` 不校验 errcode 即返回 `ok()` → 失败也报成功
+  - `:32` `new RestTemplate()` 未注入 Spring bean
+  - 前端全仓搜 `ai-card` **0 结果**，无任何页面调用
+
+### B7 数据治理中枢
+
+**新增**：`V69` 迁移、`RetentionPolicyEntity/Repository`、`DataQualityRuleEntity/Repository`、`DataGovernanceService`、`GovernanceController`、`RetentionPolicyScheduler`；`RoleName` 枚举化；`AclPolicyEntity` 增 `data_scope_type` + `data_scope_config`（`V71`）。
+
+- ✅ **报表导出真实可用**：`BiReportService.exportToExcel/exportToPdf` 真委托 POI `SXSSFWorkbook` 与 iText7 生成字节流（`ReportExcelExporter:40-41`、`ReportPdfExporter:35-41`）
+- ✅ **`RoleName` 真枚举**（`RoleName.java:12-18`：ADMIN/USER/ANONYMOUS）
+- ✅ 保留策略/质量规则 CRUD 与调度器接线
+- 🔴 **定时分发空跑**：`ReportDistributionJob:111-119` 的 `sendEmail`/`sendDingTalkFile` **仅 `// TODO` + `log.debug`**，导出的 `fileBytes` 附件被丢弃 → 每小时 `distributeReports()` 空跑一次；`:103` catch 分支 `setLastRunAt` 后未 `save`
+- 🔴 **data_scope 为死代码**：`AclPolicyEntity:74,78` 字段 + `AclEnforcer:261 buildDataScopeCondition()` **全仓零调用者**，过滤路径从未使用
+
+### B8 移动端 PWA 适配
+
+- ✅ `public/manifest.webmanifest` + `index.html:13` link + 图标齐全（192/512/maskable/apple-touch）
+- ✅ `styles.css:626-641` 安全区 `env(safe-area-inset-bottom)`；`MessageComposer.tsx:213` 输入区安全区
+- ✅ 三页面响应式：`CalendarView.tsx:106` 移动端单列展开（真结构分支）、`AgentChatPage.tsx` 15 处响应式、`BiReportPage.tsx` MUI 断点（透视表 `minWidth:560` 窄屏横向溢出，无容器滚动）
+- ⚠️ `frontend/src/main.css` 不存在（安全区实际在 `styles.css`）
+
+### 验证
+
+后端全量 `mvn test`：**2401 tests / 1 failure / 96 errors**（96 errors 为 16 个 `@SpringBootTest` 环境依赖基线，非本轮引入）；门禁三件套（`TenantIsolation`/`AuditTrailCoverage`/`ControllerAuthorizationCoverage`）通过。
+前端：`tsc --noEmit` 0 error；`npm run test:run` **919 passed / 2 failed**（`AttachmentPreview`、`BoardView`，与 Wave3 无关）。
+
+---
+
 ## v2.1.0 (2026-10-26) — 协作深度补齐（评论 + 线程 + 双向链接 + 表单分享）
 
 > **协作深度补齐**：对标 Notion / Airtable 的记录级评论能力落地，填补平台在协作维度的核心差距；同时补齐 Slack/RocketChat 的线程对话体验。

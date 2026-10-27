@@ -44,7 +44,7 @@ graph LR
 
 | # | 任务 | 域 | 工作量 | 验收标准 |
 |---|---|---|---|---|
-| A1 | 补齐 k8s `CRDT_SERVICE_URL` 配置 | 协同 | 0.5 人日 | `k8s/02-backend-java.yaml` 注入 env；K8s 下协同为字符级合并（非整篇替换） |
+| A1 | ~~补齐 k8s `CRDT_SERVICE_URL` 配置~~ **✅ 已完成** | 协同 | 0.5 人日 | `k8s/02-backend-java.yaml:61-62` 已注入 `CRDT_SERVICE_URL: http://crdt-service:80`（2026-10-28 回写）。⚠️ 配套遗留：`k8s/11-crdt-service.yaml` 引用了不存在的 Secret `nocobase-secrets`（实际为 `nocobase-secret`），见 Wave5 阶段 2 |
 | A3 | 看板拖拽移动 | 视图 | 4–6 人日 | `KanbanView` 支持卡片跨列拖拽并落库；E2E 验证 |
 | A4 | 统一 `JsSignatureProvider`（钉钉+企微+飞书） | 嵌入 | 5–8 人日 | 前端 `dd.config`/`wx.agentConfig`/`h5Webview` 注入成功；ticket 走 Redis 缓存 |
 

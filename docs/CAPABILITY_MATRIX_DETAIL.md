@@ -215,7 +215,7 @@
 | 核查项 | 状态 | 证据 |
 |---|---|---|
 | `crdt.service.url` **docker-compose** | ✅ 已配置 | `docker-compose.yml:182` `CRDT_SERVICE_URL: http://crdt-service:3100` |
-| `crdt.service.url` **k8s** | ❌ **缺失** | `grep -rn "CRDT_SERVICE_URL\|crdt.service.url" k8s/*.yaml` → **0 命中** |
+| `crdt.service.url` **k8s** | ✅ **已修复** | `k8s/02-backend-java.yaml:61-62` 已注入 `- name: CRDT_SERVICE_URL / value: "http://crdt-service:80"`（原判缺失已过时，2026-10-28 订正）。⚠️ 但 `k8s/11-crdt-service.yaml:32,39,44,49` 引用 Secret `nocobase-secrets`（复数，无定义），应为 `00-base.yaml:48` 的 `nocobase-secret`（单数）→ crdt-service Pod 仍起不来，见 Wave5 阶段 2 |
 | 字符级 diff | ✅ 已修复 | `CollabEditor.tsx:47-89` LCS 字符级 `applyDiffToText`（旧"整篇替换"已改） |
 | 广播 payload 含 `update` | ✅ 已修复 | `RealtimeService.java:124-132` |
 | CRDT 服务部署 | ✅ | `k8s/11-crdt-service.yaml` 已部署（port 3100） |

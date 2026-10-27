@@ -10,8 +10,19 @@
 > - "CRDT 整篇替换" → ✅ 已修复（`CollabEditor.tsx:47-89` LCS 字符级）
 > - "IM 高级搜索是死代码" → ✅ 已修复（接入 `ImMessageController:244,280`）
 >
-> **仍成立（限 K8s）**：`CRDT_SERVICE_URL` 在 `docker-compose.yml:182` 已配置，
-> 但 `k8s/*.yaml` 未配置 → K8s 环境下 CRDT 服务部署了没人调，协同降级。
+> ~~**仍成立（限 K8s）**：`CRDT_SERVICE_URL` 在 `docker-compose.yml:182` 已配置，
+> 但 `k8s/*.yaml` 未配置 → K8s 环境下 CRDT 服务部署了没人调，协同降级。~~
+>
+> 🔄 **2026-10-28 再次订正（原"仍成立"判断已过时）**：
+> - `CRDT_SERVICE_URL` **K8s 侧已修复**：`k8s/02-backend-java.yaml:61-62` 已注入
+>   `- name: CRDT_SERVICE_URL / value: "http://crdt-service:80"`（Service 端口 80 → targetPort 3100，
+>   见 `k8s/11-crdt-service.yaml:90-91`）；`docker-compose.yml:182` 用服务名 `crdt-service:3100`。
+>   Spring Boot relaxed binding 会将环境变量 `CRDT_SERVICE_URL` 绑定到 `@Value("${crdt.service.url:}")`，
+>   因此本文 §2 相关论述（L60、L156、L241、L357、L491 断言"全仓无任何配置"）**均已过时**。
+> - ⚠️ **但遗留配套缺陷**：`k8s/11-crdt-service.yaml:32,39,44,49` 引用 Secret
+>   `nocobase-secrets`（复数，**全仓无定义**），而 `k8s/00-base.yaml:48` 定义的是 `nocobase-secret`（单数）
+>   且 key 为 `POSTGRES_USER`/`POSTGRES_PASSWORD`（大写）→ crdt-service Pod 必然
+>   `CreateContainerConfigError`，**K8s 下协同仍会降级**。修复见 Wave5 阶段 2。
 >
 > 详细证据见 [`docs/CAPABILITY_MATRIX_DETAIL.md`](./docs/CAPABILITY_MATRIX_DETAIL.md) §12。
 
