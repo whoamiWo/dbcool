@@ -4,6 +4,7 @@ import com.nocobase.audit.AuditService;
 import com.nocobase.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,7 +24,11 @@ import java.util.Set;
  * <p><b>租户隔离</b>：所有租户相关端点的 tenantId 一律取自
  * {@link TenantContext#requireTenantId()}（JWT 过滤器写入），路径/body 里的
  * tenantId 仅做一致性校验，不一致直接 403 —— 不接受"调用方自称是谁"。</p>
+ *
+ * <p><b>默认关闭</b>：仅在 {@code billing.enabled=true} 时装配，未开启时
+ * {@code /api/billing/*} 全部 404（前端据此提示"计费能力未启用"）。</p>
  */
+@ConditionalOnProperty(prefix = "billing", name = "enabled", havingValue = "true")
 @RestController
 @RequestMapping("/api/billing")
 public class BillingController {

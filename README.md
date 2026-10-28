@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://python.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue)](./LICENSE)
 [![Backend CI](https://img.shields.io/badge/CI-failing%20(JaCoCo%2074%25%20%3C%2082%25)-red)](./.github/workflows/backend-ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-74%25-yellow)](./backend-java/target/site/jacoco/index.html)
 [![Tests](https://img.shields.io/badge/tests-3322%20(backend%202401%20%2F%20frontend%20921)-yellow)](#-测试)
@@ -348,4 +348,8 @@ add field → 同步 ALTER(小表秒过)
 
 ## 📄 许可证
 
-[MIT](./LICENSE)
+[Apache License 2.0](./LICENSE) —— 含明确的**专利授权与反诉终止**条款（§3）、**商标非授权**（§6）、**免责声明与责任限制**（§7-§8）。
+
+本项目为**个人开发、非商业**项目：不授予任何商标/商号/产品名使用权，不提供商业支持、担保或赔偿。
+
+计费 / 订阅 / 支付（B4）属于可选能力，**默认关闭**（`billing.enabled=false`），需显式 `BILLING_ENABLED=true` 才装配。

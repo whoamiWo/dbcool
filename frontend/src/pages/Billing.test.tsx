@@ -123,4 +123,14 @@ describe('BillingPage', () => {
     fireEvent.click(screen.getByText('确认支付'));
     expect(await screen.findByText(/等待人工确认收款/)).toBeTruthy();
   });
+
+  it('后端未启用计费（plans 404）→ 提示未启用而非报错', async () => {
+    handlers = { subscription: null, invoices: [INVOICE], payments: [], providers: [] };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url.startsWith('/api/billing/plans') ? jsonResponse({}, false, 404) : jsonResponse(routeGet(url))));
+
+    render(<BillingPage />);
+    expect(await screen.findByText(/计费能力未启用/)).toBeTruthy();
+    expect(screen.queryByText(/未配置任何支付网关/)).toBeNull();
+  });
 });

@@ -2,6 +2,7 @@ package com.nocobase.billing;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +12,10 @@ import org.springframework.stereotype.Component;
  * <p>修复前 {@code scanOverdueSubscriptions/scanOverdueInvoices} 没有任何
  * {@code @Scheduled} 接线，只能靠人工 POST /api/billing/scan-overdue 触发，
  * 生产环境等于永远不会跑。这里按天扫描：订阅过期 → EXPIRED，账单逾期 → UNCOLLECTIBLE。</p>
+ *
+ * <p>与计费能力同开关：{@code billing.enabled=true} 才装配，个人自用默认不跑。</p>
  */
+@ConditionalOnProperty(prefix = "billing", name = "enabled", havingValue = "true")
 @Component
 public class BillingOverdueJob {
 
