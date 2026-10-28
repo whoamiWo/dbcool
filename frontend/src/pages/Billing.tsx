@@ -93,6 +93,8 @@ export function BillingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
   const [provider, setProvider] = useState('');
+  /** 后端 billing.enabled=false（默认）时 /api/billing/* 全部 404 */
+  const [disabled, setDisabled] = useState(false);
 
   const token = localStorage.getItem('access_token') || '';
 
@@ -121,6 +123,7 @@ export function BillingPage() {
         call('/api/billing/payment-providers'),
       ]);
       if (p?.ok) setPlans(await p.json());
+      else if (p && p.status === 404) setDisabled(true);
       if (s) setSubscription(s.ok ? await s.json() : null);
       if (i?.ok) setInvoices(await i.json());
       if (pay?.ok) setPayments(await pay.json());
@@ -201,6 +204,13 @@ export function BillingPage() {
       {error && <div style={{ color: 'var(--color-error)', fontSize: 13, marginBottom: 8 }}>{error}</div>}
       {notice && <div style={{ color: 'var(--color-success)', fontSize: 13, marginBottom: 8 }}>{notice}</div>}
       {loading && <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>加载中...</div>}
+
+      {disabled && (
+        <div style={{ ...card, marginBottom: 12, color: 'var(--color-warning)', fontSize: 13 }}>
+          计费能力未启用：后端 <code>billing.enabled=false</code>（个人自用默认关闭）。
+          需要时设置 <code>BILLING_ENABLED=true</code> 并重启后端。
+        </div>
+      )}
 
       {subscription && (
         <section style={card}>
@@ -294,7 +304,7 @@ export function BillingPage() {
           )}
         </tbody>
       </table>
-      {providers.length === 0 && (
+      {providers.length === 0 && !disabled && (
         <div style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 8 }}>
           当前未配置任何支付网关（alipay/wechat/stripe），请先在后端配置 nocobase.billing.payment.gateways。
         </div>

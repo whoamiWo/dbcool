@@ -259,6 +259,16 @@ app:
 
 # C4: AI 多模型支持 — 可用模型列表(逗号分隔,第一个为默认模型)
 # Python LLM 网关侧按需扩展新模型时,仅需在此追加
+# B4 计费能力：个人自用默认关闭
+# 仅当 billing.enabled=true（或 BILLING_ENABLED=true 环境变量）时才装配
+# BillingController / BillingService / BillingOverdueJob / PaymentGatewayRegistry / ManualPaymentGateway，
+# 未开启时 /api/billing/* 全部 404。
+billing:
+  enabled: ${BILLING_ENABLED:false}
+  payment:
+    # 支付网关：未配置 url 的渠道不会被注册，支付时直接报错（绝不静默标记成功）
+    gateways: {}
+
 ai:
   enabled: ${AI_ENABLED:false}
   python-url: ${AI_PYTHON_URL:http://localhost:8000}

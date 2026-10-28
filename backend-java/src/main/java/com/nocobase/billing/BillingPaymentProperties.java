@@ -10,21 +10,21 @@ import java.util.Map;
  * 支付网关配置 ({@code nocobase.billing.payment.gateways.*}).
  *
  * <pre>
- * nocobase:
- *   billing:
- *     payment:
- *       gateways:
- *         alipay:
- *           url: https://openapi.alipay.com/v3/pay
- *           api-key: ${ALIPAY_API_KEY}
- *         wechat: { url: https://api.mch.weixin.qq.com/v3/pay, api-key: ${WECHAT_API_KEY} }
- *         stripe: { url: https://api.stripe.com/v1/charges, api-key: ${STRIPE_API_KEY} }
+ * billing:
+ *   enabled: ${BILLING_ENABLED:false}   # 个人自用默认关闭
+ *   payment:
+ *     gateways:
+ *       alipay:
+ *         url: https://openapi.alipay.com/v3/pay
+ *         api-key: ${ALIPAY_API_KEY}
+ *       wechat: { url: https://api.mch.weixin.qq.com/v3/pay, api-key: ${WECHAT_API_KEY} }
+ *       stripe: { url: https://api.stripe.com/v1/charges, api-key: ${STRIPE_API_KEY} }
  * </pre>
  *
  * <p>未配置 url 的网关不会被注册，对应支付方式在支付时直接报错。</p>
  */
 @Component
-@ConfigurationProperties(prefix = "nocobase.billing.payment")
+@ConfigurationProperties(prefix = "billing.payment")
 public class BillingPaymentProperties {
 
     private Map<String, GatewaySettings> gateways = new LinkedHashMap<>();

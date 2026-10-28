@@ -1,3 +1,24 @@
+## Unreleased — 项目定位：个人开发 / 非商业 + Apache-2.0 边界保护
+
+### 许可证：MIT → Apache License 2.0
+
+- `LICENSE` 换为 Apache-2.0 官方原文（202 行，含 §1-§9 与附录样板）
+- 新增 `NOTICE`：署名 + 明确"个人开发、非商业"，不授予商标权（§6），不提供商业支持/担保/赔偿（§7-§9）
+- `README.md`：badge 换 Apache-2.0；许可证章节写明专利授权与反诉终止（§3）、商标非授权（§6）、免责与责任限制（§7-§8）
+- `backend-java/pom.xml` 补 `<licenses>` 声明
+
+选择 Apache-2.0 的理由：要的是**专利授权 + 反诉终止 + 商标非授权 + 清晰免责**，不是禁止他人使用。
+（若后续需要"禁止商用"应改 Polyform Noncommercial；若需要"商用必须回馈源码"应改 AGPLv3。）
+
+### B4 计费：保留代码，默认关闭
+
+- `BillingController` / `BillingService` / `BillingOverdueJob` / `PaymentGatewayRegistry` / `ManualPaymentGateway`
+  全部加 `@ConditionalOnProperty(prefix="billing", name="enabled", havingValue="true")`
+- `application.yml` 新增 `billing.enabled: ${BILLING_ENABLED:false}`（默认 false），未开启时 `/api/billing/*` 全部 404
+- `BillingPaymentProperties` 前缀由 `nocobase.billing.payment` 收敛为 `billing.payment`，与 yml 对齐
+- 新增 `BillingDisabledGuardTest`（2 用例）：锁住开关契约，防止后人摘掉条件装配或改成 matchIfMissing=true
+- 前端 `Billing.tsx`：plans 返回 404 时展示"计费能力未启用"提示，并不再误报"未配置支付网关"；`Billing.test.tsx` **6/6**
+
 ## Unreleased — B4 计费系统：审计返工（P0/P1/P2）
 
 > 审计判定 B4「已完成」不成立（此前从未通过 `mvn compile`），按 P0→P2 返工。

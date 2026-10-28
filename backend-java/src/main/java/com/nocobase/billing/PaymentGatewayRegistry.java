@@ -3,6 +3,7 @@ package com.nocobase.billing;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -24,7 +25,10 @@ import java.util.Set;
  *
  * <p>未配置的支付方式不会被静默放行：{@link #resolve(String)} 直接抛
  * {@link UnsupportedPaymentProviderException}，由 Controller 转成 400。</p>
+ *
+ * <p>与计费能力同开关：{@code billing.enabled=true} 才装配。</p>
  */
+@ConditionalOnProperty(prefix = "billing", name = "enabled", havingValue = "true")
 @Component
 public class PaymentGatewayRegistry {
 

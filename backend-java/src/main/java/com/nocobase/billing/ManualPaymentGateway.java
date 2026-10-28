@@ -1,5 +1,6 @@
 package com.nocobase.billing;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -8,7 +9,10 @@ import org.springframework.stereotype.Component;
  * <p>用于转账、合同结算等不走在线渠道的场景：不产生任何"成功"假象，
  * 返回的 PaymentResult 为 pending，PaymentEntity 落库为 PENDING，
  * 需由财务确认后调用 {@code POST /api/billing/payments/{id}/confirm} 才置为 SUCCEEDED。</p>
+ *
+ * <p>与计费能力同开关：{@code billing.enabled=true} 才装配。</p>
  */
+@ConditionalOnProperty(prefix = "billing", name = "enabled", havingValue = "true")
 @Component
 public class ManualPaymentGateway implements PaymentGateway {
 

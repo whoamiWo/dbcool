@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -25,7 +26,11 @@ import java.util.*;
  * <p>依赖全部通过构造器注入且强制非空：仓储缺失时启动即失败，
  * 避免出现 {@code @Autowired(required=false)} 那种"静默降级为 null、
  * 定时任务什么都不做"的假可用状态。</p>
+ *
+ * <p><b>默认关闭</b>：本服务仅在 {@code billing.enabled=true} 时装配。
+ * 项目定位为个人自用平台，计费不是默认能力。</p>
  */
+@ConditionalOnProperty(prefix = "billing", name = "enabled", havingValue = "true")
 @Service
 @Transactional
 public class BillingService {
