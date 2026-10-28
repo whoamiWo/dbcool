@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { disconnectStomp } from '@/lib/stompClient';
 import { GlobalSearchPanel } from '@/components/GlobalSearchPanel';
+import { EmbeddedSdkProvider } from '@/components/EmbeddedSdkProvider';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '@/i18n';
 
@@ -59,6 +60,8 @@ export function AppLayout() {
   ];
 
   return (
+    // 全局注入钉钉/企微/微信/飞书 JS-SDK：普通浏览器不执行任何逻辑
+    <EmbeddedSdkProvider>
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <header className="app-header">
         <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
@@ -262,6 +265,7 @@ export function AppLayout() {
         </div>
       )}
     </div>
+    </EmbeddedSdkProvider>
   );
 }
 
