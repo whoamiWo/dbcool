@@ -25,12 +25,15 @@ public class NotificationService {
 
     private final NotificationChannelRepository repository;
     private final Map<NotificationChannelEntity.Type, NotificationDispatcher> dispatchers;
+    private final com.nocobase.im.ImChannelMemberRepository imMemberRepository;
 
     public NotificationService(NotificationChannelRepository repository,
-                                List<NotificationDispatcher> dispatcherList) {
+                                List<NotificationDispatcher> dispatcherList,
+                                com.nocobase.im.ImChannelMemberRepository imMemberRepository) {
         this.repository = repository;
         this.dispatchers = dispatcherList.stream()
                 .collect(Collectors.toMap(NotificationDispatcher::supportedType, d -> d));
+        this.imMemberRepository = imMemberRepository;
     }
 
     /**
@@ -109,5 +112,31 @@ public List<NotificationDispatcher.SendResult> fire(String tenantId,
         payload.put("timestamp", Instant.now().toString());
         
         fire(tenantId, "im.mention", mentionedUserId, payload);
+    }
+
+    /**
+     * 创建 @全体成员 通知。
+     *
+     * @param tenantId 租户 ID
+     * @param channelId 频道 ID
+     * @param messageId 消息 ID
+     * @param senderId 发送者 ID
+     * @param contentSnippet 内容片段
+     */
+    public void createAtAllNotification(String tenantId, UUID channelId, UUID messageId,
+                                        UUID senderId, String contentSnippet) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", "at_all");
+        payload.put("channelId", channelId.toString());
+        payload.put("messageId", messageId.toString());
+        payload.put("senderId", senderId.toString());
+        payload.put("content", contentSnippet);
+        payload.put("timestamp", Instant.now().toString());
+
+        List<String> memberIds = imMemberRepository.findByChannelId(channelId).stream()
+                .map(e -> e.getUserId().toString()).distinct().toList();
+        for (String memberId : memberIds) {
+            fire(tenantId, "im.at_all", memberId, payload);
+        }
     }
 }

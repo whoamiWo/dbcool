@@ -47,7 +47,7 @@ public class ExternalDataSourceController {
         this.auditService = auditService;
     }
 
-    /** 创建连接请求体 */
+    /** 创建连接请求体（含同步配置，创建时可一并设置） */
     public record CreateDataSourceRequest(
             @NotBlank String name,
             @NotBlank String vendor,
@@ -57,7 +57,19 @@ public class ExternalDataSourceController {
             @NotBlank String username,
             @NotBlank String password,
             /** 可选：显式 JDBC 驱动类名（不填则按 vendor 推断） */
-            String driverClassName) {}
+            String driverClassName,
+            /** 可选：同步配置（不填则默认 MANUAL / 不启用） */
+            Boolean syncEnabled,
+            String syncMode,
+            String syncCron,
+            String incrementalKey) {}
+
+    /** 更新同步配置请求体 */
+    public record UpdateSyncConfigRequest(
+            @NotNull Boolean syncEnabled,
+            String syncMode,
+            String syncCron,
+            String incrementalKey) {}
 
     /** 创建虚拟 Collection 请求体 */
     public record CreateVirtualCollectionRequest(
@@ -89,15 +101,16 @@ public class ExternalDataSourceController {
         ExternalDataSourceEntity saved = service.createDataSource(
                 tenantId, body.name(), body.vendor(), body.host(), body.port(),
                 body.databaseName(), body.username(), body.password(),
-                body.driverClassName(), null);
+                body.driverClassName(), null,
+                body.syncEnabled(), body.syncMode(), body.syncCron(), body.incrementalKey());
         auditService.log(tenantId, null, null, "CREATE_DATASOURCE", "datasource/create",
                 String.valueOf(saved.getId()), Map.of("name", body.name(), "vendor", body.vendor()));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("code", 0, "message", "ok", "data", toView(saved)));
     }
 
-        @PreAuthorize("isAuthenticated()")
-@GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{id}")
     public Map<String, Object> get(@PathVariable UUID id) {
         String tenantId = TenantContext.requireTenantId();
         return service.getDataSource(id, tenantId)
@@ -147,6 +160,30 @@ public class ExternalDataSourceController {
     }
 
         @PreAuthorize("isAuthenticated()")
+@PostMapping("/{id}/sync-config")
+    public Map<String, Object> updateSyncConfig(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateSyncConfigRequest body) {
+        String tenantId = TenantContext.requireTenantId();
+        ExternalDataSourceEntity updated = service.updateSyncConfig(
+                id, tenantId, body.syncEnabled(), body.syncMode(), body.syncCron(), body.incrementalKey());
+        auditService.log(tenantId, null, null, "UPDATE_DATASOURCE_SYNC", "datasource/sync-config",
+                String.valueOf(id), Map.of("syncEnabled", body.syncEnabled(),
+                        "syncMode", body.syncMode() == null ? "" : body.syncMode()));
+        return Map.of("code", 0, "message", "ok", "data", toView(updated));
+    }
+
+    /** 手动触发一次同步。 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{id}/sync")
+    public Map<String, Object> syncNow(@PathVariable UUID id) {
+        String tenantId = TenantContext.requireTenantId();
+        auditService.log(tenantId, null, null, "SYNC_DATASOURCE", "datasource/sync", String.valueOf(id), null);
+        boolean ok = service.syncDatasource(id, tenantId);
+        return Map.of("code", 0, "message", "ok", "data", Map.of("synced", ok));
+    }
+
+    @PreAuthorize("isAuthenticated()")
 @DeleteMapping("/{id}")
     public Map<String, Object> delete(@PathVariable UUID id) {
         String tenantId = TenantContext.requireTenantId();
@@ -157,16 +194,22 @@ public class ExternalDataSourceController {
 
     /** 实体 → 视图（密码不返回明文/密文） */
     private Map<String, Object> toView(ExternalDataSourceEntity d) {
-        return Map.of(
-                "id", d.getId(),
-                "name", d.getName(),
-                "vendor", d.getVendor(),
-                "host", d.getHost(),
-                "port", d.getPort(),
-                "databaseName", d.getDatabaseName(),
-                "username", d.getUsername(),
-                "status", d.getStatus(),
-                "lastSyncedAt", d.getLastSyncedAt() == null ? "" : d.getLastSyncedAt().toString(),
-                "createdAt", d.getCreatedAt() == null ? "" : d.getCreatedAt().toString());
+        Map<String, Object> view = new java.util.LinkedHashMap<>();
+        view.put("id", d.getId());
+        view.put("name", d.getName());
+        view.put("vendor", d.getVendor());
+        view.put("host", d.getHost());
+        view.put("port", d.getPort());
+        view.put("databaseName", d.getDatabaseName());
+        view.put("username", d.getUsername());
+        view.put("status", d.getStatus());
+        view.put("lastSyncedAt", d.getLastSyncedAt() == null ? "" : d.getLastSyncedAt().toString());
+        view.put("syncMode", d.getSyncMode());
+        view.put("syncEnabled", d.getSyncEnabled());
+        view.put("syncCron", d.getSyncCron() == null ? "" : d.getSyncCron());
+        view.put("incrementalKey", d.getIncrementalKey() == null ? "" : d.getIncrementalKey());
+        view.put("lastSyncCursor", d.getLastSyncCursor() == null ? "" : d.getLastSyncCursor());
+        view.put("createdAt", d.getCreatedAt() == null ? "" : d.getCreatedAt().toString());
+        return view;
     }
 }

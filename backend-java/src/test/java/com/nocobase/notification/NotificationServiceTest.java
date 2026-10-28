@@ -27,7 +27,7 @@ class NotificationServiceTest {
         // 提供 dummy dispatcher
         NotificationDispatcher dummy = mock(NotificationDispatcher.class);
         when(dummy.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
-        service = new NotificationService(repository, List.of(dummy));
+        service = new NotificationService(repository, List.of(dummy), mock(com.nocobase.im.ImChannelMemberRepository.class));
     }
 
     @Test
@@ -53,7 +53,7 @@ class NotificationServiceTest {
         when(dispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
         when(dispatcher.send(any(), any(), any())).thenReturn(new NotificationDispatcher.SendResult(true, "ok"));
 
-        service = new NotificationService(repository, List.of(dispatcher));
+        service = new NotificationService(repository, List.of(dispatcher), mock(com.nocobase.im.ImChannelMemberRepository.class));
         when(repository.findEnabledByTenantId("t1")).thenReturn(List.of(ch));
 
         var results = service.fire("t1", "im.mention", "u1", Map.of("k", "v"));
@@ -90,7 +90,7 @@ class NotificationServiceTest {
         when(dispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
         when(dispatcher.send(any(), any(), any())).thenThrow(new RuntimeException("channel down"));
 
-        service = new NotificationService(repository, List.of(dispatcher));
+        service = new NotificationService(repository, List.of(dispatcher), mock(com.nocobase.im.ImChannelMemberRepository.class));
 
         var results = service.fire("t1", "event", "u1", Map.of());
 
@@ -109,7 +109,7 @@ class NotificationServiceTest {
         NotificationDispatcher dispatcher = mock(NotificationDispatcher.class);
         when(dispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
         when(dispatcher.send(any(), any(), any())).thenReturn(new NotificationDispatcher.SendResult(true, "ok"));
-        service = new NotificationService(repository, List.of(dispatcher));
+        service = new NotificationService(repository, List.of(dispatcher), mock(com.nocobase.im.ImChannelMemberRepository.class));
 
         var results = service.fire("t1", null, "u1", Map.of());
 
@@ -126,7 +126,7 @@ class NotificationServiceTest {
         NotificationDispatcher dispatcher = mock(NotificationDispatcher.class);
         when(dispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
         when(dispatcher.send(any(), any(), any())).thenReturn(new NotificationDispatcher.SendResult(true, "ok"));
-        service = new NotificationService(repository, List.of(dispatcher));
+        service = new NotificationService(repository, List.of(dispatcher), mock(com.nocobase.im.ImChannelMemberRepository.class));
 
         var results = service.fire("t1", "any.event", "u1", Map.of());
 
@@ -143,7 +143,7 @@ class NotificationServiceTest {
         NotificationDispatcher dispatcher = mock(NotificationDispatcher.class);
         when(dispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
         when(dispatcher.send(any(), any(), any())).thenReturn(new NotificationDispatcher.SendResult(true, "ok"));
-        service = new NotificationService(repository, List.of(dispatcher));
+        service = new NotificationService(repository, List.of(dispatcher), mock(com.nocobase.im.ImChannelMemberRepository.class));
 
         var results = service.fire("t1", "b", "u1", Map.of());
 
@@ -160,7 +160,7 @@ class NotificationServiceTest {
         NotificationDispatcher dispatcher = mock(NotificationDispatcher.class);
         when(dispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
         when(dispatcher.send(any(), any(), any())).thenReturn(new NotificationDispatcher.SendResult(true, "ok"));
-        service = new NotificationService(repository, List.of(dispatcher));
+        service = new NotificationService(repository, List.of(dispatcher), mock(com.nocobase.im.ImChannelMemberRepository.class));
 
         var results = service.fire("t1", "x", "u1", Map.of());
 
@@ -204,7 +204,7 @@ class NotificationServiceTest {
         when(dispatcher.supportedType()).thenReturn(NotificationChannelEntity.Type.EMAIL);
         when(dispatcher.send(any(), any(), any())).thenReturn(new NotificationDispatcher.SendResult(true, "ok"));
 
-        service = new NotificationService(repository, List.of(dispatcher));
+        service = new NotificationService(repository, List.of(dispatcher), mock(com.nocobase.im.ImChannelMemberRepository.class));
 
         service.createMentionNotification("t1", "u2", UUID.randomUUID(), UUID.randomUUID(), "snippet");
 

@@ -71,6 +71,17 @@ public class ExternalDataSourceService {
                                                      String host, Integer port, String databaseName,
                                                      String username, String password,
                                                      String driverClassName, UUID createdBy) {
+        return createDataSource(tenantId, name, vendor, host, port, databaseName,
+                username, password, driverClassName, createdBy, null, null, null, null);
+    }
+
+    /** 创建外部数据源（支持同步配置，创建时可一并设置） */
+    public ExternalDataSourceEntity createDataSource(String tenantId, String name, String vendor,
+                                                     String host, Integer port, String databaseName,
+                                                     String username, String password,
+                                                     String driverClassName, UUID createdBy,
+                                                     Boolean syncEnabled, String syncMode,
+                                                     String syncCron, String incrementalKey) {
         if (tenantId == null || tenantId.isBlank()) {
             throw new IllegalArgumentException("租户上下文缺失，拒绝创建外部数据源");
         }
@@ -100,8 +111,19 @@ public class ExternalDataSourceService {
         e.setUpdatedAt(now);
         e.setCreatedBy(createdBy);
 
+        // 同步配置（可选）
+        if (Boolean.TRUE.equals(syncEnabled)) {
+            e.setSyncEnabled(true);
+            e.setSyncMode(syncMode != null ? syncMode.toUpperCase() : "MANUAL");
+            e.setSyncCron(syncCron);
+            e.setIncrementalKey(incrementalKey);
+        } else {
+            e.setSyncEnabled(false);
+            e.setSyncMode("MANUAL");
+        }
+
         ExternalDataSourceEntity saved = datasourceRepository.save(e);
-        log.info("[ext-ds] 创建数据源 id={} tenant={} name={} vendor={}", saved.getId(), tenantId, name, vendor);
+        log.info("[ext-ds] 创建数据源 id={} tenant={} name={} vendor={} syncEnabled={}", saved.getId(), tenantId, name, vendor, e.getSyncEnabled());
         return saved;
     }
 
@@ -370,6 +392,26 @@ public class ExternalDataSourceService {
         // 删除数据源记录
         datasourceRepository.delete(entity);
         log.info("[ext-ds] 删除外部数据源 id={}", datasourceId);
+    }
+
+    /** 更新同步配置 */
+    @Transactional
+    public ExternalDataSourceEntity updateSyncConfig(
+            UUID datasourceId, String tenantId, Boolean syncEnabled,
+            String syncMode, String syncCron, String incrementalKey) {
+        ExternalDataSourceEntity entity = datasourceRepository.findByIdAndTenantId(datasourceId, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("外部数据源不存在"));
+
+        entity.setSyncEnabled(syncEnabled);
+        if (syncMode != null) entity.setSyncMode(syncMode);
+        entity.setSyncCron(syncCron);
+        entity.setIncrementalKey(incrementalKey);
+        entity.setUpdatedAt(java.time.Instant.now());
+
+        datasourceRepository.save(entity);
+        log.info("[ext-ds] 更新同步配置 id={} enabled={} mode={} cron={} incrementalKey={}",
+                datasourceId, syncEnabled, syncMode, syncCron, incrementalKey);
+        return entity;
     }
 
     /** 列出租户下的所有外部数据源 */
