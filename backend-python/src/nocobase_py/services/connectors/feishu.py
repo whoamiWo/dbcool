@@ -187,3 +187,94 @@ class FeishuConnector(BaseConnector):
             if data.get("code") != 0:
                 logger.error("[Feishu] 发送消息失败：%s", data)
             return data
+
+    async def send_card_message(
+        self,
+        open_id: str,
+        card_element: dict,
+        card_header_title: str,
+        card_elements: list[dict],
+    ) -> dict:
+        """发送富文本卡片消息（/im/v1/messages）。
+
+        Args:
+            open_id: 接收者 open_id
+            card_element: 主元素 (text 或其他类型)
+            card_header_title: 卡片标题
+            card_elements: 额外元素列表 (可选)
+
+        Returns:
+            API 响应
+        """
+        if not self.is_configured:
+            raise RuntimeError("飞书未配置")
+
+        access_token = await self.get_tenant_access_token()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
+        # 构建卡片结构
+        card = {
+            "header": {"title": card_header_title},
+            "elements": [card_element] + (card_elements or []),
+        }
+
+        payload = {
+            "receive_id": open_id,
+            "msg_type": "interactive",
+            "content": json.dumps(card),
+        }
+
+        async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
+            resp = await client.post(
+                f"{self.base_url}/im/v1/messages?receive_id_type=open_id",
+                headers=headers,
+                json=payload,
+            )
+            data = resp.json()
+            if data.get("code") != 0:
+                logger.error("[Feishu] 发送卡片消息失败：%s", data)
+            return data
+
+
+def build_feishu_card_text_element(text: str, tag: str = "lark_md") -> dict:
+    """构建飞书卡片文本元素。
+
+    Args:
+        text: 文本内容
+        tag: 标签类型 (lark_md/text/plain)
+
+    Returns:
+        卡片元素对象
+    """
+    return {"tag": tag, "text": text}
+
+
+def build_feishu_card_divider() -> dict:
+    """构建飞书卡片分割线元素。
+
+    Returns:
+        卡片元素对象
+    """
+    return {"tag": "hr"}
+
+
+def build_feishu_card_button(text: str, value: str, action_type: str = "click") -> dict:
+    """构建飞书卡片按钮元素。
+
+    Args:
+        text: 按钮文本
+        value: 按钮值 (回调用)
+        action_type: 动作类型 (click/request)
+
+    Returns:
+        卡片元素对象
+    """
+    return {
+        "tag": "button",
+        "text": {"tag": "plain_text", "content": text},
+        "value": {"action_value": value},
+        "type": action_type,
+    }

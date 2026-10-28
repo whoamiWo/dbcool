@@ -112,7 +112,17 @@ public class MessageService {
                         .warning("Failed to send mention notification: " + ex.getMessage());
             }
         });
-        
+
+        if (parsed.atAll()) {
+            try {
+                notificationService.createAtAllNotification(tenantId, channelId, saved.getId(),
+                        senderId, body.substring(0, Math.min(100, body.length())));
+            } catch (Exception ex) {
+                java.util.logging.Logger.getLogger(MessageService.class.getName())
+                        .warning("Failed to send at-all notification: " + ex.getMessage());
+            }
+        }
+
         return saved;
     }
 

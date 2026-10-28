@@ -165,6 +165,9 @@ const PlaybookRunPage = lazy(() =>
 const RecycleBinPage = lazy(() =>
   import('./pages/RecycleBin').then(m => ({ default: m.RecycleBinPage } as { default: React.ComponentType })),
 );
+const DataSourcesPage = lazy(() =>
+  import('./pages/DataSources').then(m => ({ default: m.DataSourcesPage } as { default: React.ComponentType })),
+);
 
 /** R12 懒加载占位 */
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -254,6 +257,9 @@ export const router = createBrowserRouter([
       { path: 'playbooks/:id', element: <Lazy><PlaybookRunPage /></Lazy> },
       { path: 'agent', element: <Lazy><AgentChatPage /></Lazy> },
       { path: 'ai/prompt-templates', element: <Lazy><PromptTemplateManagerPage /></Lazy> },
+
+      // Data Sources
+      { path: 'admin/datasources', element: <Lazy><DataSourcesPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

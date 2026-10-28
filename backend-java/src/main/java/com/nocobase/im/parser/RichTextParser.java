@@ -13,16 +13,20 @@ import org.springframework.stereotype.Component;
  * <p>支持解析:
  * <ul>
  *   <li>@提及：@{displayName}:userId</li>
+ *   <li>@全体成员：@all / @全员 / @所有人</li>
  *   <li>链接：http(s)://...</li>
  *   <li>代码块：```code```</li>
  * </ul>
  *
  * <p>PHASE 61: 已接入 IM @提及链路。MessageSearchService 中 formatMention 调用已删除。
+ * <p>PHASE 106: 新增 @全体成员(@all/@全员/@所有人)识别。
  */
 @Component
 public class RichTextParser {
 
     private static final Pattern MENTION_PATTERN = Pattern.compile("@\\{([^}]+)}:([a-f0-9-]+)");
+    /** @全体成员的三种写法。 */
+    private static final Pattern AT_ALL_PATTERN = Pattern.compile("@all|@全员|@所有人");
     private static final Pattern LINK_PATTERN = Pattern.compile("https?://[^\\s<>\"']+");
     private static final Pattern CODE_BLOCK_PATTERN = Pattern.compile("```([\\s\\S]*?)```");
 
@@ -30,10 +34,11 @@ public class RichTextParser {
      * 解析结果。
      *
      * @param mentions 提及列表
+     * @param atAll 是否 @全体成员
      * @param links 链接列表
      * @param codeBlocks 代码块列表
      */
-    public record ParseResult(List<Mention> mentions, List<String> links, List<String> codeBlocks) {}
+    public record ParseResult(List<Mention> mentions, boolean atAll, List<String> links, List<String> codeBlocks) {}
 
     /**
      * 提及信息。
@@ -52,12 +57,16 @@ public class RichTextParser {
      */
     public static ParseResult parse(String content) {
         if (content == null || content.isEmpty()) {
-            return new ParseResult(Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+            return new ParseResult(Collections.emptyList(), false, Collections.emptyList(), Collections.emptyList());
         }
 
         List<Mention> mentions = new ArrayList<>();
+        boolean atAll = false;
         List<String> links = new ArrayList<>();
         List<String> codeBlocks = new ArrayList<>();
+
+        // 解析 @全体成员
+        atAll = AT_ALL_PATTERN.matcher(content).find();
 
         // 解析 @提及
         Matcher mentionMatcher = MENTION_PATTERN.matcher(content);
@@ -81,7 +90,7 @@ public class RichTextParser {
             codeBlocks.add(codeBlockMatcher.group(1).trim());
         }
 
-        return new ParseResult(mentions, links, codeBlocks);
+        return new ParseResult(mentions, atAll, links, codeBlocks);
     }
 
     /**

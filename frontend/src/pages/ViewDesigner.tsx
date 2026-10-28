@@ -59,6 +59,7 @@ export function ViewDesignerPage() {
       setTitle(v.title);
       setType(v.type);
       const cfg = (v.config ?? {}) as Record<string, unknown>;
+
       if (typeof cfg.pageSize === 'number') setPageSize(cfg.pageSize);
       if (typeof cfg.groupBy === 'string') setGroupBy(cfg.groupBy);
       // 恢复 columns(没有就用 default)
@@ -356,14 +357,16 @@ function FreezeEditor({
   onChange: (next: number) => void;
 }) {
   const { t } = useTranslation('viewDesigner');
-  const max = columns.filter((c) => c.visible !== false).length;
+  // 可见列数未知（首帧/加载中）时不设上限，避免把用户输入误钳制为 0
+  const visibleCount = columns.filter((c) => c.visible !== false).length;
+  const max = visibleCount > 0 ? visibleCount : 20;
   return (
     <div style={{ marginBottom: 12 }}>
       <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-freeze">{t('freezeCount')}</label>
       <input id="v-lbl-freeze"
              type="number"
              min={0}
-             max={Math.max(max, 1)}
+             max={max}
              value={freezeCount}
              onChange={(e) => {
                const n = Number(e.target.value);
