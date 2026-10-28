@@ -115,4 +115,19 @@ describe('integrationsApi 统一入口', () => {
     expect(integrationsApi.wecom).toBe(wecomApi);
     expect(integrationsApi.integration).toBe(integrationApi);
   });
+
+  // B1 返工：JS-SDK 签名统一使用 platform 参数
+  it('jsSdk.getSignature 使用 platform 参数（B1 参数对齐）', async () => {
+    await integrationsApi.jsSdk.getSignature('wechat', 'https://app.example.com/page');
+    expect(apiClient.get).toHaveBeenCalledWith('/js-signature', {
+      params: { platform: 'wechat', url: 'https://app.example.com/page' },
+    });
+  });
+
+  it('jsSdk.getSignature 兼容 provider 别名', async () => {
+    await integrationsApi.jsSdk.getSignature('wecom', 'https://app.example.com/x', 'wecom');
+    expect(apiClient.get).toHaveBeenCalledWith('/js-signature', {
+      params: { platform: 'wecom', url: 'https://app.example.com/x', provider: 'wecom' },
+    });
+  });
 });

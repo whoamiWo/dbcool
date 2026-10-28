@@ -35,6 +35,8 @@ export function GanttViewPage() {
     startDateField?: string;
     endDateField?: string;
     titleField?: string;
+    progressField?: string;
+    dependsOnField?: string;
   };
 
   const startField =
@@ -49,6 +51,13 @@ export function GanttViewPage() {
     config.titleField ??
     fields.find((f) => f.type === 'text')?.name ??
     'title';
+  // B5 返工：progress / 依赖字段解析（修复前 pages/GanttView 无 progress、无依赖线）
+  const progressField =
+    config.progressField ??
+    fields.find((f) => f.name.toLowerCase().includes('progress'))?.name;
+  const dependsOnField =
+    config.dependsOnField ??
+    fields.find((f) => f.name.toLowerCase().includes('depend'))?.name;
 
   const { data: recordsData } = useQuery({
     queryKey: ['gantt-records', collectionName, startField, endField],
@@ -63,13 +72,29 @@ export function GanttViewPage() {
       .map((r) => {
         const s = r[startField] ? Date.parse(String(r[startField])) : null;
         const e = r[endField] ? Date.parse(String(r[endField])) : null;
-        return { id: String(r.id), title: String(r[titleField] ?? r.id ?? '').slice(0, 40), s, e };
+        // B5 返工：progress / dependsOn 字段（可选）
+        const progress = progressField && r[progressField] != null
+          ? Math.min(100, Math.max(0, Number(r[progressField]) || 0))
+          : 0;
+        const dependsOn = dependsOnField && r[dependsOnField] != null
+          ? String(r[dependsOnField]).split(',').map((x: string) => x.trim()).filter(Boolean)
+          : [] as string[];
+        return {
+          id: String(r.id),
+          title: String(r[titleField] ?? r.id ?? '').slice(0, 40),
+          s,
+          e,
+          progress,
+          dependsOn,
+        };
       })
       .filter((x) => x.s != null || x.e != null) as Array<{
       id: string;
       title: string;
       s: number | null;
       e: number | null;
+      progress: number;
+      dependsOn: string[];
     }>;
 
     const times = parsed
@@ -79,14 +104,36 @@ export function GanttViewPage() {
     const hi = times.length ? Math.max(...times) : 0;
     const span = Math.max(hi - lo, 1);
 
+    // B5 返工：依赖线 — 每条依赖连接「前置任务结束点 → 当前任务开始点」
+    const byId = new Map(parsed.map((p) => [p.id, p]));
+    const deps: Array<{ fromId: string; toId: string; fromX: number; toX: number; fromY: number; toY: number }> = [];
+    const rowIndex = new Map(parsed.map((p, i) => [p.id, i]));
+    parsed.forEach((cur, i) => {
+      cur.dependsOn.forEach((depId) => {
+        const dep = byId.get(depId);
+        if (!dep || dep.s == null || dep.e == null || cur.s == null) return;
+        const depRow = rowIndex.get(depId);
+        if (depRow == null) return;
+        // 前置任务结束 X 坐标 → 当前任务开始 X 坐标
+        deps.push({
+          fromId: depId,
+          toId: cur.id,
+          fromX: ((dep.e as number) - lo) / span * 100,
+          toX: ((cur.s as number) - lo) / span * 100,
+          fromY: depRow,
+          toY: i,
+        });
+      });
+    });
+
     // 时间轴刻度：按 25% / 50% / 75% / 100% 分段
     const ticks = [0, 0.25, 0.5, 0.75, 1].map((p) => ({
       pos: p,
       label: new Date(lo + span * p).toISOString().slice(0, 10),
     }));
 
-    return { rows: parsed, lo, span, ticks };
-  }, [recordsData, startField, endField, titleField]);
+    return { rows: parsed, lo, span, ticks, deps };
+  }, [recordsData, startField, endField, titleField, progressField, dependsOnField]);
 
   if (!viewData || !collectionData) {
     return <p style={{ color: 'var(--color-text-muted)' }}>{t('calendarView.loading')}</p>;
@@ -143,8 +190,57 @@ export function GanttViewPage() {
           border: '1px solid var(--color-border-light)',
           borderRadius: 8,
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
+        {/* B5 返工：依赖线 SVG 覆盖层（修复前 pages/GanttView 无依赖连线）
+            每条依赖从前置任务结束 X 斜拉到当前任务开始 X */}
+        {rows.deps.length > 0 && (
+          <svg
+            style={{
+              position: 'absolute',
+              left: 240,
+              top: 0,
+              width: 'calc(100% - 248px)',
+              height: '100%',
+              pointerEvents: 'none',
+              overflow: 'visible',
+            }}
+            aria-hidden
+          >
+            {rows.deps.map((d, i) => {
+              const rowH = 38; // 每行约 38px（8px padding + 22px bar）
+              const y1 = d.fromY * rowH + 14;
+              const y2 = d.toY * rowH + 14;
+              const x1 = d.fromX;
+              const x2 = d.toX;
+              return (
+                <path
+                  key={i}
+                  d={`M ${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`}
+                  fill="none"
+                  stroke="var(--color-border-light)"
+                  strokeWidth={1.5}
+                  markerEnd="url(#gantt-arrow)"
+                  opacity={0.7}
+                />
+              );
+            })}
+            <defs>
+              <marker
+                id="gantt-arrow"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-border-light)" />
+              </marker>
+            </defs>
+          </svg>
+        )}
         {rows.rows.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
             {t('calendarView.noData')}
@@ -203,7 +299,18 @@ export function GanttViewPage() {
                       title={`${new Date(row.s as number).toISOString().slice(0, 10)} → ${new Date(
                         row.e as number,
                       ).toISOString().slice(0, 10)}`}
-                    />
+                    >
+                      {/* B5 返工：区间条内嵌 progress 进度填充（修复前 pages/GanttView 无 progress） */}
+                      <div
+                        style={{
+                          width: `${row.progress}%`,
+                          height: '100%',
+                          background: 'var(--color-success)',
+                          opacity: 0.85,
+                        }}
+                        aria-label={`progress ${row.progress}%`}
+                      />
+                    </div>
                   ) : (
                     <span style={{ fontSize: 11, color: 'var(--color-text-muted)', paddingLeft: 6, lineHeight: '22px' }}>
                       {t('calendarView.noData')}
