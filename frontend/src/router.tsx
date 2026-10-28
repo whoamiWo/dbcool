@@ -104,6 +104,9 @@ const ErDiagramPage = lazy(() =>
 const AlertCenterPage = lazy(() =>
   import('./pages/AlertCenter').then(m => ({ default: m.AlertCenterPage } as { default: React.ComponentType })),
 );
+const PromptTemplateManagerPage = lazy(() =>
+  import('./pages/PromptTemplateManagerPage').then(m => ({ default: m.PromptTemplateManagerPage } as { default: React.ComponentType })),
+);
 const ImChatPage = lazy(() =>
   import('./features/im/ImLayout').then(m => ({ default: m.ImChatPage } as { default: React.ComponentType })),
 );
@@ -245,6 +248,7 @@ export const router = createBrowserRouter([
       { path: 'playbooks', element: <Lazy><PlaybookListPage /></Lazy> },
       { path: 'playbooks/:id', element: <Lazy><PlaybookRunPage /></Lazy> },
       { path: 'agent', element: <Lazy><AgentChatPage /></Lazy> },
+      { path: 'ai/prompt-templates', element: <Lazy><PromptTemplateManagerPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
