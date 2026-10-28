@@ -116,6 +116,39 @@ export function TableViewPage() {
   const records = recordsData ?? [];
   const fieldMap = new Map(fields.map((f) => [f.name, f]));
   
+  // C2 冻结列 + 条件格式
+  const freezeCount = config.freezeCount ?? 0;
+  const conditionalStyles = config.conditionalStyles ?? [];
+
+  /** C2 条件格式匹配：返回匹配的样式对象 */
+  const matchCondition = (val: unknown, rule: { op: string; value?: string | number }): boolean => {
+    if (rule.value == null && val != null) return false;
+    switch (rule.op) {
+      case 'eq': return String(val) === String(rule.value);
+      case 'neq': return String(val) !== String(rule.value);
+      case 'contains': return String(val).includes(String(rule.value));
+      case 'gt': return Number(val) > Number(rule.value);
+      case 'lt': return Number(val) < Number(rule.value);
+      case 'empty': return val == null || val === '';
+      case 'notEmpty': return val != null && val !== '';
+      default: return false;
+    }
+  };
+
+  /** C2 获取单元格最终样式（结合基础样式 + 条件格式） */
+  const getCellStyle = (field: string, val: unknown): React.CSSProperties => {
+    let style: React.CSSProperties = { padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: 'var(--color-text-secondary)' };
+    
+    for (const rule of conditionalStyles) {
+      if (rule.field !== field) continue;
+      if (!matchCondition(val, rule)) continue;
+      if (rule.color) style.color = rule.color;
+      if (rule.background) style.background = rule.background;
+      break; // 第一条匹配即止
+    }
+    return style;
+  };
+
   // R2 T2: 分组配置
   const groupByField = config.groupBy;
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
@@ -152,6 +185,21 @@ export function TableViewPage() {
   type Col = { field: string; label?: string; width?: number; visible?: boolean };
   const allColumns: Col[] = config.columns ?? fields.map((f) => ({ field: f.name, label: f.label ?? f.name, width: 160, visible: true }));
   const columns = allColumns.filter((c) => c.visible !== false);
+
+  // C2 冻结列：计算每个冻结列的 left 偏移（复选框列宽 40px 起算）
+  const frozenOffsets: number[] = [];
+  {
+    let acc = 40;
+    columns.forEach((c, i) => {
+      frozenOffsets[i] = acc;
+      if (i < freezeCount) acc += c.width ?? 160;
+    });
+  }
+  /** C2 冻结列 sticky 样式（含不透明背景，避免横向滚动时透底） */
+  const freezeStyle = (ci: number): React.CSSProperties =>
+    ci < freezeCount
+      ? { position: 'sticky', left: frozenOffsets[ci], zIndex: 2, background: 'var(--color-bg-surface)' }
+      : {};
 
   // R2 T2: 分组渲染数据
   const groupedData = useMemo(() => {
@@ -413,7 +461,16 @@ export function TableViewPage() {
             </colgroup>
             <thead>
               <tr style={{ background: 'rgba(30, 41, 59, 0.5)' }}>
-                <th style={{ padding: 8, textAlign: 'center', minWidth: 40, borderBottom: '1px solid var(--color-border-light)' }} aria-label="select all">
+                <th
+                  style={{
+                    padding: 8,
+                    textAlign: 'center',
+                    minWidth: 40,
+                    borderBottom: '1px solid var(--color-border-light)',
+                    ...(freezeCount > 0 ? { position: 'sticky', left: 0, zIndex: 3, background: 'rgba(30, 41, 59, 0.5)' } : {}),
+                  }}
+                  aria-label="select all"
+                >
                   <input
                     type="checkbox"
                     checked={selectedIds.size > 0 && selectedIds.size === sorted.length}
@@ -425,9 +482,33 @@ export function TableViewPage() {
                     style={{ cursor: 'pointer' }}
                   />
                 </th>
-                {groupByField && <th style={{ padding: 8, textAlign: 'left', minWidth: 60, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)' }}>📊</th>}
-                {columns.map((c) => (
-                  <th key={c.field} style={{ padding: 8, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)' }}>
+                {groupByField && (
+                  <th
+                    style={{
+                      padding: 8,
+                      textAlign: 'left',
+                      minWidth: 60,
+                      color: 'var(--color-text-secondary)',
+                      borderBottom: '1px solid var(--color-border-light)',
+                      ...(freezeCount > 0 ? { position: 'sticky', left: 40, zIndex: 3, background: 'rgba(30, 41, 59, 0.5)' } : {}),
+                    }}
+                  >
+                    📊
+                  </th>
+                )}
+                {columns.map((c, ci) => (
+                  <th
+                    key={c.field}
+                    style={{
+                      padding: 8,
+                      textAlign: 'left',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      color: 'var(--color-text-secondary)',
+                      borderBottom: '1px solid var(--color-border-light)',
+                      ...freezeStyle(ci),
+                    }}
+                  >
                     {c.label ?? c.field}
                   </th>
                 ))}
@@ -484,13 +565,13 @@ export function TableViewPage() {
                                   style={{ cursor: 'pointer' }}
                                 />
                               </td>
-                              {columns.map((c) => {
+                              {columns.map((c, ci) => {
                                 const f = fieldMap.get(c.field);
                                 const val = r[c.field];
                                 return (
                                   <td
                                     key={c.field}
-                                    style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
+                                    style={{ ...getCellStyle(c.field, val), ...freezeStyle(ci) }}
                                     onDoubleClick={() => {
                                       setEditing({ id: r.id, field: c.field });
                                     }}
@@ -530,7 +611,9 @@ export function TableViewPage() {
                     </div>
                   ) : !groupByField && sorted.map((r) => (
                     <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
-                      <td style={{ padding: 8, textAlign: 'center' }}>
+                      <td
+                        style={{ padding: 8, textAlign: 'center', ...(freezeCount > 0 ? { position: 'sticky', left: 0, zIndex: 2, background: 'var(--color-bg-surface)' } : {}) }}
+                      >
                         <input
                           type="checkbox"
                           checked={selectedIds.has(r.id)}
@@ -539,13 +622,13 @@ export function TableViewPage() {
                           style={{ cursor: 'pointer' }}
                         />
                       </td>
-                      {columns.map((c) => {
+                      {columns.map((c, ci) => {
                         const f = fieldMap.get(c.field);
                         const val = r[c.field];
                         return (
                           <td
                             key={c.field}
-                            style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
+                            style={{ ...getCellStyle(c.field, val), ...freezeStyle(ci) }}
                             onDoubleClick={() => {
                               setEditing({ id: r.id, field: c.field });
                             }}
@@ -583,30 +666,33 @@ export function TableViewPage() {
                   {groupByField && groupedData?.map((g) => (
                     <React.Fragment key={g._groupKey}>
                       <tr style={{ background: 'rgba(99, 102, 241, 0.1)', borderTop: '1px solid var(--color-border-light)' }}>
-                        <td style={{ padding: 8, cursor: 'pointer', fontWeight: 600 }} onClick={() => toggleGroup(g._groupKey)}>
+                        <td
+                          style={{ padding: 8, cursor: 'pointer', fontWeight: 600, ...(freezeCount > 0 ? { position: 'sticky', left: 0, zIndex: 2, background: 'var(--color-bg-surface)' } : {}) }}
+                          onClick={() => toggleGroup(g._groupKey)}
+                        >
                           {expandedGroups.has(g._groupKey) ? '▼' : '▶'}
                         </td>
-                        {columns.map((c) => {
+                        {columns.map((c, ci) => {
                           if (c.field === groupByField) {
-                            return <td key={c.field} style={{ padding: 8, fontWeight: 600 }}>{g._groupKey}</td>;
+                            return <td key={c.field} style={{ ...freezeStyle(ci), fontWeight: 600 }}>{g._groupKey}</td>;
                           }
                           if (g._aggregations.hasOwnProperty(c.field)) {
-                            return <td key={c.field} style={{ padding: 8, color: 'var(--color-info)' }}>{formatAgg(g._aggregations[c.field])}</td>;
+                            return <td key={c.field} style={{ ...freezeStyle(ci), color: 'var(--color-info)' }}>{formatAgg(g._aggregations[c.field])}</td>;
                           }
-                          return <td key={c.field} style={{ padding: 8, color: 'var(--color-text-muted)' }}>—</td>;
+                          return <td key={c.field} style={{ ...freezeStyle(ci), color: 'var(--color-text-muted)' }}>—</td>;
                         })}
                         <td style={{ padding: 8, fontWeight: 600, color: 'var(--color-info)' }}>{t('table.itemsCount', { count: g._count })}</td>
                       </tr>
                       {expandedGroups.has(g._groupKey) && g._children.map((r) => (
                         <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)', background: 'rgba(0,0,0,0.02)' }}>
                           <td style={{ padding: 8 }} aria-hidden="true"></td>
-                          {columns.map((c) => {
+                          {columns.map((c, ci) => {
                             const f = fieldMap.get(c.field);
                             const val = r[c.field];
                             return (
                               <td
                                 key={c.field}
-                                style={{ padding: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
+                                style={{ ...getCellStyle(c.field, val), ...freezeStyle(ci) }}
                                 onDoubleClick={() => {
                                   setEditing({ id: r.id, field: c.field });
                                 }}

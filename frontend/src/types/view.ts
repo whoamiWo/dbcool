@@ -9,6 +9,17 @@ export interface TableColumn {
   visible?: boolean; // 默认 true
 }
 
+/** C2 条件格式规则：命中条件的单元格着色 */
+export interface ConditionalStyle {
+  field: string;
+  op: 'eq' | 'neq' | 'contains' | 'gt' | 'lt' | 'empty' | 'notEmpty';
+  value?: string | number;
+  /** 命中后的文本颜色（CSS color 值） */
+  color?: string;
+  /** 命中后的背景色（CSS color 值） */
+  background?: string;
+}
+
 export interface SortRule {
   field: string;
   direction: 'asc' | 'desc';
@@ -27,6 +38,8 @@ export interface TableConfig {
   filters?: FilterRule[];
   groupBy?: string; // T2: 分组字段
   groupAggregations?: Array<{ field: string; operator: 'sum' | 'avg' | 'min' | 'max' }>; // T2: 数值聚合
+  freezeCount?: number; // C2: 冻结前 N 列（0 = 不冻结）
+  conditionalStyles?: ConditionalStyle[]; // C2: 条件格式规则
 }
 
 export interface KanbanConfig {
