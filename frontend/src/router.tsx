@@ -168,6 +168,9 @@ const RecycleBinPage = lazy(() =>
 const DataSourcesPage = lazy(() =>
   import('./pages/DataSources').then(m => ({ default: m.DataSourcesPage } as { default: React.ComponentType })),
 );
+const BillingPage = lazy(() =>
+  import('./pages/Billing').then(m => ({ default: m.BillingPage } as { default: React.ComponentType })),
+);
 
 /** R12 懒加载占位 */
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -260,6 +263,7 @@ export const router = createBrowserRouter([
 
       // Data Sources
       { path: 'admin/datasources', element: <Lazy><DataSourcesPage /></Lazy> },
+      { path: 'admin/billing', element: <Lazy><BillingPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

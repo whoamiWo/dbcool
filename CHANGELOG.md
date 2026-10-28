@@ -1,3 +1,28 @@
+## Unreleased — B4 计费系统：审计返工（P0/P1/P2）
+
+> 审计判定 B4「已完成」不成立（此前从未通过 `mvn compile`），按 P0→P2 返工。
+
+### P0 编译与迁移阻塞
+
+- 删除重复迁移 `V72__external_ds_sync.sql`（与 `V72__external_datasource_sync.sql` 同版本号，Flyway 启动即失败）
+- `V74__billing_system.sql:53` 的 `CONSTRAINT ... UNIQUE (...) WHERE (...)`（PostgreSQL 不支持部分唯一约束）改为 `CREATE UNIQUE INDEX unique_tenant_active_subscription ... WHERE status IN ('active','trialing')`
+- `BillingService` 依赖的 `org.json.JSONArray` 在 `pom.xml` 与本地仓库均不存在 → 改用 Jackson `ObjectMapper`
+- 清理 8 处 Checkstyle `UnusedImports`（`PlanTierEntity`/`SubscriptionEntity`/`BillingService`），补 `SubscriptionEntity` 缺失的 `BigDecimal` import → `mvn -o compile` **BUILD SUCCESS**
+
+### P1 租户隔离与支付真实性
+
+- `BillingController` 全部端点改为 `TenantContext.requireTenantId()` 取租户，路径/body 中的 `tenantId` 仅做一致性校验，不一致 → 403（`BillingAccessDeniedException`）
+- `BillingService` 的 `upgrade/cancel/renew/markInvoiceAsPaid/confirmPayment` 增加归属校验；去掉 4 处 `@Autowired(required = false)`，改构造器注入 + `Objects.requireNonNull` fail-fast
+- 新增支付网关抽象：`PaymentGateway`、`PaymentGatewayRegistry`、`HttpPaymentGateway`（真实 HTTP 扣款，按响应 succeeded/pending/failed 三态落库）、`ManualPaymentGateway`（线下支付落 PENDING，需 `POST /payments/{id}/confirm`）。未注册支付方式直接抛 `UnsupportedPaymentProviderException`，不再静默置 SUCCEEDED
+- 新增 `GET /api/billing/payment-providers`，逾期扫描改按租户遍历（`findByTenantIdAnd...`），补 `BillingOverdueJob` `@Scheduled`（每天 02:15）
+- 写操作补 `auditService.log` 埋点，跨租户拒绝走 403
+
+### P2 测试与前端
+
+- 新增 `BillingServiceTest`（15）+ `HttpPaymentGatewayTest`（5）= **20/20 通过**；顺带修复 `ExternalDataSourceControllerTest` 因 `CreateDataSourceRequest` 扩参导致的**测试编译失败（主干本就红）**
+- 门禁三件套全绿：`TenantIsolationIntegrationTest`、`AuditTrailCoverageIntegrationTest`、`ControllerAuthorizationCoverageTest`
+- 新增前端 `frontend/src/pages/Billing.tsx`（套餐选择 / 当前订阅 / 账单支付 / 支付记录）+ 路由 `admin/billing` + `Billing.test.tsx` **5/5 通过**
+
 ## Unreleased — Phase B：微信嵌入集群（B1 + B2 + B6）
 
 > **微信嵌入集群**：Phase B Wave 1，让 DBCool 页面可在微信公众平台 / 小程序内置浏览器内完成鉴权、登录与订阅消息推送，直接延续 Phase A 已落地的通用 JS-SDK 签名框架。

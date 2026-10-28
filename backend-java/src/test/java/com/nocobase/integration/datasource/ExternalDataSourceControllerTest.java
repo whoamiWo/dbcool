@@ -71,12 +71,14 @@ class ExternalDataSourceControllerTest {
         UUID dsId = UUID.randomUUID();
         ExternalDataSourceEntity saved = sample(dsId, "tenant_a");
         when(service.createDataSource(eq("tenant_a"), anyString(), anyString(), anyString(),
-                anyInt(), anyString(), anyString(), eq("p@ss"), isNull(), isNull()))
+                anyInt(), anyString(), anyString(), eq("p@ss"), isNull(), isNull(),
+                any(), any(), any(), any()))
                 .thenReturn(saved);
 
         TenantContext.set("tenant_a");
         var resp = controller.create(new ExternalDataSourceController.CreateDataSourceRequest(
-                "mysqlds", "mysql", "10.0.0.1", 3306, "shopdb", "reader", "p@ss", null));
+                "mysqlds", "mysql", "10.0.0.1", 3306, "shopdb", "reader", "p@ss", null,
+                false, "MANUAL", null, null));
 
         assertNotNull(resp);
         assertEquals(201, resp.getStatusCodeValue());
@@ -85,19 +87,22 @@ class ExternalDataSourceControllerTest {
 
         // 关键：Service 收到的 tenantId 来自 TenantContext（非 "system"）
         verify(service).createDataSource(eq("tenant_a"), anyString(), anyString(), anyString(),
-                anyInt(), anyString(), anyString(), eq("p@ss"), isNull(), isNull());
+                anyInt(), anyString(), anyString(), eq("p@ss"), isNull(), isNull(),
+                any(), any(), any(), any());
     }
 
     @Test
     void create_duplicateRejected_propagatesIAE() {
         when(service.createDataSource(anyString(), anyString(), anyString(), anyString(),
-                anyInt(), anyString(), anyString(), anyString(), any(), any()))
+                anyInt(), anyString(), anyString(), anyString(), any(), any(),
+                any(), any(), any(), any()))
                 .thenThrow(new IllegalArgumentException("同名数据源已存在"));
 
         TenantContext.set("tenant_a");
         assertThrows(IllegalArgumentException.class, () ->
                 controller.create(new ExternalDataSourceController.CreateDataSourceRequest(
-                        "dup", "mysql", "h", 3306, "db", "u", "p", null)));
+                        "dup", "mysql", "h", 3306, "db", "u", "p", null,
+                        false, "MANUAL", null, null)));
     }
 
     @Test
