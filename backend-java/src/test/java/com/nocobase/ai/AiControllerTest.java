@@ -23,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
 class AiControllerTest {
 
     private AiAssistantService aiService;
+    private AiPromptTemplateService promptService;
     private AiController controller;
 
     private final AuthenticatedUser user = new AuthenticatedUser(
@@ -31,7 +32,8 @@ class AiControllerTest {
     @BeforeEach
     void setUp() {
         aiService = mock(AiAssistantService.class);
-        controller = new AiController(aiService);
+        promptService = mock(AiPromptTemplateService.class);
+        controller = new AiController(aiService, promptService);
     }
 
     @Test

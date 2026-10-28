@@ -143,6 +143,10 @@ const CollabPage = lazy(() =>
 const WorkbenchPage = lazy(() =>
   import('./pages/Workbench').then(m => ({ default: m.default } as { default: React.ComponentType })),
 );
+// B1: 微信 JS-SDK 原生能力演示页（仅微信内可见）
+const WorkbenchWechatDemoPage = lazy(() =>
+  import('./pages/WorkbenchWechatDemo').then(m => ({ default: m.WorkbenchWechatDemo } as { default: React.ComponentType })),
+);
 const TimelineViewPage = lazy(() =>
   import('./features/collection/TimelineView').then(m => ({ default: m.TimelineViewPage } as { default: React.ComponentType })),
 );
@@ -227,6 +231,7 @@ export const router = createBrowserRouter([
       { path: 'views/:id/detail/:recordId', element: <Lazy><DetailViewPage /></Lazy> },
       { path: 'views/:id/timeline', element: <Lazy><TimelineViewPage /></Lazy> },
       { path: 'workbench', element: <Lazy><WorkbenchPage /></Lazy> },
+      { path: 'workbench/wechat-demo', element: <Lazy><WorkbenchWechatDemoPage /></Lazy> },
       { path: 'im', element: <Lazy><ImChatPage /></Lazy> },
       { path: 'im/:channelId', element: <Lazy><ImChatPage /></Lazy> },
 
