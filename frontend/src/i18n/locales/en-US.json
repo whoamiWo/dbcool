@@ -1245,7 +1245,12 @@
     "expandDay": "Expand day {{day}} records",
     "expand": "Expand",
     "collapse": "Collapse",
-    "noRecords": "No records this day"
+    "noRecords": "No records this day",
+    "modeMonth": "Month",
+    "modeWeek": "Week",
+    "modeYear": "Year",
+    "prevWeek": "← Prev week",
+    "nextWeek": "Next week →"
   },
   "auditLogs": {
     "title": "🔍 Audit Logs",

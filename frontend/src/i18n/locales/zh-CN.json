@@ -1225,6 +1225,8 @@
   "calendarView": {
     "prevMonth": "← 上一月",
     "nextMonth": "下一月 →",
+    "prevWeek": "← 上一周",
+    "nextWeek": "下一周 →",
     "backToToday": "回到今天",
     "recordsSummary": "共 {{count}} 条记录 · 按 <code>{{field}}</code> 排列",
     "dayWeeks": [
@@ -1245,7 +1247,10 @@
     "expandDay": "展开 {{day}} 日记录",
     "expand": "展开",
     "collapse": "收起",
-    "noRecords": "当日无记录"
+    "noRecords": "当日无记录",
+    "modeMonth": "月",
+    "modeWeek": "周",
+    "modeYear": "年"
   },
   "auditLogs": {
     "title": "🔍 审计日志",

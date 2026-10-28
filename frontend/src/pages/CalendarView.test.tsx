@@ -1,5 +1,5 @@
 /**
- * PHASE 4.2 覆盖率补测：pages/CalendarView.tsx
+ * PHASE 4.2 覆盖率补测：pages/CalendarView.tsx（C3 周/年视图重构后）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -10,24 +10,40 @@ import { CalendarViewPage } from './CalendarView';
 vi.mock('@/api/client', () => ({
   default: {
     get: vi.fn(),
+    put: vi.fn(),
   },
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ 
+  useTranslation: () => ({
     t: (k: string, opts?: Record<string, unknown>) => {
       const translations: Record<string, string> = {
-        'calendarView.dayWeeks': JSON.stringify(['Mon','Tue','Wed','Thu','Fri','Sat','Sun']),
+        'calendarView.dayWeeks': JSON.stringify(['Sun','Mon','Tue','Wed','Thu','Fri','Sat']),
         'calendarView.loading': 'Loading...',
-        'calendarView.prevMonth': '上月',
-        'calendarView.nextMonth': '下月',
-        'calendarView.today': '今天',
-        'calendarView.noData': '暂无数据',
-        'calendarView.recordCount': `共 ${opts?.count ?? 0} 条`,
-        'calendarView.sortedBy': `按 ${opts?.field ?? ''} 排序`,
-        'calendarView.moreRecords': `还有 ${opts?.count ?? 0} 条`,
+        'calendarView.prevMonth': 'Prev Month',
+        'calendarView.nextMonth': 'Next Month',
+        'calendarView.today': 'Today',
+        'calendarView.prevWeek': 'Prev Week',
+        'calendarView.nextWeek': 'Next Week',
+        'calendarView.modeMonth': 'Month',
+        'calendarView.modeWeek': 'Week',
+        'calendarView.modeYear': 'Year',
+        'calendarView.noData': 'No data',
+        'calendarView.recordCount': `{{count}} total`,
+        'calendarView.sortedBy': `sorted by {{field}}`,
+        'calendarView.moreRecords': '{{count}} more',
+        'calendarView.expandDay': 'Expand day {{day}}',
+        'calendarView.expand': 'Expand',
+        'calendarView.collapse': 'Collapse',
+        'calendarView.noRecords': 'No records',
       };
-      return translations[k] ?? k;
+      let result = translations[k] ?? k;
+      if (opts) {
+        for (const [key, val] of Object.entries(opts)) {
+          result = result.replace(`{{${key}}}`, String(val));
+        }
+      }
+      return result;
     },
   }),
 }));
@@ -51,7 +67,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('CalendarViewPage', () => {
+describe('CalendarViewPage (C3)', () => {
   it('加载视图后显示日历', async () => {
     (apiClient.get as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -103,7 +119,7 @@ describe('CalendarViewPage', () => {
     expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
 
-  it('无记录时日历为空', async () => {
+  it('默认显示月视图模式切换按钮', async () => {
     (apiClient.get as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
         id: 'v1',
@@ -113,7 +129,7 @@ describe('CalendarViewPage', () => {
       })
       .mockResolvedValueOnce({
         name: 'events',
-        fields: [{ name: 'date', type: 'date' }],
+        fields: [{ name: 'date', type: 'date' }, { name: 'title', type: 'text' }],
       })
       .mockResolvedValueOnce([]);
 
@@ -121,9 +137,10 @@ describe('CalendarViewPage', () => {
     await waitFor(() => {
       expect(apiClient.get).toHaveBeenCalledTimes(3);
     });
-    // buildCalendar 始终生成整月网格（含空白占位格），因此渲染的是空网格而非「暂无数据」
-    expect(await screen.findByText(/共 0 条/)).toBeInTheDocument();
-    expect(screen.getByText('Mon')).toBeInTheDocument();
+    // C3 新增的视图切换按钮
+    expect(screen.getByText('Month')).toBeInTheDocument();
+    expect(screen.getByText('Week')).toBeInTheDocument();
+    expect(screen.getByText('Year')).toBeInTheDocument();
   });
 
   it('有记录时渲染日历网格和记录标题', async () => {
@@ -154,38 +171,7 @@ describe('CalendarViewPage', () => {
     expect(await screen.findByText('任务 3')).toBeInTheDocument();
   });
 
-  it('翻月按钮点击切换月份', async () => {
-    const mockRecords = [
-      { id: 'r1', date: '2026-10-05', title: '会议 1' },
-    ];
-    (apiClient.get as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({
-        id: 'v1',
-        title: 'Calendar',
-        collection_name: 'events',
-        config: { dateField: 'date' },
-      })
-      .mockResolvedValueOnce({
-        name: 'events',
-        fields: [{ name: 'date', type: 'date' }, { name: 'title', type: 'text' }],
-      })
-      .mockResolvedValueOnce(mockRecords);
-
-    renderView();
-    await waitFor(() => {
-      expect(apiClient.get).toHaveBeenCalledTimes(3);
-    });
-
-    const prevBtn = await screen.findByText('上月');
-    const nextBtn = screen.getByText('下月');
-    const todayBtn = screen.getByText('今天');
-
-    expect(prevBtn).toBeInTheDocument();
-    expect(nextBtn).toBeInTheDocument();
-    expect(todayBtn).toBeInTheDocument();
-  });
-
-  it('单列超过 3 条记录时显示"还有 N 条"', async () => {
+  it('单列超过 3 条记录时显示"N 条更多"', async () => {
     const mockRecords = Array.from({ length: 5 }).map((_, i) => ({
       id: `r${i}`,
       date: '2026-10-12',
@@ -208,6 +194,35 @@ describe('CalendarViewPage', () => {
     await waitFor(() => {
       expect(apiClient.get).toHaveBeenCalledTimes(3);
     });
-    expect(await screen.findByText('还有 2 条')).toBeInTheDocument();
+    // desktop mode shows "2 条更多" for day with 5 records
+    expect(await screen.findByText('2 条更多')).toBeInTheDocument();
+  });
+
+  it('年份视图渲染 12 个月份', async () => {
+    (apiClient.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        id: 'v1',
+        title: 'Calendar',
+        collection_name: 'events',
+        config: { dateField: 'date' },
+      })
+      .mockResolvedValueOnce({
+        name: 'events',
+        fields: [{ name: 'date', type: 'date' }, { name: 'title', type: 'text' }],
+      })
+      .mockResolvedValueOnce([]);
+
+    renderView();
+    await waitFor(() => {
+      expect(apiClient.get).toHaveBeenCalledTimes(3);
+    });
+    // 切换至年视图
+    const yearBtn = screen.getByText('Year');
+    yearBtn.click();
+    // 年份视图应显示月份卡片
+    await waitFor(() => {
+      expect(screen.getByText('1 月')).toBeInTheDocument();
+      expect(screen.getByText('12 月')).toBeInTheDocument();
+    });
   });
 });

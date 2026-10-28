@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
 import type { CollectionMeta } from '@/types/collection';
 import type { ViewFull } from '@/types/view';
+
+type ViewMode = 'month' | 'week' | 'year';
 
 /** 移动端断点检测 hook（<=768px 视为移动端） */
 function useIsMobile(breakpoint = 768): boolean {
@@ -19,13 +21,15 @@ function useIsMobile(breakpoint = 768): boolean {
   return isMobile;
 }
 
-/** 日历视图 — 按日期字段分组展示记录 (T3: 支持翻月) */
+/** 日历视图 — 支持月/周/年视图（C3） */
 export function CalendarViewPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const isMobile = useIsMobile();
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: viewData } = useQuery({
     queryKey: ['view', id],
@@ -40,246 +44,281 @@ export function CalendarViewPage() {
     enabled: !!collectionName,
   });
 
-  // 派生值空安全计算（Hook 必须在 early return 之前，故不用 viewData! 断言）
   const fields = collectionData?.fields ?? [];
   const config = (viewData?.config ?? {}) as { dateField?: string; titleField?: string };
   const dateField = config.dateField ?? fields.find((f) => f.type === 'date' || f.type === 'datetime')?.name;
   const titleField = config.titleField ?? fields.find((f) => f.type === 'text')?.name ?? 'id';
 
-  const { data: monthRecordsData } = useQuery({
-    queryKey: ['records', collectionName, currentMonth.toISOString().slice(0, 7), dateField],
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+
+  const { data: allRecordsData } = useQuery({
+    queryKey: ['records', collectionName, year, month, dateField],
     queryFn: () => {
-      // R5 T3: Query by month to avoid limit=500 truncation
-      const year = currentMonth.getFullYear();
-      const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
-      return apiClient.get<any[]>(`/collections/${collectionName}/records?limit=5000&filter=${encodeURIComponent(String(dateField) + '_gte=' + year + '-' + month + '-01')}&filter=${encodeURIComponent(String(dateField) + '_lte=' + year + '-' + month + '-31')}`);
+      const y = String(year);
+      const m = String(month + 1).padStart(2, '0');
+      const nextM = String(month + 2 > 12 ? 1 : month + 2).padStart(2, '0');
+      const nextYear = month + 1 >= 12 ? year + 1 : year;
+      const filter1 = encodeURIComponent(`${dateField}_gte=${y}-${m}-01`);
+      const filter2 = encodeURIComponent(`${dateField}_lte=${nextYear}-${nextM}-01`);
+      return apiClient.get<any[]>(`/collections/${collectionName}/records?limit=5000&filter=${filter1}&filter=${filter2}`);
     },
     enabled: !!collectionName && !!dateField && !!viewData && !!collectionData,
   });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
-  const allRecords = monthRecordsData ?? [];
+  const allRecords = allRecordsData ?? [];
 
-   
-  const { weeks, monthName } = useMemo(
-    () => buildCalendar(allRecords, currentMonth, dateField, titleField),
-    [allRecords, currentMonth, dateField, titleField]
-  );
+  // C3: 按日期索引记录
+  const recordsByDate = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const r of allRecords) {
+      const raw = dateField ? r[dateField] : undefined;
+      if (!raw) continue;
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) continue;
+      const key = d.toISOString().slice(0, 10);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ id: r.id, title: r[titleField] ?? r.id });
+    }
+    return map;
+  }, [allRecords, dateField, titleField]);
+
+  // C3: 拖拽改期 mutation
+  const updateRecordDate = useMutation({
+    mutationFn: ({ id, dateFieldVal }: { id: string; dateFieldVal: string }) =>
+      apiClient.put(`/collections/${collectionName}/records/${id}`, {
+        [String(dateField)]: dateFieldVal,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['records', collectionName] });
+    },
+  });
+
+  const handleDrop = (recordId: string, newDate: string) => {
+    updateRecordDate.mutate({ id: recordId, dateFieldVal: newDate });
+  };
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   if (!viewData || !collectionData) return <p>{t('calendarView.loading')}</p>;
 
-  const goToPrevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  };
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+  const todayBtn = () => setCurrentMonth(new Date());
 
-  const goToNextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-  };
-
-  const goToToday = () => {
-    setCurrentMonth(new Date());
-  };
+  const monthName = currentMonth.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', background: 'var(--color-bg-primary)', minHeight: '100vh', padding: isMobile ? '12px' : '24px 0' }}>
       <h1 style={{ color: 'var(--color-text-primary)', margin: '16px 0', fontSize: isMobile ? 20 : 28 }}>{viewData.title}</h1>
 
+      {/* C3: 视图模式切换 + 翻页 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <button onClick={goToPrevMonth} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
-          {t('calendarView.prevMonth')}
-        </button>
-        <button onClick={goToNextMonth} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
-          {t('calendarView.nextMonth')}
-        </button>
-        <button onClick={goToToday} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
-          {t('calendarView.today')}
-        </button>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-          {monthName}
-        </span>
+        <div style={{ display: 'flex', border: '1px solid var(--color-border-light)', borderRadius: 6, overflow: 'hidden' }}>
+          {(['month', 'week', 'year'] as ViewMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setViewMode(m)}
+              style={{
+                padding: '4px 12px',
+                fontSize: 12,
+                cursor: 'pointer',
+                border: 'none',
+                background: viewMode === m ? 'var(--color-primary-500)' : 'transparent',
+                color: viewMode === m ? '#fff' : 'var(--color-text-secondary)',
+              }}
+            >
+              {t(`calendarView.mode${m.charAt(0).toUpperCase() + m.slice(1)}`)}
+            </button>
+          ))}
+        </div>
+        {(viewMode === 'month' || viewMode === 'year') && (
+          <>
+            <button onClick={prevMonth} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
+              {t('calendarView.prevMonth')}
+            </button>
+            <button onClick={nextMonth} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
+              {t('calendarView.nextMonth')}
+            </button>
+            <button onClick={todayBtn} className="glass-button" style={{ padding: isMobile ? '6px 10px' : '4px 12px', fontSize: 12 }}>
+              {t('calendarView.today')}
+            </button>
+            {(viewMode === 'month' ? monthName : `${year} 年`)}
+          </>
+        )}
+        {viewMode === 'week' && (
+          <>
+            <button onClick={() => setCurrentMonth(new Date(year, month, currentMonth.getDate() - 7))} className="glass-button" style={{ padding: '4px 10px', fontSize: 12 }}>
+              {t('calendarView.prevWeek')}
+            </button>
+            <button onClick={() => setCurrentMonth(new Date(year, month, currentMonth.getDate() + 7))} className="glass-button" style={{ padding: '4px 10px', fontSize: 12 }}>
+              {t('calendarView.nextWeek')}
+            </button>
+            {currentMonth.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </>
+        )}
       </div>
 
-      <p style={{ color: 'var(--color-text-muted)', marginBottom: isMobile ? 12 : 24, fontSize: isMobile ? 12 : 14 }}>
-        {t('calendarView.recordCount', { count: allRecords.length })} · {t('calendarView.sortedBy', { field: dateField })}
-      </p>
-
-      {isMobile ? (
-        /* 移动端：单列日期列表，点击展开当天全部记录 */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {weeks.flat().filter((d) => d.day > 0).length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
-              {t('calendarView.noData')}
-            </div>
-          ) : (
-            weeks
-              .flat()
-              .filter((d) => d.day > 0)
-              .map((day) => {
-                const isOpen = expandedDay === day.day;
-                const today = isToday(day.day, currentMonth);
-                return (
-                  <div
-                    key={day.day}
-                    className="glass-card"
-                    style={{ padding: 12, border: '1px solid var(--color-border-light)', borderRadius: 8 }}
-                  >
-                    <button
-                      onClick={() => setExpandedDay(isOpen ? null : day.day)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        width: '100%', background: 'transparent', border: 'none', cursor: 'pointer',
-                        padding: 0, color: 'var(--color-text-primary)',
-                      }}
-                      aria-expanded={isOpen}
-                      aria-label={t('calendarView.expandDay', { day: day.day })}
-                    >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
-                        {today && <span style={{ color: 'var(--color-info)' }}>●</span>}
-                        {day.day}
-                        {day.records.length > 0 && (
-                          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--color-text-muted)' }}>
-                            ({day.records.length})
-                          </span>
-                        )}
-                      </span>
-                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                        {isOpen ? t('calendarView.collapse') : t('calendarView.expand')}
-                      </span>
-                    </button>
-                    {day.records.length === 0 ? (
-                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                        {t('calendarView.noRecords')}
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
-                        {(isOpen ? day.records : day.records.slice(0, 2)).map((r) => (
-                          <div
-                            key={r.id}
-                            style={{
-                              background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid var(--color-info)',
-                              padding: '4px 8px', borderRadius: 2, fontSize: 12,
-                              color: 'var(--color-primary-200)', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}
-                            title={r.title}
-                          >
-                            {r.title}
-                          </div>
-                        ))}
-                        {!isOpen && day.records.length > 2 && (
-                          <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                            {t('calendarView.moreRecords', { count: day.records.length - 2 })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-          )}
-        </div>
+      {viewMode === 'year' ? (
+        renderYearView(year, recordsByDate, isMobile)
+      ) : viewMode === 'week' ? (
+        renderWeekView(currentMonth, recordsByDate, todayStr, handleDrop, isMobile)
       ) : (
-        /* 桌面端：7 列网格 */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--color-border-light)', borderRadius: 8, overflow: 'hidden' }}>
-          {(JSON.parse(t('calendarView.dayWeeks')) as string[]).map((day) => (
-            <div key={day} style={{ background: 'rgba(255,255,255,0.02)', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-text-muted)' }}>
-              {day}
-            </div>
-          ))}
-
-          {weeks.length === 0 ? (
-            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
-              {t('calendarView.noData')}
-            </div>
-          ) : (
-            weeks.map((week, wi) =>
-              week.map((day, di) => (
-                <div
-                  key={wi + '-' + di}
-                  className="glass-card"
-                  style={{ minHeight: 120, padding: 8, border: '1px solid var(--color-border-light)' }}
-                >
-                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                    {day.day > 0 && (
-                      <>
-                        {day.records.some(() => isToday(day.day, currentMonth)) && (
-                          <span style={{ marginRight: 4, color: 'var(--color-info)' }}>●</span>
-                        )}
-                        {day.day}
-                      </>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {day.records.slice(0, 3).map((r) => (
-                      <div
-                        key={r.id}
-                        style={{ background: 'rgba(59, 130, 246, 0.15)', borderLeft: '2px solid var(--color-info)', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: 'var(--color-primary-200)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                        title={r.title}
-                      >
-                        {r.title}
-                      </div>
-                    ))}
-                    {day.records.length > 3 && (
-                      <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{t('calendarView.moreRecords', { count: day.records.length - 3 })}</div>
-                    )}
-                  </div>
-                </div>
-              ))
-            )
-          )}
-        </div>
+        isMobile ? renderMonthMobile(expandedDay, setExpandedDay, recordsByDate) : renderMonthDesktop(recordsByDate)
       )}
     </div>
   );
 }
 
-interface CalendarDay {
-  day: number;
-  records: Array<{ id: string; title: string }>;
-}
+// ===================== 子视图渲染 =====================
 
-function isToday(day: number, month: Date): boolean {
+function renderMonthDesktop(byDate: Map<string, any[]>) {
   const today = new Date();
-  return day === today.getDate() && 
-         month.getMonth() === today.getMonth() && 
-         month.getFullYear() === today.getFullYear();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const weeks: { day: number; records: any[] }[][] = [];
+  let currentWeek: { day: number; records: any[] }[] = [];
+  for (let i = 0; i < startOffset; i++) currentWeek.push({ day: 0, records: [] });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    currentWeek.push({ day: d, records: byDate.get(dateStr) ?? [] });
+    if (currentWeek.length === 7) { weeks.push(currentWeek); currentWeek = []; }
+  }
+  if (currentWeek.length) { while (currentWeek.length < 7) currentWeek.push({ day: 0, records: [] }); weeks.push(currentWeek); }
+
+  const dayLabels = ['日', '一', '二', '三', '四', '五', '六'];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, background: 'var(--color-border-light)', borderRadius: 8, overflow: 'hidden' }}>
+      {dayLabels.map((d) => (
+        <div key={d} style={{ background: 'rgba(255,255,255,0.02)', padding: 8, textAlign: 'center', fontWeight: 600, fontSize: 12, color: 'var(--color-text-muted)' }}>{d}</div>
+      ))}
+      {weeks.flat().filter((x) => x.day > 0).length === 0 ? (
+        <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>暂无数据</div>
+      ) : (
+        weeks.map((week, wi) =>
+          week.map((day, di) => {
+            const key = `${wi}-${di}`;
+            const isToday = day.day > 0 && `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(day.day).padStart(2, '0')}` === todayStr;
+            return (
+              <div key={key} style={{ minHeight: 120, padding: 8, border: '1px solid var(--color-border-light)', background: isToday ? 'rgba(99,102,241,0.1)' : undefined }}>
+                <div style={{ fontSize: 12, color: isToday ? 'var(--color-info)' : 'var(--color-text-muted)', marginBottom: 4 }}>{day.day > 0 ? day.day : ''}</div>
+                {day.records.length === 0 ? (
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>—</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {day.records.slice(0, 3).map((r) => (
+                      <div key={r.id} style={{ background: 'rgba(59,130,246,0.15)', borderLeft: '2px solid var(--color-info)', padding: '2px 6px', borderRadius: 2, fontSize: 11, color: 'var(--color-primary-200)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.title}>{r.title}</div>
+                    ))}
+                    {day.records.length > 3 && <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{day.records.length - 3} 条更多</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )
+      )}
+    </div>
+  );
 }
 
-function buildCalendar(records: any[], currentMonth: Date, dateField?: string, titleField?: string) {
-  const year = currentMonth.getFullYear();
-  const month = currentMonth.getMonth();
+function renderMonthMobile(_expandedDay: number | null, _setExpandedDay: (n: number | null) => void, byDate: Map<string, any[]>) {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {Array.from(byDate.entries()).sort().map(([date, recs]) => {
+        const day = parseInt(date.split('-')[2]);
+        const isOpen = _expandedDay === day;
+        const isToday = date === todayStr;
+        return (
+          <div key={date} style={{ background: isToday ? 'rgba(99,102,241,0.1)' : 'var(--color-bg-surface)', border: '1px solid var(--color-border-light)', borderRadius: 8, padding: 12 }}>
+            <button onClick={() => _setExpandedDay(isOpen ? null : day)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-primary)' }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{date.slice(5)} · {recs.length} 条</span>
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{isOpen ? '收起' : '展开'}</span>
+            </button>
+            {isOpen && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {recs.map((r) => (
+                  <div key={r.id} style={{ padding: '4px 8px', background: 'rgba(59,130,246,0.1)', borderRadius: 4, fontSize: 13 }}>{r.title}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-  const firstDay = new Date(year, month, 1);
-  const startOffset = firstDay.getDay(); // 0=周日
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+function renderWeekView(baseDate: Date, byDate: Map<string, any[]>, todayStr: string, _handleDrop: (_: string, __: string) => void, isMobile: boolean) {
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() - d.getDay() + i);
+    return d;
+  });
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(7, 1fr)', gap: 1, background: 'var(--color-border-light)', borderRadius: 8, overflow: 'hidden' }}>
+      {weekDays.map((d, i) => {
+        const dateStr = d.toISOString().slice(0, 10);
+        const recs = Array.from(byDate.get(dateStr) ?? []);
+        const isToday = dateStr === todayStr;
+        return (
+          <div key={i} style={{ padding: 8, background: isToday ? 'rgba(99,102,241,0.08)' : undefined, minHeight: 120 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+              {d.toLocaleDateString('zh-CN', { weekday: 'short', day: 'numeric' })}
+            </div>
+            {recs.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>—</div>
+            ) : (
+              recs.map((r) => (
+                <div key={r.id} style={{ padding: '3px 6px', margin: '2px 0', background: 'rgba(59,130,246,0.15)', borderLeft: '2px solid var(--color-info)', borderRadius: 2, fontSize: 11, color: 'var(--color-primary-200)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.title}>{r.title}</div>
+              ))
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-  const map = new Map<string, Array<{ id: string; title: string }>>();
-  for (const r of records) {
-    const raw = r[dateField ?? ''];
-    if (!raw) continue;
-    const d = new Date(raw);
-    if (isNaN(d.getTime()) || d.getMonth() !== month || d.getFullYear() !== year) continue;
-    const key = d.getDate().toString();
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push({ id: r.id, title: r[titleField ?? ''] ?? r.id });
-  }
-
-  const weeks: CalendarDay[][] = [];
-  let currentWeek: CalendarDay[] = [];
-  for (let i = 0; i < startOffset; i++) {
-    currentWeek.push({ day: 0, records: [] });
-  }
-  for (let day = 1; day <= daysInMonth; day++) {
-    currentWeek.push({ day, records: map.get(day.toString()) ?? [] });
-    if (currentWeek.length === 7) {
-      weeks.push(currentWeek);
-      currentWeek = [];
+function renderYearView(year: number, byDate: Map<string, any[]>, isMobile: boolean) {
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const recs: Array<{ day: number; count: number }> = [];
+    const daysInMonth = new Date(year, i + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(i + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const count = (byDate.get(dateStr) ?? []).length;
+      if (count > 0) recs.push({ day: d, count });
     }
-  }
-  if (currentWeek.length > 0) {
-    while (currentWeek.length < 7) currentWeek.push({ day: 0, records: [] });
-    weeks.push(currentWeek);
-  }
-
-  const monthName = currentMonth.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
-  return { weeks, monthName };
+    return { index: i, name: `${i + 1} 月`, recs };
+  });
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 8 }}>
+      {months.map((m) => (
+        <div key={m.index} style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border-light)', borderRadius: 8, padding: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--color-text-primary)' }}>{m.name}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, fontSize: 10, color: 'var(--color-text-muted)', textAlign: 'center' }}>
+            {['日','一','二','三','四','五','六'].map((d) => <div key={d}>{d}</div>)}
+            {Array.from({ length: new Date(year, m.index, 0).getDay() }, (_, i) => <div key={`empty-${i}`}></div>)}
+            {Array.from({ length: new Date(year, m.index + 1, 0).getDate() }, (_, i) => {
+              const day = i + 1;
+              const dateStr = `${year}-${String(m.index + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const count = (byDate.get(dateStr) ?? []).length;
+              const isToday = dateStr === new Date().toISOString().slice(0, 10);
+              return (
+                <div key={day} style={{ padding: 2, background: count > 0 ? 'rgba(99,102,241,0.2)' : undefined, borderRadius: 3, color: count > 0 ? 'var(--color-info)' : isToday ? 'var(--color-info)' : 'inherit', fontWeight: isToday ? 700 : undefined }}>
+                  {day}
+                  {count > 0 && <div style={{ fontSize: 8 }}>{count}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
