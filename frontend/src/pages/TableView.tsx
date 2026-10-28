@@ -40,6 +40,43 @@ export function TableViewPage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = React.useState<{ id: string; field: string } | null>(null);
 
+  // P1 批量编辑:选中状态 + 批量更新/删除 mutation
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const hasSelection = selectedIds.size > 0;
+
+  const batchUpdate = useMutation({
+    mutationFn: (patch: Record<string, unknown>) =>
+      apiClient.put(`/collections/${collectionName}/records/batch`,
+        Array.from(selectedIds).map((rid) => ({ id: rid, data: patch })),
+      ),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['records', collectionName] });
+    },
+  });
+  const batchDelete = useMutation({
+    mutationFn: () =>
+      apiClient.delete(`/collections/${collectionName}/records/batch`, {
+        data: Array.from(selectedIds),
+      }),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['records', collectionName] });
+    },
+  });
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    if (selectedIds.size === sorted.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(sorted.map((r) => r.id)));
+  };
+
   const updateField = useMutation({
     mutationFn: ({ id, field, value }: { id: string; field: string; value: unknown }) =>
       apiClient.put(`/collections/${collectionName}/records/${id}`, { [field]: value }),
@@ -369,12 +406,25 @@ export function TableViewPage() {
         >
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
             <colgroup>
+              <col style={{ width: 40 }} />
               {columns.map((c) => (
                 <col key={c.field} style={{ width: c.width ?? 160 }} />
               ))}
             </colgroup>
             <thead>
               <tr style={{ background: 'rgba(30, 41, 59, 0.5)' }}>
+                <th style={{ padding: 8, textAlign: 'center', minWidth: 40, borderBottom: '1px solid var(--color-border-light)' }} aria-label="select all">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === sorted.length}
+                    ref={(el) => {
+                      if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < sorted.length;
+                    }}
+                    onChange={toggleAll}
+                    aria-label="select all rows"
+                    style={{ cursor: 'pointer' }}
+                  />
+                </th>
                 {groupByField && <th style={{ padding: 8, textAlign: 'left', minWidth: 60, color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)' }}>📊</th>}
                 {columns.map((c) => (
                   <th key={c.field} style={{ padding: 8, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-light)' }}>
@@ -425,6 +475,15 @@ export function TableViewPage() {
                                 borderTop: '1px solid var(--color-border-light)',
                               }}
                             >
+                              <td style={{ padding: 8, textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.has(r.id)}
+                                  onChange={() => toggleRow(r.id)}
+                                  aria-label={`select row ${r.id}`}
+                                  style={{ cursor: 'pointer' }}
+                                />
+                              </td>
                               {columns.map((c) => {
                                 const f = fieldMap.get(c.field);
                                 const val = r[c.field];
@@ -471,6 +530,15 @@ export function TableViewPage() {
                     </div>
                   ) : !groupByField && sorted.map((r) => (
                     <tr key={r.id} style={{ borderTop: '1px solid var(--color-border-light)' }}>
+                      <td style={{ padding: 8, textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(r.id)}
+                          onChange={() => toggleRow(r.id)}
+                          aria-label={`select row ${r.id}`}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
                       {columns.map((c) => {
                         const f = fieldMap.get(c.field);
                         const val = r[c.field];
@@ -580,6 +648,50 @@ export function TableViewPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* P1 批量编辑:浮窗操作栏 */}
+      {hasSelection && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            background: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-light)',
+            borderRadius: 8,
+            padding: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+            zIndex: 9999,
+          }}
+        >
+          <div style={{ marginBottom: 8, fontSize: 13 }}>已选 {selectedIds.size} 条</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => {
+                const f = prompt('输入字段名');
+                if (!f) return;
+                const v = prompt(`为这 ${selectedIds.size} 条设置 ${f}=?`);
+                if (v == null) return;
+                batchUpdate.mutate({ [f]: v });
+              }}
+              disabled={batchUpdate.isPending}
+            >
+              批量更新
+            </button>
+            <button
+              onClick={() => {
+                if (confirm(`确定删除这 ${selectedIds.size} 条吗？`)) {
+                  batchDelete.mutate();
+                }
+              }}
+              disabled={batchDelete.isPending}
+            >
+              批量删除
+            </button>
+            <button onClick={() => setSelectedIds(new Set())}>取消</button>
+          </div>
         </div>
       )}
 

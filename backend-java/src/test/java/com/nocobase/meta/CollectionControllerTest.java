@@ -88,6 +88,8 @@ class CollectionControllerTest {
         doNothing().when(aclEnforcer).assertCanWriteFields(any(), anyString(), anyString(), any(), any());
         when(aclEnforcer.filterRecord(any(), anyString(), anyString(), any()))
                 .thenAnswer(inv -> inv.getArgument(3));
+        when(aclEnforcer.filterRecordsByDataScope(any(), anyString(), anyString(), any()))
+                .thenAnswer(inv -> inv.getArgument(3));
         when(rowAclService.filterReadable(anyString(), anyString(), any(), any()))
                 .thenAnswer(inv -> inv.getArgument(2));
         when(rowAclService.evaluateRead(anyString(), anyString(), any(), any())).thenReturn(true);
@@ -560,5 +562,81 @@ class CollectionControllerTest {
         List<Map<String, Object>> errors = (List<Map<String, Object>>) data.get("errors");
         assertEquals(1, errors.size());
         assertEquals(3, errors.get(0).get("row"));  // row 3 (header + 2 rows, last fails)
+    }
+
+    // ============ P1 批量编辑 ============
+
+    /** P1:批量插入多条记录，每条都触发字段级权限检查 */
+    @Test
+    void batchCreate_records_fieldCheckedAndAudited() {
+        List<Map<String, Object>> records = List.of(
+                Map.of("title", "A"), Map.of("title", "B")
+        );
+        when(service.batchInsert(eq("posts"), eq(records), eq("tenant_default")))
+                .thenReturn(2);
+
+        Map<String, Object> resp = controller.batchCreateRecords("posts", records, testUser);
+
+        assertEquals(0, resp.get("code"));
+        assertEquals(Map.of("created", 2), resp.get("data"));
+        verify(aclEnforcer, times(2)).assertCanWriteFields(
+                eq(testUser.userId()), eq("tenant_default"), eq("posts"), any(),
+                eq(com.nocobase.auth.AclPolicyEntity.Action.CREATE));
+        verify(auditService).log(eq("tenant_default"), eq(testUser.userId()),
+                eq("alice"), eq("BATCH_CREATE"), eq("posts"), anyString(), any());
+    }
+
+    /** P1:批量插入空列表应抛 400 */
+    @Test
+    void batchCreate_emptyList_throwsBadRequest() {
+        assertThrows(ResponseStatusException.class,
+                () -> controller.batchCreateRecords("posts", List.of(), testUser));
+    }
+
+    /** P1:批量更新多条记录，每条都触发字段级权限检查 */
+    @Test
+    void batchUpdate_items_fieldCheckedAndAudited() {
+        List<CollectionService.BatchUpdateItem> items = List.of(
+                new CollectionService.BatchUpdateItem("u1", Map.of("views", 10)),
+                new CollectionService.BatchUpdateItem("u2", Map.of("views", 20))
+        );
+        when(service.batchUpdate(eq("posts"), eq(items), eq("tenant_default")))
+                .thenReturn(List.of("u1", "u2"));
+
+        Map<String, Object> resp = controller.batchUpdateRecords("posts", items, testUser);
+
+        assertEquals(0, resp.get("code"));
+        assertEquals(Map.of("updated", List.of("u1", "u2"), "count", 2), resp.get("data"));
+        verify(aclEnforcer, times(2)).assertCanWriteFields(
+                eq(testUser.userId()), eq("tenant_default"), eq("posts"), any(),
+                eq(com.nocobase.auth.AclPolicyEntity.Action.UPDATE));
+    }
+
+    /** P1:批量更新空列表应抛 400 */
+    @Test
+    void batchUpdate_emptyList_throwsBadRequest() {
+        assertThrows(ResponseStatusException.class,
+                () -> controller.batchUpdateRecords("posts", List.of(), testUser));
+    }
+
+    /** P1:批量删除多条记录 */
+    @Test
+    void batchDelete_ids_deletedAndAudited() {
+        List<String> ids = List.of("u1", "u2", "u3");
+        when(service.batchDelete(eq("posts"), eq(ids), eq("tenant_default"))).thenReturn(3);
+
+        Map<String, Object> resp = controller.batchDeleteRecords("posts", ids, testUser);
+
+        assertEquals(0, resp.get("code"));
+        assertEquals(Map.of("deleted", 3), resp.get("data"));
+        verify(auditService).log(eq("tenant_default"), eq(testUser.userId()),
+                eq("alice"), eq("BATCH_DELETE"), eq("posts"), anyString(), any());
+    }
+
+    /** P1:批量删除空列表应抛 400 */
+    @Test
+    void batchDelete_emptyList_throwsBadRequest() {
+        assertThrows(ResponseStatusException.class,
+                () -> controller.batchDeleteRecords("posts", List.of(), testUser));
     }
 }

@@ -324,6 +324,83 @@ public class CollectionController {
         ));
     }
 
+    // ============================================================
+    //  P1 批量编辑:三路由(批量插入/批量更新/批量删除)
+    //
+    //  CollectionService 已实现 batchInsert/batchUpdate/batchDelete,
+    //  修复前 Controller 层无对外端点,前端批量编辑无法调用(假完成)。
+    //  语义与单条端点对齐:走 AclEnforcer 操作级鉴权 + 审计留痕。
+    // ============================================================
+
+    /** P1:批量插入。请求体 {@code List<Map<String,Object>>} 每条为一条记录。 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{name}/records/batch")
+    public Map<String, Object> batchCreateRecords(
+            @PathVariable String name,
+            @RequestBody List<Map<String, Object>> data,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.CREATE);
+        if (data == null || data.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "批量插入 body 不能为空");
+        }
+        // 与单条 createRecord 对齐:逐条做字段级写权限检查
+        for (Map<String, Object> record : data) {
+            aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, record,
+                    com.nocobase.auth.AclPolicyEntity.Action.CREATE);
+        }
+        int count = service.batchInsert(name, data, user.tenantId());
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "BATCH_CREATE", name, String.valueOf(count), Map.of("count", count));
+        return Map.of("code", 0, "message", "success", "data", Map.of("created", count));
+    }
+
+    /** P1:批量更新。请求体 {@code List<BatchUpdateItem>} 每项含 id + data。 */
+    @PreAuthorize("isAuthenticated()")
+    @PutMapping("/{name}/records/batch")
+    public Map<String, Object> batchUpdateRecords(
+            @PathVariable String name,
+            @RequestBody List<CollectionService.BatchUpdateItem> items,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        if (items == null || items.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "批量更新 body 不能为空");
+        }
+        // 与单条 updateRecord 对齐:逐条做字段级写权限检查
+        for (CollectionService.BatchUpdateItem item : items) {
+            aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, item.data(),
+                    com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        }
+        List<String> updated = service.batchUpdate(name, items, user.tenantId());
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "BATCH_UPDATE", name, String.valueOf(updated.size()),
+                Map.of("updated", updated));
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("updated", updated, "count", updated.size()));
+    }
+
+    /** P1:批量删除。请求体 {@code List<String>} 为记录 id 列表。 */
+    @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/{name}/records/batch")
+    public Map<String, Object> batchDeleteRecords(
+            @PathVariable String name,
+            @RequestBody List<String> ids,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
+                com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        if (ids == null || ids.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "批量删除 body 不能为空");
+        }
+        int count = service.batchDelete(name, ids, user.tenantId());
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "BATCH_DELETE", name, String.valueOf(count), Map.of("count", count));
+        return Map.of("code", 0, "message", "success", "data", Map.of("deleted", count));
+    }
+
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/{name}/records")
     public Map<String, Object> listRecords(
