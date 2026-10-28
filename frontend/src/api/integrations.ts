@@ -225,6 +225,38 @@ export const wechatApi = {
 };
 
 // ============================================================
+//  平台通用 API（B1 微信 JS-SDK / 企微 JS-SDK 统一入口）
+// ============================================================
+
+export interface JsSignatureResponse {
+  code: number;
+  message: string;
+  data: {
+    platform: string;
+    signType: string;
+    signature: string;
+    timestamp: number;
+    nonceStr: string;
+    jsapiTicket: string;
+    url: string;
+  };
+}
+
+/**
+ * 获取 JS-SDK 签名（B1）。
+ *
+ * <p>B1 返工：统一使用 {@code platform} 参数（wechat/wecom），后端同时支持
+ * {@code provider} 作为别名。修复前前端传 {@code provider}、后端读 {@code platform}，
+ * 参数对不上导致签名接口 400/404。
+ */
+export const jsSdkApi = {
+  getSignature: (platform: string, url: string, provider?: string): Promise<JsSignatureResponse> =>
+    client.get('/js-signature', {
+      params: { platform, url, ...(provider ? { provider } : {}) },
+    }),
+};
+
+// ============================================================
 //  统一 API 入口
 // ============================================================
 
@@ -233,4 +265,5 @@ export const integrationsApi = {
   wecom: wecomApi,
   wechat: wechatApi,
   integration: integrationApi,
+  jsSdk: jsSdkApi,
 };

@@ -58,12 +58,14 @@ const COLLECTION = {
     { name: 'title', type: 'text' },
     { name: 'start_date', type: 'datetime' },
     { name: 'end_date', type: 'datetime' },
+    { name: 'progress', type: 'number' },
+    { name: 'depends_on', type: 'text' },
   ],
 };
 
 const RECORDS = [
-  { id: 'r1', title: '设计', start_date: '2026-01-01T00:00:00Z', end_date: '2026-01-10T00:00:00Z' },
-  { id: 'r2', title: '开发', start_date: '2026-01-05T00:00:00Z', end_date: '2026-02-05T00:00:00Z' },
+  { id: 'r1', title: '设计', start_date: '2026-01-01T00:00:00Z', end_date: '2026-01-10T00:00:00Z', progress: 60 },
+  { id: 'r2', title: '开发', start_date: '2026-01-05T00:00:00Z', end_date: '2026-02-05T00:00:00Z', progress: 30, depends_on: 'r1' },
 ];
 
 beforeEach(() => {
@@ -104,5 +106,22 @@ describe('GanttViewPage', () => {
     );
     renderView();
     expect(await screen.findByText('加载中...')).toBeTruthy();
+  });
+
+  // B5 返工：新增测试覆盖 progress 进度条与依赖线
+  test('渲染 progress 进度条（绿色填充）', async () => {
+    renderView();
+    await screen.findByText('设计');
+    // 区间条内应包含绿色 progress 填充元素
+    const progressBars = document.querySelectorAll('[aria-label*="progress"]');
+    expect(progressBars.length).toBeGreaterThan(0);
+  });
+
+  test('渲染依赖线 SVG 覆盖层', async () => {
+    renderView();
+    await screen.findByText('开发');
+    // 存在 SVG 箭头标记（依赖线 marker）
+    const arrows = document.querySelectorAll('marker[id*="gantt-arrow"]');
+    expect(arrows.length).toBeGreaterThan(0);
   });
 });
