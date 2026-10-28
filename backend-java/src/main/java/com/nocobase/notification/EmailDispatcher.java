@@ -113,4 +113,49 @@ public class EmailDispatcher implements NotificationDispatcher {
         props.put("mail.smtp.writetimeout", "10000");
         return sender;
     }
+
+    /** 带附件发送邮件（B7 报表分发专用）。 */
+    public SendResult sendWithAttachment(NotificationChannelEntity channel, String recipient,
+                                         String subject, String body, String filename, byte[] content) {
+        if (recipient == null || recipient.isBlank()) {
+            return SendResult.error("recipient email is blank");
+        }
+        Map<String, Object> cfg = channel.getConfig() == null ? Map.of() : channel.getConfig();
+        String host = (String) cfg.get("smtp_host");
+
+        if (host == null || host.isBlank()) {
+            log.error("[EMAIL 附件发送失败 to={}]: smtp_host 未配置", recipient);
+            return SendResult.error("smtp_host 未配置");
+        }
+        if (!isRealSend(cfg)) {
+            log.error("[EMAIL 附件发送失败 to={}]: real_send 未开启", recipient);
+            return SendResult.error("real_send 未开启");
+        }
+
+        try {
+            JavaMailSenderImpl sender = buildSender(cfg, host);
+            sender.send(mime -> {
+                MimeMessageHelper helper = new MimeMessageHelper(mime, true, "UTF-8");
+                helper.setTo(recipient);
+                helper.setSubject(subject);
+                helper.setText(body, false);
+                String from = (String) cfg.get("from");
+                if (from != null && !from.isBlank()) {
+                    helper.setFrom(from, String.valueOf(cfg.getOrDefault("from_name", from)));
+                }
+                helper.addAttachment(filename, new ByteArrayResource(content));
+            });
+            log.info("[EMAIL attachment sent to={} via {}] subject={} file={}", recipient, host, subject, filename);
+            return SendResult.ok("attachment sent: " + recipient + " via " + host);
+        } catch (Exception e) {
+            log.warn("[EMAIL 附件发送失败 to={} via {}]: {}", recipient, host, e.getMessage());
+            return SendResult.error("email attachment send failed: " + e.getMessage());
+        }
+    }
+
+    /** 字节数组资源适配器（用于 MimeMessageHelper.addAttachment）。 */
+    private static class ByteArrayResource extends org.springframework.core.io.ByteArrayResource {
+        ByteArrayResource(byte[] bytes) { super(bytes); }
+        @Override public String getFilename() { return null; }
+    }
 }

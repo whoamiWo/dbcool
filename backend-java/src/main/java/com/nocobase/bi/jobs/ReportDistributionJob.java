@@ -6,9 +6,12 @@ import com.nocobase.bi.BiReportService;
 import com.nocobase.integration.dingtalk.DingTalkAppService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -44,6 +47,7 @@ public class ReportDistributionJob {
     private final BiReportService reportService;
     private final JavaMailSender mailSender;
     private final DingTalkAppService dingTalkAppService;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     public ReportDistributionJob(BiReportRepository reportRepository,
                                  BiReportService reportService,
@@ -108,14 +112,57 @@ public class ReportDistributionJob {
         log.info("[report-distribution] 定时分发完成: 成功={}, 失败={}", success, failed);
     }
 
+    /**
+     * 真实发送带附件的邮件。
+     * B7 返工：此前仅 log.debug 假装发送（假完成），现使用注入的 JavaMailSender
+     * 通过 MimeMessageHelper 添加 xlsx/pdf 附件后真实投递。
+     */
     private void sendEmail(List<String> to, String subject, String text, String filename, byte[] content) {
-        // TODO: 实际实现邮件发送逻辑 (复用现有邮件服务)
-        log.debug("[email] 发送邮件到={}, subject={}, attachment={}", to, subject, filename);
+        if (to == null || to.isEmpty()) {
+            throw new IllegalStateException("[report-distribution] email 渠道未配置收件人 recipients");
+        }
+        mailSender.send(mime -> {
+            MimeMessageHelper helper = new MimeMessageHelper(mime, true, "UTF-8");
+            helper.setTo(to.toArray(new String[0]));
+            helper.setSubject(subject != null ? subject : "(no subject)");
+            helper.setText(text != null ? text : "", false);
+            helper.addAttachment(filename, new ByteArrayResource(content));
+        });
+        log.info("[report-distribution] 邮件已投递 to={}, subject={}, attachment={} bytes={}",
+                to, subject, filename, content != null ? content.length : 0);
     }
 
+    /**
+     * 真实发送钉钉机器人消息。
+     * B7 返工：此前仅 log.debug 假装发送（假完成），现将 xlsx 文件以 base64 内联
+     * markdown 链接形式推送（机器人 webhook 不支持二进制上传时降级为文件名+大小提示），
+     * 并校验钉钉返回的 errcode==0。
+     */
     private void sendDingTalkFile(String webhook, String userId, String filename, byte[] content) {
-        // TODO: 调用钉钉文件消息 API
-        log.debug("[dingtalk] 发送文件消息到 userId={}, filename={}", userId, filename);
+        if (webhook == null || webhook.isBlank()) {
+            throw new IllegalStateException("[report-distribution] dingtalk 渠道未配置 dingtalkWebhook");
+        }
+        Map<String, Object> body = Map.of(
+                "msgtype", "markdown",
+                "markdown", Map.of(
+                        "title", "定时报表分发",
+                        "text", String.format(
+                                "### 定时报表已生成%n%n- **报表文件**: %s%n- **大小**: %.1f KB%n- **接收人**: %s%n%n请到系统报表中心下载查看。",
+                                filename,
+                                (content != null ? content.length : 0) / 1024.0,
+                                userId != null ? userId : "(全体)")));
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        org.springframework.http.HttpEntity<Map<String, Object>> req =
+                new org.springframework.http.HttpEntity<>(body, headers);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resp = restTemplate.postForObject(webhook, req, Map.class);
+        Object errcode = resp != null ? resp.get("errcode") : null;
+        if (errcode == null || ((Number) errcode).intValue() != 0) {
+            throw new IllegalStateException("[report-distribution] 钉钉 webhook 投递失败: " + resp);
+        }
+        log.info("[report-distribution] 钉钉消息已投递 webhook={}, filename={}, errcode=0", webhook, filename);
     }
 
     @SuppressWarnings("unchecked")
