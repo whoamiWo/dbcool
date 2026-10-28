@@ -6,7 +6,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import apiClient from '@/api/client';
 import { SharePanel, parseShares, serializeShares } from '@/components/SharePanel';
 import type { CollectionMeta, FieldDef } from '@/types/collection';
-import type { CreateViewRequest, TableColumn, ViewFull, ViewType } from '@/types/view';
+import type { ConditionalStyle, CreateViewRequest, TableColumn, ViewFull, ViewType } from '@/types/view';
 
 /** 视图设计器(Week 9 + Week 15 columns UI) — 创建/编辑视图 */
 export function ViewDesignerPage() {
@@ -23,6 +23,10 @@ export function ViewDesignerPage() {
   const [pageSize, setPageSize] = useState(20);
   const [columns, setColumns] = useState<TableColumn[]>([]);
   const [detailFields, setDetailFields] = useState<string[]>([]);
+  // C2: 冻结列数（0 = 不冻结）
+  const [freezeCount, setFreezeCount] = useState(0);
+  // C2: 条件格式规则
+  const [conditionalStyles, setConditionalStyles] = useState<ConditionalStyle[]>([]);
   const [sharedEntries, setSharedEntries] = useState<{ type: 'user' | 'role'; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +73,13 @@ export function ViewDesignerPage() {
       } else if (v.type === 'detail') {
         setDetailFields(fields.map((f) => f.name));
       }
+      // C2: 恢复冻结列数和条件格式
+      if (typeof cfg.freezeCount === 'number') {
+        setFreezeCount(Math.max(0, Math.min(cfg.freezeCount, 20)));
+      }
+      if (Array.isArray(cfg.conditionalStyles)) {
+        setConditionalStyles(cfg.conditionalStyles as ConditionalStyle[]);
+      }
       // Parse shared_with_json
       if (v.shared_with_json) {
         setSharedEntries(parseShares(v.shared_with_json));
@@ -94,6 +105,9 @@ export function ViewDesignerPage() {
       if (type === 'table') {
         config.pageSize = pageSize;
         config.columns = columns.filter((c) => c.visible !== false);
+        // C2: 冻结列数 + 条件格式
+        if (freezeCount > 0) config.freezeCount = freezeCount;
+        if (conditionalStyles.length > 0) config.conditionalStyles = conditionalStyles;
       }
       if (type === 'kanban') config.groupBy = groupBy;
       if (type === 'detail') config.fields = detailFields;
@@ -206,6 +220,12 @@ export function ViewDesignerPage() {
               />
             </div>
             <ColumnEditor columns={columns} fields={fields} onChange={setColumns} />
+            <FreezeEditor columns={columns} freezeCount={freezeCount} onChange={setFreezeCount} />
+            <ConditionalStyleEditor
+              fields={fields}
+              rules={conditionalStyles}
+              onChange={setConditionalStyles}
+            />
           </>
         )}
 
@@ -323,6 +343,127 @@ function ColumnEditor({
       <div style={{ fontSize: 11, color: 'var(--color-text-disabled)', marginTop: 4 }}>
         {t('colHint')}
       </div>
+    </div>
+  );
+}
+
+/* === C2 冻结列编辑器 === */
+function FreezeEditor({
+  columns, freezeCount, onChange,
+}: {
+  columns: TableColumn[];
+  freezeCount: number;
+  onChange: (next: number) => void;
+}) {
+  const { t } = useTranslation('viewDesigner');
+  const max = columns.filter((c) => c.visible !== false).length;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ display: 'block', fontWeight: 500 }} htmlFor="v-lbl-freeze">{t('freezeCount')}</label>
+      <input id="v-lbl-freeze"
+             type="number"
+             min={0}
+             max={Math.max(max, 1)}
+             value={freezeCount}
+             onChange={(e) => {
+               const n = Number(e.target.value);
+               onChange(Number.isFinite(n) ? Math.max(0, Math.min(n, max)) : 0);
+             }}
+             style={{ padding: 8, width: '100%' }} />
+      <div style={{ fontSize: 11, color: 'var(--color-text-disabled)', marginTop: 4 }}>
+        {t('freezeHint')}
+      </div>
+    </div>
+  );
+}
+
+/* === C2 条件格式编辑器 === */
+const COND_OPS: ConditionalStyle['op'][] = ['eq', 'neq', 'contains', 'gt', 'lt', 'empty', 'notEmpty'];
+
+function ConditionalStyleEditor({
+  fields, rules, onChange,
+}: {
+  fields: FieldDef[];
+  rules: ConditionalStyle[];
+  onChange: (next: ConditionalStyle[]) => void;
+}) {
+  const { t } = useTranslation('viewDesigner');
+  const opLabel: Record<ConditionalStyle['op'], string> = {
+    eq: t('opEq'), neq: t('opNeq'), contains: t('opContains'),
+    gt: t('opGt'), lt: t('opLt'), empty: t('opEmpty'), notEmpty: t('opNotEmpty'),
+  };
+  const needsValue = (op: ConditionalStyle['op']) => op !== 'empty' && op !== 'notEmpty';
+
+  const patch = (i: number, next: Partial<ConditionalStyle>) => {
+    const copy = [...rules];
+    copy[i] = { ...copy[i], ...next };
+    onChange(copy);
+  };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ display: 'block', fontWeight: 500, marginBottom: 6 }}>
+        {t('condStyles')} ({rules.length})
+      </label>
+      <div style={{ border: '1px solid var(--color-border-light)', borderRadius: 4, padding: 4 }}>
+        {rules.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--color-text-disabled)', padding: '6px 4px' }}>
+            {t('condEmpty')}
+          </div>
+        )}
+        {rules.map((r, i) => (
+          <div key={i}
+               style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '6px 4px',
+                        borderBottom: i < rules.length - 1 ? '1px solid var(--color-bg-secondary)' : 'none' }}>
+            <select value={r.field} onChange={(e) => patch(i, { field: e.target.value })}
+                    style={{ padding: 4, fontSize: 12 }} title={t('condField')}>
+              {fields.map((f) => (
+                <option key={f.name} value={f.name}>{f.label ?? f.name}</option>
+              ))}
+            </select>
+            <select value={r.op} onChange={(e) => patch(i, { op: e.target.value as ConditionalStyle['op'] })}
+                    style={{ padding: 4, fontSize: 12 }} title={t('condOp')}>
+              {COND_OPS.map((op) => (
+                <option key={op} value={op}>{opLabel[op]}</option>
+              ))}
+            </select>
+            {needsValue(r.op) && (
+              <input value={r.value ?? ''}
+                     onChange={(e) => patch(i, { value: e.target.value })}
+                     placeholder={t('condValue')}
+                     style={{ width: 90, padding: 4, fontSize: 12 }} />
+            )}
+            <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
+              {t('condColor')}
+              <input type="color" value={r.color ?? '#ef4444'}
+                     onChange={(e) => patch(i, { color: e.target.value })}
+                     style={{ width: 28, height: 22, padding: 0 }} />
+            </label>
+            <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
+              {t('condBg')}
+              <input type="color" value={r.background ?? '#fee2e2'}
+                     onChange={(e) => patch(i, { background: e.target.value })}
+                     style={{ width: 28, height: 22, padding: 0 }} />
+            </label>
+            <button type="button"
+                    onClick={() => onChange(rules.filter((_, j) => j !== i))}
+                    style={{ padding: '2px 6px', fontSize: 11, cursor: 'pointer' }}>
+              {t('condRemove')}
+            </button>
+          </div>
+        ))}
+      </div>
+      <button type="button"
+              onClick={() => onChange([
+                ...rules,
+                { field: fields[0]?.name ?? '', op: 'eq', value: '', color: '#ef4444', background: '#fee2e2' },
+              ])}
+              disabled={fields.length === 0}
+              style={{ marginTop: 6, padding: '4px 10px', fontSize: 12,
+                       cursor: fields.length === 0 ? 'not-allowed' : 'pointer',
+                       opacity: fields.length === 0 ? 0.5 : 1 }}>
+        + {t('condAdd')}
+      </button>
     </div>
   );
 }
