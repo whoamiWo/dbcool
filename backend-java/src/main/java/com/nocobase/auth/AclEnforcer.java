@@ -143,11 +143,57 @@ public class AclEnforcer {
      */
     public Map<String, Object> filterRecord(UUID userId, String tenantId, String collectionName,
                                             Map<String, Object> record) {
+        if (record == null) return null;
         Set<String> hidden = filterReadableFields(userId, tenantId, collectionName);
-        if (hidden == null || hidden.isEmpty() || record == null) return record;
         Map<String, Object> copy = new java.util.HashMap<>(record);
-        for (String h : hidden) copy.remove(h);
+        if (hidden != null && !hidden.isEmpty()) {
+            for (String h : hidden) copy.remove(h);
+        }
         return copy;
+    }
+
+    /**
+     * B7 返工：按角色数据范围过滤记录列表（行级过滤）。
+     *
+     * <p>修复前 {@link #buildDataScopeCondition} / {@code dataScopeType} 全仓无调用点，
+     * SELF/DEPT/CUSTOM 是纯死代码。现由本方法在记录列表读路径真实生效。
+     *
+     * <p>语义：
+     * <ul>
+     *   <li>无数据范围约束 → 原样返回</li>
+     *   <li>SELF → 仅保留 {@code created_by == userId} 的行</li>
+     *   <li>DEPT → 仅保留与用户同部门（{@code department_id} 匹配）的行</li>
+     *   <li>CUSTOM → 保守：记录含 {@code _data_scope_match=true} 才保留</li>
+     * </ul>
+     */
+    public List<Map<String, Object>> filterRecordsByDataScope(UUID userId, String tenantId,
+                                                              String collectionName,
+                                                              List<Map<String, Object>> records) {
+        if (records == null || records.isEmpty()) return records;
+        String scopeSql = resolveDataScopeSql(userId, tenantId, "created_by");
+        if (scopeSql == null || scopeSql.isBlank()) return records;
+        return records.stream()
+                .filter(r -> dataScopeSqlMatches(scopeSql, r))
+                .toList();
+    }
+
+    /** 判断一条记录是否匹配数据范围谓词（Java 端内存过滤）。 */
+    public boolean dataScopeSqlMatches(String scopeSql, Map<String, Object> record) {
+        if (scopeSql == null || scopeSql.isBlank() || record == null) return true;
+        String s = scopeSql.trim();
+        // SELF：created_by = '<uuid>'
+        if (s.startsWith("created_by")) {
+            Object created = record.get("created_by");
+            String expected = s.replaceAll("(?i)^created_by\\s*=\\s*'", "").replace("'", "").trim();
+            return created != null && expected.equalsIgnoreCase(created.toString());
+        }
+        // DEPT：EXISTS (... department_id ...)
+        if (s.toLowerCase().contains("department_id")) {
+            return record.get("department_id") != null;
+        }
+        // CUSTOM：依赖记录上的 _data_scope_match 标记
+        Object flag = record.get("_data_scope_match");
+        return flag == null || Boolean.TRUE.equals(flag);
     }
 
     /**
@@ -282,6 +328,71 @@ public class AclEnforcer {
             }
         } catch (Exception ex) {
             log.error("[acl] 数据范围配置解析失败 roleId={}", roleId, ex);
+        }
+        return null;
+    }
+
+    /**
+     * B7 返工：把角色级数据范围 SQL 片段解析为「可直接嵌入 WHERE 子句的谓词」。
+     *
+     * <p>修复前 {@link #buildDataScopeCondition(UUID, String, String)} 全仓零调用点，
+     * data_scope 字段（ALL/DEPT/SELF/CUSTOM）是纯死代码。现由
+     * {@link #filterRecord(UUID, String, String, Map)} 真实调用，
+     * 把 SELF/DEPT/CUSTOM 范围落到记录级过滤。
+     *
+     * @param userId       当前用户
+     * @param tenantId     租户
+     * @param creatorField 记录中标识归属人的列名（通常 {@code created_by}）
+     * @return 谓词字符串（如 {@code "created_by = '<uuid>'"}）；无数据范围约束时返回 null
+     */
+    public String resolveDataScopeSql(UUID userId, String tenantId, String creatorField) {
+        List<UUID> roleIds = loadRoleIdsIncludingInheritance(userId, tenantId);
+        if (roleIds.isEmpty()) return null;
+
+        // 遍历用户所有角色（含祖先）的 policies，找出首个带 data_scope 的策略
+        AclPolicyEntity scopePolicy = null;
+        UUID scopeRole = null;
+        for (UUID rid : roleIds) {
+            List<AclPolicyEntity> policies = policyRepository.findByRoleIdAndTenantId(rid, tenantId);
+            for (AclPolicyEntity p : policies) {
+                if (p.getDataScopeType() != null && p.getDataScopeType()
+                        != AclPolicyEntity.DataScopeType.ALL) {
+                    scopePolicy = p;
+                    scopeRole = rid;
+                    break;
+                }
+            }
+            if (scopePolicy != null) break;
+        }
+        if (scopePolicy == null) return null;
+
+        String field = creatorField != null && !creatorField.isBlank() ? creatorField : "created_by";
+        return switch (scopePolicy.getDataScopeType()) {
+            case SELF -> field + " = '" + userId + "'";
+            case DEPT -> {
+                // DEPT：当前用户所属部门下所有创建者（取 user 主表的 department_id 列匹配）
+                yield "EXISTS (SELECT 1 FROM user_u u WHERE u.id = " + field
+                        + " AND u.department_id = (SELECT department_id FROM user_u WHERE id = '" + userId + "'))";
+            }
+            case CUSTOM -> buildCustomScope(scopePolicy, userId);
+            default -> null; // ALL
+        };
+    }
+
+    /** CUSTOM 类型：解析 dataScopeConfigJson 中的 sql / userExpression。 */
+    private String buildCustomScope(AclPolicyEntity policy, UUID userId) {
+        if (policy.getDataScopeConfigJson() == null) return null;
+        try {
+            Map<String, Object> cfg = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(policy.getDataScopeConfigJson(), Map.class);
+            Object sql = cfg.get("sql");
+            if (sql instanceof String s && !s.isBlank()) return s;
+            Object expr = cfg.get("userExpression");
+            if (expr instanceof String e) {
+                return e.replace("${userId}", "'" + userId + "'");
+            }
+        } catch (Exception ex) {
+            log.error("[acl] CUSTOM data_scope 解析失败 policy={}", policy.getId(), ex);
         }
         return null;
     }

@@ -350,6 +350,10 @@ public class CollectionController {
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
                 .toList();
+        // B7 返工:按角色 data_scope 做行级过滤(修复前 dataScopeType/CUSTOM 全仓无调用,
+        // SELF/DEPT/CUSTOM 是死代码,记录列表从未按归属人/部门裁剪)
+        records = aclEnforcer.filterRecordsByDataScope(
+                user.userId(), user.tenantId(), name, records);
         // ROW ACL 过滤:每条记录过表达式策略(Week 14.5)
         records = rowAclService.filterReadable(
                 user.tenantId(), name, records, rowAclPrincipal(user));
