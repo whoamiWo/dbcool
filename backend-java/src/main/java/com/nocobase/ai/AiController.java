@@ -6,11 +6,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
- * AI 助手 REST API — 文档生成 / 问答 / 代码辅助。
+ * AI 助手 REST API — 文档生成 / 问答 / 代码辅助 / 提示词模板。
  *
  * <p>请求转发至 Python LLM 网关,用户 JWT 由请求头透传(配额按真实用户记账)。
  * 未启用或网关异常时返回提示文案,HTTP 始终 200,不阻断前端流程。
@@ -20,9 +23,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 public class AiController {
 
     private final AiAssistantService aiService;
+    private final AiPromptTemplateService promptService;
 
-    public AiController(AiAssistantService aiService) {
+    public AiController(AiAssistantService aiService, AiPromptTemplateService promptService) {
         this.aiService = aiService;
+        this.promptService = promptService;
     }
 
     /** 生成 Wiki 文档:body = {title, instruction} */
@@ -124,5 +129,160 @@ public class AiController {
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth
     ) {
         return aiService.getQuota(user.userId().toString(), auth);
+    }
+
+    // ============================================================
+    //  C4: PromptTemplate CRUD
+    // ============================================================
+
+    /** 创建提示词模板。 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/prompt-templates")
+    public ResponseEntity<Map<String, Object>> createPromptTemplate(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String tenantId = user.tenantId();
+        String name = (String) body.get("name");
+        String description = (String) body.get("description");
+        String promptTemplate = (String) body.get("prompt_template");
+        String variablesJson = (String) body.get("variables_json");
+
+        if (name == null || name.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "name 必填"));
+        }
+        if (promptTemplate == null || promptTemplate.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "prompt_template 必填"));
+        }
+
+        var entity = promptService.createTemplate(tenantId, name, description, promptTemplate, variablesJson);
+        return ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", templateToMap(entity)));
+    }
+
+    /** 更新提示词模板。 */
+    @PreAuthorize("isAuthenticated()")
+    @PutMapping("/prompt-templates/{id}")
+    public ResponseEntity<Map<String, Object>> updatePromptTemplate(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String tenantId = user.tenantId();
+        Optional<AiPromptTemplateEntity> opt = promptService.getTemplate(id, tenantId);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("code", 404, "message", "模板不存在或无权访问"));
+        }
+
+        String name = (String) body.get("name");
+        String description = (String) body.get("description");
+        String promptTemplate = (String) body.get("prompt_template");
+        String variablesJson = (String) body.get("variables_json");
+
+        var updated = promptService.updateTemplate(id, name, description, promptTemplate, variablesJson);
+        return updated.map(e -> ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", templateToMap(e))))
+                .orElse(ResponseEntity.status(404).body(Map.of("code", 404, "message", "更新失败")));
+    }
+
+    /** 删除提示词模板。 */
+    @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/prompt-templates/{id}")
+    public ResponseEntity<Map<String, Object>> deletePromptTemplate(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String tenantId = user.tenantId();
+        Optional<AiPromptTemplateEntity> opt = promptService.getTemplate(id, tenantId);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("code", 404, "message", "模板不存在或无权访问"));
+        }
+        boolean deleted = promptService.deleteTemplate(id);
+        if (!deleted) {
+            return ResponseEntity.status(500).body(Map.of("code", 500, "message", "删除失败"));
+        }
+        return ResponseEntity.ok(Map.of("code", 0, "message", "success"));
+    }
+
+    /** 列出提示词模板。 */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/prompt-templates")
+    public ResponseEntity<Map<String, Object>> listPromptTemplates(
+            @RequestParam(required = false) String search,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String tenantId = user.tenantId();
+        List<AiPromptTemplateEntity> list;
+        if (search != null && !search.isBlank()) {
+            list = promptService.searchTemplates(tenantId, search);
+        } else {
+            list = promptService.listTemplates(tenantId);
+        }
+        return ResponseEntity.ok(Map.of(
+                "code", 0,
+                "message", "success",
+                "data", list.stream().map(AiController::templateToMap).toList()
+        ));
+    }
+
+    /** 获取单个提示词模板。 */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/prompt-templates/{id}")
+    public ResponseEntity<Map<String, Object>> getPromptTemplate(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String tenantId = user.tenantId();
+        Optional<AiPromptTemplateEntity> opt = promptService.getTemplate(id, tenantId);
+        return opt.map(e -> ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", templateToMap(e))))
+                .orElse(ResponseEntity.status(404).body(Map.of("code", 404, "message", "模板不存在或无权访问")));
+    }
+
+    /** 填充提示词变量。 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/prompt-templates/{id}/fill")
+    public ResponseEntity<Map<String, Object>> fillPromptTemplate(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String tenantId = user.tenantId();
+        Optional<AiPromptTemplateEntity> opt = promptService.getTemplate(id, tenantId);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("code", 404, "message", "模板不存在或无权访问"));
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> values = (Map<String, String>) body.get("values");
+        String filled = promptService.fillVariables(opt.get().getPromptTemplate(), values);
+
+        return ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", Map.of("filled_prompt", filled)));
+    }
+
+    /** 提取模板中的变量列表。 */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/prompt-templates/{id}/variables")
+    public ResponseEntity<Map<String, Object>> extractTemplateVariables(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        String tenantId = user.tenantId();
+        Optional<AiPromptTemplateEntity> opt = promptService.getTemplate(id, tenantId);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("code", 404, "message", "模板不存在或无权访问"));
+        }
+        List<String> variables = promptService.extractVariables(opt.get().getPromptTemplate());
+        return ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", Map.of("variables", variables)));
+    }
+
+    private static Map<String, Object> templateToMap(AiPromptTemplateEntity e) {
+        return Map.of(
+                "id", e.getId().toString(),
+                "tenant_id", e.getTenantId(),
+                "name", e.getName(),
+                "description", e.getDescription(),
+                "prompt_template", e.getPromptTemplate(),
+                "variables_json", e.getVariablesJson(),
+                "created_at", e.getCreatedAt().toString(),
+                "updated_at", e.getUpdatedAt() != null ? e.getUpdatedAt().toString() : null
+        );
     }
 }
