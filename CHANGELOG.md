@@ -1,3 +1,29 @@
+## Unreleased — CI 门禁实测收口（覆盖率 + 全量测试）
+
+### 全量验证（实测）
+
+- `mvn -o test`：**2493 run / 0 Failures / 96 Errors**，96 个 Error 全部为
+  `Failed to load ApplicationContext`（本地缺 DB/Redis/Python AI 的环境基线，非回归）
+- 前端 `vitest run`：**959 passed / 2 failed**，2 个失败为既有失败
+  （`AttachmentPreview.test.tsx` lightbox、`BoardView.test.tsx` 取消 prompt），非本次引入
+
+### 修掉 1 个真实遗留 Bug（AI 对话静默降级）
+
+- `AiAssistantService.callLlm` 用 `Map.of("model", model, ...)` 组包，而
+  `chat(prompt, null, 0, token)`「用默认模型」会传 `model=null` → **NPE 被 catch 吞掉**，
+  用户看到的是"AI 助手暂未启用或不可用"。改为可空 Map + 缺省回退（`this.model` / `this.maxTokens`）
+- 证据：该失败此前只在全量跑才暴露（`AiAssistantServiceHttpTest.chat_success_returnsResult`），单跑门禁三件套看不到
+
+### 覆盖率补测（不改阈值）
+
+- 新增 `BillingControllerTest`(21)、`PaymentGatewayRegistryTest`(3)、`BillingOverdueJobTest`(2)，
+  `BillingServiceTest` 扩到 23 → billing 包 **LINE 0.8965**
+- 补 `TaskNotificationServiceTest`(5)（此前 0 覆盖）、`MdcFilterTest`(4)、`JwtAuthFilterTest`(4)
+- 实测：BUNDLE LINE **0.7351**（门槛 0.73，PASS）；auth 0.8631（门槛 0.86，PASS）；
+  notification 0.8847（门槛 0.85，PASS）；其余包级规则均 PASS
+- 顺带统一 Billing 错误语义：`requireTenant` 缺失上下文 → `BillingAccessDeniedException` → 403，
+  业务 `IllegalStateException` 仍为 400（此前两者混用会让 403/400 串味）
+
 ## Unreleased — 项目定位：个人开发 / 非商业 + Apache-2.0 边界保护
 
 ### 许可证：MIT → Apache License 2.0
