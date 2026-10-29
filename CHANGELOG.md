@@ -10,6 +10,18 @@
 选择 Apache-2.0 的理由：要的是**专利授权 + 反诉终止 + 商标非授权 + 清晰免责**，不是禁止他人使用。
 （若后续需要"禁止商用"应改 Polyform Noncommercial；若需要"商用必须回馈源码"应改 AGPLv3。）
 
+### V74 迁移实测执行
+
+用项目自身的 `flyway-core` 对 docker 内 Postgres(nocobase:5432) 真实执行：
+从 v65 一次性应用到 **v74**（`migrationsExecuted=9, success=true`，Flyway 历史 `version=74 success=true`）。
+实测结果：4 张 `billing_*` 表建成；部分唯一索引
+`unique_tenant_active_subscription ... WHERE status IN ('active','trialing')` 生效
+（旧的部分唯一「约束」写法在 PG 下根本无法创建，这次是首次真跑验证）；
+默认套餐种子 3 条（free 0 / pro 99 / enterprise 499）。
+
+> 注：后端容器镜像是 25h 前构建的（jar 内只含到 V65），重启容器不会拾取新脚本，
+> 故用 classpath 直连 Flyway 执行；下次重建镜像时 Flyway 校验会与库内历史一致（checksum 由 Flyway 写入）。
+
 ### B4 计费：保留代码，默认关闭
 
 - `BillingController` / `BillingService` / `BillingOverdueJob` / `PaymentGatewayRegistry` / `ManualPaymentGateway`
