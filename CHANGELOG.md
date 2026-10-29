@@ -1,9 +1,32 @@
+## Unreleased — 96 个 SpringBootTest 失败根因定位与修复
+
+### 根因（B7 返工引入的硬回归，此前误判为“环境基线”）
+
+- `ReportDistributionJob` 构造函数强依赖 `JavaMailSender`
+- `spring-boot-starter-mail` 虽在 pom 里，但**无任何 `spring.mail.*` 配置**
+- Spring Boot 的 `MailSenderAutoConfiguration` 只在 `spring.mail.host` 存在时才创建 Bean
+  → 测试环境该 Bean 缺失 → `UnsatisfiedDependencyException` → 全部 `@SpringBootTest`
+  报 `Failed to load ApplicationContext`（96 个 Error 同一根因，非缺 DB/Redis 所致）
+
+### 修复
+
+- 在 `application.yml` 的 `on-profile: test` 段补最小 dummy 邮件配置
+  (`host=smtp.local / port=25 / auth=false / starttls=false`)
+- 配置置于 test profile 内，不影响 dev/docker 生产 profile
+
+### 实测（修复后）
+
+- `mvn -o test`：**2493 run / 0 Failures / 0 Errors / 0 Skipped**（原 96 Errors 全清）
+- BUNDLE LINE 覆盖率：**0.7351 → 0.7767**（门槛 0.73 PASS）—— 96 个测试由“跳过”变为真实执行
+- 提交 `c994c44`，已推送 `origin/main`
+
 ## Unreleased — CI 门禁实测收口（覆盖率 + 全量测试）
 
 ### 全量验证（实测）
 
 - `mvn -o test`：**2493 run / 0 Failures / 96 Errors**，96 个 Error 全部为
   `Failed to load ApplicationContext`（本地缺 DB/Redis/Python AI 的环境基线，非回归）
+  - ⚠️ 此归因已被证伪，见上方「96 个 SpringBootTest 失败根因定位与修复」
 - 前端 `vitest run`：**959 passed / 2 failed**，2 个失败为既有失败
   （`AttachmentPreview.test.tsx` lightbox、`BoardView.test.tsx` 取消 prompt），非本次引入
 
