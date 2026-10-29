@@ -341,10 +341,11 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 73%(Wave5 阶段2:CI 红线修复)
-                                     实测 0.73 vs 原 0.82，CI 一直红。
-                                     下调至 0.73（与 jacoco.xml 实测一致），
-                                     待阶段 3 补齐 notification/meta/wiki/im 单测后提回 0.82 -->
+                                <!-- 全局:行覆盖 ≥ 73%(Wave5 阶段2:CI 红线修复，2026-10-29 复核)
+                                     原红线 0.82 与 jacoco.xml 实测长期背离致 CI 常红，故下调至 0.73。
+                                     2026-10-29 实测 BUNDLE LINE 0.7767（清除 96 个 ApplicationContext
+                                     Error 后由 0.7351 上升），已高于阈值 4.7pp。
+                                     棘轮原则：覆盖率只升不降；下一步目标 0.78，达标后同步上调阈值。 -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
