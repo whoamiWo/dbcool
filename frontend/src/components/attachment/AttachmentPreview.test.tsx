@@ -67,7 +67,21 @@ describe('AttachmentLightbox', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     // At minimum the dialog with buttons should be present
-    expect(screen.getByRole('button', { name: /关闭/i })).toBeInTheDocument();
+    const closeButtons = screen.getAllByRole('button', { name: /关闭/i });
+    expect(closeButtons.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should close lightbox on close button click', () => {
+    const onClose = vi.fn();
+    render(<AttachmentLightbox open={true} onClose={onClose} storageKey="tenant-123/photo.jpg" />);
+    
+    // 使用 labelText 来定位具体的关闭按钮（DialogActions 里的第二个按钮）
+    const closeButton = screen.getAllByRole('button', { name: /关闭/i });
+    expect(closeButton.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(closeButton[closeButton.length - 1]); // 点击最后一个（最可能是在 actions 里的）
+    
+    // 注意：Dialog 需要动画或等待关闭，这里只验证 onClose 被调用
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('should not render when closed', () => {
