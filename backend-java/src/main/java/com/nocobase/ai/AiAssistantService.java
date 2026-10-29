@@ -105,11 +105,14 @@ public class AiAssistantService {
             if (bearerToken != null && !bearerToken.isBlank()) {
                 headers.setBearerAuth(stripBearer(bearerToken));
             }
-            Map<String, Object> body = Map.of(
-                    "model", model,
-                    "prompt", prompt,
-                    "max_tokens", maxTokens
-            );
+            // Map.of 不接受 null 值：chat(prompt, null, 0, token)「用默认模型」的场景会 NPE，
+            // 被 catch 吞掉后降级成"AI 不可用"。这里改为可空 Map + 缺省回退。
+            String effectiveModel = (model == null || model.isBlank()) ? this.model : model;
+            int effectiveMaxTokens = maxTokens > 0 ? maxTokens : this.maxTokens;
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("model", effectiveModel);
+            body.put("prompt", prompt);
+            body.put("max_tokens", effectiveMaxTokens);
             ResponseEntity<Map> resp = rest.postForEntity(
                     pythonUrl + "/api/ai/chat",
                     new HttpEntity<>(body, headers),

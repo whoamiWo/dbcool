@@ -91,8 +91,8 @@ public class BillingController {
     @PostMapping("/subscription")
     public ResponseEntity<SubscriptionEntity> createSubscription(
             @RequestBody CreateSubscriptionRequest request) {
-        String tenantId = requireTenant(request == null ? null : request.tenantId());
         return handle(() -> {
+            String tenantId = requireTenant(request == null ? null : request.tenantId());
             SubscriptionEntity sub = billingService.createSubscription(
                     tenantId, request.planTierId(), request.paymentMethod(), request.trial());
             auditService.log(tenantId, null, null, "BILLING_CREATE_SUBSCRIPTION", "billing/subscription",
@@ -190,8 +190,8 @@ public class BillingController {
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/payments")
     public ResponseEntity<PaymentEntity> recordPayment(@RequestBody RecordPaymentRequest request) {
-        String tenantId = requireTenant(request == null ? null : request.tenantId());
         return handle(() -> {
+            String tenantId = requireTenant(request == null ? null : request.tenantId());
             PaymentEntity payment = billingService.recordPayment(
                     tenantId, request.invoiceId(), request.subscriptionId(),
                     request.amount(), request.paymentMethod(), request.transactionId());
@@ -249,7 +249,13 @@ public class BillingController {
      * @param declaredTenantId 路径/body 中声明的租户，可为 null 表示未声明
      */
     private String requireTenant(String declaredTenantId) {
-        String tenantId = TenantContext.requireTenantId();
+        String tenantId;
+        try {
+            tenantId = TenantContext.requireTenantId();
+        } catch (IllegalStateException e) {
+            // 请求未过 JwtAuthFilter / 上下文未设置 —— 属于拒绝访问，不是业务参数错误
+            throw new BillingAccessDeniedException("租户上下文缺失: " + e.getMessage());
+        }
         if (declaredTenantId != null && !declaredTenantId.isBlank()
                 && !tenantId.equals(declaredTenantId)) {
             throw new BillingAccessDeniedException(

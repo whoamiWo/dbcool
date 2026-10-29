@@ -281,6 +281,109 @@ class BillingServiceTest {
         verify(invoiceRepository, never()).saveAll(anyList());
     }
 
+    @Test
+    @DisplayName("listAvailablePlans / getPlanById 直接透传仓储")
+    void planQueries() {
+        when(planTierRepository.findAllByOrderBySortOrderAsc()).thenReturn(List.of(plan("plan_pro", "pro")));
+        when(planTierRepository.findById("plan_pro")).thenReturn(Optional.of(plan("plan_pro", "pro")));
+
+        assertThat(service.listAvailablePlans()).hasSize(1);
+        assertThat(service.getPlanById("plan_pro")).isPresent();
+        assertThat(service.getPlanById("nope")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getPayments / supportedPaymentProviders 透传")
+    void paymentQueries() {
+        when(paymentRepository.findByTenantIdOrderByCreatedAtDesc("t1")).thenReturn(List.of(new PaymentEntity()));
+        when(paymentGatewayRegistry.supportedProviders()).thenReturn(java.util.Set.of("manual"));
+
+        assertThat(service.getPayments("t1")).hasSize(1);
+        assertThat(service.supportedPaymentProviders()).containsExactly("manual");
+    }
+
+    @Test
+    @DisplayName("createSubscription(trial=true) → TRIALING 且不设下次扣费日")
+    void createSubscription_trial() {
+        when(subscriptionRepository.findByTenantIdAndStatusIn(eq("t1"), anyList())).thenReturn(Optional.empty());
+        when(planTierRepository.findById("plan_pro")).thenReturn(Optional.of(plan("plan_pro", "pro")));
+        when(subscriptionRepository.save(any(SubscriptionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubscriptionEntity saved = service.createSubscription("t1", "plan_pro", "manual", true);
+
+        assertThat(saved.getStatus()).isEqualTo(SubscriptionEntity.Status.TRIALING);
+        assertThat(saved.getNextBillingDate()).isNull();
+    }
+
+    @Test
+    @DisplayName("upgradeSubscription 同租户 → 切换套餐")
+    void upgradeSubscription_ok() {
+        SubscriptionEntity sub = new SubscriptionEntity();
+        sub.setId("sub-1");
+        sub.setTenantId("t1");
+        when(subscriptionRepository.findById("sub-1")).thenReturn(Optional.of(sub));
+        when(planTierRepository.findById("plan_pro")).thenReturn(Optional.of(plan("plan_pro", "pro")));
+        when(subscriptionRepository.save(any(SubscriptionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.upgradeSubscription("sub-1", "t1", "plan_pro").getPlanTierId()).isEqualTo("plan_pro");
+    }
+
+    @Test
+    @DisplayName("cancelSubscriptionImmediately → CANCELED 并写入取消时间")
+    void cancelImmediately() {
+        SubscriptionEntity sub = new SubscriptionEntity();
+        sub.setId("sub-1");
+        sub.setTenantId("t1");
+        when(subscriptionRepository.findById("sub-1")).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.save(any(SubscriptionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubscriptionEntity canceled = service.cancelSubscriptionImmediately("sub-1", "t1");
+
+        assertThat(canceled.getStatus()).isEqualTo(SubscriptionEntity.Status.CANCELED);
+        assertThat(canceled.getCanceledAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("renewSubscription → 续期一个月且清除取消标记")
+    void renew() {
+        SubscriptionEntity sub = new SubscriptionEntity();
+        sub.setId("sub-1");
+        sub.setTenantId("t1");
+        sub.setCurrentPeriodEnd(LocalDate.of(2026, 3, 1));
+        sub.setCancelAtPeriodEnd(true);
+        when(subscriptionRepository.findById("sub-1")).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.save(any(SubscriptionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SubscriptionEntity renewed = service.renewSubscription("sub-1", "t1");
+
+        assertThat(renewed.getStatus()).isEqualTo(SubscriptionEntity.Status.ACTIVE);
+        assertThat(renewed.getCurrentPeriodEnd()).isEqualTo(LocalDate.of(2026, 4, 1));
+        assertThat(renewed.getCancelAtPeriodEnd()).isFalse();
+    }
+
+    @Test
+    @DisplayName("markInvoiceAsPaid 同租户 → PAID")
+    void markInvoicePaid_ok() {
+        InvoiceEntity invoice = invoice("inv-1", "t1");
+        when(invoiceRepository.findById("inv-1")).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.save(any(InvoiceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.markInvoiceAsPaid("inv-1", "t1", java.time.Instant.now()).getStatus())
+                .isEqualTo(InvoiceEntity.Status.PAID);
+    }
+
+    @Test
+    @DisplayName("confirmPayment 跨租户 → 拒绝")
+    void confirmPayment_crossTenant_denied() {
+        PaymentEntity payment = new PaymentEntity();
+        payment.setId("pay-1");
+        payment.setTenantId("other");
+        when(paymentRepository.findById("pay-1")).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.confirmPayment("pay-1", "t1"))
+                .isInstanceOf(BillingAccessDeniedException.class);
+    }
+
     private static PlanTierEntity plan(String id, String slug) {
         PlanTierEntity p = new PlanTierEntity();
         p.setId(id);
