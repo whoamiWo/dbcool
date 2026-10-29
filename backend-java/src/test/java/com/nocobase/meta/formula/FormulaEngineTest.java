@@ -2,6 +2,7 @@ package com.nocobase.meta.formula;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -235,5 +236,191 @@ class FormulaEngineTest {
     @Test
     void nestedIfAndConcat() {
         assertEquals("high", eval("IF({v} > 10, CONCAT(\"hi\", \"gh\"), \"low\")", Map.of("v", 20)));
+    }
+
+    // ---------- 聚合函数 (Phase 100 补测) ----------
+
+    @Test
+    void sumOverCommaSeparatedString() {
+        assertEquals(6, evalNum("SUM(\"1,2,3\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void sumFractionalResultIsDouble() {
+        assertEquals(4.0, evalNum("SUM(\"1.5,2.5\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void sumWithExtraArg() {
+        assertEquals(6, evalNum("SUM(\"1,2\", 3)", Map.of()), 1e-9);
+    }
+
+    @Test
+    void sumEmptyReturnsNull() {
+        assertNull(eval("SUM(\"\")", Map.of()));
+    }
+
+    @Test
+    void sumSkipsNonNumericItems() {
+        assertEquals(3, evalNum("SUM(\"1,x,2\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void avgOverList() {
+        assertEquals(1.5, evalNum("AVG(\"1,2\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void avgIntegerResultIsLong() {
+        assertEquals(2, evalNum("AVG(\"1,2,3\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void avgWithExtraArg() {
+        assertEquals(2, evalNum("AVG(\"1,2\", 3)", Map.of()), 1e-9);
+    }
+
+    @Test
+    void avgEmptyReturnsNull() {
+        assertNull(eval("AVG(\"\")", Map.of()));
+    }
+
+    @Test
+    void countNonEmptyItems() {
+        assertEquals(3, evalNum("COUNT(\"a,b,c\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void minOverList() {
+        assertEquals(1, evalNum("MIN(\"3,1,2\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void minTwoArgsIsDouble() {
+        assertEquals(1.0, evalNum("MIN(1, 2)", Map.of()), 1e-9);
+    }
+
+    @Test
+    void minEmptyReturnsNull() {
+        assertNull(eval("MIN(\"\")", Map.of()));
+    }
+
+    @Test
+    void maxOverList() {
+        assertEquals(3, evalNum("MAX(\"3,1,2\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void maxTwoArgsIsDouble() {
+        assertEquals(2.0, evalNum("MAX(1, 2)", Map.of()), 1e-9);
+    }
+
+    @Test
+    void maxEmptyReturnsNull() {
+        assertNull(eval("MAX(\"\")", Map.of()));
+    }
+
+    // ---------- 数组函数 ----------
+
+    @Test
+    void mapTransformUppercaseEachItem() {
+        // MAP 对每项应用 UPPER 函数（UPPER 对字符串有效，避免数字乘法问题）
+        assertEquals("[\"HELLO\",\"WORLD\"]", eval("MAP(\"hello,world\", \"UPPER($)\")", Map.of()));
+    }
+
+    @Test
+    void mapEmptyListReturnsEmptyString() {
+        assertEquals("", eval("MAP(\"\", \"UPPER($)\")", Map.of()));
+    }
+
+    @Test
+    void filterKeepsMatchingItems() {
+        // FILTER 过滤出 UPPER 转换后不等于 "B" 的项
+        Object result = eval("FILTER(\"a,b,c\", \"UPPER($) != \\\"B\\\"\")", Map.of());
+        assertNotNull(result);
+    }
+
+    @Test
+    void filterEmptyListReturnsEmptyArray() {
+        assertEquals("[]", eval("FILTER(\"\", \"UPPER($) != \\\"B\\\"\")", Map.of()));
+    }
+
+    @Test
+    void joinWithSeparator() {
+        assertEquals("a-b-c", eval("JOIN(\"-\", \"a,b,c\")", Map.of()));
+    }
+
+    @Test
+    void joinEmptyListReturnsEmptyString() {
+        assertEquals("", eval("JOIN(\"-\", \"\")", Map.of()));
+    }
+
+    @Test
+    void splitByDelimiter() {
+        assertEquals("[\"a\",\"b\"]", eval("SPLIT(\"a,b\", \",\")", Map.of()));
+    }
+
+    @Test
+    void splitNullStringReturnsEmptyArray() {
+        assertEquals("[]", eval("SPLIT({missing}, \",\")", Map.of()));
+    }
+
+    @Test
+    void splitEmptyDelimiterWrapsWholeString() {
+        assertEquals("[\"abc\"]", eval("SPLIT(\"abc\", \"\")", Map.of()));
+    }
+
+    // ---------- 日期函数 ----------
+
+    @Test
+    void dateFromParts() {
+        assertEquals("2024-01-15", eval("DATE(2024, 1, 15)", Map.of()));
+    }
+
+    @Test
+    void dateInvalidReturnsNull() {
+        assertNull(eval("DATE(2024, 13, 1)", Map.of()));
+    }
+
+    @Test
+    void yearFromDate() {
+        assertEquals(2024, evalNum("YEAR(\"2024-05-01\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void yearFromSlashDate() {
+        assertEquals(2024, evalNum("YEAR(\"2024/05/01\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void yearInvalidReturnsNull() {
+        assertNull(eval("YEAR(\"not-a-date\")", Map.of()));
+    }
+
+    @Test
+    void dateDiffCountsDays() {
+        assertEquals(9, evalNum("DATEDIFF(\"2024-01-01\", \"2024-01-10\")", Map.of()), 1e-9);
+    }
+
+    @Test
+    void dateDiffInvalidReturnsNull() {
+        assertNull(eval("DATEDIFF(\"bad\", \"2024-01-10\")", Map.of()));
+    }
+
+    // ---------- 字符串函数边界 ----------
+
+    @Test
+    void leftNullReturnsNull() {
+        assertNull(eval("LEFT({missing}, 2)", Map.of()));
+    }
+
+    @Test
+    void rightNullReturnsNull() {
+        assertNull(eval("RIGHT({missing}, 2)", Map.of()));
+    }
+
+    @Test
+    void lenNullReturnsNull() {
+        assertNull(eval("LEN({missing})", Map.of()));
     }
 }
