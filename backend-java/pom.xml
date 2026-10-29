@@ -341,18 +341,20 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 73%(Wave5 阶段2:CI 红线修复，2026-10-29 复核)
-                                     原红线 0.82 与 jacoco.xml 实测长期背离致 CI 常红，故下调至 0.73。
-                                     2026-10-29 实测 BUNDLE LINE 0.7767（清除 96 个 ApplicationContext
-                                     Error 后由 0.7351 上升），已高于阈值 4.7pp。
-                                     棘轮原则：覆盖率只升不降；下一步目标 0.78，达标后同步上调阈值。 -->
+                                <!-- 全局:行覆盖 ≥ 78%(棘轮上调，2026-10-30)
+                                     阈值演进（棘轮原则：只升不降）：
+                                       0.82（原红线，与实测长期背离致 CI 常红）
+                                     → 0.73（Wave5 阶段2 下调对齐实测，并清除 96 个
+                                            ApplicationContext Error 后实测 0.7767）
+                                     → 0.78（PHASE100 补测后实测 0.7982，上调锁定成果）
+                                     当前实测 0.7982，高于阈值 1.8pp；下一步目标 0.80。 -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.73</minimum>
+                                            <minimum>0.78</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
