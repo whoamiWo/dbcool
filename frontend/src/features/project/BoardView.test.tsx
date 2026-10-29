@@ -82,7 +82,14 @@ describe('BoardView', () => {
     const addButtons = await screen.findAllByRole('button', { name: /添加卡片/ });
     fireEvent.click(addButtons[0]);
 
-    expect(apiClient.post).not.toHaveBeenCalled();
+    // prompt 返回 null 时，handleAddCard 会提前返回，不调用创建任务 API
+    // 注意：loadData 会先调用 checklists/batch，这是正常数据加载。
+    // 我们断言「创建任务」的 endpoint 没被调用
+    const createTaskCalls = vi.mocked(apiClient.post).mock.calls.filter(
+      (call) => call[0] === '/project-boards/tasks'
+    );
+    expect(createTaskCalls).toHaveLength(0);
+
     promptSpy.mockRestore();
   });
 

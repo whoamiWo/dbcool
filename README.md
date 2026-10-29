@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue)](./LICENSE)
 [![Backend CI](https://img.shields.io/badge/CI-passing%20(JaCoCo%2077.67%20%3E%2073%25)-brightgreen)](./.github/workflows/backend-ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-77.67%25-brightgreen)](./backend-java/target/site/jacoco/index.html)
-[![Tests](https://img.shields.io/badge/tests-3454%20(backend%202493%20%2F%20frontend%20961)-brightgreen)](#-测试)
+[![Tests](https://img.shields.io/badge/tests-3455%20(backend%202493%20%2F%20frontend%20962)-brightgreen)](#-测试)
 
 ## ✨ 核心能力
 
