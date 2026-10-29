@@ -341,20 +341,21 @@
                         <goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
-                                <!-- 全局:行覆盖 ≥ 78%(棘轮上调，2026-10-30)
+                                <!-- 全局:行覆盖 ≥ 79%(棘轮上调，2026-10-30)
                                      阈值演进（棘轮原则：只升不降）：
                                        0.82（原红线，与实测长期背离致 CI 常红）
                                      → 0.73（Wave5 阶段2 下调对齐实测，并清除 96 个
                                             ApplicationContext Error 后实测 0.7767）
-                                     → 0.78（PHASE100 补测后实测 0.7982，上调锁定成果）
-                                     当前实测 0.7982，高于阈值 1.8pp；下一步目标 0.80。 -->
+                                     → 0.78（PHASE100 第一批补测后实测 0.7982）
+                                     → 0.79（第二批补测 ReportDistributionJob 后实测 0.8020）
+                                     当前实测 0.8020，高于阈值 1.2pp；下一步目标 0.81。 -->
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.78</minimum>
+                                            <minimum>0.79</minimum>
                                         </limit>
                                     </limits>
                                     <excludes>
