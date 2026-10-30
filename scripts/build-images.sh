@@ -50,8 +50,10 @@ fi
 # "more than one source file" 直接失败（实测）。因此构建前先 clean package，
 # 保证 target 中只有当前版本的一个主 jar（.jar.original 不匹配 *.jar）。
 if [[ "${SKIP_JAVA_PACKAGE:-0}" != "1" ]]; then
-  echo "▶ backend-java: mvn -o clean package -DskipTests"
-  (cd "$ROOT/backend-java" && mvn -o clean package -DskipTests -q)
+  # 注意：不用 -o —— CI runner 无 Maven 缓存时离线模式必然失败（v2.1.2 首次发布实测）；
+  # 本地离线构建可用 SKIP_JAVA_PACKAGE=1 跳过（需自行保证 target jar 存在）。
+  echo "▶ backend-java: mvn clean package -DskipTests"
+  (cd "$ROOT/backend-java" && mvn clean package -DskipTests -q)
 fi
 
 # 服务 → Dockerfile/上下文
