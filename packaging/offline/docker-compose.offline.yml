@@ -1,0 +1,352 @@
+name: nocobase
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: nocobase-postgres
+    command: 'postgres -c wal_level=replica -c archive_mode=on -c archive_command=''test
+      ! -f /var/lib/postgresql/data/pg_archive/%f && cp %p /var/lib/postgresql/data/pg_archive/%f''
+      -c max_wal_senders=5
+
+      '
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD，请在 .env 中配置}
+    ports:
+    - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U $${POSTGRES_USER:-nocobase}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+  redis:
+    image: redis:7.4-alpine
+    container_name: nocobase-redis
+    command:
+    - redis-server
+    - --appendonly
+    - 'yes'
+    ports:
+    - 127.0.0.1:${REDIS_PORT:-6379}:6379
+    volumes:
+    - redisdata:/data
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: nocobase-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?未设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
+    ports:
+    - 127.0.0.1:${MINIO_PORT:-9000}:9000
+    - 127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001
+    volumes:
+    - miniodata:/data
+    healthcheck:
+      test:
+      - CMD
+      - mc
+      - ready
+      - local
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+  rabbitmq:
+    image: rabbitmq:3.13.7-management-alpine
+    container_name: nocobase-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?未设置 RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?未设置 RABBITMQ_PASSWORD}
+    ports:
+    - 127.0.0.1:${RABBITMQ_PORT:-5672}:5672
+    - 127.0.0.1:${RABBITMQ_MGMT_PORT:-15672}:15672
+    volumes:
+    - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - ping
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+  backend-java:
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:-2.1.1}
+    container_name: nocobase-backend-java
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      EXPORT_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      AI_SERVICE_URL: http://backend-python:8000
+      AI_PYTHON_URL: http://backend-python:8000
+      AI_ENABLED: 'true'
+      RATELIMIT_LOGIN_LIMIT: ${RATELIMIT_LOGIN_LIMIT:-5}
+      CRDT_SERVICE_URL: http://crdt-service:3100
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:?未设置 RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?未设置 RABBITMQ_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET，请用 openssl rand -base64 32 生成后写入 .env}
+      JAVA_PORT: 8080
+      NOCOBASE_ALERTS_PATH: /data/alerts.db
+      MINIO_ENABLED: ${MINIO_ENABLED:-true}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_EXTERNAL_URL: ${MINIO_EXTERNAL_URL:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
+      DINGTALK_APP_SECRET: ${DINGTALK_APP_SECRET:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      RATELIMIT_IM_LIMIT: ${RATELIMIT_IM_LIMIT:-30}
+      RATELIMIT_FILEUPLOAD_LIMIT: ${RATELIMIT_FILEUPLOAD_LIMIT:-10}
+      DB_POOL_MAX: ${DB_POOL_MAX:-80}
+      DB_POOL_MIN: ${DB_POOL_MIN:-10}
+      INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID: ${INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID:-}
+      INTEGRATION_CREDENTIAL_MASTER_KEY: ${INTEGRATION_CREDENTIAL_MASTER_KEY:-}
+    ports:
+    - 127.0.0.1:${JAVA_PORT:-8080}:8080
+    volumes:
+    - alertsdata:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8080/api/health/ready || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    restart: unless-stopped
+  backend-python:
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:-2.1.1}
+    container_name: nocobase-backend-python
+    environment:
+      JAVA_BACKEND_URL: http://backend-java:8080
+      JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENABLED: 'true'
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?未设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
+      NOCOBASE_ALERTS_PATH: /data/alerts.db
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_WEBHOOK_KIND: ${ALERT_WEBHOOK_KIND:-generic}
+      ALERT_WEBHOOK_SECRET: ${ALERT_WEBHOOK_SECRET:-}
+      BACKUP_DIR: /app/backups
+    ports:
+    - 127.0.0.1:${PYTHON_PORT:-8000}:8000
+    volumes:
+    - alertsdata:/data
+    - backupsdata:/app/backups
+    depends_on:
+      backend-java:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:8000/api/health/ready || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    restart: unless-stopped
+  crdt-service:
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:-2.1.1}
+    container_name: nocobase-crdt-service
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: ${POSTGRES_DB:-nocobase}
+      PG_USER: ${POSTGRES_USER:-nocobase}
+      PG_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
+    ports:
+    - 127.0.0.1:${CRDT_PORT:-3100}:3100
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -qO- http://127.0.0.1:3100/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+  frontend:
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:-2.1.1}
+    container_name: nocobase-frontend
+    environment:
+      API_BASE_URL: /
+      PUBLIC_HOST: ${PUBLIC_HOST:-}
+      FRONTEND_BIND_ADDR: ${FRONTEND_BIND_ADDR:-127.0.0.1}
+      FRONTEND_PORT: ${FRONTEND_PORT:-80}
+      FRONTEND_TLS_PORT: ${FRONTEND_TLS_PORT:-443}
+    ports:
+    - ${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_PORT:-80}:80
+    - ${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_TLS_PORT:-443}:443
+    volumes:
+    - ./certs/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+    - ./certs/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+    depends_on:
+      backend-java:
+        condition: service_healthy
+      backend-python:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    networks:
+    - nocobase-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
+volumes:
+  pgdata:
+    name: nocobase-pgdata
+  redisdata:
+    name: nocobase-redisdata
+  miniodata:
+    name: nocobase-miniodata
+  rabbitmqdata:
+    name: nocobase-rabbitmqdata
+  alertsdata:
+    name: nocobase-alertsdata
+  backupsdata:
+    name: nocobase-backupsdata
+networks:
+  nocobase-net:
+    name: nocobase-net
+    driver: bridge

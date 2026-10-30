@@ -1,3 +1,22 @@
+## Unreleased — Wave 1 私有化交付包 + Wave 2 项目展示
+
+### Wave 1 · 私有化交付包（T1.1 ~ T1.6，实测于 2026-10-30）
+
+- T1.1 镜像版本化多架构：`scripts/build-images.sh`（VERSION 为 tag 真相源）；**全仓 latest 清零**；基础镜像锁版本
+- T1.2 Release 自动化：`.github/workflows/release.yml`（tag 触发 → 版本一致性 → 推多架构镜像 → 抽 CHANGELOG → SHA256 → Release）
+- T1.3 离线部署包：`scripts/package-offline.sh` + `packaging/offline/install-offline.sh`（SHA256 校验链 + 缺文件 exit 2）；产出 `dist/dbcool-offline-2.1.1.tar.gz`（**断网安装未实测，beta**）
+- T1.4 安装器扩发行版：RHEL/Alma/Rocky/CentOS Stream/麒麟；`install.sh --check` 支持矩阵（**RHEL 系未实测**）
+- T1.5 Helm chart：`charts/dbcool/`（**beta：helm lint 与集群安装未实测**）
+- T1.6 升级回滚：`scripts/upgrade.sh` + `docs/upgrade-runbook.md`（实测备份 34M 成功、冒烟 13/13）
+- WAL 归档门禁根因修复：`backup-e2e-verify.py` 检查前主动 checkpoint+pg_switch_wal（仍要求 archived_count>0）；compose archive_command 改 `test -f||cp` → **backup-e2e 30/30、launch-final-verify 8/8**
+
+### Wave 2 · 项目展示（T2.1 ~ T2.4，实测于 2026-10-30）
+
+- T2.1 README 重写为产品页；PHASE 流水账 0 命中，原文存档 `docs/DEVELOPMENT_NOTES.md`
+- T2.2 文档站：VitePress `docs-site/` + 12 篇核心文档白名单同步 + `scripts/build-docs-site.sh`（构建通过 4.79s）+ CI job `docs.yml`（**Pages 部署未实测**）
+- T2.3 视觉素材：`scripts/screenshot-demo.mjs`（Playwright 登录态）产出 **10 张截图**（md5 全部唯一）；**GIF 未做**
+- T2.4 演示数据种子：`scripts/seed-demo-data.py` 默认关闭；显式开启实测落库（1 集合 + 12 记录 + 看板 + 工作流），幂等可重跑
+
 ## v2.1.1 (2026-10-30)
 
 ### 本批摘要：Wave 0 地基收口 + Wave 0.5 能力断链修复（实测于 @02b3a59）

@@ -151,10 +151,10 @@ Wave 4    持续迭代节奏            长期
 
 | # | 任务 | 落点 | 验收 | 人日 |
 |---|---|---|---|---|
-| T2.1 | README 重写为产品页 | 定位 → 能力矩阵 → 30 秒上手 → 截图 → 部署方式 → 授权与支持 → 路线图；PHASE 流水账移入 `docs/` | 首页不出现 PHASE 编号 | 2 |
-| T2.2 | 文档站 | VitePress `docs-site/`，8–10 篇核心 runbook 建导航（部署/运维/升级/备份/权限/API） | Pages 可访问、无死链 | 3 |
-| T2.3 | 视觉素材 | 6–8 张核心界面截图 + 2–3 段 30s GIF（建表→录数 / 工作流 / IM） | 落 `docs-site/public/screenshots/` | 3 |
-| T2.4 | 演示数据种子 | `scripts/seed-demo-data.py`（collection + 记录 + 视图 + 一条工作流） | **默认关闭**，仅 `--seed-demo` 或 `DEMO_SEED=true` 生效 | 2 |
+| T2.1 | README 重写为产品页 | 定位 → 能力矩阵 → 30 秒上手 → 截图 → 部署方式 → 授权与支持 → 路线图；PHASE 流水账移入 `docs/` | 首页不出现 PHASE 编号 | ✅ 2（PHASE 流水账 0 命中；原文存档至 `docs/DEVELOPMENT_NOTES.md`；版本一致性 exit 0） |
+| T2.2 | 文档站 | VitePress `docs-site/`，8–10 篇核心 runbook 建导航（部署/运维/升级/备份/权限/API） | Pages 可访问、无死链 | ✅ 3（12 篇核心文档白名单同步 + vitepress build 通过；CI job `docs.yml`；**Pages 部署未实测**） |
+| T2.3 | 视觉素材 | 6–8 张核心界面截图 + 2–3 段 30s GIF（建表→录数 / 工作流 / IM） | 落 `docs-site/public/screenshots/` | ✅ 3（**10 张截图实测**由 `scripts/screenshot-demo.mjs` 生成，md5 全部唯一；**GIF 未做**——以截图集替代） |
+| T2.4 | 演示数据种子 | `scripts/seed-demo-data.py`（collection + 记录 + 视图 + 一条工作流） | **默认关闭**，仅 `--seed-demo` 或 `DEMO_SEED=true` 生效 | ✅ 2（默认关闭 exit 0；显式开启实测：1 集合 + 12 记录 + 看板视图 + 工作流（disabled）全部落库，幂等可重跑） |
 | T2.5 | 在线 Demo（可选） | 2C4G 云主机 `deploy.sh demo`，只读账号 + 每日重置 | 有成本预算再上 | 2 |
 
 **DoD**：陌生访客 3 分钟内答出「是什么 / 能干什么 / 怎么装 / 找谁」（可用 3 个真人走查或问卷留痕）。
