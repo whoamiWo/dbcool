@@ -329,7 +329,7 @@ prepare_build_artifacts() {
     log "检查构建产物..."
     cd "$PROJECT_ROOT"
 
-    if [ ! -f "backend-java/target/nocobase-backend-0.0.1-SNAPSHOT.jar" ]; then
+    if [ -z "$(ls backend-java/target/nocobase-backend-*.jar 2>/dev/null | grep -v '\.original$')" ]; then
         log "Java jar 不存在，执行 Maven 构建..."
         make build-java || { error "Maven 构建失败"; return 1; }
         ok "Maven 构建完成"

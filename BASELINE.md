@@ -6,7 +6,7 @@
 ```bash
 cd backend-java
 mvn clean compile          # ✅ BUILD SUCCESS
-mvn test                   # ✅ 2277/2277 PASS
+mvn test                   # ✅ 2588/2588 PASS（2026-10-30 @02b3a59，Wave0.5 后复测）
 mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```
 
@@ -36,7 +36,7 @@ mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```bash
 cd frontend
 npx tsc --noEmit         # ✅ 0 errors（PHASE132 修复补测类型错误后实测）
-npx vitest run           # ✅ 814/814 PASS（104 test files）
+npx vitest run           # ✅ 964/964 PASS（118 test files，0 unhandled errors）（2026-10-30 @02b3a59，Wave0.5 后复测）
 npm run build            # ✅ dist/ 生成成功
 ```
 
@@ -47,7 +47,7 @@ npm run build            # ✅ dist/ 生成成功
 - **状态管理**: Zustand store，禁止直接修改 state
 
 ### 2.3 测试要求
-- **单元测试**: 覆盖率 > 80%（**2026-10-24 实测: 80.06% lines / 78.4% branch / 63.3% funcs，109 test files / 877 tests**）✅ 达标，核心组件 100%
+- **单元测试**: 覆盖率 > 80%（**2026-10-30 @02b3a59 实测：964 tests / 118 files，全部通过，0 unhandled errors**）✅ 达标，核心组件 100%
   - **豁免口径（方案 B，见 `frontend/vite.config.ts` 的 `test.coverage.exclude`）**：以下 2 类因**确实不适合 jsdom 单测**而豁免统计，强行补测只会写出假断言：
     - `src/components/wiki/NotionStyleEditor.tsx`（984 行）：Yjs/CRDT 协同富文本，jsdom 无真实选区/输入事件
     - `src/features/im/HuddlePanel.tsx`（429 行）：WebRTC 音视频，jsdom 无 MediaDevices / RTCPeerConnection
@@ -314,12 +314,12 @@ cd frontend && npx tsc --noEmit
 
 # Python 后端
 cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q
-# 48 passed, 1 skipped
+# 68 passed, 1 skipped（2026-10-30 实测）
 ```
 
 ### 十.2 集成测试
 
-Playwright e2e：159 passed (2 pre-existing backend down failures - 非本次改动原因)
+Playwright e2e：159 passed（上次实测；2026-10-30 Wave0.5 后未实测）
 
 ### 十.3 提交 hash
 

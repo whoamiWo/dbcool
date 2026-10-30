@@ -73,8 +73,8 @@ dependency-check -d backend-java -o target/dependency-check-report.html
 | `fixed_in` | 修复版本号（可留空表示"未知"） |
 | `note`（可选） | 补充说明（例如"当前版本不在受影响区间，命中为误报"） |
 
-当前包含 6 条（5 真实 CVE + 1 占位）：
-JJWT / Apache HttpClient5 / Logstash Logback / MinIO / Logback + 占位 `CVE-2024-0000-EXAMPLE`。
+当前包含 5 条真实 CVE：
+JJWT / Apache HttpClient5 / Logstash Logback / MinIO / Logback（不含占位条目）。
 
 新增条目时请：
 1. 确认 CVE 的 `group:artifact` 与 Maven 坐标严格一致；
