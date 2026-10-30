@@ -242,8 +242,19 @@ def test_t3_pitr():
 
     # 只 ls 归档目录不够：目录里有文件 ≠ 归档成功（归档失败时目录是空的，
     # 而曾经成功过的旧文件会让人误判）。真正的证据是 pg_stat_archiver。
-    stat = psql("nocobase-postgres",
-                "select archived_count || '|' || failed_count from pg_stat_archiver")
+    #
+    # Wave1（2026-10-30）根因修复：pg_stat_archiver 计数只统计**当前进程生命期**，
+    # 容器刚重启、还没有写满一个 WAL segment 时 archived_count 恒为 0 ——
+    # 门禁会因"时序抖动"误报 FAIL（archived_count=0 但归档配置完全正常）。
+    # 这里主动 checkpoint + switch，给 archiver 一个真实的归档机会（最多等 20s），
+    # 然后仍要求 archived_count > 0：归档没成功照样 FAIL，非弱化断言。
+    psql("nocobase-postgres", "checkpoint; select pg_switch_wal()")
+    for _ in range(10):
+        stat = psql("nocobase-postgres",
+                    "select archived_count || '|' || failed_count from pg_stat_archiver")
+        if stat and stat.split("|")[0].strip().isdigit() and int(stat.split("|")[0]) > 0:
+            break
+        time.sleep(2)
     parts = (stat or "|").split("|")
     archived_n, failed_n = (parts + ["", ""])[:2]
     check("生产库 WAL 已实际归档", archived_n.isdigit() and int(archived_n) > 0,
