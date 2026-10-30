@@ -507,7 +507,7 @@
   {
     "path": "/wiki/blocks/{}",
     "file": "frontend/src/api/wiki.ts",
-    "line": 84
+    "line": 91
   },
   {
     "path": "/wiki/categories/{}",
@@ -552,12 +552,12 @@
   {
     "path": "/wiki/pages/{}/blocks",
     "file": "frontend/src/api/wiki.ts",
-    "line": 80
+    "line": 87
   },
   {
     "path": "/wiki/pages/{}/blocks/reorder",
     "file": "frontend/src/api/wiki.ts",
-    "line": 87
+    "line": 94
   },
   {
     "path": "/wiki/pages/{}/from-template",
@@ -588,6 +588,11 @@
     "path": "/wiki/search",
     "file": "frontend/src/api/wiki.ts",
     "line": 77
+  },
+  {
+    "path": "/wiki/search/hybrid",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 84
   },
   {
     "path": "/workflows",

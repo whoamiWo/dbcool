@@ -9,6 +9,7 @@ vi.mock('@/api/wiki', () => ({
   wikiApi: {
     listKb: vi.fn(),
     search: vi.fn(),
+    searchHybrid: vi.fn(),
   },
 }));
 
@@ -36,6 +37,9 @@ describe('WikiSearchPage', () => {
   it('空结果显示"未找到相关文档"', async () => {
     vi.mocked(wikiApi.listKb).mockResolvedValue([] as any);
     vi.mocked(wikiApi.search).mockResolvedValue({ data: [], total: 0 } as any);
+    vi.mocked(wikiApi.searchHybrid).mockRejectedValue(new Error('vector index unavailable'));
+    // 默认：混合检索不可用 → 走关键词回退路径（保持既有用例语义）
+    vi.mocked(wikiApi.searchHybrid).mockRejectedValue(new Error('vector index unavailable'));
     renderPage();
     const input = screen.getByPlaceholderText(/输入关键词搜索文档/);
     fireEvent.change(input, { target: { value: 'test' } });
@@ -93,6 +97,45 @@ describe('WikiSearchPage', () => {
     fireEvent.click(screen.getByText('搜索'));
     await waitFor(() => {
       expect(wikiApi.search).toHaveBeenCalledWith('test', expect.objectContaining({ kbId: 'kb1' }));
+    });
+  });
+
+  it('Wave4#5：优先调用混合检索（searchHybrid），命中后展示结果', async () => {
+    vi.mocked(wikiApi.listKb).mockResolvedValue([] as any);
+    vi.mocked(wikiApi.searchHybrid).mockResolvedValue({
+      data: [{ id: 'p1', title: '混合命中', slug: 'hybrid-hit', status: 'PUBLISHED', content: 'x' }],
+      total: 1,
+    } as any);
+    renderPage();
+    const input = screen.getByPlaceholderText(/输入关键词搜索文档/);
+    fireEvent.change(input, { target: { value: '语义' } });
+    fireEvent.click(screen.getByText('搜索'));
+    await waitFor(() => {
+      expect(wikiApi.searchHybrid).toHaveBeenCalledWith('语义', expect.any(Object));
+    });
+    // hybrid 命中时**不应**再调 ILIKE 版
+    expect(wikiApi.search).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText('混合命中')).toBeInTheDocument();
+    });
+  });
+
+  it('Wave4#5：混合检索失败 → 自动回退关键词检索', async () => {
+    vi.mocked(wikiApi.listKb).mockResolvedValue([] as any);
+    vi.mocked(wikiApi.searchHybrid).mockRejectedValue(new Error('vector index unavailable'));
+    vi.mocked(wikiApi.search).mockResolvedValue({
+      data: [{ id: 'p2', title: '关键词命中', slug: 'kw-hit', status: 'PUBLISHED', content: 'x' }],
+      total: 1,
+    } as any);
+    renderPage();
+    const input = screen.getByPlaceholderText(/输入关键词搜索文档/);
+    fireEvent.change(input, { target: { value: '回退' } });
+    fireEvent.click(screen.getByText('搜索'));
+    await waitFor(() => {
+      expect(wikiApi.search).toHaveBeenCalledWith('回退', expect.any(Object));
+    });
+    await waitFor(() => {
+      expect(screen.getByText('关键词命中')).toBeInTheDocument();
     });
   });
 });

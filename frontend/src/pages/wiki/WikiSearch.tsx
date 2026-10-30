@@ -46,6 +46,19 @@ export function WikiSearchPage() {
       if (!query.trim()) return { data: [], total: 0 };
       const params: any = { q: query };
       if (selectedKb) params.kbId = selectedKb;
+      // Wave4 待办池 #5：优先混合检索（关键词 + 语义），语义不可用时回退 ILIKE
+      if (!selectedStatus) {
+        try {
+          const res = await wikiApi.searchHybrid(query, params);
+          return {
+            data: Array.isArray(res) ? res : (res as any)?.data || [],
+            total: Array.isArray(res) ? res.length : (res as any)?.total || 0,
+          };
+        } catch (e) {
+          // 语义检索异常（向量索引缺失/Embedding 服务不可用等）→ 降级 ILIKE，保证搜索可用
+          console.warn('[wiki-search] hybrid 检索失败，回退关键词检索', e);
+        }
+      }
       if (selectedStatus) params.status = selectedStatus;
       const res = await wikiApi.search(query, params);
       return {

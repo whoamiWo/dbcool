@@ -56,7 +56,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 3 | 平台配置三处补齐 | 🟡 进行中 |
 | 2 | Slack token 迁 TenantCredentialService | ⏳ 待取 |
 | 4 | K8s Secret → Sealed Secrets | ⏳ |
-| 5 | Wiki 混合检索接前端 | ⏳ |
+| 5 | Wiki 混合检索接前端 | ✅ 完成（2026-10-31：WikiSearch 优先走 /wiki/search/hybrid（未选 status 时），语义不可用自动回退 ILIKE；单测 6/6 + 反向自检通过） |
 | 6 | 工作流 webhook 触发 + 节点重试 | ⏳ |
 | 7 | @提及接真 | ⏳ |
 | 8 | API Key 专属限流 | ⏳ |
