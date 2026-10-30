@@ -16,7 +16,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REGISTRY="${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}"
+# GHCR 仓库名必须全小写（v2.1.2 发布实测：whoamiWo 含大写被拒）—— 统一转小写
+REGISTRY="$(echo "${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}" | tr '[:upper:]' '[:lower:]')"
 PLATFORM="${PLATFORM:-linux/amd64,linux/arm64}"
 PUSH=1
 LOAD=0
