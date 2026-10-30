@@ -1,7 +1,8 @@
 #!/bin/bash
 # ============================================================
 #  NocoBase 一键安装 + 启动脚本
-#  适用: Ubuntu 22.04+ / Debian 12+
+#  适用: Ubuntu 22.04+ / Debian 12+ / RHEL 9+ / CentOS Stream 9+ /
+#        Rocky 9+ / Alma 9+ / 麒麟 V10 (Kylin)
 #  用法:
 #    chmod +x install.sh
 #    ./install.sh all         # 全栈
@@ -10,6 +11,7 @@
 #    ./install.sh frontend    # 只前端
 #    ./install.sh stop        # 停止
 #    ./install.sh status      # 看状态
+#    ./install.sh --check     # 打印支持矩阵并退出
 # ============================================================
 
 set -e
@@ -33,18 +35,75 @@ detect_os() {
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         OS=$ID
+        OS_VERSION="${VERSION_ID:-unknown}"
     else
         err "无法检测操作系统"
     fi
+    # Wave1 T1.4：扩展 RHEL 系与麒麟；不支持的发行版明确报错 + 打印支持矩阵
     case $OS in
-        ubuntu|debian) ;;
-        *) err "不支持:$OS(本脚本只支持 Ubuntu/Debian)" ;;
+        ubuntu|debian)
+            PKG_MANAGER="apt"
+            ;;
+        rhel|centos|rocky|almalinux|ol|kylin|opensuse*|sles)
+            if command -v dnf >/dev/null 2>&1; then
+                PKG_MANAGER="dnf"
+            elif command -v yum >/dev/null 2>&1; then
+                PKG_MANAGER="yum"
+            elif command -v tdnf >/dev/null 2>&1; then
+                PKG_MANAGER="tdnf"
+            else
+                err "检测到 $OS 但未找到 dnf/yum/tdnf 包管理器"
+            fi
+            ;;
+        *)
+            print_support_matrix
+            err "不支持的操作系统：$OS $OS_VERSION（本脚本支持矩阵见下方）"
+            ;;
     esac
-    log "检测到系统:$OS"
+    log "检测到系统：$OS $OS_VERSION（包管理器：$PKG_MANAGER）"
+}
+
+# 支持矩阵（Wave1 T1.4）：docs/install-support-matrix.md 同源
+print_support_matrix() {
+    cat <<'MATRIX'
+──────────────────────────────────────────────
+  DBCool 安装器支持矩阵
+──────────────────────────────────────────────
+  发行版              版本      包管理器   状态
+  Ubuntu              22.04+    apt        支持（已实测环境）
+  Debian              12+       apt        支持（已实测环境）
+  RHEL / AlmaLinux    9+        dnf        支持（未实测）
+  Rocky               9+        dnf        支持（未实测）
+  CentOS Stream       9+        dnf        支持（未实测）
+  银河麒麟 Kylin      V10       yum/dnf   支持（未实测）
+  其他                -         -          不支持
+──────────────────────────────────────────────
+MATRIX
 }
 
 check_cmd() {
     command -v "$1" &>/dev/null
+}
+
+# Wave1 T1.4：跨发行版包管理包装（apt/dnf/yum/tdnf）
+pkg_update() {
+    case "$PKG_MANAGER" in
+        apt)  sudo apt update -qq ;;
+        dnf|yum|tdnf) sudo "$PKG_MANAGER" makecache --quiet 2>/dev/null || sudo "$PKG_MANAGER" update -y -q || true ;;
+    esac
+}
+pkg_install() {
+    case "$PKG_MANAGER" in
+        apt)  sudo apt install -y -qq "$@" ;;
+        dnf|yum|tdnf) sudo "$PKG_MANAGER" install -y -q "$@" ;;
+    esac
+}
+# RHEL 系默认无 openjdk-21-jdk 命名，统一用 java-21-openjdk(-devel)；麒麟用 java-21-openjdk
+pkg_java_name() {
+    case "$PKG_MANAGER" in
+        apt) echo "openjdk-21-jdk" ;;
+        *)   echo "java-21-openjdk java-21-openjdk-devel" ;;
+    esac
 }
 
 docker_cmd() {
@@ -61,8 +120,8 @@ install_jdk_maven() {
         return 0
     fi
     log "安装 OpenJDK 21 + Maven..."
-    sudo apt update -qq
-    sudo apt install -y -qq openjdk-21-jdk maven curl wget gnupg
+    pkg_update
+    pkg_install $(pkg_java_name) maven curl wget gnupg
     JAVA_VER=$(java -version 2>&1 | head -1 | awk '{print $2}' | tr -d '"' | cut -d. -f1)
     if [ "$JAVA_VER" != "21" ]; then
         warn "apt 装的 JDK=$JAVA_VER,改用 Adoptium Temurin 21"
@@ -80,7 +139,7 @@ install_docker() {
         return 0
     fi
     log "安装 Docker..."
-    sudo apt install -y -qq docker.io docker-compose-plugin
+    pkg_install docker.io docker-compose-plugin
     sudo systemctl start docker
     sudo systemctl enable docker
     sudo usermod -aG docker "$USER"
@@ -98,7 +157,7 @@ install_node_pnpm() {
         if check_cmd curl; then
             curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
         fi
-        sudo apt install -y -qq nodejs
+        pkg_install nodejs
     fi
     if ! check_cmd pnpm; then
         log "安装 pnpm..."
@@ -340,6 +399,12 @@ cmd_stop() {
     rm -f /tmp/nocobase-*.pid
     ok "停止完成"
 }
+
+# Wave1 T1.4：支持矩阵查询（不安装任何东西）
+if [ "${1:-}" = "--check" ]; then
+    print_support_matrix
+    exit 0
+fi
 
 case "${1:-}" in
     all)        cmd_all ;;
