@@ -1,5 +1,9 @@
 # 综合企业协作平台 — 上线就绪度与竞品差距评估
 
+> 🚫 **本文已被取代（2026-10-30，基线 `02b3a59`）**
+> 最新权威对标结论见 **[`docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`](./docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md)**。
+> 本文仅作历史审计痕迹保留，其中 16 条「差距」已被代码实证推翻（见新文 §2），**不要再按本文清单返工**。
+
 > ⚠️ **本文部分结论已被 2026-10-26 实证复核推翻（基线 `f752535` v2.1.0）**
 >
 > 权威结论请以 **[`docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md`](./docs/ENTERPRISE_PLATFORM_MASTER_PLAN.md)** 为准。

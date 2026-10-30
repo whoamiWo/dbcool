@@ -1,5 +1,11 @@
 # 企业级综合平台 — 能力补全总纲
 
+> 🚫 **本文已被取代（2026-10-30，基线 `02b3a59`）**
+> 最新权威结论见 **[`PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`](./PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md)**。
+> 本文所列「四个结构性短板」（JS-SDK 缺失 / 微信空白 / 外部数据源缺失 / 计费缺失）**均已实现**；
+> 当前的真实缺口是 6 项 P0 断链（P0-1 ~ P0-6），见新文 §4。
+> 本文仅作历史审计痕迹保留。
+
 > 基线：`f752535`（v2.1.0，2026-10-26）
 > 目标：在现有 DBCool 平台基础上，融合 NocoDB / NocoBase / Slack / RocketChat / Mattermost / Trello /
 > Airtable / Notion 七大产品优势，打造**可嵌入钉钉、企微、飞书、微信**的企业级综合协作平台。
