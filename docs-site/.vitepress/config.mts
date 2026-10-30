@@ -31,6 +31,7 @@ export default defineConfig({
           { text: '升级 Runbook', link: '/pages/upgrade-runbook' },
           { text: '备份与恢复', link: '/pages/backup-restore-runbook' },
           { text: '密钥轮换', link: '/pages/key-rotation-runbook' },
+          { text: '密钥管理（Sealed Secrets）', link: '/pages/secrets-management' },
           { text: '发布回滚', link: '/pages/release-rollout-runbook' },
         ],
       },

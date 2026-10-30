@@ -40,8 +40,10 @@ data:
   API_BASE_URL: "/"
 
 ---
-# 敏感配置 —— 示例模板，生产必须替换为真实值并纳入密钥管理（Sealed Secrets / Vault）
-# 部署前请复制为 secret.yaml 并填入真实值；切勿把真实密钥提交进仓库。
+# 敏感配置 —— ⚠️ 生产部署请改用 SealedSecret（见 docs/secrets-management.md 与
+# scripts/seal-secrets.sh，产物 k8s/sealed/secret.yaml）并跳过本段 Secret，
+# 避免与 controller 生成的 nocobase-secret 重名冲突。
+# 本文件中的占位符仅供本地开发/演示（CHANGE_ME 值不可用于生产）。
 apiVersion: v1
 kind: Secret
 metadata:
