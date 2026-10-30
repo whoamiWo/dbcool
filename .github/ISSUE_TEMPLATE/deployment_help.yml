@@ -1,0 +1,62 @@
+name: 部署求助
+description: 安装 / 部署 / 升级遇到问题
+labels: ["deployment"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        部署类问题请先自查：
+        - 支持矩阵：[docs/install-support-matrix.md](../docs/install-support-matrix.md)
+        - 排错手册：[TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
+        - 升级 Runbook：[docs/upgrade-runbook.md](../docs/upgrade-runbook.md)
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: 阶段
+      options:
+        - 首次安装（install.sh）
+        - 离线包安装（install-offline.sh）
+        - Docker Compose 启动
+        - K8s / Helm
+        - 升级（upgrade.sh）
+        - 运行中故障
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 发行版
+      options:
+        - Ubuntu 22.04+
+        - Debian 12+
+        - RHEL / Rocky / Alma / CentOS Stream 9+
+        - 银河麒麟 Kylin V10
+        - 其他（请在描述中注明）
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: 执行的命令与完整输出
+      description: 从报错前最后一条命令开始贴，保留原始输出
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 部署上下文
+      description: 版本号、是否断网/离线包、是否自建 TLS、资源配置（CPU/内存）
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前自查
+      options:
+        - label: 我已按支持矩阵确认发行版在支持范围内
+          required: true
+        - label: 输出中已移除密码、Token 等敏感信息

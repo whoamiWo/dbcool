@@ -1,4 +1,13 @@
-## Unreleased — Wave 1 私有化交付包 + Wave 2 项目展示
+## Unreleased — Wave 1 私有化交付包 + Wave 2 项目展示 + Wave 3 企业支持
+
+### Wave 3 · 企业支持（T3.1 ~ T3.4，实测于 2026-10-30）
+
+- T3.1 授权分层：`NOTICE` 改为「Apache-2.0 核心 + 可选付费支持/企业版附加组件（与授权分离）」，移除「不提供商业支持」绝对表述；新增 `TRADEMARK.md`（指称性使用边界 + 衍生作品署名建议）
+- T3.2 支持体系：新增 `SUPPORT.md`（自助入口 / 社区渠道 / L1-L3 企业支持分级与首响）、`docs/sla.md`（版本支持政策、L1-L3 时限、**不含项**、客户义务）、`SECURITY.md` 新增 §0 漏洞披露流程（48h 确认 / 90 天披露窗口）与 §0.1 Supported Versions
+- T3.3 协作模板：`.github/ISSUE_TEMPLATE/`（bug_report / deployment_help / feature_request / config.yml 私密披露与支持链接）、`.github/PULL_REQUEST_TEMPLATE.md`、对外版 `CONTRIBUTING.md`
+- T3.4 客户入职包：`docs/enterprise-onboarding.md`（Day0-5 全流程 + 留存产出物）、`docs/acceptance-checklist.md`（A-F 六组 20 项，命令与路线图 §6 同源 + 签署模板）
+- 文档站导航同步扩展到 18 页（新增支持/入职/验收/商标/贡献），vitepress build 通过
+
 
 ### Wave 1 · 私有化交付包（T1.1 ~ T1.6，实测于 2026-10-30）
 

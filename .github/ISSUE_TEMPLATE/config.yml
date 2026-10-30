@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞（私密披露）
+    url: https://github.com/whoamiWo/dbcool/security/advisories/new
+    about: 请勿公开提交安全问题，走私密披露流程（见 SECURITY.md §0）
+  - name: 企业支持订阅
+    url: https://github.com/whoamiWo/dbcool#路线图与支持
+    about: 付费支持 / SLA / 企业版附加组件（见 SUPPORT.md）

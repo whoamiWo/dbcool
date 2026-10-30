@@ -43,6 +43,17 @@ export default defineConfig({
         ],
       },
       {
+        text: '支持与企业版',
+        items: [
+          { text: '支持渠道', link: '/pages/SUPPORT' },
+          { text: '服务级别协议（SLA）', link: '/pages/sla' },
+          { text: '客户入职指南', link: '/pages/enterprise-onboarding' },
+          { text: '上线验收清单', link: '/pages/acceptance-checklist' },
+          { text: '商标与署名', link: '/pages/TRADEMARK' },
+          { text: '贡献指南', link: '/pages/CONTRIBUTING' },
+        ],
+      },
+      {
         text: '平台与对标',
         items: [
           { text: '七强对标实证（2026-10-30）', link: '/pages/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30' },

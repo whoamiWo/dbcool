@@ -165,10 +165,10 @@ Wave 4    持续迭代节奏            长期
 
 | # | 任务 | 落点 | 验收 | 人日 |
 |---|---|---|---|---|
-| T3.1 | 授权分层 | **Apache-2.0 核心 + 支持订阅 / 企业版附加** 双轨；修订 `NOTICE:7-9` 绝对表述；新增 `TRADEMARK.md` | 授权表述自洽，不与 Apache-2.0 冲突 | 2 |
-| T3.2 | 支持体系 | `SUPPORT.md`（渠道 / L1-L3 分级 / 响应时限）、`docs/sla.md`（含「不含什么」）、`SECURITY.md` 补漏洞披露 + Supported Versions | 三份文档存在且承诺可兑现 | 3 |
-| T3.3 | 协作模板 | `.github/ISSUE_TEMPLATE/`（bug / 部署求助 / 安全）、PR 模板、对外版 `CONTRIBUTING.md` | 新建 issue 出现模板选择 | 2 |
-| T3.4 | 客户入职包 | `docs/enterprise-onboarding.md` + `docs/acceptance-checklist.md`（复用 `scripts/launch-final-verify.py` 8 道门禁 + 6 条冒烟） | 客户照单可自行验收 | 3 |
+| T3.1 | 授权分层 | **Apache-2.0 核心 + 支持订阅 / 企业版附加** 双轨；修订 `NOTICE:7-9` 绝对表述；新增 `TRADEMARK.md` | 授权表述自洽，不与 Apache-2.0 冲突 | ✅ 2（NOTICE 改为"可选付费服务与授权分离"；TRADEMARK.md 明确指称性使用边界） |
+| T3.2 | 支持体系 | `SUPPORT.md`（渠道 / L1-L3 分级 / 响应时限）、`docs/sla.md`（含「不含什么」）、`SECURITY.md` 补漏洞披露 + Supported Versions | 三份文档存在且承诺可兑现 | ✅ 3（SECURITY.md §0 披露流程 48h 确认 / 90 天披露窗口 + §0.1 Supported Versions；SLA 含版本支持政策与不含项） |
+| T3.3 | 协作模板 | `.github/ISSUE_TEMPLATE/`（bug / 部署求助 / 安全）、PR 模板、对外版 `CONTRIBUTING.md` | 新建 issue 出现模板选择 | ✅ 3（3 个 issue 模板 + config.yml 私密披露链接 + PR 模板 + CONTRIBUTING.md；模板 YAML 已本地校验） |
+| T3.4 | 客户入职包 | `docs/enterprise-onboarding.md` + `docs/acceptance-checklist.md`（复用 `scripts/launch-final-verify.py` 8 道门禁 + 6 条冒烟） | 客户照单可自行验收 | ✅ 3（入职指南 Day0-5 流程 + 验收清单 A-F 六组 20 项，命令与路线图 §6 同源；已并入文档站导航） |
 
 **DoD**：企业用户有明确路径（渠道 → 响应时限 → 升级路径）；有版本支持政策。
 
