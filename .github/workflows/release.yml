@@ -1,8 +1,17 @@
 name: Release
 
-# Wave1 T1.2 — tag 触发的发布流水线：
-# 构建多架构镜像并推送 → 抽取 CHANGELOG 版本段落 → 生成 SHA256 → 创建 GitHub Release。
-# 仅在 tag push 时运行（PR/普通 push 不触发），避免重复发布。
+# Wave1 T1.2 / Wave4 v2.1.2：tag 触发的发布流水线。
+#
+# 结构（v2.1.2 发布实测三次失败后定稿）：
+#   job release    : amd64 单架构构建推送 → 抽 CHANGELOG → SHA256 → 创建 GitHub Release
+#   job multi-arch : arm64 单独构建（continue-on-error，不阻塞 Release）
+#
+# 教训（均为真实失败）：
+#   1) mvn -o 离线模式在 CI 无缓存必失败 → 改为在线构建；
+#   2) runner 默认 JDK 不支持 release 21 → 必须 setup-java 21；
+#   3) GHCR 仓库名必须全小写 → whoamiWo 会被拒；
+#   4) 多架构一次构建（QEMU 模拟 arm64）在 runner 上耗时过长导致 job 被取消
+#      → 拆分：发布主链路只做 amd64，arm64 独立且失败不阻塞。
 
 on:
   push:
@@ -27,9 +36,6 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Set up QEMU（多架构构建需要）
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -41,11 +47,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Version consistency（发布前置门禁）
-        run: |
-          python3 -m pip install --disable-pip-version-check --quiet || true
-          python3 scripts/version-consistency-verify.py
+        run: python3 scripts/version-consistency-verify.py
 
-      - name: Build & push images（多架构）
+      - name: Build & push images（amd64）
         env:
           APP_VERSION: ${{ github.ref_name }}
           IMAGE_REGISTRY: ghcr.io/whoamiwo/dbcool
@@ -54,8 +58,7 @@ jobs:
           if [ "v$(cat VERSION | tr -d '[:space:]')" != "${GITHUB_REF_NAME}" ]; then
             echo "❌ tag ${GITHUB_REF_NAME} 与 VERSION $(cat VERSION) 不一致"; exit 2
           fi
-          # 单一路径：一次构建并推送（v2.1.2 首发实测曾在此步骤用 -o 离线模式失败）
-          APP_VERSION=${GITHUB_REF_NAME#v} PLATFORM=linux/amd64,linux/arm64 \
+          APP_VERSION=${GITHUB_REF_NAME#v} PLATFORM=linux/amd64 \
             IMAGE_REGISTRY=ghcr.io/whoamiwo/dbcool \
             bash scripts/build-images.sh
 
@@ -82,3 +85,40 @@ jobs:
             dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  multi-arch:
+    # arm64 单独构建：失败不阻塞 Release（QEMU 模拟耗时长，已实测会拖垮整体）
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up QEMU（arm64 构建需要）
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push images（arm64）
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+          IMAGE_REGISTRY: ghcr.io/whoamiwo/dbcool
+        run: |
+          APP_VERSION=${GITHUB_REF_NAME#v} PLATFORM=linux/arm64 \
+            IMAGE_REGISTRY=ghcr.io/whoamiwo/dbcool \
+            bash scripts/build-images.sh
