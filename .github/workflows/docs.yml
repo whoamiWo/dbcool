@@ -1,0 +1,37 @@
+name: Docs
+
+# Wave2 T2.2 — 文档站构建门禁：
+# 文档/脚本/站点配置变更时验证 vitepress build 通过（产物不提交，Pages 部署另行配置）。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs-site/**"
+      - "docs/**"
+      - "SECURITY.md"
+      - "TROUBLESHOOTING.md"
+      - "scripts/build-docs-site.sh"
+  pull_request:
+    paths:
+      - "docs-site/**"
+      - "docs/**"
+      - "scripts/build-docs-site.sh"
+
+permissions:
+  contents: read
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build docs site（核心文档缺失/构建失败即红）
+        run: bash scripts/build-docs-site.sh
