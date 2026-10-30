@@ -1,0 +1,78 @@
+name: Release
+
+# Wave1 T1.2 — tag 触发的发布流水线：
+# 构建多架构镜像并推送 → 抽取 CHANGELOG 版本段落 → 生成 SHA256 → 创建 GitHub Release。
+# 仅在 tag push 时运行（PR/普通 push 不触发），避免重复发布。
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write   # 创建 Release 需要
+  packages: write   # 推 ghcr.io 镜像需要
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU（多架构构建需要）
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Version consistency（发布前置门禁）
+        run: |
+          python3 -m pip install --disable-pip-version-check --quiet || true
+          python3 scripts/version-consistency-verify.py
+
+      - name: Build & push images（多架构）
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+          IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}/dbcool
+        run: |
+          # VERSION 真相源与 tag 一致性：tag vX.Y.Z 必须等于 VERSION 内容
+          if [ "v$(cat VERSION | tr -d '[:space:]')" != "${GITHUB_REF_NAME}" ]; then
+            echo "❌ tag ${GITHUB_REF_NAME} 与 VERSION $(cat VERSION) 不一致"; exit 2
+          fi
+          bash scripts/build-images.sh --no-push
+          # buildx push 由脚本内 --push 处理；此处保持单一路径：
+          APP_VERSION=${GITHUB_REF_NAME#v} PLATFORM=linux/amd64,linux/arm64 \
+            IMAGE_REGISTRY=ghcr.io/${{ github.repository_owner }}/dbcool \
+            bash scripts/build-images.sh
+
+      - name: Extract Release Notes（版本不存在则失败）
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          python3 scripts/extract-changelog.py --version "$TAG" > /tmp/RELEASE_NOTES.md
+          wc -l /tmp/RELEASE_NOTES.md
+
+      - name: Generate checksums
+        run: |
+          mkdir -p dist
+          python3 scripts/extract-changelog.py --version "${GITHUB_REF_NAME}" > dist/RELEASE_NOTES-${GITHUB_REF_NAME}.md
+          cd dist
+          sha256sum RELEASE_NOTES-*.md > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: /tmp/RELEASE_NOTES.md
+          files: |
+            dist/RELEASE_NOTES-*.md
+            dist/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

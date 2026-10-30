@@ -22,7 +22,7 @@ services:
     command: >
       postgres -c wal_level=replica
       -c archive_mode=on
-      -c archive_command='test ! -f /var/lib/postgresql/data/pg_archive/%f && cp %p /var/lib/postgresql/data/pg_archive/%f'
+      -c archive_command='test -f /var/lib/postgresql/data/pg_archive/%f || cp %p /var/lib/postgresql/data/pg_archive/%f'
       -c max_wal_senders=5
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}
@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     container_name: nocobase-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
@@ -79,7 +79,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: nocobase-minio
     command: server /data --console-address ":9001"
     environment:
@@ -116,7 +116,7 @@ services:
   #  此前缺失该服务,导致 MQ 相关功能在本地与容器环境均不可用。
   # ============================================================
   rabbitmq:
-    image: rabbitmq:3.13-management-alpine
+    image: rabbitmq:3.13.7-management-alpine
     container_name: nocobase-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?未设置 RABBITMQ_USER}
@@ -149,6 +149,10 @@ services:
   #  后端 — Java (核心引擎)
   # ============================================================
   backend-java:
+    # Wave1 T1.1：优先使用已推送的版本化镜像（与 scripts/build-images.sh 一致）。
+    # 本地开发构建：用 `docker compose --profile dev-build build <svc>`，详见镜像内注释。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:-2.1.1}
+    # 本地开发：镜像不存在时自动按下方 Dockerfile 构建（build 与 image 并存是合法写法）
     build:
       context: ./backend-java
       dockerfile: Dockerfile
@@ -266,6 +270,8 @@ services:
   #  后端 — Python (AI / 集成)
   # ============================================================
   backend-python:
+    # Wave1 T1.1：优先使用已推送的版本化镜像；本地无镜像时自动 build。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:-2.1.1}
     build:
       context: ./backend-python
       dockerfile: Dockerfile
@@ -357,6 +363,8 @@ services:
   #  CRDT 实时协作服务 (PHASE 64 T3)
   # ============================================================
   crdt-service:
+    # Wave1 T1.1：优先使用已推送的版本化镜像；本地无镜像时自动 build。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:-2.1.1}
     build:
       context: ./crdt-service
       dockerfile: Dockerfile
@@ -396,6 +404,8 @@ services:
   #  前端 — Nginx 静态服务 + 反向代理
   # ============================================================
   frontend:
+    # Wave1 T1.1：优先使用已推送的版本化镜像；本地无镜像时自动 build。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:-2.1.1}
     build:
       context: ./frontend
       dockerfile: Dockerfile
