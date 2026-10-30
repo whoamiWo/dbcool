@@ -1,3 +1,43 @@
+## v2.1.2 (2026-10-30)
+
+### Wave 4 · 持续迭代机制落地 + 全新部署可用性修复（实测于 2026-10-30）
+
+**迭代机制**
+- 新增 `scripts/monthly-gate.py`：一条命令跑 12 项全量门禁（--quick 快档/--list），失败项输出尾部；反向自检（制造版本不一致 → exit 1）通过
+- 新增 `docs/WAVE4_CHECKLIST.md`：节奏/批次模板/16 项待办池状态
+
+**Wave 4 首批小批次（待办池 #1 + #3）**
+- #1 集成市场前端可达：新增路由 `/admin/integrations` + 菜单入口（页面与后端 IntegrationMarketController 均已接真）；顺带补齐 i18n 缺失的 15 个 nav.* key（zh-CN/en-US，此前菜单显示 key 原文）
+- #3 平台配置三处补齐：application.yml / docker-compose / k8s Secret 补齐 feishu/wecom/wechat/slack 配置段（relaxed binding 对齐）
+
+**全新部署可用性修复（离线包实测逐个复现并修复，共 6 个真实缺陷）**
+
+| # | 缺陷 | 修复 |
+|---|---|---|
+| 1 | Flyway baseline 默认 1 → V1（含 uuid-ossp 扩展）从未执行，全新库 V2 起必然失败 | `baseline-version: 0` + `out-of-order: true`（兼容迁移低于主库版本） |
+| 2 | `auth_user` 遗留表不在 Flyway 内，V28 外键引用全新库必失败 | 新增 `V27_5__auth_user_compat.sql`（最小兼容表） |
+| 3 | V28 建表漏 `tenant_id` 列（UNIQUE 键引用），全新库失败 | 新增 `V27_6__ldap_user_mapping_compat.sql`（预建完整表） |
+| 4 | `collection_version` 表迁移从未创建（主库靠 ddl-auto 遗留），Hibernate validate 必失败 | 新增 `V75__collection_version.sql` |
+| 5 | 实体 vs 迁移缺 2 列（external_data_source.driver_class_name / users.email） | 新增 `V76__schema_completion.sql`（静态比对法：实体 @Table/@Column vs information_schema，全量差异仅此 2 列） |
+| 6 | `INTEGRATION_CREDENTIAL_MASTER_KEY` 未配置启动 fail-fast，但 env 模板缺失 | compose 显式注入 + 离线包 .env.example 补齐 |
+
+**离线包（T1.3 beta → 实测通过）**
+- 修复 3 个交付缺陷：① images.tar 未含基础镜像（断网安装会联网拉取）→ 8 镜像全进包；② offline compose 复用主栈 `container_name` → 冲突，改项目前缀命名；③ offline compose 复用主栈数据卷 `nocobase-pgdata` 与网络 `nocobase-net` → **串库/串网风险**，强制 `dbcool-offline-*` 前缀
+- **实测（断网等价）**：`packaging/offline` 全新库起栈 → **8 服务全部 healthy，java/python/frontend 全部 200**，Flyway V1→V76 全量迁移成功，全程零 registry 拉取
+
+**beta 项实测结果**
+- Helm：`helm lint` 0 failed、`helm template` 渲染 11 资源（required 密钥反向自检 exit 1）✅；**集群安装仍未实测**
+- Rocky 9 安装器：容器内 `--check` 通过、`detect_os` 正确识别 rocky/dnf ✅、不支持发行版（alpine）正确报错 exit 1 ✅
+- 离线包：如上 ✅
+
+**顺带修复**
+- `ReportDistributionJob` 硬依赖 JavaMailSender → 未配置邮件的环境启动失败：改 `@ConditionalOnProperty(spring.mail.host)` 条件装配（邮件为可选能力）
+- backend-java 容器运行 uid 统一为 1000（与 backend-python 一致）：此前共用告警 SQLite 卷时 uid=100 对 uid=1000 属主文件无写权限
+
+**质量门禁（实测 2026-10-30）**
+- monthly-gate.py **12/12 全绿**：Java 2588/0F/0E（BUNDLE 0.8007）、前端 964/0 failed/0 errors、契约 0 漂移、冒烟 13/13、租户隔离 16/16、备份 PITR 30/30、上线终验 8/8
+- 已知待办：Helm 集群安装、Playwright E2E 复跑（本批次未实测）
+
 ## Unreleased — Wave 1 私有化交付包 + Wave 2 项目展示 + Wave 3 企业支持
 
 ### Wave 3 · 企业支持（T3.1 ~ T3.4，实测于 2026-10-30）

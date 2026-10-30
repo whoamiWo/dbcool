@@ -45,6 +45,15 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 2
 fi
 
+# Wave4：backend-java 的 Dockerfile 用 `COPY target/nocobase-backend-*.jar ./`，
+# 若 target 里残留上一版本的 jar（如 2.1.1 与 2.1.2 同时存在），COPY 会因
+# "more than one source file" 直接失败（实测）。因此构建前先 clean package，
+# 保证 target 中只有当前版本的一个主 jar（.jar.original 不匹配 *.jar）。
+if [[ "${SKIP_JAVA_PACKAGE:-0}" != "1" ]]; then
+  echo "▶ backend-java: mvn -o clean package -DskipTests"
+  (cd "$ROOT/backend-java" && mvn -o clean package -DskipTests -q)
+fi
+
 # 服务 → Dockerfile/上下文
 declare -A CONTEXT=(
   [backend-java]="$ROOT/backend-java"

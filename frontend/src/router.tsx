@@ -168,6 +168,10 @@ const RecycleBinPage = lazy(() =>
 const DataSourcesPage = lazy(() =>
   import('./pages/DataSources').then(m => ({ default: m.DataSourcesPage } as { default: React.ComponentType })),
 );
+// Wave4 首批#1：集成市场前端可达（页面与后端 IntegrationMarketController 均已接真）
+const IntegrationsPage = lazy(() =>
+  import('./pages/IntegrationsPage').then(m => ({ default: m.default } as { default: React.ComponentType })),
+);
 const BillingPage = lazy(() =>
   import('./pages/Billing').then(m => ({ default: m.BillingPage } as { default: React.ComponentType })),
 );
@@ -263,6 +267,7 @@ export const router = createBrowserRouter([
 
       // Data Sources
       { path: 'admin/datasources', element: <Lazy><DataSourcesPage /></Lazy> },
+      { path: 'admin/integrations', element: <Lazy><IntegrationsPage /></Lazy> },
       { path: 'admin/billing', element: <Lazy><BillingPage /></Lazy> },
     ],
   },

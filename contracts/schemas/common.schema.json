@@ -3,11 +3,15 @@
   "$id": "https://multistack.local/schemas/common.schema.json",
   "title": "Multistack Common Schema",
   "description": "三栈共享基础 schema,由 Cline 维护,各栈代码生成器引用此文件",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "definitions": {
     "ApiResponse": {
       "type": "object",
-      "required": ["code", "message", "data"],
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
       "properties": {
         "code": {
           "type": "integer",
@@ -45,7 +49,10 @@
     },
     "PageResponse": {
       "type": "object",
-      "required": ["total", "items"],
+      "required": [
+        "total",
+        "items"
+      ],
       "properties": {
         "total": {
           "type": "integer",

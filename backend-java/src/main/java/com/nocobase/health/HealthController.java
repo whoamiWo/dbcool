@@ -43,7 +43,7 @@ public class HealthController {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "ok");
         body.put("service", "nocobase-backend");
-        body.put("version", "2.1.1");
+        body.put("version", "2.1.2");
         body.put("timestamp", Instant.now().toString());
         return body;
     }

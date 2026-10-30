@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # 服务
     app_name: str = "nocobase-py"
-    app_version: str = "2.1.1"
+    app_version: str = "2.1.2"
     debug: bool = False
 
     # HTTP
