@@ -1,0 +1,131 @@
+{{/* Wave1 T1.5 — 应用 Deployment 模板（backend-java / backend-python / crdt-service / frontend） */}}
+{{- $full := include "dbcool.fullname" . -}}
+{{- $labels := include "dbcool.labels" . -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-backend-java
+  labels:
+    {{- $labels | nindent 4 }}
+    app: backend-java
+spec:
+  replicas: {{ .Values.backendJava.replicas }}
+  selector:
+    matchLabels:
+      app: backend-java
+  template:
+    metadata:
+      labels:
+        app: backend-java
+    spec:
+      containers:
+        - name: backend-java
+          image: {{ include "dbcool.image" (dict "image" .Values.backendJava.image "Values" .Values "image" .Values.image "appVersion" .Values.appVersion) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "docker"
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ $full }}-secret, key: JWT_SECRET } }
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $full }}-secret, key: INTERNAL_SERVICE_TOKEN } }
+            - name: CRDT_SERVICE_URL
+              value: "http://{{ $full }}-crdt-service:3100"
+          readinessProbe:
+            httpGet: { path: /api/health, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 8080 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.backendJava.resources | nindent 12 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-backend-python
+  labels:
+    {{- $labels | nindent 4 }}
+    app: backend-python
+spec:
+  replicas: {{ .Values.backendPython.replicas }}
+  selector:
+    matchLabels:
+      app: backend-python
+  template:
+    metadata:
+      labels:
+        app: backend-python
+    spec:
+      containers:
+        - name: backend-python
+          image: {{ include "dbcool.image" (dict "image" .Values.backendPython.image "Values" .Values "image" .Values.image "appVersion" .Values.appVersion) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: JAVA_BACKEND_URL
+              value: "http://{{ $full }}-backend-java:8080"
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ $full }}-secret, key: JWT_SECRET } }
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $full }}-secret, key: INTERNAL_SERVICE_TOKEN } }
+          resources:
+            {{- toYaml .Values.backendPython.resources | nindent 12 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-crdt-service
+  labels:
+    {{- $labels | nindent 4 }}
+    app: crdt-service
+spec:
+  replicas: {{ .Values.crdtService.replicas }}
+  selector:
+    matchLabels:
+      app: crdt-service
+  template:
+    metadata:
+      labels:
+        app: crdt-service
+    spec:
+      containers:
+        - name: crdt-service
+          image: {{ include "dbcool.image" (dict "image" .Values.crdtService.image "Values" .Values "image" .Values.image "appVersion" .Values.appVersion) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 3100
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-frontend
+  labels:
+    {{- $labels | nindent 4 }}
+    app: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: {{ include "dbcool.image" (dict "image" .Values.frontend.image "Values" .Values "image" .Values.image "appVersion" .Values.appVersion) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
