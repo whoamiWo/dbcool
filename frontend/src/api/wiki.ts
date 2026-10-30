@@ -76,6 +76,13 @@ export const wikiApi = {
   search: (q: string, params?: { kbId?: string; page?: number; size?: number }) =>
     apiClient.get('/wiki/search', { params: { q, ...params } }),
 
+  /** Wave4 待办池 #5：混合检索（关键词 FTS + pgvector 语义召回）。
+   * 后端已完整实现（WikiController:633 /search/hybrid + WikiEmbeddingService），
+   * 此前前端从未接线，搜索页一直走 ILIKE 版 /wiki/search。
+   * 注意：hybrid 端点**不支持 status 过滤**，有 status 筛选时调用方应走 ILIKE 版。 */
+  searchHybrid: (q: string, params?: { kbId?: string; page?: number; size?: number }) =>
+    apiClient.get('/wiki/search/hybrid', { params: { q, ...params } }),
+
   // Block（Notion 式块级内容）
   listBlocks: (pageId: string) => apiClient.get(`/wiki/pages/${pageId}/blocks`),
   createBlocks: (pageId: string, blocks: Array<{ type: string; content: any }>) =>
