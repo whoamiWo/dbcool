@@ -1,0 +1,63 @@
+# Wave1 T1.5 — DBCool Helm values
+# beta（未实测）：无 k8s 集群环境，仅通过 helm lint / helm template 校验
+
+image:
+  registry: ghcr.io/whoamiwo/dbcool
+  pullPolicy: IfNotPresent
+
+appVersion: "2.1.1"
+
+secret:
+  # 必填校验见 templates/secret.yaml（required "..."）
+  # 生产环境请用 --set-file 或外部 Secret 管理（Sealed Secrets/Vault）
+  jwtSecret: ""
+  postgresPassword: ""
+  minioRootUser: "nocobase"
+  minioRootPassword: ""
+  internalServiceToken: ""
+
+postgres:
+  image: pgvector/pgvector:pg16
+  storage: 20Gi
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { cpu: "2", memory: 4Gi }
+
+redis:
+  image: redis:7.4-alpine
+  storage: 5Gi
+
+minio:
+  image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+  storage: 50Gi
+
+rabbitmq:
+  image: rabbitmq:3.13.7-management-alpine
+  storage: 5Gi
+
+backendJava:
+  image: dbcool-backend-java
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { cpu: "2", memory: 4Gi }
+
+backendPython:
+  image: dbcool-backend-python
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 2Gi }
+    limits: { cpu: "2", memory: 6Gi }
+
+crdtService:
+  image: dbcool-crdt-service
+  replicas: 1
+
+frontend:
+  image: dbcool-frontend
+  replicas: 2
+
+ingress:
+  enabled: false
+  className: nginx
+  host: dbcool.example.com

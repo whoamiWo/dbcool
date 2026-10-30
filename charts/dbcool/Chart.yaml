@@ -1,0 +1,8 @@
+apiVersion: v2
+name: dbcool
+description: DBCool — 自部署企业协作低代码平台（数据/Wiki/IM/看板/工作流）
+type: application
+version: 0.1.0          # chart 自身版本
+appVersion: "2.1.1"     # 与根目录 VERSION 对齐（发布时同步）
+annotations:
+  status: "beta（未实测：本环境无 kind/minikube 集群，见 docs/WAVE1_PRIVATE_DELIVERY_TASKS.md T1.5）"
