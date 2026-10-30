@@ -69,6 +69,9 @@ class ControllerAuthorizationCoverageTest {
         // PHASE114: 第三方回调（SecurityConfig permitAll + Controller 内 HMAC 验签）。
         // 这些端点若误加 @PreAuthorize，回调方无 JWT 将直接 403 → 功能中断，故必须白名单。
         "integration/slack/SlackController.java:77 -> eventsCallback (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)",
+        // Wave4 待办池 #6a：工作流 webhook 触发（外部系统调用）——
+        // SecurityConfig permitAll + URL 随机 token 常量时间比较（未命中 404 防探测）+ 全局限流兜底
+        "workflow/WorkflowController.java:225 -> webhook (reason: 外部系统 webhook 触发入口，SecurityConfig permitAll + 随机 token 常量时间比较)",
         "integration/feishu/FeishuController.java:68 -> eventsCallback (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)",
         "integration/wecom/WeComController.java:78 -> callback (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)",
         "integration/mattermost/MattermostController.java:42 -> incomingWebhook (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)",

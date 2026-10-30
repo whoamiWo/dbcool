@@ -57,7 +57,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 2 | Slack token 迁 TenantCredentialService | ⏳ 待取 |
 | 4 | K8s Secret → Sealed Secrets | ✅ 完成（2026-10-31：scripts/seal-secrets.sh 端到端实测（自签证书模拟 controller 公钥），产物合法 SealedSecret；占位符拦截反向自检 exit 2；docs/secrets-management.md；**controller 端到端解密未实测——无集群环境**） |
 | 5 | Wiki 混合检索接前端 | ✅ 完成（2026-10-31：WikiSearch 优先走 /wiki/search/hybrid（未选 status 时），语义不可用自动回退 ILIKE；单测 6/6 + 反向自检通过） |
-| 6 | 工作流 webhook 触发 + 节点重试 | ⏳ |
+| 6 | 工作流 webhook 触发 + 节点重试 | ✅ 完成（2026-10-31：POST /api/workflows/webhook/{token}（permitAll + 常量时间 token 比较 + 未命中 404）；webhook 工作流自动生成 32 位 hex token 并落 trigger_json；节点 config.retry 失败重试（上限 3，既有 184 workflow 测试全绿 + 新增 7/7）；设计器暴露 webhook 类型与 token 展示；契约 437→438 |
 | 7 | @提及接真 | ⏳ |
 | 8 | API Key 专属限流 | ⏳ |
 | 9 | 钉钉组织同步分页 | ⏳ |
@@ -74,6 +74,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 月份 | 批次 | 门禁结果 | 备注 |
 |---|---|---|---|
 | 2026-10 | Wave0/0.5/1/2/3 收口 | 12/12 | v2.1.1 发布 |
+| 2026-10-31 | Wave4 第二批：#6 工作流 webhook+重试（待办池 #6 完成） | **12/12** | v2.1.2 已发布；Java 2594 tests |
 | 2026-10 | Wave4 首批（#1 集成市场可达 + #3 配置三处）+ 全新部署可用性修复 | **12/12**（monthly-gate 全量实测） | **v2.1.2 发布**：Release + 4 镜像已上 GHCR（amd64）；arm64 独立 job 不阻塞 |
 
 ### 已修复的"全新部署"阻断项（v2.1.2，6 项）

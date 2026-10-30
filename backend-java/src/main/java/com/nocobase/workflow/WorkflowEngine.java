@@ -51,6 +51,43 @@ public class WorkflowEngine {
 
     public enum NodeResult { CONTINUE, NEEDS_APPROVAL, FAILED }
 
+    /**
+     * Wave4 待办池 #6b：节点级重试上限（节点 config.retry）。
+     * 0 = 不重试（默认，向后兼容）；上限 3，避免长时间占用执行线程。
+     * 注意：有副作用的节点（http/webhook）重试会重复调用，配置时应谨慎。
+     */
+    private static final int MAX_NODE_RETRY = 3;
+
+    /** 读取节点的重试次数配置。 */
+    static int retryCountOf(Map<String, Object> node) {
+        Object cfg = node == null ? null : node.get("config");
+        Object v = null;
+        if (cfg instanceof Map<?, ?> m) {
+            v = m.get("retry");
+        }
+        if (v == null) v = node == null ? null : node.get("retry");
+        int n = 0;
+        if (v instanceof Number num) n = num.intValue();
+        else if (v != null) {
+            try { n = Integer.parseInt(v.toString()); } catch (Exception ignored) { n = 0; }
+        }
+        return Math.max(0, Math.min(MAX_NODE_RETRY, n));
+    }
+
+    /** 执行节点并按 config.retry 重试（Wave4 #6b）。 */
+    private NodeOutcome executeNodeWithRetry(WorkflowNodeHandler handler,
+                                             NodeExecutionContext ctx,
+                                             Map<String, Object> node,
+                                             String nodeId) {
+        NodeOutcome outcome = handler.execute(ctx);
+        int max = retryCountOf(node);
+        for (int attempt = 1; attempt <= max && outcome == NodeOutcome.FAILED; attempt++) {
+            log.warn("[workflow] 节点失败重试 node={} attempt={}/{}", nodeId, attempt, max);
+            outcome = handler.execute(ctx);
+        }
+        return outcome;
+    }
+
     private final WorkflowInstanceRepository instanceRepository;
     private final WorkflowTaskRepository taskRepository;
     private final WorkflowRepository workflowRepository;
@@ -151,7 +188,7 @@ public class WorkflowEngine {
             if (handler.isPresent()) {
                 NodeExecutionContext nodeCtx = new NodeExecutionContext(
                         instance, node, defaultAssignee, null);
-                NodeOutcome outcome = handler.get().execute(nodeCtx);
+                NodeOutcome outcome = executeNodeWithRetry(handler.get(), nodeCtx, node, current);
                 if (outcome == NodeOutcome.NEEDS_APPROVAL) {
                     instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                     instanceRepository.save(instance);
@@ -247,7 +284,7 @@ public class WorkflowEngine {
             if (handler.isPresent()) {
                 NodeExecutionContext nodeCtx = new NodeExecutionContext(
                         instance, node, defaultAssignee, null);
-                NodeOutcome outcome = handler.get().execute(nodeCtx);
+                NodeOutcome outcome = executeNodeWithRetry(handler.get(), nodeCtx, node, String.valueOf(node.get("id")));
                 if (outcome == NodeOutcome.NEEDS_APPROVAL) {
                     instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                     instanceRepository.save(instance);

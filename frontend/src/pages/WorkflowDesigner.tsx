@@ -133,6 +133,8 @@ export function WorkflowDesignerPage() {
 
   const [name, setName] = useState('new_workflow');
   const [triggerType, setTriggerType] = useState('manual');
+  // Wave4 #6a：webhook 触发 token（后端生成，前端只读展示）
+  const [webhookToken, setWebhookToken] = useState('');
   const [title, setTitle] = useState(t('workflowDesigner.createMode'));
   const [description, setDescription] = useState('');
   const [collectionName, setCollectionName] = useState('customer');
@@ -235,6 +237,7 @@ export function WorkflowDesignerPage() {
       try {
         const t = JSON.parse(existing.trigger_json || '{}');
         if (t.type) setTriggerType(t.type);
+        if (t.token) setWebhookToken(t.token);
       } catch {}
       try {
         const ns = JSON.parse(existing.nodes_json) as WorkflowNodeDef[];
@@ -306,7 +309,7 @@ export function WorkflowDesignerPage() {
   }, [project]);
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const nodesOut: WorkflowNodeDef[] = nodes.map((n) => ({
         id: n.id, type: n.data.kind, config: n.data.config,
         position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
@@ -320,13 +323,21 @@ export function WorkflowDesignerPage() {
       }));
       const body = {
         name, title, description, collectionName, enabled,
-        trigger: JSON.stringify({ type: triggerType }),
+        trigger: JSON.stringify(triggerType === 'webhook' && webhookToken
+          ? { type: triggerType, token: webhookToken }
+          : { type: triggerType }),
         nodes: JSON.stringify(nodesOut),
         edges: JSON.stringify(edgesOut),
       };
-      return isEdit
-        ? apiClient.put<WorkflowMeta>(`/workflows/${id}`, body)
-        : apiClient.post<WorkflowMeta>('/workflows', body);
+      const resp = isEdit
+        ? await apiClient.put<WorkflowMeta>(`/workflows/${id}`, body)
+        : await apiClient.post<WorkflowMeta>('/workflows', body);
+      // 后端对 webhook 触发器自动生成 token → 回读展示
+      try {
+        const t = JSON.parse(resp?.trigger_json || '{}');
+        if (t.token) setWebhookToken(t.token);
+      } catch {}
+      return resp;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
@@ -395,7 +406,17 @@ export function WorkflowDesignerPage() {
           <option value="on_create">{t('workflowDesigner.triggerOnCreate')}</option>
           <option value="on_update">{t('workflowDesigner.triggerOnUpdate')}</option>
           <option value="schedule">{t('workflowDesigner.triggerSchedule')}</option>
+          <option value="webhook">{t('workflowDesigner.triggerWebhook')}</option>
         </select>
+        {triggerType === 'webhook' && (
+          <div style={{ marginTop: 8, padding: 8, border: '1px dashed var(--color-border-light)', borderRadius: 6 }}>
+            <label style={{ ...lbl, display: 'block' }} htmlFor="w-lbl-webhook-token">{t('workflowDesigner.webhookToken')}</label>
+            <input id="w-lbl-webhook-token" readOnly value={webhookToken || '—'} style={{ ...inp, fontFamily: 'monospace' }} />
+            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>
+              {t('workflowDesigner.webhookTokenHint')}
+            </div>
+          </div>
+        )}
         <h4 style={{ marginTop: 12 }}>{t('workflowDesigner.dragNodes')}</h4>
         {(Object.keys(nodeKindMeta) as NodeKind[]).map((k) => {
           const m = nodeKindMeta[k];
