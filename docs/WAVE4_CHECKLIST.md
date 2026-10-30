@@ -73,4 +73,15 @@ commit & push：待授权 / 已授权（<hash>）
 
 | 月份 | 批次 | 门禁结果 | 备注 |
 |---|---|---|---|
-| 2026-10 | Wave0/0.5/1/2/3 收口 | 12/12（见 monthly-gate 首跑） | v2.1.1 发布 |
+| 2026-10 | Wave0/0.5/1/2/3 收口 | 12/12 | v2.1.1 发布 |
+| 2026-10 | Wave4 首批（#1 集成市场可达 + #3 配置三处）+ 全新部署可用性修复 | **12/12**（monthly-gate 全量实测） | **v2.1.2 发布**：Release + 4 镜像已上 GHCR（amd64）；arm64 独立 job 不阻塞 |
+
+### 已修复的"全新部署"阻断项（v2.1.2，6 项）
+1. Flyway `baseline-version: 0` + `out-of-order: true`（V1 从未执行 / 兼容迁移低于主库版本）
+2. `V27_5__auth_user_compat.sql`（遗留表兼容）
+3. `V27_6__ldap_user_mapping_compat.sql`（V28 漏 tenant_id 列）
+4. `V75__collection_version.sql`（表从未创建）
+5. `V76__schema_completion.sql`（实体 schema 全量比对缺 2 列）
+6. `INTEGRATION_CREDENTIAL_MASTER_KEY` env 补齐（安全红线 fail-fast 需配置）
+
+**离线包断网等价实测通过**：全新库起栈 8 服务全 healthy、Flyway V1→V76 全通过、零 registry 拉取。
