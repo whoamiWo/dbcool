@@ -173,4 +173,70 @@ class SlackAppServiceTest {
         String teamId = service.getTeamId();
         assertThat(teamId).isEmpty();
     }
+
+    // ============================================================
+    //  Wave4 待办池 #2：bot token 凭证托管（OAuth 落库 + 读取回退链）
+    // ============================================================
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("OAuth 安装成功 → bot token 加密落租户级凭证库")
+    void oauthInstall_persistsBotTokenToCredentialStore() throws Exception {
+        service = new SlackAppService(inboundMessageService, credentialService);
+        withDefaultTenant("tenant_default");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "clientId", "cid");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "clientSecret", "cs");
+        stubSlackOAuthSuccess("xoxb-team-1");
+        // 预置：OAuth 用 default-tenant-id（默认 tenant_default）
+        service.handleOAuthCallback("code-1");
+        org.mockito.Mockito.verify(credentialService).save(
+                org.mockito.ArgumentMatchers.eq("tenant_default"),
+                org.mockito.ArgumentMatchers.eq("slack"),
+                org.mockito.ArgumentMatchers.eq("bot-token:team-1"),
+                org.mockito.ArgumentMatchers.eq("xoxb-team-1"),
+                org.mockito.ArgumentMatchers.eq("slack-oauth"));
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("读取回退链：凭证库命中（模拟重启后）→ 返回库中 token")
+    void getBotTokenByTeam_credentialStoreHit() {
+        withDefaultTenant("tenant_default");
+        when(credentialService.get(org.mockito.ArgumentMatchers.eq("tenant_default"),
+                org.mockito.ArgumentMatchers.eq("slack"),
+                org.mockito.ArgumentMatchers.eq("bot-token:team-9")))
+                .thenReturn(java.util.Optional.of("xoxb-from-store"));
+        String token = service.getBotToken("team-9");
+        org.assertj.core.api.Assertions.assertThat(token).isEqualTo("xoxb-from-store");
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("读取回退链：凭证库未命中 → 回退全局 @Value")
+    void getBotTokenByTeam_fallsBackToGlobal() {
+        withDefaultTenant("tenant_default");
+        when(credentialService.get(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("team-none")))
+                .thenReturn(java.util.Optional.empty());
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "botToken", "xoxb-global");
+        String token = service.getBotToken("team-none");
+        org.assertj.core.api.Assertions.assertThat(token).isEqualTo("xoxb-global");
+    }
+
+    /** @Value 字段在单元测试中不会被 Spring 注入，需手动设置默认租户 */
+    private void withDefaultTenant(String tenantId) {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultTenantId", tenantId);
+    }
+
+    private void stubSlackOAuthSuccess(String token) {
+        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+        JsonNode resp;
+        try {
+            resp = om.readTree("{\"ok\":true,\"access_token\":\"" + token + "\",\"team\":{\"id\":\"team-1\",\"name\":\"Team One\"},\"bot_user_id\":\"U1\"}");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        RestTemplate rest = mock(RestTemplate.class);
+        org.mockito.Mockito.doReturn(resp).when(rest)
+                .postForObject(org.mockito.ArgumentMatchers.contains("oauth.v2.access"),
+                        org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.eq(JsonNode.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "restTemplate", rest);
+    }
 }
