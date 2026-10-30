@@ -35,6 +35,7 @@ CORE_DOCS=(
   acceptance-checklist.md
   enterprise-onboarding.md
   sla.md
+  secrets-management.md
 )
 ROOT_DOCS=(SECURITY.md TROUBLESHOOTING.md SUPPORT.md TRADEMARK.md CONTRIBUTING.md)
 

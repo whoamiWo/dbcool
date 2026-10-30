@@ -113,3 +113,7 @@ docs-site/pages/
 docs-site/.vitepress/dist/
 docs-site/.vitepress/cache/
 docs-site/.vitepress/*.timestamp-*.mjs
+
+# Wave4 #4 Sealed Secrets：明文凭证输入绝不入库
+k8s/secrets.env
+k8s/sealed/secret.yaml
