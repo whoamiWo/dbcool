@@ -250,7 +250,9 @@
     "uploadAttachment": "上传附件",
     "inputMessage": "输入消息",
     "sendMessage": "发送消息",
-    "burnedMessage": "该消息已焚毁"
+    "burnedMessage": "该消息已焚毁",
+    "mentionSuggestions": "提及成员",
+    "mentionNoMatch": "无匹配成员"
   },
   "project": {
     "title": "项目协同",

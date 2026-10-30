@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.UserRepository;
+import com.nocobase.auth.UserEntity;
 import com.nocobase.im.entity.ImChannelEntity;
 import com.nocobase.im.entity.ImChannelMemberEntity;
 import java.util.List;
@@ -25,6 +27,8 @@ class ImChannelControllerTest {
     private ChannelService channelService;
     private PresenceService presenceService;
     private AuditService auditService;
+    /** Wave4 待办池 #7：members 端点补 displayName 需要用户表 */
+    private UserRepository userRepository;
     private ImChannelController controller;
 
     private final UUID userId = UUID.randomUUID();
@@ -36,7 +40,8 @@ class ImChannelControllerTest {
         channelService = mock(ChannelService.class);
         presenceService = mock(PresenceService.class);
         auditService = mock(AuditService.class);
-        controller = new ImChannelController(channelService, presenceService, auditService);
+        userRepository = mock(UserRepository.class);
+        controller = new ImChannelController(channelService, presenceService, auditService, userRepository);
     }
 
     @Test
@@ -138,5 +143,41 @@ class ImChannelControllerTest {
         c.setCreatedBy(userId);
         c.setTenantId("tenant_default");
         return c;
+    }
+
+    @Test
+    void members_includeDisplayName_forMentionPicker() {
+        // Wave4 待办池 #7：提及下拉需要可读名称 —— members 端点必须返回 displayName
+        ImChannelMemberEntity m = new ImChannelMemberEntity();
+        m.setChannelId(channelId);
+        m.setUserId(userId);
+        m.setRole("MEMBER");
+        when(channelService.members(channelId)).thenReturn(List.of(m));
+        UserEntity u = new UserEntity(userId, "zhangsan", "hash", "tenant_default",
+                "张三", java.time.Instant.now());
+        when(userRepository.findAllById(any())).thenReturn(List.of(u));
+
+        Map<String, Object> resp = controller.members(channelId, user);
+
+        List<?> data = (List<?>) resp.get("data");
+        assertThat(data).hasSize(1);
+        Map<?, ?> item = (Map<?, ?>) data.get(0);
+        assertThat(item.get("displayName")).isEqualTo("张三");
+        assertThat(item.get("userId")).isEqualTo(userId.toString());
+    }
+
+    @Test
+    void members_displayNameFallbackToUserIdPrefix_whenUserMissing() {
+        ImChannelMemberEntity m = new ImChannelMemberEntity();
+        m.setChannelId(channelId);
+        m.setUserId(userId);
+        m.setRole("MEMBER");
+        when(channelService.members(channelId)).thenReturn(List.of(m));
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+
+        Map<String, Object> resp = controller.members(channelId, user);
+
+        Map<?, ?> item = (Map<?, ?>) ((List<?>) resp.get("data")).get(0);
+        assertThat((String) item.get("displayName")).startsWith(userId.toString().substring(0, 8));
     }
 }
