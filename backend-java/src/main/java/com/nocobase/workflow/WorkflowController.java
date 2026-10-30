@@ -11,6 +11,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,6 +38,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Workflows", description = "工作流")
 @RequestMapping("/api/workflows")
 public class WorkflowController {
+    private static final Logger log = LoggerFactory.getLogger(WorkflowController.class);
 
     private final WorkflowRepository workflowRepository;
     private final WorkflowInstanceRepository instanceRepository;
@@ -112,7 +115,8 @@ public class WorkflowController {
         w.setTitle(req.title() != null ? req.title() : req.name());
         w.setDescription(req.description());
         w.setCollectionName(req.collectionName());
-        w.setTriggerJson(req.trigger() != null ? req.trigger() : "{\"type\":\"manual\"}");
+        // Wave4 待办池 #6a：webhook 触发自动生成随机 token（可由调用方显式提供）
+        w.setTriggerJson(ensureWebhookToken(req.trigger() != null ? req.trigger() : "{\"type\":\"manual\"}"));
         w.setNodesJson(req.nodes() != null ? req.nodes() : "[]");
         w.setEdgesJson(req.edges() != null ? req.edges() : "[]");
         w.setEnabled(req.enabled() == null || req.enabled());
@@ -147,7 +151,7 @@ public class WorkflowController {
         if (req.title() != null) w.setTitle(req.title());
         if (req.description() != null) w.setDescription(req.description());
         if (req.collectionName() != null && !req.collectionName().isBlank()) w.setCollectionName(req.collectionName());
-        if (req.trigger() != null) w.setTriggerJson(req.trigger());
+        if (req.trigger() != null) w.setTriggerJson(ensureWebhookToken(req.trigger()));
         // Week 42 D4b.2: 仅当 nodes/edges 实际被改时校验,避免无意义重读+重序列化
         if (req.nodes() != null) {
             w.setNodesJson(req.nodes());
@@ -210,6 +214,81 @@ public class WorkflowController {
         if (!w.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "工作流未启用");
         }
+        return runWorkflow(w, payload, user);
+    }
+
+    /**
+     * Wave4 待办池 #6a：webhook 触发入口（外部系统调用，无 JWT）。
+     * 鉴权：URL 中的随机 token 与 trigger_json.token 做常量时间比较；
+     * 未命中返回 404（不区分"工作流不存在"与"token 错误"，避免探测）。
+     */
+    @PostMapping("/webhook/{token}")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> webhook(
+            @PathVariable String token,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) {
+        byte[] provided = token.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        List<WorkflowEntity> candidates = workflowRepository.findByWebhookToken(token);
+        WorkflowEntity matched = null;
+        for (WorkflowEntity w : candidates) {
+            String stored = webhookTokenOf(w);
+            if (stored != null && java.security.MessageDigest.isEqual(
+                    provided, stored.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+                matched = w;
+                break;
+            }
+        }
+        if (matched == null || !matched.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "webhook 不存在");
+        }
+        // webhook 无登录用户 → 审计归属工作流创建者
+        return runWorkflow(matched, payload, null);
+    }
+
+    /** 从 trigger_json 提取 webhook token。 */
+    String webhookTokenOf(WorkflowEntity w) {
+        try {
+            Map<String, Object> trigger = objectMapper.readValue(
+                    w.getTriggerJson(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            Object t = trigger.get("token");
+            return t == null ? null : t.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** trigger_json.type = webhook 时确保存在随机 token（缺省生成 32 位 hex）。 */
+    String ensureWebhookToken(String triggerJson) {
+        try {
+            Map<String, Object> trigger = objectMapper.readValue(
+                    triggerJson, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            if (!"webhook".equals(String.valueOf(trigger.get("type")))) {
+                return triggerJson;
+            }
+            Object existing = trigger.get("token");
+            if (existing == null || existing.toString().isBlank()) {
+                byte[] b = new byte[16];
+                new java.security.SecureRandom().nextBytes(b);
+                StringBuilder sb = new StringBuilder();
+                for (byte x : b) sb.append(String.format("%02x", x));
+                trigger.put("token", sb.toString());
+                log.info("[workflow] webhook 触发器自动生成 token");
+            }
+            return objectMapper.writeValueAsString(trigger);
+        } catch (Exception e) {
+            log.warn("[workflow] 解析 trigger_json 失败，原样返回: {}", e.getMessage());
+            return triggerJson;
+        }
+    }
+
+    /** 执行工作流（trigger 与 webhook 共用；user 为 null 表示 webhook 触发）。 */
+    private ResponseEntity<Map<String, Object>> runWorkflow(
+            WorkflowEntity w, Map<String, Object> payload,
+            com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user) {
+        String auditTenant = w.getTenantId();
+        UUID auditUser = (user != null) ? user.userId() : w.getCreatedBy();
+        String auditUsername = (user != null) ? user.username() : "webhook";
 
         // 1. 创建实例
         WorkflowInstanceEntity instance = new WorkflowInstanceEntity();
@@ -228,7 +307,8 @@ public class WorkflowController {
         }
         instance.setStartedAt(Instant.now());
         instance.setCurrentNodeIndex(0);
-        instance.setTenantId(TenantContext.currentTenantId());
+        // Wave4 #6a：webhook 触发无 TenantContext → 显式用工作流自身租户
+        instance.setTenantId(w.getTenantId());
         instance = instanceRepository.save(instance);
 
         // 2. 解析节点 + edges(Week 14:支持图遍历)
@@ -254,9 +334,10 @@ public class WorkflowController {
         }
 
         if (result == WorkflowEngine.NodeResult.NEEDS_APPROVAL) {
-            auditService.log(user.tenantId(), user.userId(), user.username(),
+            auditService.log(auditTenant, auditUser, auditUsername,
                     "TRIGGER", "workflow", w.getId().toString(),
-                    Map.of("instance", instance.getId().toString(), "result", "PENDING"));
+                    Map.of("instance", instance.getId().toString(), "result", "PENDING",
+                            "via", auditUsername.equals("webhook") ? "webhook" : "manual"));
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
                     "code", 0, "message", "workflow waiting for approval",
                     "data", instanceToDto(instance)
@@ -264,9 +345,10 @@ public class WorkflowController {
         }
 
         String msg = result == WorkflowEngine.NodeResult.FAILED ? "workflow failed" : "workflow completed";
-        auditService.log(user.tenantId(), user.userId(), user.username(),
+        auditService.log(auditTenant, auditUser, auditUsername,
                 "TRIGGER", "workflow", w.getId().toString(),
-                Map.of("instance", instance.getId().toString(), "result", instance.getStatus().name()));
+                Map.of("instance", instance.getId().toString(), "result", instance.getStatus().name(),
+                        "via", auditUsername.equals("webhook") ? "webhook" : "manual"));
         return ResponseEntity.ok(Map.of(
                 "code", result == WorkflowEngine.NodeResult.FAILED ? 500 : 0,
                 "message", msg,

@@ -102,6 +102,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/events").permitAll()
                         // B4 钉钉 AI 卡片按钮回调：钉钉服务器发起，无 JWT，靠 HMAC 验签兜底
                         .requestMatchers(HttpMethod.POST, "/api/dingtalk/ai-card/callback").permitAll()
+                        // Wave4 待办池 #6a：工作流 webhook 触发 —— 外部系统无 JWT，
+                        // 鉴权靠 URL 中的随机 token 与 trigger_json.token 常量时间比较（未命中 404）。
+                        // 另有 GlobalRateLimitFilter 限流兜底（回调入站维度）。
+                        .requestMatchers(HttpMethod.POST, "/api/workflows/webhook/*").permitAll()
                         // Actuator: 生产 profile 下仅 health 匿名，其他需要认证
                         .requestMatchers("/actuator/health").permitAll()
                         // PHASE104 审计修正：Prometheus 的 scrape 是匿名 HTTP GET，无法携带 JWT。

@@ -435,7 +435,10 @@
     "rollbackSuccess": "已回滚到 v{{version}}",
     "rollbackFailed": "回滚失败",
     "cancel": "取消",
-    "confirmRollback": "确认回滚"
+    "confirmRollback": "确认回滚",
+    "triggerWebhook": "Webhook 触发（外部系统调用）",
+    "webhookToken": "Webhook Token",
+    "webhookTokenHint": "保存后由服务端生成，外部系统用 POST /api/workflows/webhook/{token} 调用"
   },
   "editor": {
     "block": {

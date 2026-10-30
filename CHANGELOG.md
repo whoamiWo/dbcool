@@ -66,6 +66,13 @@
 - T2.3 视觉素材：`scripts/screenshot-demo.mjs`（Playwright 登录态）产出 **10 张截图**（md5 全部唯一）；**GIF 未做**
 - T2.4 演示数据种子：`scripts/seed-demo-data.py` 默认关闭；显式开启实测落库（1 集合 + 12 记录 + 看板 + 工作流），幂等可重跑
 
+### Wave 4 第二批（2026-10-31）
+
+- **#6 工作流 webhook 触发**：新增 `POST /api/workflows/webhook/{token}`（SecurityConfig permitAll + token 常量时间比较 + 未命中 404 防探测）；webhook 类型触发器自动生成 32 位 hex token 并存入 trigger_json（创建/更新时 `ensureWebhookToken`）；trigger 执行体抽为 `runWorkflow` 与手动触发共用；webhook 审计归属工作流创建者（via=webhook）。契约 **438 后端 × 128 前端 → 0 漂移**
+- **#6 节点失败重试**：节点 `config.retry` 支持失败重试（上限 3，默认 0 向后兼容），图模式与数组模式两条执行路径均生效；既有 184 workflow 测试全绿 + 新增 7/7（WorkflowWebhookAndRetryTest）
+- 前端设计器：触发类型暴露 **Webhook**（含 token 只读展示与服务端生成说明）；保存后回读服务端生成的 token
+- 文档站：新增密钥管理页（19 页）
+
 ## v2.1.1 (2026-10-30)
 
 ### 本批摘要：Wave 0 地基收口 + Wave 0.5 能力断链修复（实测于 @02b3a59）
