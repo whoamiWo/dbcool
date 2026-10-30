@@ -35,6 +35,7 @@ export async function getChannelDetail(channelId: string) {
 /** 加入/邀请成员到频道 */
 export async function joinChannel(channelId: string, userId: string, role: 'MEMBER' | 'ADMIN') {
   return apiClient.post<{ code: number; data: any }>(`/im/channels/${channelId}/members`, { userId, role });
+
 }
 
 /** 退出频道 */
@@ -91,6 +92,16 @@ export async function getChannelMessages(
 }
 
 /** 发送消息 */
+/**
+ * Wave4 待办池 #7：频道成员列表（含 displayName）—— @提及下拉的数据源。
+ */
+export async function listChannelMembers(channelId: string) {
+  return apiClient.get<{
+    code: number;
+    data: Array<{ userId: string; displayName: string; role: string; muted: boolean; online: boolean }>;
+  }>(`/im/channels/${channelId}/members`);
+}
+
 export async function sendMessage(channelId: string, content: string, contentType: 'TEXT' | 'EMOTION' | 'FILE') {
   return apiClient.post<{ code: number; data: ImMessage }>('/im/messages', {
     channelId,

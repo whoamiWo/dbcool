@@ -58,7 +58,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 4 | K8s Secret → Sealed Secrets | ✅ 完成（2026-10-31：scripts/seal-secrets.sh 端到端实测（自签证书模拟 controller 公钥），产物合法 SealedSecret；占位符拦截反向自检 exit 2；docs/secrets-management.md；**controller 端到端解密未实测——无集群环境**） |
 | 5 | Wiki 混合检索接前端 | ✅ 完成（2026-10-31：WikiSearch 优先走 /wiki/search/hybrid（未选 status 时），语义不可用自动回退 ILIKE；单测 6/6 + 反向自检通过） |
 | 6 | 工作流 webhook 触发 + 节点重试 | ✅ 完成（2026-10-31：POST /api/workflows/webhook/{token}（permitAll + 常量时间 token 比较 + 未命中 404）；webhook 工作流自动生成 32 位 hex token 并落 trigger_json；节点 config.retry 失败重试（上限 3，既有 184 workflow 测试全绿 + 新增 7/7）；设计器暴露 webhook 类型与 token 展示；契约 437→438 |
-| 7 | @提及接真 | ⏳ |
+| 7 | @提及接真 | ✅ 完成（2026-10-31：MessageComposer @提及下拉（频道成员 displayName 候选 + 键盘导航），选中插入后端结构化语法 @{displayName}:userId（此前用户手打 @ 名字后端永远匹配不到 → 通知永不触发）；后端 members 端点补 displayName；单测后端 11/11（含 2 新例）、前端 16/16（含 2 新例）；反向自检 exit 1） |
 | 8 | API Key 专属限流 | ⏳ |
 | 9 | 钉钉组织同步分页 | ⏳ |
 | 10 | 钉钉审批回调闭环 | ⏳ |

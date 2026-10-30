@@ -262,7 +262,7 @@
   {
     "path": "/im/channels/presence/heartbeat",
     "file": "frontend/src/features/im/api.ts",
-    "line": 47
+    "line": 48
   },
   {
     "path": "/im/channels/{}",
@@ -277,67 +277,67 @@
   {
     "path": "/im/channels/{}/members/me",
     "file": "frontend/src/features/im/api.ts",
-    "line": 42
+    "line": 43
   },
   {
     "path": "/im/messages",
     "file": "frontend/src/features/im/api.ts",
-    "line": 95
+    "line": 106
   },
   {
     "path": "/im/messages/pins",
     "file": "frontend/src/features/im/api.ts",
-    "line": 213
+    "line": 224
   },
   {
     "path": "/im/messages/read",
     "file": "frontend/src/features/im/api.ts",
-    "line": 151
+    "line": 162
   },
   {
     "path": "/im/messages/search?{}&channelId={}",
     "file": "frontend/src/features/im/api.ts",
-    "line": 141
+    "line": 152
   },
   {
     "path": "/im/messages/unread?channelId={}",
     "file": "frontend/src/features/im/api.ts",
-    "line": 146
+    "line": 157
   },
   {
     "path": "/im/messages/{}",
     "file": "frontend/src/features/im/api.ts",
-    "line": 104
+    "line": 115
   },
   {
     "path": "/im/messages/{}/burn/read",
     "file": "frontend/src/features/im/api.ts",
-    "line": 277
+    "line": 288
   },
   {
     "path": "/im/messages/{}/reactions",
     "file": "frontend/src/features/im/api.ts",
-    "line": 168
+    "line": 179
   },
   {
     "path": "/im/messages/{}/reactions?emoji={}",
     "file": "frontend/src/features/im/api.ts",
-    "line": 173
+    "line": 184
   },
   {
     "path": "/im/messages/{}/thread",
     "file": "frontend/src/features/im/api.ts",
-    "line": 114
+    "line": 125
   },
   {
     "path": "/im/messages?{}",
     "file": "frontend/src/features/im/api.ts",
-    "line": 90
+    "line": 91
   },
   {
     "path": "/im/slash/commands",
     "file": "frontend/src/features/im/api.ts",
-    "line": 272
+    "line": 283
   },
   {
     "path": "/integrations/install/{}",
@@ -617,7 +617,7 @@
   {
     "path": "/workflows/{}",
     "file": "frontend/src/pages/WorkflowDesigner.tsx",
-    "line": 199
+    "line": 201
   },
   {
     "path": "/workflows/{}/trigger",
@@ -627,16 +627,16 @@
   {
     "path": "/workflows/{}/versions",
     "file": "frontend/src/pages/WorkflowDesigner.tsx",
-    "line": 158
+    "line": 160
   },
   {
     "path": "/workflows/{}/versions/publish",
     "file": "frontend/src/pages/WorkflowDesigner.tsx",
-    "line": 165
+    "line": 167
   },
   {
     "path": "/workflows/{}/versions/{}/rollback",
     "file": "frontend/src/pages/WorkflowDesigner.tsx",
-    "line": 179
+    "line": 181
   }
 ]

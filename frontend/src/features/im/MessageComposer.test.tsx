@@ -10,12 +10,13 @@ import { MessageComposer } from './MessageComposer';
 
 /** onSent 为必填 prop，未提供交互断言的用例传此空实现。 */
 const noopSent = () => {};
-import { sendMessage, uploadAttachment, listSlashCommands } from './api';
+import { sendMessage, uploadAttachment, listSlashCommands, listChannelMembers } from './api';
 
 vi.mock('./api', () => ({
   sendMessage: vi.fn(),
   uploadAttachment: vi.fn(),
   listSlashCommands: vi.fn(),
+  listChannelMembers: vi.fn(),
 }));
 
 vi.mock('@/hooks/useIsMobile', () => ({ useIsMobile: () => false }));
@@ -24,10 +25,12 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }
 const mockedSend = sendMessage as unknown as ReturnType<typeof vi.fn>;
 const mockedUpload = uploadAttachment as unknown as ReturnType<typeof vi.fn>;
 const mockedCmds = listSlashCommands as unknown as ReturnType<typeof vi.fn>;
+const mockedMembers = listChannelMembers as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedCmds.mockResolvedValue({ code: 0, data: [{ name: 'remind', description: '设置提醒' }] });
+  mockedMembers.mockResolvedValue({ code: 0, data: [] });
   mockedSend.mockResolvedValue({ data: { id: 'm1' } });
   mockedUpload.mockResolvedValue({ code: 0, data: { url: 'https://cdn/a.txt', id: 'a1' } });
 });
@@ -161,5 +164,42 @@ describe('MessageComposer', () => {
     const file = new File(['x'], 'fail.txt', { type: 'text/plain' });
     fireEvent.drop(panel, { dataTransfer: { files: [file] } });
     await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('im.uploadFailed'));
+  });
+
+  // ============================================================
+  //  Wave4 待办池 #7：@提及选择器
+  // ============================================================
+
+  it('Wave4#7：输入 @ 出现成员候选，点击后插入结构化提及语法', async () => {
+    mockedMembers.mockResolvedValue({
+      code: 0,
+      data: [{ userId: 'u-2', displayName: '李四', role: 'MEMBER', muted: false, online: true }],
+    } as any);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
+    const ta = await screen.findByLabelText('im.inputMessage');
+    fireEvent.change(ta, { target: { value: '你好 @李' } });
+    const opt = await screen.findByRole('option', { name: '@李四' });
+    fireEvent.mouseDown(opt);
+    // 插入后内容应为 @{李四}:u-2
+    await waitFor(() => {
+      expect((ta as HTMLTextAreaElement).value).toContain('@{李四}:u-2');
+    });
+  });
+
+  it('Wave4#7：候选打开时 Enter 选择候选而非发送消息', async () => {
+    mockedMembers.mockResolvedValue({
+      code: 0,
+      data: [{ userId: 'u-3', displayName: '王五', role: 'MEMBER', muted: false, online: true }],
+    } as any);
+    render(<MessageComposer channelId="c1" onSent={noopSent} />);
+    const ta = await screen.findByLabelText('im.inputMessage');
+    fireEvent.change(ta, { target: { value: '@王' } });
+    await screen.findByRole('option', { name: '@王五' });
+    fireEvent.keyDown(ta, { key: 'Enter' });
+    await waitFor(() => {
+      expect((ta as HTMLTextAreaElement).value).toContain('@{王五}:u-3');
+    });
+    // 未发送消息
+    expect(mockedSend).not.toHaveBeenCalled();
   });
 });

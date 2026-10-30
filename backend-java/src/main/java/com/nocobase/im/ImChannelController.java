@@ -2,7 +2,9 @@ package com.nocobase.im;
 
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
+import com.nocobase.auth.UserRepository;
 import com.nocobase.im.entity.ImChannelEntity;
+import com.nocobase.im.entity.ImChannelMemberEntity;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
@@ -28,11 +30,15 @@ public class ImChannelController {
     private final ChannelService channelService;
     private final PresenceService presenceService;
     private final AuditService auditService;
+    /** Wave4 待办池 #7：提及下拉需显示成员 displayName */
+    private final UserRepository userRepository;
 
-    public ImChannelController(ChannelService channelService, PresenceService presenceService, AuditService auditService) {
+    public ImChannelController(ChannelService channelService, PresenceService presenceService,
+                               AuditService auditService, UserRepository userRepository) {
         this.channelService = channelService;
         this.presenceService = presenceService;
         this.auditService = auditService;
+        this.userRepository = userRepository;
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -88,12 +94,31 @@ public class ImChannelController {
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        List<Map<String, Object>> data = channelService.members(id).stream()
-                .map(m -> Map.<String, Object>of(
-                        "userId", m.getUserId().toString(),
-                        "role", m.getRole(),
-                        "muted", m.isMuted(),
-                        "online", presenceService.isOnline(user.tenantId(), m.getUserId())))
+        // Wave4 待办池 #7：补 displayName —— 前端提及下拉需展示可读名称，
+        // 否则用户无法把 @目标 映射为后端要求的 @{displayName}:userId 结构化语法。
+        List<ImChannelMemberEntity> members = channelService.members(id);
+        java.util.Map<java.util.UUID, String> nameById = new java.util.HashMap<>();
+        if (!members.isEmpty()) {
+            java.util.List<java.util.UUID> ids = members.stream().map(ImChannelMemberEntity::getUserId).toList();
+            for (com.nocobase.auth.UserEntity u : userRepository.findAllById(ids)) {
+                String display = (u.getDisplayName() != null && !u.getDisplayName().isBlank())
+                        ? u.getDisplayName() : u.getUsername();
+                nameById.put(u.getId(), display);
+            }
+        }
+        List<Map<String, Object>> data = members.stream()
+                .map(m -> {
+                    String display = nameById.get(m.getUserId());
+                    if (display == null || display.isBlank()) {
+                        display = m.getUserId().toString().substring(0, 8);
+                    }
+                    return Map.<String, Object>of(
+                            "userId", m.getUserId().toString(),
+                            "displayName", display,
+                            "role", m.getRole(),
+                            "muted", m.isMuted(),
+                            "online", presenceService.isOnline(user.tenantId(), m.getUserId()));
+                })
                 .toList();
         return Map.of("code", 0, "message", "success", "data", data);
     }

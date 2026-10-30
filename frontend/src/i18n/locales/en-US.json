@@ -250,7 +250,9 @@
     "uploadAttachment": "Upload attachment",
     "inputMessage": "Type a message",
     "sendMessage": "Send message",
-    "burnedMessage": "This message has been burned"
+    "burnedMessage": "This message has been burned",
+    "mentionSuggestions": "Mention member",
+    "mentionNoMatch": "No matching member"
   },
   "project": {
     "title": "Projects",
