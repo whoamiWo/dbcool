@@ -19,7 +19,7 @@
 
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.54.1
     container_name: nocobase-prometheus
     ports:
       # PHASE100 T2: 仅监听 127.0.0.1
@@ -49,7 +49,7 @@ services:
   #  AlertManager（PHASE104 T7.3）—— 告警路由 + 通知
   # ============================================================
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.27.0
     container_name: nocobase-alertmanager
     ports:
       # 仅监听 127.0.0.1
@@ -80,7 +80,7 @@ services:
   #  Grafana（PHASE104 T7.3）—— 面板可视化
   # ============================================================
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.2.0
     container_name: nocobase-grafana
     ports:
       # 仅监听 127.0.0.1

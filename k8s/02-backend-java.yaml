@@ -41,7 +41,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: backend-java
-          image: nocobase/backend-java:latest
+          image: ghcr.io/whoamiwo/dbcool/dbcool-backend-java:2.1.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
