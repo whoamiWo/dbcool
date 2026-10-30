@@ -271,6 +271,7 @@ export function MessageComposer({ channelId, onSent, disabled, onAttachment }: M
             <div
               key={m.userId}
               role="option"
+              tabIndex={-1}
               aria-selected={i === mentionIdx}
               onMouseDown={(e) => { e.preventDefault(); applyMention(m); }}
               style={{

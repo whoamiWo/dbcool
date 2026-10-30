@@ -78,7 +78,15 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
         int windowSeconds;
         String key;
 
-        if (LOGIN_PATTERN.matcher(path).matches()) {
+        // Wave4 待办池 #8：API Key 维度限流 —— 带 X-Api-Key 的机器调用按 key 隔离
+        //（此前该类请求不匹配任何维度 → 完全不限流，单把 key 可打爆服务）。
+        // 限流 key 用 key 的 SHA-256 前 12 位，明文不进日志/内存记录。
+        String apiKeyHeader = request.getHeader(com.nocobase.apikey.ApiKeyFilter.HEADER_NAME);
+        if (apiKeyHeader != null && !apiKeyHeader.isBlank()) {
+            limit = properties.getApiKey().getLimit();
+            windowSeconds = properties.getApiKey().getWindowSeconds();
+            key = "apikey:" + shortHash(apiKeyHeader) + ":" + path;
+        } else if (LOGIN_PATTERN.matcher(path).matches()) {
             limit = properties.getLogin().getLimit();
             windowSeconds = properties.getLogin().getWindowSeconds();
             key = buildKey(request, path);
@@ -139,6 +147,19 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
             return user.userId().toString();
         }
         return null;
+    }
+
+    /** API Key 限流 key 用哈希前 12 位，避免明文密钥进入日志/内存记录。 */
+    static String shortHash(String apiKey) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(apiKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 6; i++) sb.append(String.format("%02x", digest[i]));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return "unknown";
+        }
     }
 
     private int getRemaining(String key, int limit, int windowSeconds) {

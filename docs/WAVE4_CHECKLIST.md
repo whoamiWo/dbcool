@@ -59,7 +59,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 5 | Wiki 混合检索接前端 | ✅ 完成（2026-10-31：WikiSearch 优先走 /wiki/search/hybrid（未选 status 时），语义不可用自动回退 ILIKE；单测 6/6 + 反向自检通过） |
 | 6 | 工作流 webhook 触发 + 节点重试 | ✅ 完成（2026-10-31：POST /api/workflows/webhook/{token}（permitAll + 常量时间 token 比较 + 未命中 404）；webhook 工作流自动生成 32 位 hex token 并落 trigger_json；节点 config.retry 失败重试（上限 3，既有 184 workflow 测试全绿 + 新增 7/7）；设计器暴露 webhook 类型与 token 展示；契约 437→438 |
 | 7 | @提及接真 | ✅ 完成（2026-10-31：MessageComposer @提及下拉（频道成员 displayName 候选 + 键盘导航），选中插入后端结构化语法 @{displayName}:userId（此前用户手打 @ 名字后端永远匹配不到 → 通知永不触发）；后端 members 端点补 displayName；单测后端 11/11（含 2 新例）、前端 16/16（含 2 新例）；反向自检 exit 1） |
-| 8 | API Key 专属限流 | ⏳ |
+| 8 | API Key 专属限流 | ✅ 完成（2026-10-31：GlobalRateLimitFilter 新增 apiKey 维度（X-Api-Key 机器调用按 key 隔离，默认 600/60s，ratelimit.api-key.* 可配）；限流 key 用 SHA-256 前 12 位，明文密钥不进日志/内存；单测 4/4 + 反向自检 exit 1） |
 | 9 | 钉钉组织同步分页 | ⏳ |
 | 10 | 钉钉审批回调闭环 | ⏳ |
 | 11 | 移动端响应式 5 关键页 | ⏳ |
