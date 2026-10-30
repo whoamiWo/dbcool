@@ -36,9 +36,9 @@ export function PinList({ channelId, channel, onChanged }: PinListProps) {
   const handlePin = async (messageId: string, alreadyPinned?: boolean) => {
     try {
       if (alreadyPinned) {
-        await unpinMessage(messageId);
+        await unpinMessage(channelId, messageId);
       } else {
-        await pinMessage(messageId);
+        await pinMessage(channelId, messageId);
       }
       await refresh();
       onChanged?.();
@@ -76,7 +76,7 @@ export function PinList({ channelId, channel, onChanged }: PinListProps) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 13 }}>消息 ID: {pin.messageId}</span>
               <button
-                onClick={() => handlePin(pin.id, true)}
+                onClick={() => handlePin(pin.messageId, true)}
                 style={{
                   marginLeft: 8,
                   padding: '2px 8px',

@@ -81,8 +81,51 @@ def scan_controllers():
 
     return mappings
 
+# ============================================================
+# Wave0.5 A-8：Python FastAPI 路由纳入契约 SSOT
+# ============================================================
+# 此前只扫 Java Controller，导致 /api/ai/* 这类真实 Python 路由被误判为
+# "前端路径在后端无对应映射"（假阳性），进而削弱门禁可信度。
+PY_ROUTER_ROOT = BASE_DIR / "backend-python" / "src" / "nocobase_py" / "routers"
+PY_PREFIX_RE = re.compile(r'APIRouter\s*\(\s*prefix\s*=\s*"([^"]+)"')
+PY_ROUTE_RE = re.compile(r'@router\.(get|post|put|patch|delete)\s*\(\s*"([^"]+)"')
+
+
+def scan_python_routers():
+    mappings = []
+    if not PY_ROUTER_ROOT.exists():
+        return mappings
+    for py_file in PY_ROUTER_ROOT.glob("*.py"):
+        content = py_file.read_text(encoding='utf-8', errors='ignore')
+        pm = PY_PREFIX_RE.search(content)
+        prefix = pm.group(1) if pm else ""
+        for i, line in enumerate(content.splitlines(), 1):
+            m = PY_ROUTE_RE.search(line)
+            if m:
+                http_method = m.group(1).upper()
+                full_path = prefix.rstrip('/') + m.group(2)
+                # FastAPI 参数 {event_id} → 归一化为 {}（与 Java @PathVariable 一致）
+                mappings.append({
+                    "class": py_file.stem,
+                    "method": http_method,
+                    "path": full_path,
+                    "file": str(py_file.relative_to(BASE_DIR)),
+                    "line": i,
+                })
+    return mappings
+
+
 def main():
     mappings = scan_controllers()
+    py_mappings = scan_python_routers()
+    print(f"Java Controller 路径 {len(mappings)} 条 + Python FastAPI 路由 {len(py_mappings)} 条")
+    # Wave0.5 A-8：标记来源栈 —— 跨栈同路径双实现（如 /api/health）是合法架构，
+    # 重复检查必须在栈内进行，否则 Java/Python 各自的 /api/health 会被误判。
+    for m in mappings:
+        m["stack"] = "java"
+    for m in py_mappings:
+        m["stack"] = "python"
+    mappings.extend(py_mappings)
     mappings.sort(key=lambda x: (x["class"], x["method"], x["path"]))
 
     out_path = BASE_DIR / "contracts" / "backend-mappings.json"

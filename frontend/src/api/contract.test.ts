@@ -19,6 +19,7 @@ interface BackendMapping {
   path: string;
   file: string;
   line: number;
+  stack?: string;
 }
 
 interface FrontendMapping {
@@ -32,12 +33,39 @@ function loadJson<T>(path: string): T {
   return JSON.parse(readFileSync(resolve(__dirname, '..', '..', '..', path), 'utf-8'));
 }
 
+/**
+ * Wave0.5 A-8：模式级比对 —— 前端模板段（${id} → {}）与后端 @PathVariable（{id}）
+ * 参数名可以不同，但段数与字面量必须一致；查询串不参与比对。
+ * 与 scripts/api-contract-verify.py 保持同一口径，避免两套门禁结论打架。
+ */
+function normalize(path: string): string {
+  return path.split('?', 1)[0].replace(/\{[^/]*\}/g, '{}');
+}
+
+/**
+ * 显式例外：前端模板段实为字面量枚举的合法调用。
+ * ${op} ∈ {approve, reject} → 后端 /api/workflows/tasks/{id}/approve|reject
+ * 逐条人工维护，禁止默认宽松匹配（否则真漂移会被吞掉）。
+ */
+const APPROVED_WILDCARDS: Array<{ pattern: string; segIdx: number }> = [
+  { pattern: '/api/workflows/tasks/{}/{}', segIdx: 4 },
+];
+
+function wildcardMatch(front: string, back: string, segIdx: number): boolean {
+  // strip('/') 后分段，与 Python 版 segments 口径一致（'/api/...' → ['api','...']）
+  const f = front.replace(/^\//, '').split('/');
+  const b = back.replace(/^\//, '').split('/');
+  if (f.length !== b.length) return false;
+  return f.every((fp, i) => (i === segIdx && fp === '{}') || fp === b[i]);
+}
+
 describe('前后端 API 契约比对', () => {
   const backendMappings = loadJson<BackendMapping[]>('contracts/backend-mappings.json');
   const frontendMappings = loadJson<FrontendMapping[]>('contracts/frontend-mappings.json');
 
-  // 后端路径集合（含 /api 前缀）
+  // 后端路径集合（含 /api 前缀，归一化后的模式集合）
   const backendPaths = new Set(backendMappings.map(m => m.path));
+  const backendPatterns = new Set(backendMappings.map(m => normalize(m.path)));
 
   // 前端路径补上 baseURL /api 前缀后与后端比对
   const frontendFullPaths = frontendMappings.map(m => ({
@@ -54,7 +82,13 @@ describe('前后端 API 契约比对', () => {
   });
 
   it('前端每个调用路径都在后端存在（消除路径错位）', () => {
-    const missing = frontendFullPaths.filter(m => !backendPaths.has(m.fullPath));
+    const missing = frontendFullPaths.filter(m => {
+      const norm = normalize(m.fullPath);
+      if (backendPatterns.has(norm)) return false;
+      return !APPROVED_WILDCARDS.some(w =>
+        w.pattern === norm && [...backendPatterns].some(bp => wildcardMatch(norm, bp, w.segIdx))
+      );
+    });
     const details = missing.map(m =>
       `${m.fullPath} ← ${m.file}:${m.line}`
     ).join('\n');

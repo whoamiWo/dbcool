@@ -132,11 +132,16 @@ public class RealtimeService {
             return version;
         }
 
-        // 服务端合并成功：广播完整状态给房间成员
+        // 服务端合并成功：广播完整状态给房间成员。
+        // Wave0.5 A-2：此前 payload 只有 state 无 update —— 前端 CollabEditor 对非
+        // init/presence 消息 `if (!msg.update) return` 会把它静默丢弃 → CRDT 服务
+        // 合并成功后其他成员反而收不到任何更新。补 update 字段（值 = 合并后全量
+        // 状态，Yjs applyUpdate 对全量状态幂等，效果等同增量应用）；state 保留兼容。
         long version = docVersions.merge(docId, 1L, Long::sum);
         Map<String, Object> payload = Map.of(
                 "docId", docId,
                 "userId", userId == null ? "" : userId.toString(),
+                "update", mergedStateBase64,
                 "state", mergedStateBase64,
                 "version", version,
                 "ts", Instant.now().toString()

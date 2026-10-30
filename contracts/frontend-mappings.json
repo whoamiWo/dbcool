@@ -1,5 +1,175 @@
 [
   {
+    "path": "/admin/acl",
+    "file": "frontend/src/pages/AclEditor.tsx",
+    "line": 43
+  },
+  {
+    "path": "/admin/acl/{}",
+    "file": "frontend/src/pages/AclEditor.tsx",
+    "line": 59
+  },
+  {
+    "path": "/admin/acl?roleId={}",
+    "file": "frontend/src/pages/AclEditor.tsx",
+    "line": 26
+  },
+  {
+    "path": "/admin/er-diagram",
+    "file": "frontend/src/pages/ErDiagram.tsx",
+    "line": 61
+  },
+  {
+    "path": "/admin/roles",
+    "file": "frontend/src/pages/RolesList.tsx",
+    "line": 43
+  },
+  {
+    "path": "/admin/roles/{}",
+    "file": "frontend/src/pages/RolesList.tsx",
+    "line": 66
+  },
+  {
+    "path": "/admin/users",
+    "file": "frontend/src/pages/UsersList.tsx",
+    "line": 32
+  },
+  {
+    "path": "/admin/users/{}",
+    "file": "frontend/src/pages/UsersList.tsx",
+    "line": 55
+  },
+  {
+    "path": "/ai/alerts/{}/ack",
+    "file": "frontend/src/pages/AlertCenter.tsx",
+    "line": 335
+  },
+  {
+    "path": "/ai/alerts/{}/resolve",
+    "file": "frontend/src/pages/AlertCenter.tsx",
+    "line": 342
+  },
+  {
+    "path": "/ai/cache/stats",
+    "file": "frontend/src/pages/AlertCenter.tsx",
+    "line": 300
+  },
+  {
+    "path": "/ai/chat",
+    "file": "frontend/src/pages/AlertCenter.tsx",
+    "line": 321
+  },
+  {
+    "path": "/ai/prompt-templates",
+    "file": "frontend/src/pages/PromptTemplateManagerPage.tsx",
+    "line": 31
+  },
+  {
+    "path": "/ai/prompt-templates/{}",
+    "file": "frontend/src/pages/PromptTemplateManagerPage.tsx",
+    "line": 52
+  },
+  {
+    "path": "/ai/quota",
+    "file": "frontend/src/pages/AlertCenter.tsx",
+    "line": 305
+  },
+  {
+    "path": "/ai/status",
+    "file": "frontend/src/pages/agent/AgentChatPage.tsx",
+    "line": 60
+  },
+  {
+    "path": "/ai/webhook/stats",
+    "file": "frontend/src/pages/AlertCenter.tsx",
+    "line": 310
+  },
+  {
+    "path": "/audit/logs",
+    "file": "frontend/src/pages/AuditLogs.tsx",
+    "line": 64
+  },
+  {
+    "path": "/auth/me",
+    "file": "frontend/src/pages/Profile.tsx",
+    "line": 27
+  },
+  {
+    "path": "/auth/password",
+    "file": "frontend/src/pages/Profile.tsx",
+    "line": 34
+  },
+  {
+    "path": "/collections",
+    "file": "frontend/src/pages/CollectionsList.tsx",
+    "line": 15
+  },
+  {
+    "path": "/collections/_jobs/{}",
+    "file": "frontend/src/pages/SchemaEditor.tsx",
+    "line": 60
+  },
+  {
+    "path": "/collections/{}",
+    "file": "frontend/src/pages/CollectionDetail.tsx",
+    "line": 22
+  },
+  {
+    "path": "/collections/{}/records",
+    "file": "frontend/src/pages/CollectionDetail.tsx",
+    "line": 46
+  },
+  {
+    "path": "/collections/{}/records/batch",
+    "file": "frontend/src/pages/TableView.tsx",
+    "line": 49
+  },
+  {
+    "path": "/collections/{}/records/{}",
+    "file": "frontend/src/pages/KanbanView.tsx",
+    "line": 193
+  },
+  {
+    "path": "/collections/{}/records?limit=50",
+    "file": "frontend/src/pages/CollectionDetail.tsx",
+    "line": 40
+  },
+  {
+    "path": "/collections/{}/records?limit=500",
+    "file": "frontend/src/pages/KanbanView.tsx",
+    "line": 180
+  },
+  {
+    "path": "/collections/{}/records?limit=5000",
+    "file": "frontend/src/pages/CalendarView.tsx",
+    "line": 63
+  },
+  {
+    "path": "/collections/{}/records?{}",
+    "file": "frontend/src/pages/TableView.tsx",
+    "line": 108
+  },
+  {
+    "path": "/collections/{}/recycle",
+    "file": "frontend/src/pages/RecycleBin.tsx",
+    "line": 75
+  },
+  {
+    "path": "/collections/{}/recycle/{}",
+    "file": "frontend/src/pages/RecycleBin.tsx",
+    "line": 67
+  },
+  {
+    "path": "/collections/{}/recycle/{}/restore",
+    "file": "frontend/src/pages/RecycleBin.tsx",
+    "line": 59
+  },
+  {
+    "path": "/dingtalk/ai-card/send",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 104
+  },
+  {
     "path": "/dingtalk/approval",
     "file": "frontend/src/api/integrations.ts",
     "line": 79
@@ -50,44 +220,299 @@
     "line": 83
   },
   {
+    "path": "/form-templates",
+    "file": "frontend/src/pages/FormTemplatesList.tsx",
+    "line": 29
+  },
+  {
+    "path": "/form-templates/{}",
+    "file": "frontend/src/pages/FormTemplatesList.tsx",
+    "line": 19
+  },
+  {
+    "path": "/forms",
+    "file": "frontend/src/pages/FormDesigner.tsx",
+    "line": 114
+  },
+  {
+    "path": "/forms/public/{}",
+    "file": "frontend/src/pages/FormPublicFill.tsx",
+    "line": 25
+  },
+  {
+    "path": "/forms/{}",
+    "file": "frontend/src/pages/FormRuntime.tsx",
+    "line": 22
+  },
+  {
+    "path": "/forms/{}/share",
+    "file": "frontend/src/components/forms/FormShareDialog.tsx",
+    "line": 26
+  },
+  {
+    "path": "/forms?collection={}",
+    "file": "frontend/src/pages/CollectionDetail.tsx",
+    "line": 28
+  },
+  {
+    "path": "/im/channels",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 17
+  },
+  {
+    "path": "/im/channels/presence/heartbeat",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 47
+  },
+  {
+    "path": "/im/channels/{}",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 32
+  },
+  {
+    "path": "/im/channels/{}/members",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 37
+  },
+  {
+    "path": "/im/channels/{}/members/me",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 42
+  },
+  {
+    "path": "/im/messages",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 95
+  },
+  {
+    "path": "/im/messages/pins",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 213
+  },
+  {
+    "path": "/im/messages/read",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 151
+  },
+  {
+    "path": "/im/messages/search?{}&channelId={}",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 141
+  },
+  {
+    "path": "/im/messages/unread?channelId={}",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 146
+  },
+  {
+    "path": "/im/messages/{}",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 104
+  },
+  {
+    "path": "/im/messages/{}/burn/read",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 277
+  },
+  {
+    "path": "/im/messages/{}/reactions",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 168
+  },
+  {
+    "path": "/im/messages/{}/reactions?emoji={}",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 173
+  },
+  {
+    "path": "/im/messages/{}/thread",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 114
+  },
+  {
+    "path": "/im/messages?{}",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 90
+  },
+  {
+    "path": "/im/slash/commands",
+    "file": "frontend/src/features/im/api.ts",
+    "line": 272
+  },
+  {
+    "path": "/integrations/install/{}",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 133
+  },
+  {
     "path": "/integrations/market",
     "file": "frontend/src/api/integrations.ts",
-    "line": 112
+    "line": 129
+  },
+  {
+    "path": "/integrations/uninstall/{}",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 137
+  },
+  {
+    "path": "/js-signature",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 254
+  },
+  {
+    "path": "/js-signature?{}",
+    "file": "frontend/src/hooks/useJsSdk.ts",
+    "line": 113
   },
   {
     "path": "/livechat/message",
     "file": "frontend/src/features/im/LivechatWidget.tsx",
-    "line": 96
+    "line": 122
+  },
+  {
+    "path": "/messages/{}/read",
+    "file": "frontend/src/pages/MessagesInbox.tsx",
+    "line": 54
+  },
+  {
+    "path": "/messages?",
+    "file": "frontend/src/pages/MessagesInbox.tsx",
+    "line": 44
+  },
+  {
+    "path": "/playbooks",
+    "file": "frontend/src/pages/playbook/PlaybookList.tsx",
+    "line": 53
+  },
+  {
+    "path": "/playbooks/runs/{}/finish",
+    "file": "frontend/src/pages/playbook/PlaybookRun.tsx",
+    "line": 118
+  },
+  {
+    "path": "/playbooks/{}",
+    "file": "frontend/src/pages/playbook/PlaybookRun.tsx",
+    "line": 67
+  },
+  {
+    "path": "/playbooks/{}/run",
+    "file": "frontend/src/pages/playbook/PlaybookRun.tsx",
+    "line": 104
+  },
+  {
+    "path": "/playbooks/{}/runs",
+    "file": "frontend/src/pages/playbook/PlaybookRun.tsx",
+    "line": 73
   },
   {
     "path": "/project-boards/cards/move",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 91
+    "line": 153
+  },
+  {
+    "path": "/project-boards/checklist-items/batch",
+    "file": "frontend/src/features/project/BoardView.tsx",
+    "line": 96
+  },
+  {
+    "path": "/project-boards/checklist-items/{}",
+    "file": "frontend/src/features/project/api.ts",
+    "line": 111
+  },
+  {
+    "path": "/project-boards/checklists/batch",
+    "file": "frontend/src/features/project/BoardView.tsx",
+    "line": 88
   },
   {
     "path": "/project-boards/tasks",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 117
+    "line": 179
+  },
+  {
+    "path": "/project-boards/{}/lists",
+    "file": "frontend/src/features/project/BoardView.tsx",
+    "line": 76
+  },
+  {
+    "path": "/projects/tasks/{}",
+    "file": "frontend/src/features/project/api.ts",
+    "line": 96
+  },
+  {
+    "path": "/projects/{}/tasks",
+    "file": "frontend/src/features/project/BoardView.tsx",
+    "line": 79
+  },
+  {
+    "path": "/search",
+    "file": "frontend/src/api/search.ts",
+    "line": 38
+  },
+  {
+    "path": "/views",
+    "file": "frontend/src/pages/ViewDesigner.tsx",
+    "line": 128
+  },
+  {
+    "path": "/views/{}",
+    "file": "frontend/src/pages/KanbanView.tsx",
+    "line": 159
+  },
+  {
+    "path": "/views?collection={}",
+    "file": "frontend/src/pages/CollectionDetail.tsx",
+    "line": 34
+  },
+  {
+    "path": "/wechat/auth-url",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 216
+  },
+  {
+    "path": "/wechat/callback",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 220
+  },
+  {
+    "path": "/wechat/mini-program/login",
+    "file": "frontend/src/api/integrations.ts",
+    "line": 224
   },
   {
     "path": "/wecom/auth-url",
     "file": "frontend/src/api/integrations.ts",
-    "line": 157
+    "line": 174
   },
   {
     "path": "/wecom/callback",
     "file": "frontend/src/api/integrations.ts",
-    "line": 161
+    "line": 178
   },
   {
     "path": "/wecom/message/send",
     "file": "frontend/src/api/integrations.ts",
-    "line": 169
+    "line": 186
   },
   {
     "path": "/wecom/sync-contacts",
     "file": "frontend/src/api/integrations.ts",
-    "line": 165
+    "line": 182
+  },
+  {
+    "path": "/wiki/blocks/batch-upsert",
+    "file": "frontend/src/components/wiki/NotionStyleEditor.tsx",
+    "line": 345
+  },
+  {
+    "path": "/wiki/blocks/{}",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 84
+  },
+  {
+    "path": "/wiki/categories/{}",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 72
   },
   {
     "path": "/wiki/kb",
@@ -95,13 +520,118 @@
     "line": 37
   },
   {
+    "path": "/wiki/kb/{}",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 38
+  },
+  {
+    "path": "/wiki/kb/{}/categories",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 68
+  },
+  {
     "path": "/wiki/pages",
     "file": "frontend/src/api/wiki.ts",
     "line": 47
   },
   {
+    "path": "/wiki/pages/by-slug/{}",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 50
+  },
+  {
+    "path": "/wiki/pages/{}",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 48
+  },
+  {
+    "path": "/wiki/pages/{}/archive",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 57
+  },
+  {
+    "path": "/wiki/pages/{}/blocks",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 80
+  },
+  {
+    "path": "/wiki/pages/{}/blocks/reorder",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 87
+  },
+  {
+    "path": "/wiki/pages/{}/from-template",
+    "file": "frontend/src/components/wiki/NotionStyleEditor.tsx",
+    "line": 420
+  },
+  {
+    "path": "/wiki/pages/{}/publish",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 56
+  },
+  {
+    "path": "/wiki/pages/{}/versions",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 60
+  },
+  {
+    "path": "/wiki/pages/{}/versions/{}",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 62
+  },
+  {
+    "path": "/wiki/pages/{}/versions/{}/restore",
+    "file": "frontend/src/api/wiki.ts",
+    "line": 64
+  },
+  {
     "path": "/wiki/search",
     "file": "frontend/src/api/wiki.ts",
     "line": 77
+  },
+  {
+    "path": "/workflows",
+    "file": "frontend/src/pages/WorkflowsList.tsx",
+    "line": 23
+  },
+  {
+    "path": "/workflows/instances/{}",
+    "file": "frontend/src/pages/WorkflowInstances.tsx",
+    "line": 141
+  },
+  {
+    "path": "/workflows/tasks/my",
+    "file": "frontend/src/pages/MyTasks.tsx",
+    "line": 43
+  },
+  {
+    "path": "/workflows/tasks/{}/{}",
+    "file": "frontend/src/pages/MyTasks.tsx",
+    "line": 50
+  },
+  {
+    "path": "/workflows/{}",
+    "file": "frontend/src/pages/WorkflowDesigner.tsx",
+    "line": 199
+  },
+  {
+    "path": "/workflows/{}/trigger",
+    "file": "frontend/src/pages/FormRuntime.tsx",
+    "line": 44
+  },
+  {
+    "path": "/workflows/{}/versions",
+    "file": "frontend/src/pages/WorkflowDesigner.tsx",
+    "line": 158
+  },
+  {
+    "path": "/workflows/{}/versions/publish",
+    "file": "frontend/src/pages/WorkflowDesigner.tsx",
+    "line": 165
+  },
+  {
+    "path": "/workflows/{}/versions/{}/rollback",
+    "file": "frontend/src/pages/WorkflowDesigner.tsx",
+    "line": 179
   }
 ]

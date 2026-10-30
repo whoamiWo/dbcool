@@ -15,8 +15,14 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent.parent
 FRONTEND_ROOT = BASE_DIR / "frontend" / "src"
 
-# 匹配 client.xxx('/path') 或 apiClient.xxx('/path') 或 client.xxx(`/path`)
-PATH_RE = re.compile(r'(?:client|apiClient)\.(?:get|post|put|patch|delete)\s*\(\s*[\'`]([^\'`]+)[\'`]')
+# 匹配 client.xxx('/path') / apiClient.xxx(`/path`)
+# Wave0.5 A-8：此前正则要求方法名后直接跟 "("，而项目里大量调用带泛型参数
+# （apiClient.post<{ code: number; data: ImPin }>('/im/messages/pins')），
+# 这类调用全部未被收录 → 契约门禁形同虚设（Pin/阅后即焚正是这种写法）。
+# 现支持可选泛型段：<...>。
+PATH_RE = re.compile(
+    r'(?:client|apiClient)\.(?:get|post|put|patch|delete)\s*(?:<[^>]*>)?\s*\(\s*[\'`]([^\'`]+)[\'`]'
+)
 
 def extract_frontend_paths():
     mappings = []
@@ -34,9 +40,13 @@ def extract_frontend_paths():
         for i, line in enumerate(content.splitlines(), 1):
             for m in PATH_RE.finditer(line):
                 path = m.group(1)
-                # 跳过模板变量（含 $）
-                if '$' in path:
-                    continue
+                # Wave0.5 A-8：模板字面量路径（如 /im/messages/${id}/burn/read）此前被整段跳过，
+                # 导致 Pin/阅后即焚/Checklist 这类真实断链逃过契约门禁。
+                # 现在把 ${...} 归一化为 {}（与后端 @PathVariable 占位符一致）再纳入比对。
+                path = re.sub(r'\$\{[^}]*\}', '{}', path)
+                if path.startswith('/api/'):
+                    # baseURL 已带 /api，重复前缀交由 api-contract-verify.py 报错
+                    pass
                 mappings.append({
                     "path": path,
                     "file": rel_path,

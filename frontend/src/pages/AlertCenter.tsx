@@ -477,15 +477,16 @@ export function AlertCenterPage() {
               </div>
               <div style={statLineStyle}>
                 <span>{t('alertCenter.dailyTokens')}</span>
-                <strong>{quota.daily_tokens_remaining.toLocaleString()}</strong>
+                {/* Wave0.5 A-7：后端未返回该字段时为 undefined，直接 .toLocaleString() 会抛 Uncaught TypeError */}
+                <strong>{(quota.daily_tokens_remaining ?? 0).toLocaleString()}</strong>
               </div>
               <div style={statLineStyle}>
                 <span>{t('alertCenter.monthlyCalls')}</span>
-                <strong>{quota.monthly_calls_remaining.toLocaleString()}</strong>
+                <strong>{(quota.monthly_calls_remaining ?? 0).toLocaleString()}</strong>
               </div>
               <div style={statLineStyle}>
                 <span>{t('alertCenter.monthlyTokens')}</span>
-                <strong>{quota.monthly_tokens_remaining.toLocaleString()}</strong>
+                <strong>{(quota.monthly_tokens_remaining ?? 0).toLocaleString()}</strong>
               </div>
             </>
           ) : (

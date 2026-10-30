@@ -81,6 +81,22 @@ public class ImMessageController {
         ));
     }
 
+    /**
+     * Wave0.5 A-4：阅后即焚「已读回执」。
+     * 消息被阅读后立即进入焚毁流程（expires_at = now，由 BurnOnReadCleanupJob 软删除）。
+     * 普通消息幂等返回 burned=false；跨租户访问 404。
+     */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{id}/burn/read")
+    public Map<String, Object> markBurnRead(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        boolean burned = messageService.markBurnOnRead(id, user.tenantId());
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("messageId", id.toString(), "burned", burned));
+    }
+
     /** 取消置顶。 */
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/pins")

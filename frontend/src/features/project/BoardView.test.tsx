@@ -37,7 +37,9 @@ describe('BoardView', () => {
 
     await waitFor(() => {
       expect(apiClient.get).toHaveBeenCalledWith('/project-boards/proj-1/lists');
-      expect(apiClient.get).toHaveBeenCalledWith('/project-boards/proj-1/tasks');
+      // Wave0.5 A-8：任务列表 GET 在 ProjectController（/api/projects/{id}/tasks），
+      // 原断言锁的是恒 404 的断链路径
+      expect(apiClient.get).toHaveBeenCalledWith('/projects/proj-1/tasks');
     });
   });
 

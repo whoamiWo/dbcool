@@ -53,6 +53,7 @@ SyntaxHighlighter.registerLanguage('sql', sql);
 SyntaxHighlighter.registerLanguage('python', python);
 SyntaxHighlighter.registerLanguage('css', css);
 import { useTranslation } from 'react-i18next';
+import apiClient from '@/api/client';
 import type { WikiPage } from '@/types/wiki';
 import {
   useWikiLinkAutocomplete,
@@ -340,20 +341,17 @@ export function NotionStyleEditor({
     setSaveError(null);
     try {
       // 调用后端 POST /api/wiki/blocks/batch-upsert
-      const res = await fetch(`/api/wiki/blocks/batch-upsert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pageId: _page?.id,
-          blocks: blocks.map(b => ({
-            type: b.type,
-            content: b.content,
-            language: b.language,
-            checked: b.checked,
-          })),
-        }),
+      // Wave0.5 A-1: 经 apiClient（axios 实例自动注入 Authorization），修复裸 fetch 无 JWT → 401
+      const res = await apiClient.post<{ code: number; data: unknown }>('/wiki/blocks/batch-upsert', {
+        pageId: _page?.id,
+        blocks: blocks.map(b => ({
+          type: b.type,
+          content: b.content,
+          language: b.language,
+          checked: b.checked,
+        })),
       });
-      if (!res.ok) throw new Error(t('editor.error.saveFailedWithStatus', { status: res.status }));
+      void res;
       setSaveError(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('editor.error.saveFailed');
@@ -380,9 +378,8 @@ export function NotionStyleEditor({
     if (!_page?.id) return;
     setBacklinksLoading(true);
     try {
-      const res = await fetch(`/api/wiki/pages/${_page.id}/backlinks`);
-      if (!res.ok) throw new Error(t('editor.error.loadBacklinksFailed'));
-      const data = await res.json();
+      // Wave0.5 A-1: apiClient 自动注入 Authorization；返回值已解为信封体 {code,data}
+      const data = await apiClient.get<{ code: number; data: Array<{ id: string; sourcePageId: string; sourceTitle?: string; sourceSlug?: string; targetPageId?: string; targetSlug?: string; anchorText?: string; context?: string; createdAt: string }> }>(`/wiki/pages/${_page.id}/backlinks`);
       // 信封格式 {code:0, data:[...]}，需 unwrap
       const backlinks = data?.data || [];
       setBacklinks(backlinks);
@@ -391,16 +388,15 @@ export function NotionStyleEditor({
     } finally {
       setBacklinksLoading(false);
     }
-  }, [_page?.id, t]);
+  }, [_page?.id]);
 
   // 加载模板列表
   const loadTemplates = useCallback(async () => {
     if (!kbId) return;
     try {
       setTemplatesLoading(true);
-      const res = await fetch(`/api/wiki/kb/${kbId}/templates`);
-      if (!res.ok) throw new Error(t('editor.error.loadTemplatesFailedWithStatus', { status: res.status }));
-      const data = await res.json();
+      // Wave0.5 A-1: apiClient 自动注入 Authorization；返回值已解为信封体 {code,data}
+      const data = await apiClient.get<{ code: number; data: Array<{ id: string; title: string; kbId?: string }> }>(`/wiki/kb/${kbId}/templates`);
       // 信封格式 {code:0, data:[...]}，需 unwrap
       setTemplates(data?.data || []);
     } catch (err) {
@@ -408,7 +404,7 @@ export function NotionStyleEditor({
     } finally {
       setTemplatesLoading(false);
     }
-  }, [kbId, t]);
+  }, [kbId]);
 
   // 应用模板（从模板创建新页面）
   const applyTemplate = useCallback(async (templateId: string) => {
@@ -420,17 +416,12 @@ export function NotionStyleEditor({
     if (!title) return;
     
     try {
-      const res = await fetch(`/api/wiki/pages/${templateId}/from-template`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          kbId, 
-          title,
-          slug: title.toLowerCase().replace(/\s+/g, '-'),
-        }),
+      // Wave0.5 A-1: apiClient 自动注入 Authorization；返回值已解为信封体 {code,data}
+      const data = await apiClient.post<{ code: number; data: { slug: string } }>(`/wiki/pages/${templateId}/from-template`, {
+        kbId,
+        title,
+        slug: title.toLowerCase().replace(/\s+/g, '-'),
       });
-      if (!res.ok) throw new Error(t('editor.error.createPageFailed'));
-      const data = await res.json();
       // 跳转到新创建的页面
       window.location.href = `/wiki/${data.data.slug}`;
     } catch (err) {

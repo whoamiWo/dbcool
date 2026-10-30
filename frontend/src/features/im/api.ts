@@ -195,16 +195,31 @@ export interface ImPin {
   /** F4：该消息是否被置顶（用于 PinList 取消置顶按钮） */
   pinned?: boolean;
 }
+/**
+ * 置顶列表。
+ *
+ * Wave0.5 A-3（断链修复）：后端 GET /im/messages/pins 返回信封 {code,data:{pins:[...]}}，
+ * 原前端按 data: ImPin[] 消费 → 置顶列表恒为空、ImLayout 的 .map 会抛 "map is not a function"。
+ * 这里统一在 api 层解包为 data: ImPin[]，调用方无需感知信封细节。
+ */
 export async function listPins(channelId: string) {
-  return apiClient.get<{ code: number; data: ImPin[] }>(
+  const res = await apiClient.get<{ code: number; data: { pins?: ImPin[] } }>(
     `/im/messages/pins?channelId=${channelId}`,
   );
+  return { ...res, data: res?.data?.pins ?? [] };
 }
-export async function pinMessage(messageId: string) {
-  return apiClient.post<{ code: number; data: ImPin }>(`/im/messages/${messageId}/pin`);
+/** 置顶某条消息：后端 POST /im/messages/pins，body 需同时带 channelId + messageId */
+export async function pinMessage(channelId: string, messageId: string) {
+  return apiClient.post<{ code: number; data: ImPin }>(`/im/messages/pins`, {
+    channelId,
+    messageId,
+  });
 }
-export async function unpinMessage(messageId: string) {
-  return apiClient.delete<{ code: number; data: any }>(`/im/messages/${messageId}/pin`);
+/** 取消置顶：后端 DELETE /im/messages/pins（body 同上） */
+export async function unpinMessage(channelId: string, messageId: string) {
+  return apiClient.delete<{ code: number; data: any }>(`/im/messages/pins`, {
+    data: { channelId, messageId },
+  });
 }
 
 /** 跨频道搜索（带 tenantId + 频道成员过滤，防越权） */
