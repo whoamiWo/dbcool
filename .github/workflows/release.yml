@@ -48,7 +48,7 @@ jobs:
       - name: Build & push images（多架构）
         env:
           APP_VERSION: ${{ github.ref_name }}
-          IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}/dbcool
+          IMAGE_REGISTRY: ghcr.io/whoamiwo/dbcool
         run: |
           # VERSION 真相源与 tag 一致性：tag vX.Y.Z 必须等于 VERSION 内容
           if [ "v$(cat VERSION | tr -d '[:space:]')" != "${GITHUB_REF_NAME}" ]; then
@@ -56,7 +56,7 @@ jobs:
           fi
           # 单一路径：一次构建并推送（v2.1.2 首发实测曾在此步骤用 -o 离线模式失败）
           APP_VERSION=${GITHUB_REF_NAME#v} PLATFORM=linux/amd64,linux/arm64 \
-            IMAGE_REGISTRY=ghcr.io/${{ github.repository_owner }}/dbcool \
+            IMAGE_REGISTRY=ghcr.io/whoamiwo/dbcool \
             bash scripts/build-images.sh
 
       - name: Extract Release Notes（版本不存在则失败）
