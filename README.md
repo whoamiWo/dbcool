@@ -106,12 +106,15 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 | [`docs/WAVE1_PRIVATE_DELIVERY_TASKS.md`](docs/WAVE1_PRIVATE_DELIVERY_TASKS.md) | 私有化交付包任务书（镜像/离线包/Helm/升级） |
 | [`docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`](docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md) | 七强对标实证与差距清单 |
 | [`docs/backup-restore-runbook.md`](docs/backup-restore-runbook.md) / [`docs/key-rotation-runbook.md`](docs/key-rotation-runbook.md) | 备份恢复 / 密钥轮换 |
+| [`docs/enterprise-onboarding.md`](docs/enterprise-onboarding.md) / [`docs/acceptance-checklist.md`](docs/acceptance-checklist.md) | 企业客户入职指南 / 上线验收清单 |
+| [`SUPPORT.md`](SUPPORT.md) / [`docs/sla.md`](docs/sla.md) | 支持渠道与分级 / 服务级别协议 |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) / [`TRADEMARK.md`](TRADEMARK.md) | 贡献指南 / 商标与署名政策 |
 | [`docs/DEVELOPMENT_NOTES.md`](docs/DEVELOPMENT_NOTES.md) | 开发者手册（模块结构 / 里程碑 / 历史工程记录） |
 
 ## 路线图与支持
 
 - 当前方向：**项目展示 + 私有化部署 + 企业支持**（不再新增业务功能），见[路线图](docs/PRODUCTIZATION_ROADMAP.md)。
-- **支持**：Apache-2.0 核心开源；企业支持与附加组件按订阅提供（支持体系文档 Wave 3 交付中，见路线图 §5）。
+- **支持**：Apache-2.0 核心开源；企业支持与附加组件按订阅提供 —— 渠道与分级见 [SUPPORT.md](SUPPORT.md)，SLA 见 [docs/sla.md](docs/sla.md)，贡献指南见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 - **安全**：漏洞披露流程见 [`SECURITY.md`](SECURITY.md)。
 
 ## 许可证

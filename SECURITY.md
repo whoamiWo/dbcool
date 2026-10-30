@@ -1,5 +1,33 @@
 # 安全说明与依赖漏洞扫描
 
+## 0. 漏洞披露流程（Wave3 T3.2）
+
+**请不要为安全漏洞创建公开 Issue。**
+
+1. **报告**：通过 GitHub 私密渠道报告——在仓库页面使用 *Report a vulnerability*
+   （Security Advisories → Private vulnerability reporting）；无法使用时，通过
+   [`SUPPORT.md`](SUPPORT.md) 所列渠道联系并在标题注明 `[SECURITY]`。
+2. **内容**：影响版本、复现步骤（PoC 可选但利于定级）、影响面评估、建议修复方向。
+3. **响应时限**：收到完整报告后 **48 小时内**确认收讫并给出初判严重级
+   （参考 CVSS v3.1；Critical/High 7×24 处理，见 [`docs/sla.md`](docs/sla.md) L3 定义）。
+4. **修复与披露**：
+   - 确认后按严重级排期修复；修复发布前与报告者协商披露窗口（目标 ≤ 90 天）；
+   - 发布安全公告（GitHub Advisory + Release Notes），必要时同步发版；
+   - 报告者获得致谢（除非要求匿名）。
+5. **范围**：本仓库代码与默认部署配置。第三方依赖漏洞按 §1-§5 的扫描与披露机制处理。
+
+## 0.1 Supported Versions
+
+| 版本线 | 状态 | 安全修复 |
+|---|---|---|
+| 2.1.x | ✅ 支持 | ✅ 接收 |
+| 2.0.x | 🟡 维护 | ✅ 仅安全修复（至 2027-04-30） |
+| < 2.0 | ❌ EOL | ❌ 不再接收 |
+
+（与 [`docs/sla.md`](docs/sla.md) §一 同源，变更需两处同步。）
+
+## 1. 默认扫描器（离线可用）
+
 ## 1. 默认扫描器（离线可用）
 
 项目默认依赖 `scripts/java-dependency-audit.py`（PHASE104/106 引入），它用**本地已知漏洞库**

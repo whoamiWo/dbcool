@@ -1,4 +1,4 @@
-DBCool — NocoBase-like multi-stack platform
+DBCool — 自部署的企业协作低代码平台
 Copyright 2026 whoamiWo
 
 This product includes software developed by whoamiWo.
@@ -9,8 +9,24 @@ You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 
-This project is developed and maintained as a personal, non-commercial
-project. No rights to any trade name, trademark, service mark, or product
-name of the Licensor are granted (Apache License 2.0, Section 6).
-No commercial support, warranty, indemnity, or other liability obligation
-is offered (Sections 7-9).
+Trademarks
+----------
+No rights to any trade name, trademark, service mark, or product name of the
+Licensor are granted by this repository (Apache License 2.0, Section 6).
+See TRADEMARK.md for the permitted nominative-use policy.
+
+Commercial support, warranty, indemnity, and enterprise add-on components
+-------------------------------------------------------------------------
+The software in this repository is provided under the Apache License 2.0 "AS IS",
+without warranties or conditions of any kind, and the contributors are not
+liable for any damages arising from its use (Sections 7-9). Nothing in this
+repository grants any support obligation.
+
+Separately from the license grant, the project owner may offer **optional
+paid services** — commercial support subscriptions and enterprise add-on
+components — whose scope, response times and liability terms are described in
+SUPPORT.md and the applicable service agreement. Those services are not
+granted by, and do not modify, the Apache License 2.0 grant above.
+
+The source code in this repository remains licensed under Apache License 2.0
+in all cases, including when the optional services are purchased.
