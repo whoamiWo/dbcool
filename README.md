@@ -4,7 +4,7 @@
 
 **自部署的企业协作低代码平台 —— 数据表 · 文档 Wiki · 即时通讯 · 看板 · 工作流 · AI，一套全有**
 
-**v2.1.1**（当前稳定版，发布于 2026-10-30）
+**v2.1.2**（当前稳定版，发布于 2026-10-30）
 
 [![Version](https://img.shields.io/badge/version-2.1.1-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)

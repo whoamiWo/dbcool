@@ -53,6 +53,7 @@ export function AppLayout() {
     { path: '/admin/audit', labelKey: 'nav.audit' },
     { path: '/admin/row-acl', labelKey: 'nav.rowAcl' },
     { path: '/admin/er', labelKey: 'nav.er' },
+    { path: '/admin/integrations', labelKey: 'nav.integrations' },
     { path: '/admin/notifications', labelKey: 'nav.notifications' },
     { path: '/swagger', labelKey: 'nav.apiDocs', external: 'http://localhost:8080/swagger-ui/index.html' },
     { path: '/messages', labelKey: 'nav.inAppMessages' },

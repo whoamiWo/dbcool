@@ -52,6 +52,15 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    # Wave4：baseline-version 显式为 0 —— 此前默认 1，导致 V1__init.sql（含
+    # CREATE EXTENSION uuid-ossp）被 baseline 标记为"已应用"而从未真正执行；
+    # 全新环境的 V2 迁移因 uuid_generate_v4() 不存在必然失败（离线包实测复现）。
+    # 已有 schema history 的库不受影响（baseline 只在空 history 时触发）。
+    baseline-version: 0
+    # Wave4：允许乱序应用 —— 新增的兼容迁移版本号低于主库当前版本
+    # （V27.5/V27.6 必须在 V28 之前执行，新库需要；主库已到 V74），
+    # 否则 Flyway 报 "Detected resolved migration not applied to database" 并拒绝启动。
+    out-of-order: true
     validate-on-migrate: true
     # 注：V58 曾尝试 CREATE INDEX CONCURRENTLY + execute-in-transaction=false，
     # 但在单机 Docker 部署下 HikariCP(autoCommit=false) 与 CONCURRENTLY 的
@@ -97,6 +106,32 @@ app:
     app-secret: ${DINGTALK_APP_SECRET:}
     agent-id: ${DINGTALK_AGENT_ID:}
     corp-id: ${DINGTALK_CORP_ID:}
+  # Wave4 首批#3：补齐其余平台配置段（此前仅钉钉在 yml 声明，
+  # 其余平台靠租户级凭证表兜底，导致"部署配置缺失"与"运行时配置缺失"难以区分）。
+  # 环境变量名遵循 Spring relaxed binding：feishu.app-secret → FEISHU_APP_SECRET
+  feishu:
+    app-id: ${FEISHU_APP_ID:}
+    app-secret: ${FEISHU_APP_SECRET:}
+    redirect-uri: ${FEISHU_REDIRECT_URI:}
+    encrypt-key: ${FEISHU_ENCRYPT_KEY:}
+  wecom:
+    corp-id: ${WECOM_CORP_ID:}
+    agent-id: ${WECOM_AGENT_ID:}
+    secret: ${WECOM_SECRET:}
+    redirect-uri: ${WECOM_REDIRECT_URI:}
+  wechat:
+    app-id: ${WECHAT_APP_ID:}
+    app-secret: ${WECHAT_APP_SECRET:}
+    redirect-uri: ${WECHAT_REDIRECT_URI:}
+  slack:
+    client-id: ${SLACK_CLIENT_ID:}
+    client-secret: ${SLACK_CLIENT_SECRET:}
+    signing-secret: ${SLACK_SIGNING_SECRET:}
+    bot-token: ${SLACK_BOT_TOKEN:}
+    team-id: ${SLACK_TEAM_ID:}
+    default-tenant-id: ${SLACK_DEFAULT_TENANT_ID:tenant_default}
+    default-channel-id: ${SLACK_DEFAULT_CHANNEL_ID:}
+    redirect-uri: ${SLACK_REDIRECT_URI:}
   jwt:
     # PHASE114: 移除 dev 占位默认值 —— 未注入 JWT_SECRET 直接启动失败(fail fast),
     # 与 docker-compose 的 ${JWT_SECRET:?} 及 KeyRingService 硬阻断对齐。

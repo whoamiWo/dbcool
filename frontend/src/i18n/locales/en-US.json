@@ -32,7 +32,21 @@
     "settings": "Settings",
     "profile": "Profile",
     "tables": "Data Model",
-    "formTemplates": "Form Templates"
+    "formTemplates": "Form Templates",
+    "wiki": "Wiki",
+    "projects": "Projects",
+    "workflows": "Workflows",
+    "agent": "AI Assistant",
+    "users": "Users",
+    "roles": "Roles",
+    "permissions": "Permissions",
+    "audit": "Audit Log",
+    "rowAcl": "Row ACL",
+    "er": "ER Diagram",
+    "notifications": "Notification Channels",
+    "apiDocs": "API Docs",
+    "inAppMessages": "Inbox",
+    "integrations": "Integrations"
   },
   "home": {
     "welcome": "Welcome",

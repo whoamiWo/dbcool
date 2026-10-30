@@ -32,7 +32,21 @@
     "settings": "设置",
     "profile": "个人中心",
     "tables": "数据模型",
-    "formTemplates": "表单模板"
+    "formTemplates": "表单模板",
+    "wiki": "知识库",
+    "projects": "项目管理",
+    "workflows": "工作流",
+    "agent": "AI 助手",
+    "users": "用户管理",
+    "roles": "角色管理",
+    "permissions": "权限配置",
+    "audit": "审计日志",
+    "rowAcl": "行级权限",
+    "er": "ER 图",
+    "notifications": "通知渠道",
+    "apiDocs": "API 文档",
+    "inAppMessages": "站内消息",
+    "integrations": "集成市场"
   },
   "home": {
     "welcome": "欢迎",

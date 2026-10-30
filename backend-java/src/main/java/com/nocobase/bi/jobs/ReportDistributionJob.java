@@ -4,6 +4,7 @@ import com.nocobase.bi.BiReportEntity;
 import com.nocobase.bi.BiReportRepository;
 import com.nocobase.bi.BiReportService;
 import com.nocobase.integration.dingtalk.DingTalkAppService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
@@ -38,7 +39,13 @@ import java.util.Map;
  * }
  * }</pre>
  */
+/**
+ * Wave4：@ConditionalOnProperty(spring.mail.host) —— 报表邮件分发是可选能力，
+ * 未配置邮件服务（spring.mail.host 为空）时本 Job 不装配，否则启动即失败
+ * （JavaMailSender Bean 不存在）。配置邮件后自动恢复。
+ */
 @Component
+@ConditionalOnProperty(prefix = "spring.mail", name = "host")
 public class ReportDistributionJob {
 
     private static final Logger log = LoggerFactory.getLogger(ReportDistributionJob.class);

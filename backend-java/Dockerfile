@@ -21,8 +21,12 @@ RUN apk add --no-cache curl
 # 复制构建产物（同样用通配符，避免版本号写死）
 COPY --from=build /workspace/nocobase-backend-*.jar app.jar
 
-# 创建非 root 用户
-RUN addgroup -S nocobase && adduser -S nocobase -G nocobase
+# 创建非 root 用户 —— uid/gid 固定 1000，与 backend-python 容器一致：
+# 两者共用同一告警 SQLite 卷（PHASE100 T6 设计），uid 不一致会导致
+# 后挂载方对卷内文件 Permission denied（Wave4 离线包实测复现）。
+RUN addgroup -S -g 1000 nocobase && adduser -S -u 1000 -G nocobase nocobase
+# 告警 SQLite 卷挂载点（属主与运行用户一致）
+RUN mkdir -p /data && chown -R 1000:1000 /data
 USER nocobase
 
 EXPOSE 8080
