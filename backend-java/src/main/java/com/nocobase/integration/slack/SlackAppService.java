@@ -143,7 +143,18 @@ public class SlackAppService {
             throw new RuntimeException("Slack 未返回 access_token");
         }
 
-        // 保存到内存 Map（生产环境应持久化到数据库或 Vault）
+        // Wave4 待办池 #2：bot token 落**租户级凭证库**（加密持久化）。
+        // 此前只写内存 Map —— ①重启即丢 ②多副本不一致 ③读取路径根本不走 Map
+        // （getBotToken() 只读全局 @Value），导致 OAuth 安装的 token 从未被使用。
+        // 现在：凭证库为真相源，Map 仅作本进程热路径缓存。
+        try {
+            credentialService.save(defaultTenantId, "slack",
+                    "bot-token:" + newTeamId, accessToken, "slack-oauth");
+            log.info("[Slack] bot token 已加密落库 tenant={} team={}", defaultTenantId, newTeamId);
+        } catch (Exception e) {
+            log.error("[Slack] bot token 落库失败（安装仍返回成功，但重启后需重新授权）team={} err={}",
+                    newTeamId, e.getMessage(), e);
+        }
         workspaces.put(newTeamId, new SlackWorkspaceConfig(
                 newTeamId, teamName, botUserId, accessToken, "",
                 java.time.Instant.now().toString()
@@ -215,7 +226,30 @@ public class SlackAppService {
     }
 
     public String getBotToken() {
+        // 兼容入口：无 teamId 时用全局配置（存量行为不变）
         return resolveForKey("bot-token", null).orElse("");
+    }
+
+    /**
+     * 按工作区解析 bot token（Wave4 #2）。
+     * 顺序：① 本进程 OAuth 缓存 ② 租户级加密凭证库（跨重启/多副本可用） ③ 全局 @Value。
+     */
+    public String getBotToken(String teamId) {
+        if (teamId != null && !teamId.isBlank()) {
+            SlackWorkspaceConfig cached = workspaces.get(teamId);
+            if (cached != null && cached.botToken() != null && !cached.botToken().isBlank()) {
+                return cached.botToken();
+            }
+            try {
+                Optional<String> stored = credentialService.get(defaultTenantId, "slack", "bot-token:" + teamId);
+                if (stored.isPresent() && !stored.get().isBlank()) {
+                    return stored.get();
+                }
+            } catch (Exception e) {
+                log.warn("[Slack] 读取租户级 bot token 失败 team={} err={}", teamId, e.getMessage());
+            }
+        }
+        return getBotToken();
     }
 
     public String getTeamId() {
