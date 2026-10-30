@@ -11,6 +11,8 @@ public class GlobalRateLimitProperties {
     private FileUpload fileUpload = new FileUpload();
     /** PHASE99 T2: 第三方回调入站限流（匿名放行端点，必须防刷） */
     private Inbound inbound = new Inbound();
+    /** Wave4 待办池 #8: API Key 维度限流（带 X-Api-Key 的机器调用，按 key 隔离） */
+    private ApiKey apiKey = new ApiKey();
 
     public Login getLogin() { return login; }
     public void setLogin(Login login) { this.login = login; }
@@ -20,6 +22,17 @@ public class GlobalRateLimitProperties {
     public void setFileUpload(FileUpload fileUpload) { this.fileUpload = fileUpload; }
     public Inbound getInbound() { return inbound; }
     public void setInbound(Inbound inbound) { this.inbound = inbound; }
+    public ApiKey getApiKey() { return apiKey; }
+    public void setApiKey(ApiKey apiKey) { this.apiKey = apiKey; }
+
+    public static class ApiKey {
+        private int limit = 600;
+        private int windowSeconds = 60;
+        public int getLimit() { return limit; }
+        public void setLimit(int limit) { this.limit = limit; }
+        public int getWindowSeconds() { return windowSeconds; }
+        public void setWindowSeconds(int windowSeconds) { this.windowSeconds = windowSeconds; }
+    }
 
     public static class Login {
         private int limit = 5;

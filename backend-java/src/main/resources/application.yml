@@ -290,6 +290,11 @@ ratelimit:
   inbound:
     limit: 60
     window-seconds: 60
+  # Wave4 待办池 #8: API Key 机器调用限流 —— 每个 key 独立配额；
+  # 限流 key 用 SHA-256 前 12 位，明文密钥不进日志/内存记录
+  api-key:
+    limit: 600
+    window-seconds: 60
 
 # PHASE69: MinIO 配置 (app.storage.minio prefix for @ConfigurationProperties)
 app:
