@@ -179,6 +179,45 @@ class MessageServiceTest {
         assertThat(m.getLastReadMessageId()).isNull(); // 游标不得被推进
     }
 
+    // ==================== Wave0.5 A-4：阅后即焚已读回执 ====================
+
+    @Test
+    void markBurnOnRead_burnMessage_setsExpiresAtAndReturnsTrue() {
+        ImMessageEntity m = message(senderId);
+        m.setBurnAfterRead(true);
+        when(messageRepo.findByIdAndTenantId(m.getId(), "tenant_default")).thenReturn(Optional.of(m));
+        when(messageRepo.save(any(ImMessageEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        boolean burned = service.markBurnOnRead(m.getId(), "tenant_default");
+
+        assertThat(burned).isTrue();
+        assertThat(m.getExpiresAt()).isNotNull(); // 立即到期 → BurnOnReadCleanupJob 软删除
+        verify(messageRepo).save(m);
+    }
+
+    @Test
+    void markBurnOnRead_normalMessage_isIdempotentNoOp() {
+        ImMessageEntity m = message(senderId);
+        m.setBurnAfterRead(false);
+        when(messageRepo.findByIdAndTenantId(m.getId(), "tenant_default")).thenReturn(Optional.of(m));
+
+        boolean burned = service.markBurnOnRead(m.getId(), "tenant_default");
+
+        assertThat(burned).isFalse();
+        assertThat(m.getExpiresAt()).isNull();
+        org.mockito.Mockito.verify(messageRepo, org.mockito.Mockito.never())
+                .save(any(ImMessageEntity.class));
+    }
+
+    @Test
+    void markBurnOnRead_crossTenant_throws404() {
+        when(messageRepo.findByIdAndTenantId(any(UUID.class), anyString())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.markBurnOnRead(UUID.randomUUID(), "tenant_default"))
+                .isInstanceOf(ResponseStatusException.class)
+                .matches(e -> ((ResponseStatusException) e).getStatusCode() == HttpStatus.NOT_FOUND);
+    }
+
     private ImMessageEntity message(UUID owner) {
         ImMessageEntity m = new ImMessageEntity();
         m.setId(UUID.randomUUID());

@@ -26,6 +26,38 @@ def load(path):
         return json.load(f)
 
 
+def normalize(path):
+    """Wave0.5 A-8：把路径参数段（{id} / {}）归一化为 {}，实现模式级比对。
+    前端模板字面量（/im/messages/{}/burn/read）与后端 @PathVariable
+    （/api/im/messages/{id}/burn/read）的参数名可以不同，但段数与字面量必须一致。
+    查询串（?...）不参与路径比对。"""
+    import re as _re
+    path = path.split('?', 1)[0]
+    return _re.sub(r'\{[^/]*\}', '{}', path)
+
+
+# Wave0.5 A-8：显式例外清单 —— 前端模板段实为"字面量枚举"的合法调用。
+# 格式：(前端归一化模式, 允许变量段匹配字面量的段索引)。逐条人工维护，
+# 禁止默认宽松匹配（否则 POST /im/messages/{}/pin 会被 /im/messages/pins 吞掉，掩盖真漂移）。
+APPROVED_WILDCARDS = {
+    ("/api/workflows/tasks/{}/{}", 4),  # 第 4 段 ${op} ∈ {approve, reject}，对应后端 /tasks/{id}/approve|reject
+}
+
+
+def wildcard_match(front_pattern: str, back_pattern: str, seg_idx: int) -> bool:
+    f = front_pattern.strip('/').split('/')
+    b = back_pattern.strip('/').split('/')
+    if len(f) != len(b) or seg_idx >= len(f):
+        return False
+    for i, (fp, bp) in enumerate(zip(f, b)):
+        if i == seg_idx and fp == '{}':
+            continue  # 该位允许变量段 ↔ 字面量枚举
+        if fp == bp:
+            continue  # 其余位按归一化字面比较
+        return False
+    return True
+
+
 def main():
     print("=" * 70)
     print("PHASE97 T5: 前后端契约比对")
@@ -39,13 +71,22 @@ def main():
 
     errors = []
 
-    # 1. 前端路径在后端无对应映射 → 路径错位
-    backend_paths = {m["path"] for m in backend}
+    # 1. 前端路径在后端无对应映射 → 路径错位（Wave0.5 A-8：改为模式级比对 + 段级回退）
+    backend_patterns = {normalize(m["path"]) for m in backend}
     missing_in_backend = []
+    loose_matched = 0
     for m in frontend:
         full_path = f"/api{m['path']}"
-        if full_path not in backend_paths:
-            missing_in_backend.append({**m, "full_path": full_path})
+        norm = normalize(full_path)
+        if norm in backend_patterns:
+            continue
+        # 回退：仅显式例外清单允许"变量段 ↔ 字面量枚举"
+        if any(wildcard_match(norm, bp, idx)
+               for (pat, idx) in APPROVED_WILDCARDS if pat == norm
+               for bp in backend_patterns):
+            loose_matched += 1
+            continue
+        missing_in_backend.append({**m, "full_path": full_path})
 
     if missing_in_backend:
         errors.append("前端调用路径在后端无对应映射（路径错位）：")
@@ -66,16 +107,17 @@ def main():
         for m in no_method:
             errors.append(f"  {m['path']} ← {m['file']}:{m['line']}")
 
-    # 4. 后端路径重复（同 method+path 出现多次）
+    # 4. 后端路径重复（同 method+path 在**同一栈**出现多次）
+    # Wave0.5 A-8：Java/Python 两栈各自实现 /api/health 属合法架构，跨栈不算重复。
     path_counts = {}
     for m in backend:
-        key = (m["method"], m["path"])
+        key = (m.get("stack", "java"), m["method"], m["path"])
         path_counts[key] = path_counts.get(key, 0) + 1
     duplicates = [(k, v) for k, v in path_counts.items() if v > 1]
     if duplicates:
         errors.append("后端路径重复定义：")
-        for (method, path), count in duplicates:
-            errors.append(f"  {method} {path} ×{count}")
+        for (stack, method, path), count in duplicates:
+            errors.append(f"  [{stack}] {method} {path} ×{count}")
 
     # 结果
     print("\n比对结果：")
@@ -86,7 +128,8 @@ def main():
         print("\n" + "=" * 70)
         sys.exit(1)
     else:
-        print(f"  ✅ {len(backend)} 后端路径 × {len(frontend)} 前端路径 → 0 漂移")
+        print(f"  ✅ {len(backend)} 后端路径 × {len(frontend)} 前端路径 → 0 漂移"
+              f"（其中 {loose_matched} 条为模板段↔字面量枚举的段级回退匹配）")
         print("\nPASS：0 处漂移")
         sys.exit(0)
 

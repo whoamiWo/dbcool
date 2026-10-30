@@ -73,14 +73,15 @@ describe('PinList', () => {
     await waitFor(() => expect(screen.getByText('暂无置顶消息')).toBeInTheDocument());
   });
 
-  it('点击取消置顶调用 unpinMessage(pin.id) 并回调 onChanged', async () => {
+  it('点击取消置顶调用 unpinMessage(channelId, pin.messageId) 并回调 onChanged（Wave0.5 A-3）', async () => {
     mockedList.mockResolvedValue({ data: [pin()] });
     mockedUnpin.mockResolvedValue({});
     const onChanged = vi.fn();
     render(<PinList channelId="c1" channel={channel} onChanged={onChanged} />);
     await waitFor(() => expect(screen.getByText(/取消置顶/)).toBeInTheDocument());
     fireEvent.click(screen.getByText('取消置顶'));
-    await waitFor(() => expect(mockedUnpin).toHaveBeenCalledWith('p1'));
+    // 修复前传的是 pin.id（置顶记录 id），后端 DELETE /pins 需要的是消息 id + channelId
+    await waitFor(() => expect(mockedUnpin).toHaveBeenCalledWith('c1', 'm1'));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 

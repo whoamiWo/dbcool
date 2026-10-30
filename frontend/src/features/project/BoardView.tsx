@@ -74,7 +74,9 @@ export function BoardView({ projectId }: { projectId: string }) {
     try {
       const [colsRes, cardsRes] = await Promise.all([
         apiClient.get(`/project-boards/${projectId}/lists`) as Promise<{ data: Column[] }>,
-        apiClient.get(`/project-boards/${projectId}/tasks`) as Promise<{ data: Card[] }>,
+        // Wave0.5 A-8 契约门禁发现：任务列表 GET 在 ProjectController（/api/projects/{id}/tasks），
+        // ProjectBoardController 只有 POST/PUT/DELETE /tasks —— 原路径 /project-boards/{id}/tasks 恒 404
+        apiClient.get(`/projects/${projectId}/tasks`) as Promise<{ data: Card[] }>,
       ]);
       setColumns(colsRes.data);
 

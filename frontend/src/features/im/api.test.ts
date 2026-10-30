@@ -16,6 +16,8 @@ import apiClient from '@/api/client';
 
 /** TS: apiClient.post 为泛型函数，mock 后需断言为 vi.fn 才能调 mockResolvedValue。 */
 const mockedPost = apiClient.post as unknown as ReturnType<typeof vi.fn>;
+/** Wave0.5 A-3: listPins 信封解包测试需单独控制 get 的返回 */
+const mockedGet = apiClient.get as unknown as ReturnType<typeof vi.fn>;
 
 import {
   getJoinedChannels,
@@ -140,11 +142,29 @@ describe('表情与置顶', () => {
     await listPins('ch1');
     expect(apiClient.get).toHaveBeenCalledWith('/im/messages/pins?channelId=ch1');
 
-    await pinMessage('msg1');
-    expect(apiClient.post).toHaveBeenCalledWith('/im/messages/msg1/pin');
+    // Wave0.5 A-3: 端点对齐后端（POST/DELETE /im/messages/pins，body 带 channelId + messageId）
+    await pinMessage('ch1', 'msg1');
+    expect(apiClient.post).toHaveBeenCalledWith('/im/messages/pins', {
+      channelId: 'ch1',
+      messageId: 'msg1',
+    });
 
-    await unpinMessage('msg1');
-    expect(apiClient.delete).toHaveBeenCalledWith('/im/messages/msg1/pin');
+    await unpinMessage('ch1', 'msg1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/im/messages/pins', {
+      data: { channelId: 'ch1', messageId: 'msg1' },
+    });
+  });
+
+  it('listPins 解包信封 data.pins 为数组（Wave0.5 A-3）', async () => {
+    mockedGet.mockResolvedValueOnce({ code: 0, data: { pins: [{ id: 'p1', messageId: 'm1' }] } });
+    const res = await listPins('ch1');
+    expect(res.data).toEqual([{ id: 'p1', messageId: 'm1' }]);
+  });
+
+  it('listPins 在后端未返回 pins 时回落空数组（Wave0.5 A-3）', async () => {
+    mockedGet.mockResolvedValueOnce({ code: 0, data: {} });
+    const res = await listPins('ch1');
+    expect(res.data).toEqual([]);
   });
 });
 

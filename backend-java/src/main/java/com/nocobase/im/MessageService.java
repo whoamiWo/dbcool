@@ -250,6 +250,28 @@ public class MessageService {
     }
 
     /**
+     * Wave0.5 A-4：阅后即焚「已读回执」。
+     *
+     * <p>语义：消息被阅读后立即进入焚毁流程 —— 把 expires_at 置为当前时间，
+     * 由 {@link BurnOnReadCleanupJob} 在下一轮扫描中软删除。
+     *
+     * <p>安全：走 mustGet(messageId, tenantId)，跨租户一律 404。
+     * 非阅后即焚消息不做任何改动（幂等）。
+     *
+     * @return true 表示该消息是阅后即焚且已标记焚毁；false 表示普通消息（无操作）
+     */
+    @Transactional
+    public boolean markBurnOnRead(UUID messageId, String tenantId) {
+        ImMessageEntity msg = mustGet(messageId, tenantId);
+        if (!Boolean.TRUE.equals(msg.getBurnAfterRead())) {
+            return false;
+        }
+        msg.setExpiresAt(Instant.now());
+        messageRepository.save(msg);
+        return true;
+    }
+
+    /**
      * 校验用户是否为某频道的成员（用于搜索 ACL 过滤）。
      */
     public boolean isMemberOfChannel(UUID channelId, UUID userId) {

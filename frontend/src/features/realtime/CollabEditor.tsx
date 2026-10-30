@@ -5,7 +5,7 @@ import {
   Alert, Avatar, Box, Button, Chip, CircularProgress, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  sendCollabJoin, sendCollabLeave, sendCollabUpdate, subscribeToCollab,
+  sendCollabJoin, sendCollabLeave, sendCollabUpdate, subscribeToCollab, subscribeToCollabInit,
 } from '@/lib/stompClient';
 import { useAuthStore } from '@/stores/auth';
 import ConflictResolver from '@/components/ConflictResolver';
@@ -194,9 +194,10 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
   // Subscribe to remote updates + join/leave room
   useEffect(() => {
     let unsub: (() => void) | null = null;
-    try {
-      unsub = subscribeToCollab(docId, (body) => {
-        try {
+    let unsubInit: (() => void) | null = null;
+    // Wave0.5 A-2: topic 增量与 init 用户队列共用同一处理函数
+    const handleCollabMessage = (body: string) => {
+      try {
           const msg = JSON.parse(body) as {
             userId?: string; update?: string; state?: string; type?: string;
             username?: string; action?: string; awareness?: AwarenessState;
@@ -261,8 +262,12 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
         } catch (e) {
           console.error('[collab] 处理远端消息失�:', e);
         }
-      });
-      
+    };
+    try {
+      unsub = subscribeToCollab(docId, handleCollabMessage);
+      // Wave0.5 A-2: 订阅 /user/queue/collab-init —— 后端在 join 时向该队列推送初始文档状态
+      unsubInit = subscribeToCollabInit(docId, handleCollabMessage);
+
       sendCollabJoin(docId);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 安全：异步/条件/初始化模式，非连续渲染
       setConnected(true);
@@ -274,6 +279,7 @@ export default function CollabEditor({ docId, title, initialContent = '', onSave
     return () => {
       try { sendCollabLeave(docId); } catch { /* ignore leave errors */ }
       unsub?.();
+      unsubInit?.();
     };
   }, [docId, ydoc, ytext, myId, t]);
 

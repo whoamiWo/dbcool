@@ -128,6 +128,40 @@ export function subscribeToCollab(
   };
 }
 
+/**
+ * 订阅协同编辑「初始状态」用户队列。
+ *
+ * Wave0.5 A-2（断链修复）：后端 RealtimeCollabController#join 在新成员加入时
+ * convertAndSendToUser(userId, "/queue/collab-init", initPayload) —— 目标地址经
+ * user registry 解析为 /user/<userId>/queue/collab-init，客户端必须以
+ * `/user/queue/collab-init` 订阅。此前前端从未订阅 → 后加入者拿不到服务端
+ * 合并后的初始文档状态，只能看到空白/自己的内容。
+ *
+ * @param docId 仅用于日志区分（初始化消息本身已带 docId）
+ * @param onInit 收到服务端初始状态（JSON 字符串）
+ */
+export function subscribeToCollabInit(
+  docId: string,
+  onInit: (payload: string) => void,
+): () => void {
+  void docId; // 消息体含 docId，调用方可自行过滤
+  const client = getStompClient();
+  const destination = '/user/queue/collab-init';
+
+  let sub: StompSubscription | null = null;
+  if (client.connected) {
+    sub = client.subscribe(destination, (m) => onInit(m.body));
+  }
+  const entry = { destination, cb: onInit };
+  pendingSubs.push(entry);
+
+  return () => {
+    sub?.unsubscribe();
+    const i = pendingSubs.indexOf(entry);
+    if (i >= 0) pendingSubs.splice(i, 1);
+  };
+}
+
 /** 发送协同增量(Yjs update 的 Base64)到服务端广播。 */
 export function sendCollabUpdate(docId: string, updateBase64: string): void {
   getStompClient().publish({

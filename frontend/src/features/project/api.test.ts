@@ -91,7 +91,7 @@ describe('projectApi', () => {
     const checklists = [{ id: 'c1', title: 'Check', sortOrder: 1 } as projectApi.CardChecklist];
     mockedGet.mockResolvedValue(envelope(checklists));
     const result = await projectApi.projectApi.listChecklists('t1');
-    expect(mockedGet).toHaveBeenCalledWith('/projects/boards/checklists/by-task/t1');
+    expect(mockedGet).toHaveBeenCalledWith('/project-boards/checklists/by-task/t1');
     expect(result[0].title).toBe('Check');
   });
 
@@ -99,13 +99,13 @@ describe('projectApi', () => {
     const items = [{ id: 'i1', title: 'Item', done: false, sortOrder: 1 } as projectApi.CardChecklistItem];
     mockedGet.mockResolvedValue(envelope(items));
     const result = await projectApi.projectApi.listChecklistItems('c1');
-    expect(mockedGet).toHaveBeenCalledWith('/projects/boards/checklist-items/by-checklist/c1');
+    expect(mockedGet).toHaveBeenCalledWith('/project-boards/checklist-items/by-checklist/c1');
     expect(result[0].done).toBe(false);
   });
 
   it('updateChecklistItem PUT 无返回值', async () => {
     mockedPut.mockResolvedValue(undefined);
     await projectApi.projectApi.updateChecklistItem('i1', { done: true });
-    expect(mockedPut).toHaveBeenCalledWith('/projects/boards/checklist-items/i1', { done: true });
+    expect(mockedPut).toHaveBeenCalledWith('/project-boards/checklist-items/i1', { done: true });
   });
 });

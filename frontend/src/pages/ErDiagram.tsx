@@ -150,8 +150,9 @@ export function ErDiagramPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h2 style={{ margin: 0 }}>{t('erDiagram.title')}</h2>
         <div style={{ display: 'flex', gap: 16, color: 'var(--color-bg-elevated)', fontSize: 14 }}>
-          <span><b>{data.stats.collections}</b> {t('erDiagram.tables')}</span>
-          <span><b>{data.stats.relationships}</b> {t('erDiagram.relations')}</span>
+          {/* Wave0.5 A-7：后端 stats 可能缺失（空库/部分返回），未做空值保护会抛 Uncaught TypeError */}
+          <span><b>{data.stats?.collections ?? 0}</b> {t('erDiagram.tables')}</span>
+          <span><b>{data.stats?.relationships ?? 0}</b> {t('erDiagram.relations')}</span>
           <span style={{ color: 'var(--color-text-muted)' }}>{t('erDiagram.draggableNodes')}</span>
         </div>
       </div>
