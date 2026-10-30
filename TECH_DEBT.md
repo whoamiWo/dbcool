@@ -42,7 +42,7 @@
 
 - 完整审计：`docs/PHASE113_AUDIT_REPORT.md`
 - 鉴权修复：本次 PHASE114（棘轮门禁 + 203 处注解 + 14 条白名单）
-- 门禁现状（2026-10-21 实测，PHASE130 后）：Java **2263/0F/0E**、前端 vitest **403/403**（50 文件）、E2E **159/159**、ESLint **0 error / 0 warning**、CSP `unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化、`connect-src` 已收窄、冒烟 **11/11**、编排 **8/8**、依赖漏洞 **0 高危**、契约 **0 漂移**、SaaS 就绪 **11/11**、无假实现 **P0 0/P1 0**、启动检查 **0 问题**、密钥轮换 **3/3**
+- 门禁现状（2026-10-30 实测 @02b3a59，Wave0.5 后）：Java **2588/0F/0E**、前端 vitest **964/964**（118 文件，0 unhandled errors）、E2E **159/159**（上次实测，本轮未实测）、ESLint **0 error / 8 warning**、CSP `unsafe-eval` 已移除 + `unsafe-inline` 已 nonce 化、`connect-src` 已收窄、冒烟 **13/13**、编排 **8/8**（备份可恢复项因生产库 WAL 归档环境条件 FAIL，29/30）、租户隔离 **16/16**、依赖漏洞 **0 高危**、契约 **0 漂移**（437 后端 × 127 前端）、SaaS 就绪 **11/11**、无假实现 **P0 0/P1 0**、启动检查 **0 问题**、密钥轮换 **3/3**
 
 ---
 
@@ -76,7 +76,7 @@
 
 ```
 ruff check .  →  All checks passed!
-pytest tests/  →  61 passed, 1 skipped
+pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
 ```
 
 **0 error**，且测试套件未破坏。

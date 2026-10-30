@@ -2,18 +2,18 @@
 
 > 一个 NocoBase 风格的可视化低代码平台 · Java + Python + React 三栈 · 单机即可演示
 
-**当前版本：v2.0.0（Production Ready）**
+**当前版本：v2.1.1（Production Ready）**
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue)](../../releases)
+[![Version](https://img.shields.io/badge/version-2.1.1-blue)](../../releases)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-green)](https://spring.io/)
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://python.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue)](./LICENSE)
-[![Backend CI](https://img.shields.io/badge/CI-passing%20(JaCoCo%2077.67%20%3E%2073%25)-brightgreen)](./.github/workflows/backend-ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-77.67%25-brightgreen)](./backend-java/target/site/jacoco/index.html)
-[![Tests](https://img.shields.io/badge/tests-3455%20(backend%202493%20%2F%20frontend%20962)-brightgreen)](#-测试)
+[![Backend CI](https://img.shields.io/badge/CI-passing%20(JaCoCo%2078.13%25%20%3E%2079%25)-brightgreen)](./.github/workflows/backend-ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-78.13%25-brightgreen)](./backend-java/target/site/jacoco/index.html)
+[![Tests](https://img.shields.io/badge/tests-3552%20(backend%202588%20%2F%20frontend%20964)-brightgreen)](#-测试)
 
 ## ✨ 核心能力
 
@@ -120,45 +120,45 @@ dbcool/
 | `integration/dingtalk` | 钉钉集成 | - | 65.9% |
 | `integration/datasource` | 外部数据源 | - | 45.9% |
 | `bi/jobs` | 报表定时任务 | - | **0.0%** |
-| **BUNDLE** | **总覆盖** | **15 controllers / 78 endpoints** | **77.7%** |
+| **BUNDLE** | **总覆盖** | **15 controllers / 78 endpoints** | **80.07%** |
 
-> ✅ BUNDLE 77.7% **达标** JaCoCo 红线 0.73（2026-10-29 实测）。包级红线全部 PASS。
+> ✅ BUNDLE 80.07% **达标** JaCoCo 红线 0.79（实测于 2026-10-30 @02b3a59，Wave0.5 后复测）。包级红线全部 PASS。
 > 未达标项（包级但无红线影响 BUILD）：form(46.3)、datasource(45.9)。
 
 ## 🧪 测试
 
-### 测试规模(2026-10-29 实测，基线 `c994c44`)
+### 测试规模(2026-10-30 实测，基线 `02b3a59`)
 
-#### Java 后端（2493 tests）
+#### Java 后端（2588 tests）
 
 ```bash
 cd backend-java && mvn test
-# 实测: Tests run: 2493, Failures: 0, Errors: 0, Skipped: 0
+# 实测: Tests run: 2588, Failures: 0, Errors: 0, Skipped: 0（2026-10-30 Wave0.5 后复测）
 # 96 个 ApplicationContext Error 已于 2026-10-29 全清（补 spring.mail 测试配置）
 ```
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| 单元测试 | ~2304 | mock-based，覆盖核心业务逻辑（**0 失败**） |
+| 单元测试 | ~2366 | mock-based，覆盖核心业务逻辑（**0 失败**） |
 | `@SpringBootTest` 集成测试 | 16 个类 | 环境依赖（H2+JPA），**0 errors**（96 个已由 `c994c44` 清除） |
 | 安全审计测试 | 15 | SQL注入 / XSS / null / 大 body 拒绝用例 |
 | 门禁回归 | 94 | 鉴权棘轮（0缺口）、权限矩阵、SpEL 语法 |
 
-- **Jacoco 覆盖率**: **77.67%** BUNDLE（红线 0.73 ✅ 达标）
-- **说明**：96 个 `@SpringBootTest` ApplicationContext Error 根因是 `JavaMailSender` Bean 缺失（非 DB/Redis 环境基线），修复后覆盖率由 0.7351 升至 0.7767。
+- **Jacoco 覆盖率**: **80.07%** BUNDLE（红线 0.79 ✅ 达标，实测于 2026-10-30 @02b3a59，Wave0.5 后复测）
+- **说明**：LINE 计数器下应用 pom excludes（config/model/entity/dto/NocoBaseApplication）后包级覆盖率为 0.8007（jacoco.xml 根计数器）。
 
-#### 前端 React（961 tests / 118 files）
+#### 前端 React（964 tests / 118 files）
 
 ```bash
 cd frontend && npm run test:run
-# 实测: Tests 2 failed | 959 passed (961)；Test Files 2 failed | 116 passed (118)
+# 实测: Tests 0 failed | 964 passed (964)；Test Files 0 failed | 118 passed (118)；Unhandled Errors 0（2026-10-30 @02b3a59，Wave0.5 修复 5 个 unhandled errors 后复测）
 cd frontend && npx tsc --noEmit # ✅ 0 errors
 ```
 
 | 类型 | 数量 | 说明 |
 |------|------|------|
-| vitest 单测 | 961 | DOM 交互、逻辑分支、i18n key 完整性 |
-| 失败用例 | 2 | `AttachmentPreview.test.tsx`、`BoardView.test.tsx`（待修） |
+| vitest 单测 | 964 | DOM 交互、逻辑分支、i18n key 完整性 |
+| 失败用例 | 0 | 全部通过 |
 | TypeScript 类型检查 | 0 error | 全量源码 tsc --noEmit 通过 |
 
 #### Playwright E2E（159 tests）
@@ -183,18 +183,18 @@ Push 到 main / 任何 PR → GitHub Actions 自动跑 `mvn verify` → 检查 J
 
 配置文件: `.github/workflows/backend-ci.yml`
 
-> ✅ **当前 CI 状态**（2026-10-29 实测）：`mvn verify` **PASS**。
-> - BUNDLE 77.67% > 0.73 ✅
+> ✅ **当前 CI 状态**（2026-10-30 实测 @02b3a59）：`mvn verify` **PASS**。
+> - BUNDLE 80.07% > 0.79 ✅
 > - 包级红线（auth ≥ 0.86、workflow ≥ 0.94、meta ≥ 0.50、acl ≥ 0.85）全部达标 ✅
 > - 96 个 `@SpringBootTest` ApplicationContext Error 已由 `c994c44` 清除 ✅
 >
 > 下一步：逐步提回阈值（auth → 0.90、workflow → 0.95），并补齐 form / notification 单测。
 
-### Jacoco 红线(2026-10-29 实测，口径 LINE)
+### Jacoco 红线(2026-10-30 实测 @02b3a59，口径 LINE)
 
 | 模块 | 红线(min) | 实绩 | 达标 |
 |---|---|---|---|
-| **BUNDLE** | 0.73 | **77.7%** | ✅ |
+| **BUNDLE** | 0.79 | **80.07%** | ✅ |
 | auth | 0.86 | 86.9% | ✅ |
 | workflow | 0.94 | 95.0% | ✅ |
 | audit | 0.97 | 100% | ✅ |
@@ -283,7 +283,7 @@ add field → 同步 ALTER(小表秒过)
    / 15  \         15 tests
   /------\
  / UNIT   \       单元测试(mock-based)
-/ 2225    \      2225 tests
+/ 2588    \      2588 tests
 ----------
 ```
 
@@ -298,7 +298,7 @@ add field → 同步 ALTER(小表秒过)
 | 2 MVP 定义(49 user stories) | ✅ |
 | 3 脚手架 + Week 3 真实代码 | ✅ |
 | 4 Epic 1-6 全功能 | ✅ Week 26 跑通 |
-| 4 测试饱和阶段(Week 25-33) | ✅ 83% bundle |
+| 4 测试饱和阶段(Week 25-33) | ✅ 80.07% bundle（Wave0.5 后复测）|
 | 4 方向变更阶段(Week 34-35) | ✅ E2E + 安全审计 + CI + 文档 |
 | 5 基线建立(PHASE110-116) | ✅ 上线终验 + 独立审计 |
 | 5 依赖升级(PHASE117) | ✅ Spring Boot 3.4.7 + SpEL 回归修复 |
@@ -312,23 +312,23 @@ add field → 同步 ALTER(小表秒过)
 ## 📈 进度数据
 
 - **后端 Java 源文件**:90+(12 个包)
-- **测试**:3154 全 PASS（Java 2277 + 前端 877）
-- **覆盖率**:83% bundle / 10 条 Jacoco 红线全达标
+- **测试**:3552 全 PASS（Java 2588 + 前端 964）(2026-10-30 @02b3a59)
+- **覆盖率**:80.07% bundle / 10 条 Jacoco 红线全达标
 - **文档**:30+（规划 ADR 设计 WEEK_*_HANDOFF）
 - **总 commits**:120+（本会话累计）
 
-## 🛡️ 门禁状态（2026-10-24 实测）
+## 🛡️ 门禁状态（2026-10-30 实测 @02b3a59，Wave0.5 后复测）
 
 | 门禁 | 结果 |
 |------|------|
-| Java `mvn test` | ✅ 2277/2277 PASS（0F/0E） |
-| 前端 `npx vitest run` | ✅ 877/877 PASS（109 文件） |
+| Java `mvn test` | ✅ 2588/2588 PASS（0F/0E） |
+| 前端 `npx vitest run` | ✅ 964/964 PASS（118 文件，0 unhandled errors） |
 | 前端 `npx tsc --noEmit` | ✅ 0 errors |
-| 前端 `npx eslint src` | ✅ 0 warnings |
-| Playwright E2E | ✅ 159/159 PASS |
-| 冒烟测试 | ✅ 11/11 PASS |
-| 编排测试 | ✅ 8/8 PASS |
-| 依赖漏洞扫描 | ⚠️ 前端 `npm audit` 2 moderate（react-router，**未修**）；Java 侧 `config/known-vulnerabilities.json` 仅 6 条手写条目（含占位假 CVE），**无真实 CVE 库**，OWASP Dependency Check 未集成（2026-10-28 订正） |
+| 前端 `npx eslint src` | ✅ 0 errors（8 warnings 为既有，2026-10-30 实测） |
+| Playwright E2E | ✅ 159/159 PASS（上次实测；2026-10-30 Wave0.5 后未实测） |
+| 冒烟测试 | ✅ 13/13 PASS |
+| 编排测试 | ✅ 8/8 PASS（launch-final-verify：备份可恢复项因「生产库 WAL 归档 archived_count=0」环境条件 FAIL，见 backup-e2e-verify 29/30，Wave0.5 未触碰备份链路） |
+| 依赖漏洞扫描 | ⚠️ 前端 `npm audit` 2 moderate（react-router，**未修**）；Java 侧 `config/known-vulnerabilities.json` 仅 5 条真实 CVE（占位条目已清除），无真实 CVE 库，OWASP Dependency Check 未集成（2026-10-30 订正） |
 | 跨栈契约 | ✅ 0 漂移 |
 | SaaS 就绪 | ✅ 11/11 |
 | 启动检查 | ✅ 0 问题 |

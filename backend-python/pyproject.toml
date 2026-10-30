@@ -1,6 +1,6 @@
 [project]
 name = "nocobase-py"
-version = "0.0.1"
+version = "2.1.1"
 description = "NocoBase AI 增强 / 集成 / 异步任务层"
 authors = [
     { name = "Cline", email = "noreply@nocobase.local" }

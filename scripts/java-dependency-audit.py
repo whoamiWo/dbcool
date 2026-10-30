@@ -228,6 +228,9 @@ def load_vuln_db() -> list[dict]:
     if not isinstance(data, list):
         print(f"❌ 漏洞库必须是数组，实际为 {type(data).__name__}", file=sys.stderr)
         sys.exit(2)
+    if len(data) == 0:
+        print("❌ 漏洞库为空（0 条），门禁不得默认 PASS（禁止恒真）", file=sys.stderr)
+        sys.exit(2)
     return data
 
 

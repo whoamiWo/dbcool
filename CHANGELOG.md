@@ -1,4 +1,39 @@
-## Unreleased — 96 个 SpringBootTest 失败根因定位与修复
+## v2.1.1 (2026-10-30)
+
+### 本批摘要：Wave 0 地基收口 + Wave 0.5 能力断链修复（实测于 @02b3a59）
+
+**Wave 0 · 地基收口**
+- 版本单一真相源：新增根目录 `VERSION`（2.1.1），同步 10 处版本号，新增 `scripts/version-consistency-verify.py`（含 `--fix`）并接入 CI（`version-consistency` job）；三条反向自检 exit 1 / 2 / 0 全通过
+- 门禁数字基线化：README / BASELINE / RISK_REGISTER / TECH_DEBT 统一为同一套实测值并标注「实测于 2026-10-30 @02b3a59」
+- 漏洞库：删除占位条目 `CVE-2024-0000-EXAMPLE`，`scripts/java-dependency-audit.py` 补空库 fail-fast（exit 2）
+
+**Wave 0.5 · 能力断链修复（A-1 ~ A-8）**
+- A-1 块编辑器 4 处裸 `fetch`（无 Authorization → 401）改用 `apiClient`
+- A-2 CRDT：前端新增 `subscribeToCollabInit()` 订阅 `/user/queue/collab-init`（后加入者此前拿不到服务端初始状态）；后端合并成功分支补 `update` 字段（此前前端 `if (!msg.update) return` 静默丢弃）
+- A-3 IM Pin：前端对齐后端 `POST/DELETE /im/messages/pins`，并修正列表解包与 `messageId` 传参
+- A-4 阅后即焚：后端补 `POST /api/im/messages/{id}/burn/read`（跨租户 404、普通消息幂等）
+- A-5 Checklist：`/projects/boards/**` → `/project-boards/**`
+- A-6 日历：月视图改用 `currentMonth`（此前硬编码 `new Date()`，翻月无效）；移除对后端无效的日期过滤语法
+- A-7 前端 5 个 unhandled errors 根因修复（`AlertCenter` quota 字段、`ErDiagram` stats 缺空值保护）→ 0 errors
+- A-8 端点契约门禁修复根因：提取器此前不支持泛型调用（`apiClient.post<{...}>(...)` 全部漏采）且只扫 Java；现 **437 后端（Java 395 + Python 42）× 127 前端 → 0 漂移**，并有反向自检（注入断链 → exit 1）
+- 顺带修复契约门禁抓出的新断链：`BoardView` 任务列表 GET `/project-boards/{id}/tasks` → `/projects/{id}/tasks`
+
+**实测（Wave 0.5 后复测）**
+- Java `mvn -o verify`：**2588 run / 0F / 0E**，JaCoCo BUNDLE LINE **0.8007**（红线 0.79）
+- 前端 `npm run test:run`：**118 files / 964 passed / 0 failed / 0 unhandled errors**；行覆盖率 **77.12%**（含 jsdom 不适配文件的既有豁免口径）
+- `npx tsc --noEmit` 0 errors；`npx eslint src` 0 errors（8 warnings 既有）
+- Python **68 passed / 1 skipped**；冒烟 13/13；租户隔离 16/16；契约 0 漂移；版本一致性 exit 0；依赖漏洞阻断级 0
+- `launch-final-verify.py`：**7/8**（唯一 FAIL = 备份可恢复 → `backup-e2e-verify` 29/30，「生产库 WAL 已实际归档 archived_count=0」属环境条件，本批未触碰备份链路）
+- Playwright E2E：本批**未实测**
+
+### 文档：产品化路线图 v2 与七强对标权威结论
+
+- `docs/PRODUCTIZATION_ROADMAP.md` 升级为 v2（唯一权威路线图）：新增 Wave 0.5 能力断链修复（置于交付包之前）、§7 待办池（16 项，按离北极星距离排序）、迭代机制（每周 ≤3 人日批次）
+- `docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`：七强对标实证矩阵（23 行）+ 16 条旧结论证伪 + P0×6/P1×14/P2×12/对外必补×8
+- `docs/WAVE_A_CAPABILITY_FIX_TASKS.md`：Wave 0.5 任务书（A-1 ~ A-8，红线 R1-R7）
+- 旧对标文档（`COMPREHENSIVE_PLATFORM_ASSESSMENT.md` / `CAPABILITY_MATRIX_DETAIL.md` / `PLATFORM_GAP_ANALYSIS_2026-10-26.md` / `EMBED_INTEGRATION_ASSESSMENT.md` / `ENTERPRISE_PLATFORM_MASTER_PLAN.md`）顶部加「已被取代」横幅，指向新文
+
+### 96 个 SpringBootTest 失败根因定位与修复
 
 ### 根因（B7 返工引入的硬回归，此前误判为“环境基线”）
 
@@ -20,7 +55,7 @@
 - BUNDLE LINE 覆盖率：**0.7351 → 0.7767**（门槛 0.73 PASS）—— 96 个测试由“跳过”变为真实执行
 - 提交 `c994c44`，已推送 `origin/main`
 
-## Unreleased — CI 门禁实测收口（覆盖率 + 全量测试）
+### CI 门禁实测收口（覆盖率 + 全量测试）
 
 ### 全量验证（实测）
 
@@ -47,7 +82,7 @@
 - 顺带统一 Billing 错误语义：`requireTenant` 缺失上下文 → `BillingAccessDeniedException` → 403，
   业务 `IllegalStateException` 仍为 400（此前两者混用会让 403/400 串味）
 
-## Unreleased — 项目定位：个人开发 / 非商业 + Apache-2.0 边界保护
+### 项目定位：个人开发 / 非商业 + Apache-2.0 边界保护
 
 ### 许可证：MIT → Apache License 2.0
 
@@ -80,7 +115,7 @@
 - 新增 `BillingDisabledGuardTest`（2 用例）：锁住开关契约，防止后人摘掉条件装配或改成 matchIfMissing=true
 - 前端 `Billing.tsx`：plans 返回 404 时展示"计费能力未启用"提示，并不再误报"未配置支付网关"；`Billing.test.tsx` **6/6**
 
-## Unreleased — B4 计费系统：审计返工（P0/P1/P2）
+### B4 计费系统：审计返工（P0/P1/P2）
 
 > 审计判定 B4「已完成」不成立（此前从未通过 `mvn compile`），按 P0→P2 返工。
 
@@ -105,7 +140,7 @@
 - 门禁三件套全绿：`TenantIsolationIntegrationTest`、`AuditTrailCoverageIntegrationTest`、`ControllerAuthorizationCoverageTest`
 - 新增前端 `frontend/src/pages/Billing.tsx`（套餐选择 / 当前订阅 / 账单支付 / 支付记录）+ 路由 `admin/billing` + `Billing.test.tsx` **5/5 通过**
 
-## Unreleased — Phase B：微信嵌入集群（B1 + B2 + B6）
+### Phase B：微信嵌入集群（B1 + B2 + B6）
 
 > **微信嵌入集群**：Phase B Wave 1，让 DBCool 页面可在微信公众平台 / 小程序内置浏览器内完成鉴权、登录与订阅消息推送，直接延续 Phase A 已落地的通用 JS-SDK 签名框架。
 
@@ -162,7 +197,7 @@
 
 ---
 
-## Unreleased — Wave 2：B3 外部数据源 + B5 甘特图视图
+### Wave 2：B3 外部数据源 + B5 甘特图视图
 
 > 基线 `62f5193`。⚠️ 本节经 2026-10-28 实证审计复核，**部分能力为"假完成"**（文件存在但未接线），已在下方逐项标注实际可用状态。
 
@@ -190,7 +225,7 @@
 
 ---
 
-## Unreleased — Wave 3：B4 钉钉 AI 卡片 + B7 数据治理 + B8 移动端适配
+### Wave 3：B4 钉钉 AI 卡片 + B7 数据治理 + B8 移动端适配
 
 > 基线 `28d0e23`。⚠️ 经 2026-10-28 实证审计，**B4 出站投递与 B7 定时分发为假完成**，已标注。
 

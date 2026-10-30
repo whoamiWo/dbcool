@@ -1,14 +1,5 @@
 [
   {
-    "cve": "CVE-2024-0000-EXAMPLE",
-    "group": "org.example",
-    "artifact": "does-not-exist",
-    "affected": "<99.0",
-    "severity": "LOW",
-    "description": "占位条目（用于验证扫描器能真实比对，不应命中任何真实依赖）",
-    "fixed_in": ""
-  },
-  {
     "cve": "CVE-2020-26218",
     "group": "io.jsonwebtoken",
     "artifact": "jjwt-impl",
