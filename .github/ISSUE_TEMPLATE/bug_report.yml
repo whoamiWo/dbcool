@@ -1,0 +1,81 @@
+name: 缺陷报告
+description: 报告可复现的功能缺陷
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量提供**可复现**的步骤与环境信息，信息不全的 issue 可能被标记 `needs-info`。
+
+        ⚠️ 安全漏洞请勿提交公开 issue，见 [SECURITY.md](../SECURITY.md) §0 披露流程。
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 影响面
+      options:
+        - 阻塞（核心链路不可用 / 数据丢失风险）
+        - 严重（非核心功能故障 / 明显性能退化）
+        - 一般（体验问题 / 文案 / 样式）
+        - 咨询（用法问题）
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象
+      description: 实际发生了什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      placeholder: "v2.1.1（可用 curl http://<host>:8080/api/health 查看）"
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 发行版 / Docker 版本 / 部署方式（compose / K8s / 离线包）
+      placeholder: "Ubuntu 22.04 · Docker 24.0 · docker compose"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志
+      description: 相关错误日志（建议附最后 50 行，去除敏感信息）
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前自查
+      options:
+        - label: 我已确认这是可复现的问题，且不是安全漏洞
+          required: true
+        - label: 我已移除日志/截图中的密码、Token 等敏感信息

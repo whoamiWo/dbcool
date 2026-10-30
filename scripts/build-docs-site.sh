@@ -32,8 +32,11 @@ CORE_DOCS=(
   PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md
   PRODUCTIZATION_ROADMAP.md
   DEVELOPMENT_NOTES.md
+  acceptance-checklist.md
+  enterprise-onboarding.md
+  sla.md
 )
-ROOT_DOCS=(SECURITY.md TROUBLESHOOTING.md)
+ROOT_DOCS=(SECURITY.md TROUBLESHOOTING.md SUPPORT.md TRADEMARK.md CONTRIBUTING.md)
 
 mkdir -p "$PAGES"
 for f in "${CORE_DOCS[@]}"; do

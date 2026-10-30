@@ -1,0 +1,39 @@
+name: 功能建议
+description: 对既有能力的新需求或体验改进
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        当前项目处于**收窄方向**（项目展示 + 私有化部署 + 企业支持，见
+        [docs/PRODUCTIZATION_ROADMAP.md](../docs/PRODUCTIZATION_ROADMAP.md)），
+        不再主动新增业务功能。新需求会进入待办池评估，或经「能力扩容例外通道」逐条批准
+        （四条件：客户书面需求 / ≤2 人日 / 不改既有数据模型语义 / 项目所有者书面批准）。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 你试图完成什么？当前被什么挡住了？
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望方案
+      description: 期望的行为/交互（不必给实现）
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 现有替代方案
+      description: 目前的 workaround 是什么？
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前自查
+      options:
+        - label: 我已确认现有文档/功能中没有等价能力
+          required: true
