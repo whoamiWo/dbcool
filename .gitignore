@@ -106,3 +106,9 @@ target/
 packaging/offline/images.tar
 packaging/offline/.env
 packaging/offline/SHA256SUMS
+
+# Wave2 T2.2 文档站产物
+docs-site/node_modules/
+docs-site/pages/
+docs-site/.vitepress/dist/
+docs-site/.vitepress/cache/
