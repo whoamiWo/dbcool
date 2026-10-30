@@ -99,3 +99,10 @@ test-results/
 # 验证脚本的 Python 字节码产物(scripts/ 下的 E2E 脚本会被 py_compile / 直接执行)
 scripts/__pycache__/
 target/
+
+# Wave1 T1.3/T1.6 构建产物与备份（严禁入库）
+/dist/
+/backups/
+packaging/offline/images.tar
+packaging/offline/.env
+packaging/offline/SHA256SUMS
