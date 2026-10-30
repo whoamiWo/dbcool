@@ -1,5 +1,9 @@
 # 能力对标矩阵（逐域三层判定）
 
+> 🚫 **本文已被取代（2026-10-30，基线 `02b3a59`）**
+> 最新权威对标结论见 **[`PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`](./PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md)**（含 2026-10-30 代码实证的七强矩阵与差距重排）。
+> 本文仅作历史审计痕迹保留。
+
 > 评估基线：`f752535`（v2.1.0，2026-10-26）
 > 比对对象：NocoDB / NocoBase / Slack / RocketChat / Mattermost / Trello / Airtable / Notion
 > 目标场景：面向中国企业（200–500 人），可嵌入钉钉/企微/飞书/微信，SaaS 化部署

@@ -1,5 +1,9 @@
 # 平台能力对标分析 — 2026-10-26 更新版
 
+> 🚫 **本文已被取代（2026-10-30，基线 `02b3a59`）**
+> 最新权威对标结论见 **[`PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`](./PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md)**。
+> 本文仅作历史审计痕迹保留。
+
 > ⚠️ **本文已被后续实证复核部分推翻（2026-10-26，基线 `f752535` v2.1.0）**
 >
 > 权威结论请以 **[`ENTERPRISE_PLATFORM_MASTER_PLAN.md`](./ENTERPRISE_PLATFORM_MASTER_PLAN.md)** 为准。
