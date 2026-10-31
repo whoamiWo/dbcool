@@ -30,7 +30,7 @@
 
 ### 2.1 门禁基线（本次实跑）
 
-> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2610 run / 0F / 0E（BUNDLE LINE 80.25），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/13、租户隔离 16/16。
+> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2610 run / 0F / 0E（BUNDLE LINE 80.27），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/13、租户隔离 16/16。
 
 | 项 | 命令 | 实测结果 |
 |---|---|---|

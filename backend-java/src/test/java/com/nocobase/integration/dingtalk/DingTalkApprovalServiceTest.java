@@ -28,7 +28,8 @@ class DingTalkApprovalServiceTest {
         when(appService.isConfigured()).thenReturn(true);
         workflowInstanceRepository = mock(com.nocobase.workflow.WorkflowInstanceRepository.class);
         workflowTaskRepository = mock(com.nocobase.workflow.WorkflowTaskRepository.class);
-        service = new DingTalkApprovalService(appService, workflowInstanceRepository, workflowTaskRepository);
+        service = new DingTalkApprovalService(appService, workflowInstanceRepository, workflowTaskRepository,
+                mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     // ── 未配置短路 ──────────────────────────────────────────

@@ -43,6 +43,8 @@ public class WorkflowController {
     private final WorkflowRepository workflowRepository;
     private final WorkflowInstanceRepository instanceRepository;
     private final WorkflowTaskRepository taskRepository;
+    /** Wave4 待办池 #10：任务审批与推进逻辑抽至 WorkflowTaskService（Controller/webhook 共用） */
+    private final WorkflowTaskService taskService;
     private final ObjectMapper objectMapper;
     private final WorkflowEngine engine;
     private final com.nocobase.audit.AuditService auditService;
@@ -57,10 +59,13 @@ public class WorkflowController {
             WorkflowEngine engine,
             com.nocobase.audit.AuditService auditService,
             WorkflowGraphValidator graphValidator
-    ) {
+    ,
+            WorkflowTaskService taskService) {
+
         this.workflowRepository = workflowRepository;
         this.instanceRepository = instanceRepository;
         this.taskRepository = taskRepository;
+        this.taskService = taskService;
         this.objectMapper = objectMapper;
         this.engine = engine;
         this.auditService = auditService;
@@ -405,84 +410,16 @@ public class WorkflowController {
             @RequestBody(required = false) Map<String, String> body,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        WorkflowTaskEntity task = taskRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task 不存在"));
-        if (task.getStatus() != WorkflowTaskEntity.Status.PENDING) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Task 已处理");
-        }
-
-        task.setStatus(WorkflowTaskEntity.Status.APPROVED);
-        task.setComment(body != null ? body.get("comment") : null);
-        task.setFinishedAt(Instant.now());
-        taskRepository.save(task);
-
-        // Week 41 复核 D4b.5 会签:同一审批节点若还有其他人未审批,则不推进工作流。
-        // 单人审批时该列表为空,行为与改造前完全一致(向后兼容)。
-        if (task.getNodeId() != null) {
-            List<WorkflowTaskEntity> pendingSiblings = taskRepository.findByInstanceIdAndNodeIdAndStatus(
-                    task.getInstanceId(), task.getNodeId(), WorkflowTaskEntity.Status.PENDING);
-            if (!pendingSiblings.isEmpty()) {
-                WorkflowInstanceEntity waiting =
-                        instanceRepository.findById(task.getInstanceId()).orElseThrow();
-                return Map.of("code", 0,
-                        "message", "approved, waiting for other approvers ("
-                                + pendingSiblings.size() + " pending)",
-                        "data", instanceToDto(waiting));
-            }
-        }
-
-        // 推进实例到下一个节点 — 重新触发 trigger 逻辑(简化)
-        WorkflowInstanceEntity instance = instanceRepository.findById(task.getInstanceId()).orElseThrow();
-        WorkflowEntity w = workflowRepository.findById(instance.getWorkflowId()).orElseThrow();
-
-        // 标记实例 RUNNING
-        instance.setStatus(WorkflowInstanceEntity.Status.RUNNING);
-        instanceRepository.save(instance);
-
-        // 继续执行后续节点
-        List<Map<String, Object>> nodes;
-        try {
-            nodes = objectMapper.readValue(w.getNodesJson(),
-                    new TypeReference<List<Map<String, Object>>>() {});
-        } catch (Exception e) {
-            nodes = List.of();
-        }
-
-        int nextIdx = instance.getCurrentNodeIndex() + 1;
-        for (int i = nextIdx; i < nodes.size(); i++) {
-            Map<String, Object> node = nodes.get(i);
-            instance.setCurrentNodeIndex(i);
-
-            String nodeType = (String) node.get("type");
-            if ("APPROVAL".equals(nodeType)) {
-                // 下一个审批节点:创建 task
-                WorkflowTaskEntity nextTask = new WorkflowTaskEntity();
-                nextTask.setId(UUID.randomUUID());
-                nextTask.setInstanceId(instance.getId());
-                nextTask.setTenantId(instance.getTenantId());
-                nextTask.setNodeId((String) node.get("id"));
-                nextTask.setNodeType("APPROVAL");
-                nextTask.setAssignee(w.getCreatedBy());
-                nextTask.setStatus(WorkflowTaskEntity.Status.PENDING);
-                nextTask.setCreatedAt(Instant.now());
-                taskRepository.save(nextTask);
-
-                instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
-                instanceRepository.save(instance);
-                return Map.of("code", 0, "message", "approved, next node waiting",
-                        "data", instanceToDto(instance));
-            } else if ("NOTIFICATION".equals(nodeType)) {
-                System.out.println("[workflow " + w.getId() + " node " + i + "] notification: " + node.get("config"));
-            }
-        }
-
-        // 全部跑完
-        instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
-        instance.setFinishedAt(Instant.now());
-        instanceRepository.save(instance);
-
-        return Map.of("code", 0, "message", "workflow completed",
-                "data", instanceToDto(instance));
+        // Wave4 待办池 #10：逻辑搬迁至 WorkflowTaskService（Controller/webhook 共用同一推进路径）
+        WorkflowTaskService.ApproveOutcome outcome = taskService.approveTask(id, body != null ? body.get("comment") : null);
+        String message = outcome.waitingForOthers()
+                ? "approved, waiting for other approvers (" + outcome.pendingCount() + " pending)"
+                : (outcome.instance().getStatus() == WorkflowInstanceEntity.Status.PENDING
+                        ? "approved, next node waiting" : "workflow completed");
+        return Map.of(
+                "code", 0,
+                "message", message,
+                "data", instanceToDto(outcome.instance()));
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -492,27 +429,8 @@ public class WorkflowController {
             @PathVariable UUID id,
             @RequestBody(required = false) Map<String, String> body
     ) {
-        WorkflowTaskEntity task = taskRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task 不存在"));
-        if (task.getStatus() != WorkflowTaskEntity.Status.PENDING) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Task 已处理");
-        }
-        task.setStatus(WorkflowTaskEntity.Status.REJECTED);
-        task.setComment(body != null ? body.get("comment") : null);
-        task.setFinishedAt(Instant.now());
-        taskRepository.save(task);
-
-        WorkflowInstanceEntity instance = instanceRepository.findById(task.getInstanceId()).orElseThrow();
-        instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
-        instance.setErrorMessage("用户在节点 " + task.getNodeId() + " 拒绝");
-        instance.setFinishedAt(Instant.now());
-        instanceRepository.save(instance);
-
-        WorkflowEntity wf = workflowRepository.findById(instance.getWorkflowId()).orElse(null);
-        auditService.log(TenantContext.currentTenantId(), task.getAssignee(), null,
-                "REJECT", "workflow_task", task.getId().toString(),
-                Map.of("workflow", wf != null ? wf.getId().toString() : "", "comment", task.getComment() == null ? "" : task.getComment()));
-
+        // Wave4 待办池 #10：逻辑搬迁至 WorkflowTaskService
+        WorkflowInstanceEntity instance = taskService.rejectTask(id, body != null ? body.get("comment") : null, null);
         return Map.of("code", 0, "message", "workflow rejected",
                 "data", instanceToDto(instance));
     }

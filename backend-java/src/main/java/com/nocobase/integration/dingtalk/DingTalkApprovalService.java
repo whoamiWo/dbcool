@@ -2,7 +2,6 @@ package com.nocobase.integration.dingtalk;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,14 +28,18 @@ public class DingTalkApprovalService {
 
     private final com.nocobase.workflow.WorkflowInstanceRepository workflowInstanceRepository;
     private final com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     public DingTalkApprovalService(DingTalkAppService appService,
 com.nocobase.workflow.WorkflowInstanceRepository workflowInstanceRepository,
-com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository) {
+com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository,
+            org.springframework.context.ApplicationEventPublisher eventPublisher) {
+
 
         this.appService = appService;
             this.workflowInstanceRepository = workflowInstanceRepository;
         this.workflowTaskRepository = workflowTaskRepository;
+        this.eventPublisher = eventPublisher;
 }
 
     /** 是否已配置钉钉应用凭证。 */
@@ -154,48 +157,18 @@ com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository) {
     public boolean handleApprovalCallback(String instanceId, String result) {
         log.info("[DingTalk] 处理审批回调: instance={}, result={}", instanceId, result);
         try {
-            List<com.nocobase.workflow.WorkflowInstanceEntity> instances =
-                    workflowInstanceRepository.findByTriggerDataJsonContaining(instanceId);
-            if (instances.isEmpty()) {
-                log.warn("[DingTalk] 审批回调无绑定的工作流实例 instance={}", instanceId);
-                return false;
-            }
-            for (com.nocobase.workflow.WorkflowInstanceEntity instance : instances) {
-                boolean agree = "agree".equalsIgnoreCase(result);
-                List<com.nocobase.workflow.WorkflowTaskEntity> tasks =
-                        workflowTaskRepository.findByInstanceId(instance.getId());
-                boolean updated = false;
-                for (com.nocobase.workflow.WorkflowTaskEntity task : tasks) {
-                    if (task.getStatus() != com.nocobase.workflow.WorkflowTaskEntity.Status.PENDING) {
-                        continue;
-                    }
-                    task.setStatus(agree
-                            ? com.nocobase.workflow.WorkflowTaskEntity.Status.APPROVED
-                            : com.nocobase.workflow.WorkflowTaskEntity.Status.REJECTED);
-                    task.setComment("钉钉审批回调: " + result);
-                    task.setFinishedAt(java.time.Instant.now());
-                    workflowTaskRepository.save(task);
-                    updated = true;
-                }
-                if (!updated) {
-                    log.warn("[DingTalk] 实例 {} 无 PENDING 任务，回调未生效", instance.getId());
-                    continue;
-                }
-                if (agree) {
-                    instance.setStatus(com.nocobase.workflow.WorkflowInstanceEntity.Status.COMPLETED);
-                } else {
-                    instance.setStatus(com.nocobase.workflow.WorkflowInstanceEntity.Status.FAILED);
-                    instance.setErrorMessage("钉钉审批回调: " + result);
-                }
-                instance.setFinishedAt(java.time.Instant.now());
-                workflowInstanceRepository.save(instance);
-                log.info("[DingTalk] 工作流实例已按审批结果更新: instance={} status={}",
-                        instance.getId(), instance.getStatus().name());
-            }
+            // Wave4 待办池 #10：发布回调事件（解耦 —— 直接注入 WorkflowTaskService 会形成
+            // ApprovalService→TaskService→Engine→ApprovalNodeHandler→ApprovalService 的构造循环依赖，
+            // Spring 无法启动，实测）。WorkflowTaskService 的 @EventListener 完成推进。
+            boolean agree = "agree".equalsIgnoreCase(result);
+            eventPublisher.publishEvent(
+                    new com.nocobase.workflow.DingTalkApprovalCallbackEvent(
+                            instanceId, agree, "钉钉审批回调: " + result));
             return true;
         } catch (Exception e) {
-            log.error("[DingTalk] 审批回调处理失败: {}", e.getMessage(), e);
+            log.error("[DingTalk] 审批回调事件发布失败: {}", e.getMessage(), e);
             return false;
         }
     }
+
 }

@@ -62,7 +62,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 7 | @提及接真 | ✅ 完成（2026-10-31：MessageComposer @提及下拉（频道成员 displayName 候选 + 键盘导航），选中插入后端结构化语法 @{displayName}:userId（此前用户手打 @ 名字后端永远匹配不到 → 通知永不触发）；后端 members 端点补 displayName；单测后端 11/11（含 2 新例）、前端 16/16（含 2 新例）；反向自检 exit 1） |
 | 8 | API Key 专属限流 | ✅ 完成（2026-10-31：GlobalRateLimitFilter 新增 apiKey 维度（X-Api-Key 机器调用按 key 隔离，默认 600/60s，ratelimit.api-key.* 可配）；限流 key 用 SHA-256 前 12 位，明文密钥不进日志/内存；单测 4/4 + 反向自检 exit 1） |
 | 9 | 钉钉组织同步分页 | ✅ 完成（2026-10-31：syncAllUsers cursor 分页拉全量（>100 人企业不再漏人）、部门树 BFS 递归（原只拉第一层）、**钉钉 errcode != 0 显式失败**（修复假凭证下"同步成功 0 人"的静默假成功）；RestTemplate 可注入；单测 11/11 + 反向自检） |
-| 10 | 钉钉审批回调闭环 | 🟡 部分完成（2026-10-31：绑定写入（DingTalkApprovalNodeHandler 把 instanceId 落实例 trigger_data_json）+ 回调按绑定反查并推进任务（agree→APPROVED/COMPLETED、reject→REJECTED/FAILED，含会签）；测试 4/4 + 反向自检；**后续节点完整推进（调用 WorkflowEngine 续跑）尚未实现，列入下批**；另修复租户隔离棘轮（新方法登记基线，与 WeCom/WeChat callback 同类外部回调惯例一致） |
+| 10 | 钉钉审批回调闭环 | ✅ 完成（2026-10-31 收尾：新增 WorkflowTaskService（approve/reject/下游节点推进从 WorkflowController 逐行搬迁，Controller 改为委托，行为不变）；钉钉回调改为**事件解耦**（发布 DingTalkApprovalCallbackEvent —— 直接注入会形成 ApprovalService→TaskService→Engine→Handler→ApprovalService 构造循环依赖，Spring 无法启动，实测）；agree 回调经事件→approveByExternalBinding→approveTask **续跑下游节点**，与平台内审批同一逻辑；测试：Closure 4/4（含会签保持 PENDING）+ 反向自检 exit 1；全量 13/13） |
 | 11 | 移动端响应式 5 关键页 | ⏳ |
 | 12 | WAL 归档（生产侧） | ✅ 已修（backup-e2e 30/30） |
 | 13 | 灰度/蓝绿 | ⏳ |

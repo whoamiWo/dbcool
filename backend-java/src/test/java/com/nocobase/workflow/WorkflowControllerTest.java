@@ -61,7 +61,8 @@ class WorkflowControllerTest {
         com.nocobase.workflow.WorkflowGraphValidator graphValidator =
                 new com.nocobase.workflow.WorkflowGraphValidator();
         controller = new WorkflowController(workflowRepository, instanceRepository,
-                taskRepository, new ObjectMapper(), engine, auditService, graphValidator);
+                taskRepository, new ObjectMapper(), engine, auditService, graphValidator,
+                new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository, engine, auditService, new ObjectMapper()));
 
         testUser = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");
         SecurityContextHolder.setContext(new SecurityContextImpl(
