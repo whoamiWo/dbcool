@@ -175,6 +175,7 @@ jobs:
           POSTGRES_USER=nocobase \
           POSTGRES_PASSWORD=test_password \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -227,6 +228,27 @@ jobs:
   python-test:
     name: 🐍 Python Tests
     runs-on: ubuntu-latest
+    # v2.1.3：真实 pg_dump 测试（TestRealPostgresDump）需要真实 PostgreSQL
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: nocobase
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: test_password
+      PGDATABASE: nocobase
     steps:
       - uses: actions/checkout@v4
 
@@ -466,6 +488,7 @@ jobs:
           POSTGRES_USER=nocobase \
           POSTGRES_PASSWORD=dev_password \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -565,6 +588,7 @@ jobs:
           POSTGRES_USER=nocobase \
           POSTGRES_PASSWORD=dev_password \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
