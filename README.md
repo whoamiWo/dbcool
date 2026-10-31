@@ -4,12 +4,12 @@
 
 **自部署的企业协作低代码平台 —— 数据表 · 文档 Wiki · 即时通讯 · 看板 · 工作流 · AI，一套全有**
 
-**v2.1.2**（当前稳定版，发布于 2026-10-30）
+**v2.1.3**（当前稳定版，发布于 2026-10-31）
 
 [![Version](https://img.shields.io/badge/version-2.1.1-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-3552%20(backend%202614%20%2F%20frontend%20972)-brightgreen)](#-质量)
-[![Backend CI](https://img.shields.io/badge/Java%20coverage-80.24%25-success)](#-质量)
+[![Tests](https://img.shields.io/badge/tests-3552%20(backend%202617%20%2F%20frontend%20972)-brightgreen)](#-质量)
+[![Backend CI](https://img.shields.io/badge/Java%20coverage-80.28%25-success)](#-质量)
 
 **Apache-2.0 开源 · 可私有化部署 · 支持订阅与企业版附加**
 
@@ -85,7 +85,7 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 
 | 门禁 | 结果 |
 |---|---|
-| Java `mvn -o verify` | ✅ 2614 tests / 0 Failures / 0 Errors；JaCoCo BUNDLE 行覆盖 **80.24%**（红线 0.79） |
+| Java `mvn -o verify` | ✅ 2617 tests / 0 Failures / 0 Errors；JaCoCo BUNDLE 行覆盖 **80.28%**（红线 0.79） |
 | 前端 `npm run test:run` | ✅ 119 files / **972 passed / 0 failed / 0 unhandled errors**；行覆盖 77.12% |
 | TypeScript `tsc --noEmit` | ✅ 0 errors |
 | 前后端契约 | ✅ 438 后端端点 × 130 前端调用 → **0 漂移**（含反向自检） |
