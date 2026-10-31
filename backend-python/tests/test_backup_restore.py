@@ -315,10 +315,17 @@ class TestListBackups:
 class TestPostgresBackupFailure:
     """PostgreSQL 备份失败时整体失败的测试。"""
 
-    def test_postgres_fail_raises_runtime_error(self, workspace, redis_stubbed):
-        """当 _postgres_dump 抛出异常时，create_backup 应该向上抛出 RuntimeError。"""
+    def test_postgres_fail_raises_runtime_error(self, workspace, redis_stubbed, monkeypatch):
+        """当 _postgres_dump 抛出异常时，create_backup 应该向上抛出 RuntimeError。
+
+        v2.1.3：此前直接赋值 stub 未恢复 → 污染后续 TestRealPostgresDump
+        （CI 上真实 pg_dump 用例报 "pg_dump failed"）。改用 monkeypatch.setattr。
+        """
         work, _ = workspace
-        backup_service._postgres_dump = lambda: (_ for _ in ()).throw(RuntimeError("pg_dump failed"))
+        monkeypatch.setattr(
+            backup_service, "_postgres_dump",
+            lambda: (_ for _ in ()).throw(RuntimeError("pg_dump failed")),
+        )
 
         _make_db(work / "alerts.db")
 
