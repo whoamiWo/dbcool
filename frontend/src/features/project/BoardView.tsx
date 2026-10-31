@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
-import { AddCircleOutlined } from '@mui/icons-material';
+import { AddCircleOutlined, LabelOutlined } from '@mui/icons-material';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { BoardColumn } from './BoardColumn';
+import { LabelManager } from './LabelManager';
 import apiClient from '@/api/client';
 import { ErrorState } from '@/components/ErrorState';
 
@@ -56,6 +57,8 @@ interface Card {
  * 重复度实证（PHASE64 T2-R）：与 KanbanView 无成段重复代码，重复率 0%，不合并。
  */
 export function BoardView({ projectId }: { projectId: string }) {
+  // Wave4 待办池 #15：标签管理面板开关（后端标签 CRUD 已存在，此前前端零接线）
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const { t } = useTranslation();
   const [columns, setColumns] = useState<Column[]>([
     { id: 'col-todo', title: t('board.todo'), type: 'TODO' },
@@ -188,10 +191,25 @@ export function BoardView({ projectId }: { projectId: string }) {
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h6">{t('board.title')}</Typography>
-        <Button variant="outlined" startIcon={<AddCircleOutlined />} onClick={loadData}>
-          {t('board.refresh')}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<LabelOutlined />}
+            aria-label={t('board.labelManager')}
+            onClick={() => setLabelsOpen((v) => !v)}
+          >
+            {t('board.labels')}
+          </Button>
+          <Button variant="outlined" startIcon={<AddCircleOutlined />} onClick={loadData}>
+            {t('board.refresh')}
+          </Button>
+        </Box>
       </Box>
+      {labelsOpen && (
+        <Box sx={{ mb: 2 }}>
+          <LabelManager projectId={projectId} onClose={() => setLabelsOpen(false)} />
+        </Box>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

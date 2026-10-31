@@ -125,7 +125,17 @@
       "deleteItem": "Delete Item",
       "renameChecklist": "Rename Checklist",
       "moreItems": "+{{count}} items"
-    }
+    },
+    "labels": "Labels",
+    "labelsClose": "Close",
+    "labelsEmpty": "No labels",
+    "labelNamePlaceholder": "Label name",
+    "labelCreate": "Create",
+    "labelRename": "Rename",
+    "labelSave": "Save",
+    "labelDelete": "Delete",
+    "labelColor": "Color",
+    "labelManager": "Labels"
   },
   "task": {
     "title": "Task",

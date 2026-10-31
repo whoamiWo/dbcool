@@ -55,6 +55,16 @@ export interface Project {
 }
 
 export const projectApi = {
+  // Wave4 待办池 #15：项目标签 CRUD（后端端点早已存在，此前前端零接线）
+  listLabels: (projectId: string) =>
+    apiClient.get<{ code: number; data: Array<{ id: string; name: string; color?: string }> }>(
+      `/project-boards/labels/by-project/${projectId}`),
+  createLabel: (projectId: string, name: string, color?: string) =>
+    apiClient.post<{ code: number; data: { id: string } }>('/project-boards/labels', { projectId, name, color }),
+  updateLabel: (labelId: string, patch: { name?: string; color?: string }) =>
+    apiClient.put<{ code: number; data: { id: string } }>(`/project-boards/labels/${labelId}`, patch),
+  deleteLabel: (labelId: string) =>
+    apiClient.delete<{ code: number; data: { id: string } }>(`/project-boards/labels/${labelId}`),
   listProjects: async (): Promise<Project[]> => {
     const r = await apiClient.get<Envelope<Project[]>>('/projects');
     return unwrap<Project[]>(r);
