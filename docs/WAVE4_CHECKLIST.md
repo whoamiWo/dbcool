@@ -12,7 +12,7 @@
 | **每季** | 离线包重出 + 升级演练一次 + 文档站校准 + 路线回顾 | `scripts/package-offline.sh` / `scripts/upgrade.sh` | 产物 SHA256 归档 |
 | **每半年** | 旧版本 EOL 公告 | `docs/sla.md` §一 更新 | SUPPORT/security 同步 |
 
-## 二、门禁（monthly-gate.py 12 项）
+## 二、门禁（monthly-gate.py 13 项）
 
 | # | 门禁 | 命令 | 基线（2026-10-30） |
 |---|---|---|---|
@@ -28,6 +28,7 @@
 | 10 | 租户隔离 | `tenant-isolation-e2e-verify.py` | 16/16 |
 | 11 | 备份/PITR | `backup-e2e-verify.py` | 30/30 |
 | 12 | 上线终验 | `launch-final-verify.py` | 8/8 |
+| 13 | 文档数字校准 | `doc-numbers-verify.py` | 与 target/gate-numbers.json 一致（--fix 回填；反向自检 exit 1） |
 
 ## 三、每周批次模板（复制后填写）
 
