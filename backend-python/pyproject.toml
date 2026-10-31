@@ -121,6 +121,8 @@ raises-require-match-for = []
 [tool.mypy]
 python_version = "3.12"
 strict = true
+# openpyxl 等三方库无官方 stubs；业务代码自身保持 strict 类型检查不受影响。
+ignore_missing_imports = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 

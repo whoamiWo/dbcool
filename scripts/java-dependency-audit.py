@@ -173,16 +173,23 @@ def run_dependency_tree() -> list[dict]:
     注意：不能用 -q，否则 INFO 级别的依赖树被吞掉 → 解析到 0 条依赖，
     扫描会退化成"恒真 PASS"（红线 1：禁止恒真断言）。
     """
-    cmd = ["mvn", "-o", "dependency:tree"]
-    try:
-        proc = subprocess.run(cmd, cwd=POM_DIR, capture_output=True, text=True, timeout=600)
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        print(f"❌ 无法执行 mvn dependency:tree: {e}", file=sys.stderr)
-        sys.exit(2)
-
-    if proc.returncode != 0:
-        print(f"❌ mvn dependency:tree 失败 (rc={proc.returncode})", file=sys.stderr)
-        print(proc.stderr[-2000:], file=sys.stderr)
+    # v2.1.3：先离线（本地有 ~/.m2 缓存，快且稳定）；CI 等环境无完整缓存时
+    # offline 会失败 → 自动回退在线模式重试一次（依赖已在 verify 阶段下载过）。
+    commands = [["mvn", "-o", "dependency:tree"], ["mvn", "-B", "dependency:tree"]]
+    proc = None
+    for cmd in commands:
+        try:
+            proc = subprocess.run(cmd, cwd=POM_DIR, capture_output=True, text=True, timeout=600)
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            print(f"❌ 无法执行 {cmd[0]} dependency:tree: {e}", file=sys.stderr)
+            sys.exit(2)
+        if proc.returncode == 0:
+            break
+        print(f"⚠️ {cmd[0]} -o dependency:tree 失败 (rc={proc.returncode})，尝试在线重试..." if cmd == commands[0]
+              else f"❌ mvn dependency:tree 失败 (rc={proc.returncode})", file=sys.stderr)
+        if cmd == commands[0]:
+            print(proc.stderr[-2000:], file=sys.stderr)
+    if proc is None or proc.returncode != 0:
         sys.exit(2)
 
     deps: dict[tuple[str, str], dict] = {}
