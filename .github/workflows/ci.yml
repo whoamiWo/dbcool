@@ -539,6 +539,34 @@ jobs:
           echo "Python failed to start"
           cat /tmp/python.log
           exit 1
+      - name: Install CRDT service deps
+        working-directory: crdt-service
+        run: npm ci --no-audit --no-fund
+
+      - name: Start CRDT service
+        working-directory: crdt-service
+        run: |
+          PG_HOST=localhost \
+          PG_PORT=5432 \
+          PG_DB=nocobase \
+          PG_USER=nocobase \
+          PG_PASSWORD=test_password \
+          PORT=3100 \
+          nohup node index.js > /tmp/crdt.log 2>&1 &
+          echo $! > /tmp/crdt.pid
+
+      - name: Wait for CRDT service
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:3100/health > /dev/null 2>&1; then
+              echo "CRDT ready after ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "CRDT failed to start"
+          cat /tmp/crdt.log
+          exit 1
       - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
