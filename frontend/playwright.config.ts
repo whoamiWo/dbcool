@@ -33,7 +33,7 @@ export default defineConfig({
     { name: 'mobile-chromium', use: { ...devices['iPhone 13'], browserName: 'chromium' } },
   ],
   webServer: {
-    command: 'VITE_E2E=true pnpm build && VITE_E2E=true pnpm preview --port 4173',
+    command: 'VITE_E2E=true npm run build && VITE_E2E=true npm run preview -- --port 4173',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
