@@ -61,8 +61,8 @@ commit & push：待授权 / 已授权（<hash>）
 | 6 | 工作流 webhook 触发 + 节点重试 | ✅ 完成（2026-10-31：POST /api/workflows/webhook/{token}（permitAll + 常量时间 token 比较 + 未命中 404）；webhook 工作流自动生成 32 位 hex token 并落 trigger_json；节点 config.retry 失败重试（上限 3，既有 184 workflow 测试全绿 + 新增 7/7）；设计器暴露 webhook 类型与 token 展示；契约 437→438 |
 | 7 | @提及接真 | ✅ 完成（2026-10-31：MessageComposer @提及下拉（频道成员 displayName 候选 + 键盘导航），选中插入后端结构化语法 @{displayName}:userId（此前用户手打 @ 名字后端永远匹配不到 → 通知永不触发）；后端 members 端点补 displayName；单测后端 11/11（含 2 新例）、前端 16/16（含 2 新例）；反向自检 exit 1） |
 | 8 | API Key 专属限流 | ✅ 完成（2026-10-31：GlobalRateLimitFilter 新增 apiKey 维度（X-Api-Key 机器调用按 key 隔离，默认 600/60s，ratelimit.api-key.* 可配）；限流 key 用 SHA-256 前 12 位，明文密钥不进日志/内存；单测 4/4 + 反向自检 exit 1） |
-| 9 | 钉钉组织同步分页 | ⏳ |
-| 10 | 钉钉审批回调闭环 | ⏳ |
+| 9 | 钉钉组织同步分页 | ✅ 完成（2026-10-31：syncAllUsers cursor 分页拉全量（>100 人企业不再漏人）、部门树 BFS 递归（原只拉第一层）、**钉钉 errcode != 0 显式失败**（修复假凭证下"同步成功 0 人"的静默假成功）；RestTemplate 可注入；单测 11/11 + 反向自检） |
+| 10 | 钉钉审批回调闭环 | 🟡 部分完成（2026-10-31：绑定写入（DingTalkApprovalNodeHandler 把 instanceId 落实例 trigger_data_json）+ 回调按绑定反查并推进任务（agree→APPROVED/COMPLETED、reject→REJECTED/FAILED，含会签）；测试 4/4 + 反向自检；**后续节点完整推进（调用 WorkflowEngine 续跑）尚未实现，列入下批**；另修复租户隔离棘轮（新方法登记基线，与 WeCom/WeChat callback 同类外部回调惯例一致） |
 | 11 | 移动端响应式 5 关键页 | ⏳ |
 | 12 | WAL 归档（生产侧） | ✅ 已修（backup-e2e 30/30） |
 | 13 | 灰度/蓝绿 | ⏳ |

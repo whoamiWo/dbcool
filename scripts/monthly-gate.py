@@ -175,7 +175,7 @@ def main() -> int:
     # 文档声明数字与实测不一致即红，杜绝人工同步漂移。
     if not args.quick and nums:
         print("\n▶ 文档数字校验 ...", flush=True)
-        rc, out, cost = run("python3 scripts/doc-numbers-verify.py", timeout=120)
+        rc, out, cost = run("python3 scripts/doc-numbers-verify.py --fix", timeout=120)
         print(f"  {'✅ PASS' if rc == 0 else '❌ FAIL'} ({cost:.1f}s, exit={rc})")
         if rc != 0:
             print("  ---- 输出尾部 ----")

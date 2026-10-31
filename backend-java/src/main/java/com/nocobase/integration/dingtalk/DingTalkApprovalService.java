@@ -2,6 +2,7 @@ package com.nocobase.integration.dingtalk;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,9 +27,17 @@ public class DingTalkApprovalService {
     private final DingTalkAppService appService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public DingTalkApprovalService(DingTalkAppService appService) {
+    private final com.nocobase.workflow.WorkflowInstanceRepository workflowInstanceRepository;
+    private final com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository;
+
+    public DingTalkApprovalService(DingTalkAppService appService,
+com.nocobase.workflow.WorkflowInstanceRepository workflowInstanceRepository,
+com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository) {
+
         this.appService = appService;
-    }
+            this.workflowInstanceRepository = workflowInstanceRepository;
+        this.workflowTaskRepository = workflowTaskRepository;
+}
 
     /** 是否已配置钉钉应用凭证。 */
     private boolean isConfigured() {
@@ -132,9 +141,61 @@ public class DingTalkApprovalService {
      * @param instanceId 审批实例 ID
      * @param result     审批结果 (agree/reject)
      */
-    public void handleApprovalCallback(String instanceId, String result) {
+    /**
+     * Wave4 待办池 #10：处理钉钉审批回调 —— 业务闭环。
+     *
+     * <p>发起时 DingTalkApprovalNodeHandler 已把 dingtalkInstanceId 绑定写入工作流
+     * 实例的 trigger_data_json；此处按绑定反查实例，把该实例上全部 PENDING 任务按
+     * agree/reject 标记：agree 且无剩余任务 → 实例 COMPLETED；reject → 实例 FAILED
+     * （与手动 reject 语义一致）。异常吞掉不影响回调 ACK（钉钉会重试）。
+     *
+     * @return 是否找到绑定并处理（未绑定时 false，便于日志排查）
+     */
+    public boolean handleApprovalCallback(String instanceId, String result) {
         log.info("[DingTalk] 处理审批回调: instance={}, result={}", instanceId, result);
-        // 更新工作流节点状态 - 实际实现应调用 WorkflowEngine
-        // 当前记录审计日志并推进到下一节点
+        try {
+            List<com.nocobase.workflow.WorkflowInstanceEntity> instances =
+                    workflowInstanceRepository.findByTriggerDataJsonContaining(instanceId);
+            if (instances.isEmpty()) {
+                log.warn("[DingTalk] 审批回调无绑定的工作流实例 instance={}", instanceId);
+                return false;
+            }
+            for (com.nocobase.workflow.WorkflowInstanceEntity instance : instances) {
+                boolean agree = "agree".equalsIgnoreCase(result);
+                List<com.nocobase.workflow.WorkflowTaskEntity> tasks =
+                        workflowTaskRepository.findByInstanceId(instance.getId());
+                boolean updated = false;
+                for (com.nocobase.workflow.WorkflowTaskEntity task : tasks) {
+                    if (task.getStatus() != com.nocobase.workflow.WorkflowTaskEntity.Status.PENDING) {
+                        continue;
+                    }
+                    task.setStatus(agree
+                            ? com.nocobase.workflow.WorkflowTaskEntity.Status.APPROVED
+                            : com.nocobase.workflow.WorkflowTaskEntity.Status.REJECTED);
+                    task.setComment("钉钉审批回调: " + result);
+                    task.setFinishedAt(java.time.Instant.now());
+                    workflowTaskRepository.save(task);
+                    updated = true;
+                }
+                if (!updated) {
+                    log.warn("[DingTalk] 实例 {} 无 PENDING 任务，回调未生效", instance.getId());
+                    continue;
+                }
+                if (agree) {
+                    instance.setStatus(com.nocobase.workflow.WorkflowInstanceEntity.Status.COMPLETED);
+                } else {
+                    instance.setStatus(com.nocobase.workflow.WorkflowInstanceEntity.Status.FAILED);
+                    instance.setErrorMessage("钉钉审批回调: " + result);
+                }
+                instance.setFinishedAt(java.time.Instant.now());
+                workflowInstanceRepository.save(instance);
+                log.info("[DingTalk] 工作流实例已按审批结果更新: instance={} status={}",
+                        instance.getId(), instance.getStatus().name());
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("[DingTalk] 审批回调处理失败: {}", e.getMessage(), e);
+            return false;
+        }
     }
 }

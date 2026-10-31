@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
@@ -39,6 +40,12 @@ public class DingTalkOrgSyncService {
     private final UserRepository userRepository;
     private final UserMappingService userMappingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Wave4 待办池 #9：RestTemplate 提为可注入字段（此前内部 new，测试无法注入 mock，
+     * 导致"分页是否真的拉全量"无法验证）。
+     */
+    private RestTemplate restTemplate = new RestTemplate();
 
     @Value("${dingtalk.app-key:}")
     private String appKey;
@@ -81,39 +88,7 @@ public class DingTalkOrgSyncService {
             String accessToken = getAccessToken();
             
             // 2. 获取所有部门列表
-            List<Map<String, Object>> allDepartments = new ArrayList<>();
-            int offset = 0;
-            int limit = 100;
-            
-            while (true) {
-                String deptListUrl = "https://oapi.dingtalk.com/topapi/v2/dept/list?" +
-                        "access_token=" + accessToken +
-                        "&parent_dept_id=1" +
-                        "&page_size=" + limit +
-                        "&cursor=" + offset;
-                
-                String response = new org.springframework.web.client.RestTemplate()
-                        .getForObject(deptListUrl, String.class);
-                
-                JsonNode json = objectMapper.readTree(response == null ? "{}" : response);
-                JsonNode list = json.path("result").path("list");
-                
-                if (list.isArray()) {
-                    for (JsonNode dept : list) {
-                        Map<String, Object> deptMap = new HashMap<>();
-                        deptMap.put("id", dept.path("dept_id").asLong());
-                        deptMap.put("name", dept.path("name").asText());
-                        deptMap.put("parentId", dept.path("parent_dept_id").asLong());
-                        deptMap.put("order", dept.path("order").asInt());
-                        allDepartments.add(deptMap);
-                    }
-                    
-                    if (list.size() < limit) break;
-                    offset += limit;
-                } else {
-                    break;
-                }
-            }
+            List<Map<String, Object>> allDepartments = collectAllDepartments(accessToken);
 
             // 3. 同步用户（通过钉钉通讯录获取用户并映射到本地）
             int usersSynced = syncAllUsers(accessToken, tenantId);
@@ -150,44 +125,129 @@ public class DingTalkOrgSyncService {
     }
 
     /**
+     * 收集全部部门（Wave4 待办池 #9）。
+     *
+     * <p>此前只调用一次 {@code /topapi/v2/dept/list?parent_dept_id=1} ——
+     * 钉钉该接口返回的是**指定部门的直接子部门**，因此只拿到第一层部门，
+     * 子部门全部丢失。现在按部门树 BFS 递归拉取，并对每层做 cursor 分页。
+     *
+     * @param accessToken 钉钉 access_token
+     * @return 全量部门列表（含根部门下的所有层级）
+     */
+    List<Map<String, Object>> collectAllDepartments(String accessToken) throws Exception {
+        List<Map<String, Object>> all = new ArrayList<>();
+        Set<Long> visited = new LinkedHashSet<>();
+        Deque<Long> queue = new ArrayDeque<>();
+        queue.add(1L); // 根部门 id = 1
+
+        int maxNodes = 2000; // 防御性上限：避免异常数据导致无限展开
+        while (!queue.isEmpty() && all.size() < maxNodes) {
+            long parentId = queue.poll();
+            int cursor = 0;
+            int size = 100;
+            while (true) {
+                String url = "https://oapi.dingtalk.com/topapi/v2/dept/list?" +
+                        "access_token=" + accessToken +
+                        "&parent_dept_id=" + parentId +
+                        "&page_size=" + size +
+                        "&cursor=" + cursor;
+                String response = restTemplate.getForObject(url, String.class);
+                JsonNode json = objectMapper.readTree(response == null ? "{}" : response);
+                // Wave4 #9：errcode != 0 显式失败（此前静默返回空部门 → 假成功）
+                int errcode = json.path("errcode").asInt(0);
+                if (errcode != 0) {
+                    throw new IllegalStateException("钉钉部门列表获取失败：errcode=" + errcode
+                            + " errmsg=" + json.path("errmsg").asText("unknown"));
+                }
+                JsonNode result = json.path("result");
+                JsonNode list = result.path("list");
+                if (!list.isArray() || list.isEmpty()) {
+                    break;
+                }
+                for (JsonNode dept : list) {
+                    long deptId = dept.path("dept_id").asLong();
+                    if (!visited.add(deptId)) {
+                        continue;
+                    }
+                    Map<String, Object> deptMap = new HashMap<>();
+                    deptMap.put("id", deptId);
+                    deptMap.put("name", dept.path("name").asText());
+                    deptMap.put("parentId", dept.path("parent_dept_id").asLong());
+                    deptMap.put("order", dept.path("order").asInt());
+                    all.add(deptMap);
+                    queue.add(deptId);
+                }
+                boolean hasMore = result.path("has_more").asBoolean(false);
+                long nextCursor = result.path("next_cursor").asLong(cursor + size);
+                if (!hasMore || nextCursor <= cursor) {
+                    break;
+                }
+                cursor = (int) nextCursor;
+            }
+        }
+        log.info("[DingTalk] 部门收集完成，共 {} 个（含子部门层级）", all.size());
+        return all;
+    }
+
+    /**
      * 同步所有部门用户。
      */
     private int syncAllUsers(String accessToken, String tenantId) {
+        int count = 0;
         try {
-            // 获取根部门用户列表
-            String userListUrl = "https://oapi.dingtalk.com/topapi/v2/user/list?" +
-                    "access_token=" + accessToken +
-                    "&dept_id=1" +
-                    "&cursor=0" +
-                    "&size=100";
-            
-            String response = new org.springframework.web.client.RestTemplate()
-                    .getForObject(userListUrl, String.class);
-            
-            JsonNode json = objectMapper.readTree(response == null ? "{}" : response);
-            JsonNode list = json.path("result").path("list");
-            
-            int count = 0;
-            if (list.isArray()) {
-                for (JsonNode user : list) {
-                    String dingtalkUserId = user.path("userid").asText();
-                    String name = user.path("name").asText();
-                    
-                    // 查找或创建用户
-                    UserEntity userEntity = syncUserFromDingTalk(dingtalkUserId, name, tenantId);
-                    if (userEntity != null) {
-                        // 建立映射
-                        userMappingService.mapUser(dingtalkUserId, userEntity.getId().toString(), tenantId);
-                        count++;
+            // Wave4 待办池 #9：此前只拉 cursor=0&size=100 一页 —— 超过 100 人的企业
+            // 会静默漏人（同步仍报 success）。现按 cursor 循环拉全量。
+            int cursor = 0;
+            int size = 100;
+            int pages = 0;
+            int maxPages = 500; // 防御性上限
+            while (pages < maxPages) {
+                String userListUrl = "https://oapi.dingtalk.com/topapi/v2/user/list?" +
+                        "access_token=" + accessToken +
+                        "&dept_id=1" +
+                        "&cursor=" + cursor +
+                        "&size=" + size;
+
+                String response = restTemplate.getForObject(userListUrl, String.class);
+                JsonNode json = objectMapper.readTree(response == null ? "{}" : response);
+                // Wave4 #9：errcode != 0 显式失败（此前静默返回空列表 → 假成功）
+                int errcode = json.path("errcode").asInt(0);
+                if (errcode != 0) {
+                    throw new IllegalStateException("钉钉用户列表获取失败：errcode=" + errcode
+                            + " errmsg=" + json.path("errmsg").asText("unknown"));
+                }
+                JsonNode result = json.path("result");
+                JsonNode list = result.path("list");
+                pages++;
+
+                if (list.isArray()) {
+                    for (JsonNode user : list) {
+                        String dingtalkUserId = user.path("userid").asText();
+                        String name = user.path("name").asText();
+                        if (dingtalkUserId.isBlank()) {
+                            continue;
+                        }
+                        UserEntity userEntity = syncUserFromDingTalk(dingtalkUserId, name, tenantId);
+                        if (userEntity != null) {
+                            userMappingService.mapUser(dingtalkUserId, userEntity.getId().toString(), tenantId);
+                            count++;
+                        }
                     }
                 }
+
+                boolean hasMore = result.path("has_more").asBoolean(false);
+                long nextCursor = result.path("next_cursor").asLong(cursor + size);
+                if (!hasMore || list.isEmpty() || nextCursor <= cursor) {
+                    break;
+                }
+                cursor = (int) nextCursor;
             }
-            
+            log.info("[DingTalk] 用户同步完成：{} 个（{} 页）", count, pages);
             return count;
-            
+
         } catch (Exception e) {
             log.warn("[DingTalk] 同步用户失败: {}", e.getMessage());
-            return 0;
+            return count;
         }
     }
 

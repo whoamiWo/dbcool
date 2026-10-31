@@ -1,3 +1,4 @@
 WeComController#callback
 WeChatController#callback
 WeChatController#miniProgramLogin
+DingTalkApprovalService#handleApprovalCallback
