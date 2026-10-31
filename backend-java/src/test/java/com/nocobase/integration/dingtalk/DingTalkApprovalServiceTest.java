@@ -18,13 +18,17 @@ import org.junit.jupiter.api.Test;
 class DingTalkApprovalServiceTest {
 
     private DingTalkApprovalService service;
+    private com.nocobase.workflow.WorkflowInstanceRepository workflowInstanceRepository;
+    private com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository;
     private DingTalkAppService appService;
 
     @BeforeEach
     void setUp() {
         appService = mock(DingTalkAppService.class);
         when(appService.isConfigured()).thenReturn(true);
-        service = new DingTalkApprovalService(appService);
+        workflowInstanceRepository = mock(com.nocobase.workflow.WorkflowInstanceRepository.class);
+        workflowTaskRepository = mock(com.nocobase.workflow.WorkflowTaskRepository.class);
+        service = new DingTalkApprovalService(appService, workflowInstanceRepository, workflowTaskRepository);
     }
 
     // ── 未配置短路 ──────────────────────────────────────────

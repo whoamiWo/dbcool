@@ -15,7 +15,10 @@ import com.nocobase.workflow.NodeOutcome;
 class DingTalkApprovalNodeHandlerTest {
 
     private final DingTalkApprovalService approvalService = mock(DingTalkApprovalService.class);
-    private final DingTalkApprovalNodeHandler handler = new DingTalkApprovalNodeHandler(approvalService);
+    private final com.nocobase.workflow.WorkflowInstanceRepository instanceRepository =
+            org.mockito.Mockito.mock(com.nocobase.workflow.WorkflowInstanceRepository.class);
+    private final DingTalkApprovalNodeHandler handler =
+            new DingTalkApprovalNodeHandler(approvalService, instanceRepository);
 
     @Test
     void missingProcessCode_null_returnsContinue() {
