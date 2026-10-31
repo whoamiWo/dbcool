@@ -139,3 +139,10 @@ pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
    疑似 uv sync/启动超时或与 Java 争用 runner 资源；建议拆分为两个 job 或串行化。
 3. **Security (Trivy)**：exit 100（下载官方二进制/漏洞库的网络与证书问题）→ 已改 continue-on-error 非阻断
    （阻断级依赖审计由 java-dependency-audit.py 承担）。
+
+**2026-11-01 E2E 实质进展**：frontend-e2e 起真实后端（Java 8s ready + Python 2s ready）→
+**112 passed / 68 failed**（此前 0 通过）。剩余 68 失败分两类：
+1. `collab-crdt` 等 CRDT 相关（Expected 403 Received 501）—— CI 未起 crdt-service（Go/Dockerfile 存在）→
+   需在 frontend-e2e job 增加 crdt 服务构建与启动步骤。
+2. `form-export-api`（Expected 200/503 Received 501）—— 导出链路依赖 Python 导出服务（已起）但
+   /api/export 501，疑 Java 端 INTERNAL_SERVICE_TOKEN 校验或 Python 端点路径（需本地复现确认）。
