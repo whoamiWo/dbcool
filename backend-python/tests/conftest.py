@@ -10,7 +10,7 @@ _CI_JWT_SECRET = "ci_jwt_secret_at_least_32_chars_for_hs256_algorithm"
 
 def pytest_configure(config):
     """Early environment setup before any test collection.
-    
+
     This hook runs before test collection starts, ensuring that Settings
     can be instantiated during import time without validation errors.
     See PHASE114 security fix: JWT_SECRET must be provided via env var.
