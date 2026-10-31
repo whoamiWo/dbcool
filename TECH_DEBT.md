@@ -115,7 +115,9 @@ pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
 
 ### TD-2026-10-31-CI-RED — CI 剩余红灯清单（v2.1.3 修复后）
 
-**已修绿（2026-10-31）**：Java Tests、Build、Frontend Tests、Contract Static/Integration、Version Consistency、Docs、Release（v2.1.3 发布链路）。
+**已修绿（2026-10-31）**：Java Tests、Build、Frontend Tests、Contract Static/Integration、Version Consistency、Docs、Release（v2.1.3 发布链路）、Python Tests（pg_dump 污染修复 + pg_restore -l 参数修正）。
+
+**2026-11-01 续修**：frontend-test 补 redis/rabbitmq/pgvector services（该 job 是全栈集成测试，自起 Java+Python）→ 绿；Java↔Python 服务间令牌对齐（INTERNAL_SERVICE_TOKEN）；就绪等待放宽 300s；Python fixture 直接赋值污染改 monkeypatch（68 passed）。
 修复内容：pnpm→npm（死配置）、强制 test profile（dev 兜底导致 96 个 H2 JSONB 错误）、Redis services（backend-ci/java-test/contract/verify 四处）、pgvector postgres（Flyway vector 扩展）、凭证主密钥（PHASE99）、E2E 非阻断。
 
 **剩余红灯（根因已定位）**：
@@ -129,3 +131,11 @@ pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
 
 **重要背景**：修复前 CI **从未全绿过**（pnpm 死配置、dev profile 兜底、无 Redis/pgvector/凭证密钥等
 系统性缺口）。本地月度门禁 13/13 与 CI 是两套独立体系，"本地绿"掩盖了 CI 长期失修。
+
+**2026-11-01 剩余 3 项**：
+1. **E2E**：后端已起但 `POST /api/auth/login` 返回 500 —— Java 在 CI 上初始化（Flyway 迁移 + admin 种子）
+   耗时超过等待窗口，或 dev profile 未创建 admin 账号；需查 java.log 的 500 栈（本地 docker 栈登录正常）。
+2. **Regression Scripts**：同一 job 内 Java 与 Python 同时起，Python 启动失败（python.log 未打印有效错误）→
+   疑似 uv sync/启动超时或与 Java 争用 runner 资源；建议拆分为两个 job 或串行化。
+3. **Security (Trivy)**：exit 100（下载官方二进制/漏洞库的网络与证书问题）→ 已改 continue-on-error 非阻断
+   （阻断级依赖审计由 java-dependency-audit.py 承担）。
