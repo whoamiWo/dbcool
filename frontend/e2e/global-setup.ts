@@ -19,6 +19,13 @@ const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:4173';
 const TOKEN_FILE = path.resolve(process.cwd(), 'e2e/.auth/token.json');
 
 async function globalSetup() {
+  // Wave4 v2.1.3：CI（ci.yml 的 E2E job）无真实后端 —— collab-crdt 是唯一真实登录
+  // 的 spec，CI 以 --grep-invert 排除；其余 spec 全 mock，无需登录。设
+  // E2E_SKIP_REAL_LOGIN=1 时跳过（本地跑真实 E2E 仍 fail-fast 校验登录）。
+  if (process.env.E2E_SKIP_REAL_LOGIN === '1') {
+    console.log('[e2e-global-setup] E2E_SKIP_REAL_LOGIN=1 → 跳过真实登录（CI mock 模式）');
+    return;
+  }
   const api = await request.newContext();
 
   const login = await api.post(`${BASE_URL}/api/auth/login`, {

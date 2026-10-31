@@ -306,6 +306,8 @@ jobs:
   frontend-e2e:
     name: 🎭 Frontend E2E (Playwright)
     runs-on: ubuntu-latest
+    env:
+      E2E_SKIP_REAL_LOGIN: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -331,7 +333,7 @@ jobs:
 
       - name: Run E2E tests
         working-directory: frontend
-        run: npm run test:e2e
+        run: npx playwright test --grep-invert collab-crdt
 
       - name: Upload Playwright report
         if: always()
