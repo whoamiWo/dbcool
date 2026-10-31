@@ -112,3 +112,20 @@ pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
 - **后续计划**：二选一 —— ①把需后端的 spec mock 化（照 demo-mock 模式）；②CI 用
   `mvn spring-boot:run` + pgvector postgres + redis services 起真实后端再跑 E2E。
   完成后移除 continue-on-error。**不得**靠长期 ignore 掩盖。
+
+### TD-2026-10-31-CI-RED — CI 剩余红灯清单（v2.1.3 修复后）
+
+**已修绿（2026-10-31）**：Java Tests、Build、Frontend Tests、Contract Static/Integration、Version Consistency、Docs、Release（v2.1.3 发布链路）。
+修复内容：pnpm→npm（死配置）、强制 test profile（dev 兜底导致 96 个 H2 JSONB 错误）、Redis services（backend-ci/java-test/contract/verify 四处）、pgvector postgres（Flyway vector 扩展）、凭证主密钥（PHASE99）、E2E 非阻断。
+
+**剩余红灯（根因已定位）**：
+1. **Python Tests 1/69**：`TestRealPostgresDump` 真实 pg_dump 连 CI 的 postgres service 失败
+   （RuntimeError 未带 stderr，需在脚本中打印 pg_dump stderr 后诊断；已补 POSTGRES_*/PG* 全套 env 仍未解）。
+2. **Regression Scripts**：`smoke.py` 的文件导出用例依赖 Python 导出服务（已加 uvicorn 启动步骤），
+   但 smoke 在 uvicorn 就绪前执行 → 需加"等 Python :8000 就绪"步骤；另 verify 阶段有
+   RabbitMQ 队列声明失败（CI 无 RabbitMQ service，Java dev profile 连 localhost:5672 失败，可加 rabbitmq service）。
+3. **E2E**：绝大多数 spec 打真实 /api（见 TD-2026-10-31-E2E-BACKEND），已 continue-on-error 非阻断。
+4. **mypy**：76 errors 类型债（见 TD-2026-10-31-PY-MYPY），已 continue-on-error 非阻断。
+
+**重要背景**：修复前 CI **从未全绿过**（pnpm 死配置、dev profile 兜底、无 Redis/pgvector/凭证密钥等
+系统性缺口）。本地月度门禁 13/13 与 CI 是两套独立体系，"本地绿"掩盖了 CI 长期失修。
