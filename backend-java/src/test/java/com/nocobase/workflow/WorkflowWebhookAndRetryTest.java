@@ -38,7 +38,8 @@ class WorkflowWebhookAndRetryTest {
         engine = mock(WorkflowEngine.class);
         auditService = mock(AuditService.class);
         controller = new WorkflowController(workflowRepository, instanceRepository, taskRepository,
-                new ObjectMapper(), engine, auditService, new WorkflowGraphValidator());
+                new ObjectMapper(), engine, auditService, new WorkflowGraphValidator(),
+                new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository, engine, auditService, new ObjectMapper()));
         when(instanceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
