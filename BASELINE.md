@@ -6,7 +6,7 @@
 ```bash
 cd backend-java
 mvn clean compile          # ✅ BUILD SUCCESS
-mvn test                   # ✅ 2612/2612 PASS（2026-10-30 @02b3a59，Wave0.5 后复测）
+mvn test                   # ✅ 2614/2614 PASS（2026-10-30 @02b3a59，Wave0.5 后复测）
 mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```
 

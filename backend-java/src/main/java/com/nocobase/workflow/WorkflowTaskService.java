@@ -96,6 +96,39 @@ public class WorkflowTaskService {
         instance.setStatus(WorkflowInstanceEntity.Status.RUNNING);
         instanceRepository.save(instance);
 
+        // Wave4 待办池 #10 收尾：图模式（edges 非空）→ 用引擎图遍历续跑下游节点，
+        // 支持 CONDITION 分支 / HTTP / DINGTALK_APPROVAL 等引擎能力（此前仅数组模式
+        // 有推进逻辑，图模式工作流审批通过后实例停留在当前节点不再前进）。
+        List<Map<String, Object>> graphEdges;
+        try {
+            graphEdges = objectMapper.readValue(w.getEdgesJson(),
+                    new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            graphEdges = List.of();
+        }
+        if (!graphEdges.isEmpty()) {
+            List<Map<String, Object>> graphNodes;
+            try {
+                graphNodes = objectMapper.readValue(w.getNodesJson(),
+                        new TypeReference<List<Map<String, Object>>>() {});
+            } catch (Exception e) {
+                graphNodes = List.of();
+            }
+            int nextIdx = instance.getCurrentNodeIndex() + 1;
+            if (nextIdx >= graphNodes.size()) {
+                // 当前已是最后一个节点 → 完成
+                instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
+                instance.setFinishedAt(Instant.now());
+                instanceRepository.save(instance);
+                return new ApproveOutcome(instance, false, 0);
+            }
+            String startId = String.valueOf(graphNodes.get(nextIdx).get("id"));
+            WorkflowEngine.NodeResult result =
+                    engine.executeGraphFrom(instance, graphNodes, graphEdges, startId, w.getCreatedBy());
+            log.info("[workflow-task] 图模式推进完成 instance={} result={}", instance.getId(), result);
+            return new ApproveOutcome(instance, false, 0);
+        }
+
         // 继续执行后续节点
         List<Map<String, Object>> nodes;
         try {
