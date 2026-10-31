@@ -447,6 +447,12 @@ jobs:
   # ============================================================
   contract-integration:
     name: 🔌 Contract Integration
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: nocobase
+      PGPASSWORD: test_password
+      PGDATABASE: nocobase
     runs-on: ubuntu-latest
     needs: [java-test]
     services:
@@ -557,6 +563,12 @@ jobs:
   # ============================================================
   verify-scripts:
     name: 🛡️ Regression Scripts
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: nocobase
+      PGPASSWORD: test_password
+      PGDATABASE: nocobase
     runs-on: ubuntu-latest
     needs: [java-test]
     services:
