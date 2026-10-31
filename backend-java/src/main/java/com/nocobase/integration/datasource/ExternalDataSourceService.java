@@ -174,7 +174,9 @@ public class ExternalDataSourceService {
         // → 读表恒返回空。现统一按实体配置的 databaseName 参数化。
         String schema = entity.getDatabaseName();
 
-        String tableSql = switch (entity.getVendor().toLowerCase()) {
+        // Wave4 待办池 #14：按驱动家族分派（MariaDB/OceanBase → MySQL 元数据；
+        // Kingbase/openGauss → PostgreSQL 元数据）
+        String tableSql = switch (ExternalDataSourceConnectionFactory.familyOf(entity.getVendor())) {
             case "mysql" ->
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'";
             case "postgresql" ->
@@ -203,7 +205,8 @@ public class ExternalDataSourceService {
         // MySQL 实际库名非 public → 读列恒返回空。现按 databaseName 参数化。
         String schema = entity.getDatabaseName();
 
-        String columnSql = switch (entity.getVendor().toLowerCase()) {
+        // Wave4 待办池 #14：information_schema.columns 两家族通用，按家族分派校验
+        String columnSql = switch (ExternalDataSourceConnectionFactory.familyOf(entity.getVendor())) {
             case "mysql", "postgresql" ->
                 "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position";
             default -> throw new IllegalArgumentException("不支持的数据库类型：" + entity.getVendor());
@@ -333,7 +336,7 @@ public class ExternalDataSourceService {
             }
             String table = metas.get(0).getExternalTableName();
             String schema = entity.getDatabaseName();
-            String sql = switch (entity.getVendor().toLowerCase()) {
+            String sql = switch (ExternalDataSourceConnectionFactory.familyOf(entity.getVendor())) {
                 case "mysql", "postgresql" ->
                         "SELECT COALESCE(MAX(" + incKey + ")::text, '') FROM "
                                 + quotedIdent(entity.getVendor(), schema) + "." + quotedIdent(entity.getVendor(), table);

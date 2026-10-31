@@ -68,16 +68,31 @@ public class ExternalDataSourceConnectionFactory {
         });
     }
 
-    /** 校验 vendor 合法（mysql / postgresql） */
-    void validateVendor(String vendor) {
-        if (vendor == null) {
+    /**
+     * Wave4 待办池 #14：vendor → 驱动家族归一。
+     *
+     * <p>支持的 vendor（全部**复用既有驱动，零新增依赖**）：
+     * <ul>
+     *   <li>MySQL 家族：mysql / mariadb / oceanbase → MySQL Connector/J 驱动</li>
+     *   <li>PostgreSQL 家族：postgresql / kingbase（人大金仓）/ opengauss → PostgreSQL JDBC 驱动</li>
+     * </ul>
+     * 这些库与对应上游产品协议兼容，JDBC URL 与元数据 SQL 与家族主库一致。
+     * 若实际部署需要厂商专用驱动，可通过实体的 driver_class_name 覆盖（已有机制）。
+     */
+    static String familyOf(String vendor) {
+        if (vendor == null || vendor.isBlank()) {
             throw new IllegalArgumentException("外部数据源 vendor 不能为空");
         }
-        switch (vendor.toLowerCase()) {
-            case "mysql", "postgresql" -> {
-            }
+        return switch (vendor.toLowerCase()) {
+            case "mysql", "mariadb", "oceanbase" -> "mysql";
+            case "postgresql", "kingbase", "opengauss" -> "postgresql";
             default -> throw new IllegalArgumentException("不支持的数据库类型：" + vendor);
-        }
+        };
+    }
+
+    /** 校验 vendor 合法（mysql 家族 / postgresql 家族） */
+    void validateVendor(String vendor) {
+        familyOf(vendor);
     }
 
     /** 移除并关闭缓存中的数据源 */
@@ -109,11 +124,13 @@ public class ExternalDataSourceConnectionFactory {
         config.setLeakDetectionThreshold(60_000L);
 
         String vendor = entity.getVendor().toLowerCase();
+        String family = familyOf(vendor);
         String jdbcUrl;
         String driverClassName;
 
-        // 根据 vendor 构建 JDBC URL（必填）
-        switch (vendor) {
+        // 根据驱动家族构建 JDBC URL（Wave4 #14：MariaDB/OceanBase 用 MySQL 驱动；
+        // Kingbase/openGauss 用 PostgreSQL 驱动；专用驱动可用 driver_class_name 覆盖）
+        switch (family) {
             case "mysql":
                 jdbcUrl = "jdbc:mysql://%s:%d/%s?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8mb4"
                         .formatted(entity.getHost(), entity.getPort(), entity.getDatabaseName());
