@@ -364,8 +364,9 @@ class TestRealPostgresDump:
         # 断言 3: 如果能找到 pg_restore，验证它能列出内容
         if shutil.which("pg_restore"):
             import subprocess
+            # pg_restore 不接受 "-" 作为文件名参数（会按字面找文件）；stdin 需省略文件参数
             proc = subprocess.run(
-                ["pg_restore", "-l", "-"],
+                ["pg_restore", "-l"],
                 input=dump_data,
                 capture_output=True,
                 timeout=30

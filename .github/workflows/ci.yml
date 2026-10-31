@@ -176,12 +176,13 @@ jobs:
           POSTGRES_PASSWORD=test_password \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
+          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
       - name: Wait for Java to be ready
         run: |
-          for i in {1..60}; do
+          for i in {1..150}; do
             if curl -sf http://localhost:8080/api/health > /dev/null; then
               echo "Java ready after ${i}s"
               exit 0
@@ -391,12 +392,13 @@ jobs:
           POSTGRES_PASSWORD=test_password \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
+          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
       - name: Wait for Java to be ready
         run: |
-          for i in {1..60}; do
+          for i in {1..150}; do
             if curl -sf http://localhost:8080/api/health > /dev/null; then
               echo "Java ready after ${i}s"
               exit 0
@@ -419,6 +421,7 @@ jobs:
           POSTGRES_PASSWORD=test_password \
           REDIS_URL=redis://localhost:6379/0 \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
           nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log 2>&1 &
           echo $! > /tmp/python.pid
           for i in {1..30}; do
@@ -632,6 +635,7 @@ jobs:
           POSTGRES_PASSWORD=dev_password \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
+          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -758,12 +762,13 @@ jobs:
           POSTGRES_PASSWORD=dev_password \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
+          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
       - name: Wait for Java to be ready
         run: |
-          for i in {1..60}; do
+          for i in {1..150}; do
             if curl -sf http://localhost:8080/api/health > /dev/null; then
               echo "Java ready after ${i}s"
               exit 0
@@ -808,12 +813,13 @@ jobs:
           POSTGRES_PASSWORD=test_password \
           REDIS_URL=redis://localhost:6379/0 \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
           nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log 2>&1 &
           echo $! > /tmp/python.pid
 
       - name: Wait for Python export service
         run: |
-          for i in {1..60}; do
+          for i in {1..150}; do
             if curl -sf http://localhost:8000/health > /dev/null 2>&1 || curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
               echo "Python ready after ${i}s"
               exit 0
