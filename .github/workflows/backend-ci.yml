@@ -40,6 +40,11 @@ jobs:
 
       - name: Run mvn verify (Tests + JaCoCo coverage gates)
         working-directory: backend-java
+        # v2.1.3 修复：CI 未设 profile 时默认 dev（Flyway 启用 + URL 无 JSONB INIT）
+        # → 96 个 @SpringBootTest 上下文加载失败（本地因环境变量兜底未暴露）。
+        # 显式强制 test profile（application-test.properties 的 INIT JSONB domain 生效）。
+        env:
+          SPRING_PROFILES_ACTIVE: test
         run: mvn -B verify
 
       - name: Upload JaCoCo coverage report
