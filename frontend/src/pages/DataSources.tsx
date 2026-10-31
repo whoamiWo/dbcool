@@ -199,6 +199,8 @@ export function DataSourcesPage() {
         )}
       </div>
 
+      {/* Wave4 待办池 #11：表格横向滚动容器（移动端窄屏不裁剪） */}
+      <div className="page-responsive">
       <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--color-text-primary)', boxShadow: '0 1px 3px var(--color-bg-primary)' }}>
         <thead style={{ background: 'var(--color-bg-tertiary)' }}>
           <tr>
@@ -293,7 +295,7 @@ export function DataSourcesPage() {
             </tr>
           )}
         </tbody>
-      </table>
+      </table></div>
       {editing && (
         <div role="presentation" style={modalOverlay} onClick={() => setEditing(null)}>
           <div role="presentation" style={modalCard} onClick={(e) => e.stopPropagation()}>
@@ -321,7 +323,7 @@ export function DataSourcesPage() {
                   </select>
                 </Field>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="grid-2">
                   <Field label="主机">
                     <input value={editing.host || ''} onChange={(e) => setEditing({ ...editing, host: e.target.value })} style={input} placeholder="127.0.0.1" />
                   </Field>
@@ -334,7 +336,7 @@ export function DataSourcesPage() {
                   <input value={editing.databaseName || ''} onChange={(e) => setEditing({ ...editing, databaseName: e.target.value })} style={input} />
                 </Field>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="grid-2">
                   <Field label="用户名">
                     <input value={editing.username || ''} onChange={(e) => setEditing({ ...editing, username: e.target.value })} style={input} />
                   </Field>

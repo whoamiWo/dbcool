@@ -404,4 +404,52 @@ test.describe('Mobile Responsive Tests', () => {
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
   });
+
+  test('Wave4 #11: DataSources page - no horizontal scroll, table in scrollable container, grid single column', async ({ page }) => {
+    await page.route('**/api/datasources*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          message: 'ok',
+          data: [
+            { id: 'ds1', name: '订单库', vendor: 'mysql', host: '10.0.0.5', port: 3306,
+              database_name: 'orders', username: 'reader', status: 'ACTIVE', tenant_id: 't1' },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/datasources');
+    await page.waitForLoadState('networkidle');
+
+    // 页面无横向滚动
+    const docScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const docClientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(docScrollWidth).toBeLessThanOrEqual(docClientWidth + 1);
+
+    // 表格若存在，必须在可横向滚动的容器内
+    const tableInScrollable = await page.evaluate(() => {
+      const table = document.querySelector('table');
+      if (!table) return true;
+      let el = table.parentElement;
+      while (el && el !== document.body) {
+        const ox = getComputedStyle(el).overflowX;
+        if (ox === 'auto' || ox === 'scroll') return true;
+        el = el.parentElement;
+      }
+      return false;
+    });
+    expect(tableInScrollable).toBe(true);
+
+    // 双列表单网格在移动端必须塌缩为单列（.grid-2 媒体查询）
+    const gridSingleCol = await page.evaluate(() => {
+      const g = document.querySelector('.grid-2');
+      if (!g) return true;
+      return getComputedStyle(g).gridTemplateColumns.split(' ').length === 1;
+    });
+    expect(gridSingleCol).toBe(true);
+  });
+
 });
