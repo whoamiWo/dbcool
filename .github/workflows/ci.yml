@@ -696,8 +696,10 @@ jobs:
   #  PHASE95-101 验证脚本（PHASE103 T4 纳入 CI）
   #  这些脚本是各批次沉淀的回归防线，必须在 CI 中持续运行
   # ============================================================
-  verify-scripts:
+  verify-scripts-e2e:
     name: 🛡️ Regression Scripts
+    needs: build
+
     env:
       PGHOST: localhost
       PGPORT: "5432"
@@ -705,7 +707,6 @@ jobs:
       PGPASSWORD: test_password
       PGDATABASE: nocobase
     runs-on: ubuntu-latest
-    needs: [java-test]
     services:
       # v2.1.3：huddleBridgeListenerContainer 等 Redis 组件启动必需（dev profile 连 localhost:6379）
       redis:
@@ -796,7 +797,6 @@ jobs:
         run: python3 scripts/no-fake-impl-verify.py
 
       # 需要运行中服务的 E2E 脚本
-      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -870,3 +870,22 @@ jobs:
           name: verify-scripts-java-log
           path: /tmp/java.log
           retention-days: 7
+
+
+  verify-scripts-static:
+    name: 🧪 Verify Scripts (static, no backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: api-contract-verify (PHASE97)
+        run: python3 scripts/api-contract-verify.py
+
+      - name: no-fake-impl-verify (PHASE96)
+        run: python3 scripts/no-fake-impl-verify.py
+
