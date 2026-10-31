@@ -307,10 +307,17 @@ export function DataSourcesPage() {
 
                 <Field label="数据库类型">
                   <select value={editing.vendor || 'mysql'} onChange={(e) => setEditing({ ...editing, vendor: e.target.value })} style={input}>
+                    {/* Wave4 待办池 #14：新增零依赖兼容库（MariaDB/OceanBase→MySQL 驱动；
+                        Kingbase/openGauss→PG 驱动）。SQL Server/Oracle 后端未实现，
+                        原先展示为可选项属假入口（选中即报错）→ 显式禁用并注明。 */}
                     <option value="mysql">MySQL</option>
                     <option value="postgresql">PostgreSQL</option>
-                    <option value="sqlserver">SQL Server</option>
-                    <option value="oracle">Oracle</option>
+                    <option value="mariadb">MariaDB（MySQL 兼容）</option>
+                    <option value="oceanbase">OceanBase（MySQL 模式）</option>
+                    <option value="kingbase">KingbaseES（人大金仓，PG 兼容）</option>
+                    <option value="opengauss">openGauss（PG 兼容）</option>
+                    <option value="sqlserver" disabled>SQL Server（未支持）</option>
+                    <option value="oracle" disabled>Oracle（未支持）</option>
                   </select>
                 </Field>
 

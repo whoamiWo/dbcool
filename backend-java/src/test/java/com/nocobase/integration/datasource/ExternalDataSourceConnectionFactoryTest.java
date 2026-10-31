@@ -72,4 +72,33 @@ class ExternalDataSourceConnectionFactoryTest {
         javax.sql.DataSource ds = factory.createOrGet(e, "pwd");
         assertThat(ds).isNotNull();
     }
+    // ============================================================
+    //  Wave4 待办池 #14：vendor 家族映射（零新增依赖的兼容库支持）
+    // ============================================================
+
+    @Test
+    void familyOf_mapsCompatibleVendorsToExistingDrivers() {
+        assertThat(ExternalDataSourceConnectionFactory.familyOf("mysql")).isEqualTo("mysql");
+        assertThat(ExternalDataSourceConnectionFactory.familyOf("mariadb")).isEqualTo("mysql");
+        assertThat(ExternalDataSourceConnectionFactory.familyOf("oceanbase")).isEqualTo("mysql");
+        assertThat(ExternalDataSourceConnectionFactory.familyOf("postgresql")).isEqualTo("postgresql");
+        assertThat(ExternalDataSourceConnectionFactory.familyOf("kingbase")).isEqualTo("postgresql");
+        assertThat(ExternalDataSourceConnectionFactory.familyOf("opengauss")).isEqualTo("postgresql");
+        // 大小写不敏感
+        assertThat(ExternalDataSourceConnectionFactory.familyOf("MariaDB")).isEqualTo("mysql");
+    }
+
+    @Test
+    void validateVendor_rejectsUnsupportedVendors() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> factory.validateVendor("oracle"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("不支持的数据库类型");
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> factory.validateVendor("sqlserver"))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> factory.validateVendor(null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
