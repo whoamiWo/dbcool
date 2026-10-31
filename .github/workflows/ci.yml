@@ -792,7 +792,6 @@ jobs:
       PGPASSWORD: test_password
       PGDATABASE: nocobase
     runs-on: ubuntu-latest
-    needs: [java-test]
     services:
       # v2.1.3：huddleBridgeListenerContainer 等 Redis 组件启动必需（dev profile 连 localhost:6379）
       redis:
