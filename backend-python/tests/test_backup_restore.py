@@ -98,8 +98,11 @@ def postgres_stubbed(monkeypatch):
     **真实 pg_dump 是否可用由 TestRealPostgresDump 单独负责**（见文件末尾，
     用 skipif(shutil.which("pg_dump")) 做条件跳过），两者分工不冲突。
     """
-    backup_service._postgres_dump = lambda: FAKE_PG_DUMP
-    backup_service._restore_postgres = lambda dump_bytes: True
+    # v2.1.3：此前直接赋值（声明了 monkeypatch 却未使用）→ fixture 结束后残留
+    # FAKE_PG_DUMP，污染后续 TestRealPostgresDump（CI 上真实 pg_dump 用例报
+    # "pg_dump failed"）。改用 monkeypatch.setattr，测试后自动恢复。
+    monkeypatch.setattr(backup_service, "_postgres_dump", lambda: FAKE_PG_DUMP)
+    monkeypatch.setattr(backup_service, "_restore_postgres", lambda dump_bytes: True)
 
 
 @pytest.fixture
