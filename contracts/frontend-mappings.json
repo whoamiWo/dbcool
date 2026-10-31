@@ -407,42 +407,52 @@
   {
     "path": "/project-boards/cards/move",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 153
+    "line": 156
   },
   {
     "path": "/project-boards/checklist-items/batch",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 96
+    "line": 99
   },
   {
     "path": "/project-boards/checklist-items/{}",
     "file": "frontend/src/features/project/api.ts",
-    "line": 111
+    "line": 121
   },
   {
     "path": "/project-boards/checklists/batch",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 88
+    "line": 91
+  },
+  {
+    "path": "/project-boards/labels",
+    "file": "frontend/src/features/project/api.ts",
+    "line": 63
+  },
+  {
+    "path": "/project-boards/labels/{}",
+    "file": "frontend/src/features/project/api.ts",
+    "line": 65
   },
   {
     "path": "/project-boards/tasks",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 179
+    "line": 182
   },
   {
     "path": "/project-boards/{}/lists",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 76
+    "line": 79
   },
   {
     "path": "/projects/tasks/{}",
     "file": "frontend/src/features/project/api.ts",
-    "line": 96
+    "line": 106
   },
   {
     "path": "/projects/{}/tasks",
     "file": "frontend/src/features/project/BoardView.tsx",
-    "line": 79
+    "line": 82
   },
   {
     "path": "/search",

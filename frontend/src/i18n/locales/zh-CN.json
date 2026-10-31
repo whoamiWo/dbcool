@@ -125,7 +125,17 @@
       "deleteItem": "删除项",
       "renameChecklist": "重命名清单",
       "moreItems": "+{{count}} 项"
-    }
+    },
+    "labels": "标签管理",
+    "labelsClose": "关闭",
+    "labelsEmpty": "暂无标签",
+    "labelNamePlaceholder": "标签名称",
+    "labelCreate": "新建",
+    "labelRename": "重命名",
+    "labelSave": "保存",
+    "labelDelete": "删除",
+    "labelColor": "颜色",
+    "labelManager": "标签"
   },
   "task": {
     "title": "任务",
