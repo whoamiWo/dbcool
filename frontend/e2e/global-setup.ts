@@ -24,6 +24,10 @@ async function globalSetup() {
   // E2E_SKIP_REAL_LOGIN=1 时跳过（本地跑真实 E2E 仍 fail-fast 校验登录）。
   if (process.env.E2E_SKIP_REAL_LOGIN === '1') {
     console.log('[e2e-global-setup] E2E_SKIP_REAL_LOGIN=1 → 跳过真实登录（CI mock 模式）');
+    // 仍需写入 storageState 文件（playwright.config 的 use.storageState 引用它，
+    // 缺文件会导致全部用例失败）；空 state 即可 —— mock spec 用 page.route 不依赖 token。
+    fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
+    fs.writeFileSync(TOKEN_FILE, JSON.stringify({ cookies: [], origins: [] }));
     return;
   }
   const api = await request.newContext();
