@@ -234,7 +234,7 @@ jobs:
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_DB: nocobase
-          POSTGRES_USER: postgres
+          POSTGRES_USER: nocobase
           POSTGRES_PASSWORD: test_password
         ports:
           - 5432:5432
@@ -246,7 +246,7 @@ jobs:
     env:
       PGHOST: localhost
       PGPORT: "5432"
-      PGUSER: postgres
+      PGUSER: nocobase
       PGPASSWORD: test_password
       PGDATABASE: nocobase
     steps:
