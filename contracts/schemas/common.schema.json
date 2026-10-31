@@ -3,7 +3,7 @@
   "$id": "https://multistack.local/schemas/common.schema.json",
   "title": "Multistack Common Schema",
   "description": "三栈共享基础 schema,由 Cline 维护,各栈代码生成器引用此文件",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "definitions": {
     "ApiResponse": {
       "type": "object",

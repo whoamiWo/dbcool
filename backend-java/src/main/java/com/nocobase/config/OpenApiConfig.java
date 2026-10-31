@@ -37,7 +37,7 @@ public class OpenApiConfig {
                                 ## 鉴权
                                 所有 endpoint 除 `/auth/login`、`/health`、Swagger UI 外,均需 `Authorization: Bearer {access_token}`.
                                 """)
-                        .version("2.1.2")
+                        .version("2.1.3")
                         .contact(new Contact().name("dbcool team").email("dev@dbcool.local"))
                         .license(new License().name("MIT").url("https://opensource.org/licenses/MIT")))
                 .components(new Components()

@@ -1,3 +1,39 @@
+## v2.1.3 (2026-10-31)
+
+### 本批摘要：Wave 4 待办池全量收口（16/16）+ Compose 蓝绿发布
+
+**集成与协同**
+- **#2 Slack 凭证托管**：OAuth 回调 token 加密落租户级凭证库（`credentialService.save`），新增 `getBotToken(teamId)` 回退链（内存缓存 → 凭证库 → 全局 @Value），消除内存态丢失
+- **#5 Wiki 混合检索接前端**：`/wiki/search/hybrid`（FTS+语义召回）前端优先调用，失败回退 ILIKE；`frontend/src/api/wiki.ts` 新增 `searchHybrid()`
+- **#4 K8s Secret → Sealed Secrets**：`scripts/seal-secrets.sh` 端到端实测（kubeseal v0.41.2 tar.gz + ELF 校验 + 自签证书模拟公钥），占位符拦截反向自检；`k8s/secrets.env.example` + `docs/secrets-management.md`（controller 端到端解密未实测）
+
+**工作流与审批**
+- **#6 工作流 webhook 触发 + 节点失败重试**：`POST /api/workflows/webhook/{token}`（permitAll + token 常量时间比较 + 未命中 404），webhook 类型自动生成 32 位 hex token；`runWorkflow` 抽取共用；节点 `config.retry`（上限 3）；鉴权棘轮白名单登记；设计器暴露 webhook 类型与 token 展示；契约 437→438×128
+- **#10 钉钉审批回调业务闭环（含收尾）**：`DingTalkApprovalNodeHandler` 发起审批后把 instanceId 绑定写入实例 `trigger_data_json` → 回调按绑定反查并推进任务（agree→APPROVED/COMPLETED、reject→REJECTED/FAILED，含会签）；新增 `WorkflowTaskService`（Controller 委托，行为不变）+ `DingTalkApprovalCallbackEvent` **事件解耦**（消除构造循环依赖）；**收尾**：approveTask 支持**图模式续跑**（edges 非空 → 引擎图遍历，支持 CONDITION/HTTP 全能力）；Closure 9/9 + 反向自检；JaCoCo 包级红线触发后补分支用例恢复达标
+- **#9 钉钉组织同步分页**：`syncAllUsers` cursor 循环拉全量（>100 人企业不再漏人）、部门树 BFS 递归（原只拉第一层）、**errcode != 0 显式失败**（修复假凭证下"同步成功 0 人"的静默假成功）；测试 11/11
+
+**安全与运维**
+- **#8 API Key 专属限流**：`GlobalRateLimitFilter` 新增 apiKey 维度（X-Api-Key 按 key 隔离，默认 600/60s），限流 key 用 SHA-256 前 12 位（明文不入日志）；`ratelimit.api-key.*` 可配；测试 4/4 + 反向自检
+- **#13 蓝绿发布（Compose 单机零停机）**：`docker-compose.blue-green.yml` + `scripts/blue-green-deploy.sh`（起 green → 就绪 → sed 切 upstream → 切后强校验 → 失败自动回切 + 清理）；**实测三路径**（成功 exit 0 / 镜像不存在 exit 1 且现网保持 blue / 回切 exit 0）；实测中修正 3 个真实缺陷（容器内 render_nginx.py 旧版导致切换假成功 → sed 直改 default.conf + 强校验；green 带 build 使任意 tag 都能"成功" → 移除 build 仅用预构建镜像；重渲染破坏 CSP nonce）；K8s 侧未做
+- **#16 文档数字自动校准**：monthly-gate 实测数字落 `target/gate-numbers.json`；`doc-numbers-verify.py`（21 锚点 + --fix 回填）成为**第 13 项门禁**；首跑修正 7 处漂移（2588→2604、964→972、437→438 等）
+
+**体验与数据**
+- **#7 @提及接真**：MessageComposer 提及下拉（频道成员 displayName 候选 + 键盘导航）选中插入后端结构化语法 `@{displayName}:userId`（此前手打 @ 后端永远匹配不到 → 通知永不触发）；后端 members 端点补 displayName；测试后端 11/11、前端 16/16 + 反向自检
+- **#15 看板标签管理 UI**：`LabelManager` 组件消费既有 `/api/project-boards/labels*`（新建/重命名/删除/颜色）；BoardView 入口；测试 4/4
+- **#14 外部数据源类型扩展**：vendor 家族映射（零新增依赖）支持 MariaDB/OceanBase（MySQL 驱动）与 KingbaseES/openGauss（PG 驱动）；元数据 SQL 三处按家族分派；**修复 SQL Server/Oracle 假入口**（改为禁用）；OB/金仓真实库连通未实测
+- **#11 移动端响应式**：`.grid-2` 单列塌缩 + `.page-responsive` 横滚兜底；Home/DataSources 应用；**Playwright mobile-chromium（iPhone 13）13/13** 实测
+- **#12 WAL 归档**（前批）：backup-e2e 30/30、launch-final-verify 8/8
+
+**实测（v2.1.3 前全量门禁 13 项）**
+- Java `mvn -o verify`：**2617 run / 0F / 0E**，BUNDLE LINE ≥ 0.79，包级红线全部达标
+- 前端：**119 files / 972 passed / 0 failed / 0 unhandled errors**，tsc 0，eslint 0 errors（8 warnings 既有）
+- Python **68 passed / 1 skipped**；契约 **438 后端 × 130 前端 → 0 漂移**（含反向自检）
+- 冒烟 13/13、租户隔离 16/16、备份 PITR 30/30、上线终验 8/8、文档数字校验 21 锚点一致
+- Playwright mobile-chromium 13/13；蓝绿发布三路径实测（成功/失败/回切）
+
+**未实测项（如实）**
+- Sealed Secrets controller 端到端解密（无集群）；OceanBase/Kingbase/openGauss 真实库连通（无实例）；K8s 侧蓝绿（未做）；SQL Server/Oracle 数据源（已标注未支持）
+
 ## v2.1.2 (2026-10-30)
 
 ### Wave 4 · 持续迭代机制落地 + 全新部署可用性修复（实测于 2026-10-30）

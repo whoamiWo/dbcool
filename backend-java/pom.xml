@@ -13,7 +13,7 @@
 
     <groupId>com.nocobase</groupId>
     <artifactId>nocobase-backend</artifactId>
-    <version>2.1.2</version>
+    <version>2.1.3</version>
     <name>nocobase-backend</name>
     <description>NocoBase 多栈平台核心引擎</description>
 
