@@ -88,6 +88,10 @@ jobs:
   # ============================================================
   security-trivy:
     name: 🛡️ Security (Trivy)
+    # v2.1.3：Trivy 需下载官方二进制与漏洞库（CI 网络/证书受限，exit 100）；
+    # 阻断级依赖审计已由 scripts/java-dependency-audit.py（java-test job）承担，
+    # 此处保留为非阻断告警。
+    continue-on-error: true
     runs-on: ubuntu-latest
     needs: [java-test, python-test, frontend-test]
     steps:
