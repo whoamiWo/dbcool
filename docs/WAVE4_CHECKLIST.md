@@ -63,7 +63,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 8 | API Key 专属限流 | ✅ 完成（2026-10-31：GlobalRateLimitFilter 新增 apiKey 维度（X-Api-Key 机器调用按 key 隔离，默认 600/60s，ratelimit.api-key.* 可配）；限流 key 用 SHA-256 前 12 位，明文密钥不进日志/内存；单测 4/4 + 反向自检 exit 1） |
 | 9 | 钉钉组织同步分页 | ✅ 完成（2026-10-31：syncAllUsers cursor 分页拉全量（>100 人企业不再漏人）、部门树 BFS 递归（原只拉第一层）、**钉钉 errcode != 0 显式失败**（修复假凭证下"同步成功 0 人"的静默假成功）；RestTemplate 可注入；单测 11/11 + 反向自检） |
 | 10 | 钉钉审批回调闭环 | ✅ 完成（2026-10-31 收尾：新增 WorkflowTaskService（approve/reject/下游节点推进从 WorkflowController 逐行搬迁，Controller 改为委托，行为不变）；钉钉回调改为**事件解耦**（发布 DingTalkApprovalCallbackEvent —— 直接注入会形成 ApprovalService→TaskService→Engine→Handler→ApprovalService 构造循环依赖，Spring 无法启动，实测）；agree 回调经事件→approveByExternalBinding→approveTask **续跑下游节点**，与平台内审批同一逻辑；测试：Closure 4/4（含会签保持 PENDING）+ 反向自检 exit 1；全量 13/13） |
-| 11 | 移动端响应式 5 关键页 | ⏳ |
+| 11 | 移动端响应式 5 关键页 | ✅ 完成（2026-10-31：实测发现基础已相当完善（AppLayout 6 入口底导航 44px 触控、IM 布局 768px、表格滚动、PWA 安全区、44px 输入框）；补齐：styles.css 新增 .grid-2（桌面双列→移动单列）与 .page-responsive（页面级横滚兜底），Home/DataSources 内联网格改用类、DataSources 表格包滚动容器；实测：mobile-chromium（iPhone 13）Playwright 13/13 通过，含新增 DataSources 用例（无横滚 + 表格滚动容器 + 网格塌缩单列） |
 | 12 | WAL 归档（生产侧） | ✅ 已修（backup-e2e 30/30） |
 | 13 | 灰度/蓝绿 | ⏳ |
 | 14 | 外部数据源类型扩展 | ⏳ |

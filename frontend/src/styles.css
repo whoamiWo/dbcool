@@ -660,3 +660,32 @@ button {
     font-size: 0.72rem;
   }
 }
+
+
+/* ============================================
+   Wave4 待办池 #11: 移动端响应式工具类
+   ============================================ */
+
+/* 页面级横向滚动容器 —— 表格/宽内容在窄屏不裁剪（移动端标准做法） */
+.page-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 双列网格：桌面 1fr 1fr，移动端单列（替代内联 gridTemplateColumns，使其可被媒体查询控制） */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* 防止内联 flex 行（如页头操作区）在窄屏溢出视口 */
+  .app-main {
+    overflow-x: hidden;
+  }
+}

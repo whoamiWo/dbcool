@@ -51,7 +51,7 @@ export function HomePage() {
       </div>
 
       {/* 待办 + 运行中 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+      <div className="grid-2" style={{ marginTop: 16 }}>
         <Panel title={`⏳ ${t('home.pendingTasks')}`} link="/tasks/my" linkText={t('home.viewAll')}>
           {pendingTasks.length === 0 && <Empty text={t('home.noPendingTasks')} />}
           {pendingTasks.slice(0, 5).map((t) => (
@@ -78,7 +78,7 @@ export function HomePage() {
       </div>
 
       {/* 未读站内信 + 最近审计 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+      <div className="grid-2" style={{ marginTop: 16 }}>
         <Panel title={`📨 ${t('home.unreadMessages')}`} link="/messages" linkText={t('home.viewAll')}>
           {(unreadQuery.data?.data?.messages ?? []).length === 0 && <Empty text={t('home.noUnread')} />}
           {(unreadQuery.data?.data?.messages ?? []).map((m) => (
