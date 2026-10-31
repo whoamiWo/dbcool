@@ -696,9 +696,9 @@ jobs:
   #  PHASE95-101 验证脚本（PHASE103 T4 纳入 CI）
   #  这些脚本是各批次沉淀的回归防线，必须在 CI 中持续运行
   # ============================================================
-  verify-scripts-e2e:
+  verify-scripts:
     name: 🛡️ Regression Scripts
-    needs: build
+    needs: [java-test]
 
     env:
       PGHOST: localhost
@@ -873,7 +873,7 @@ jobs:
 
 
   verify-scripts-static:
-    name: 🧪 Verify Scripts (static, no backend)
+    name: 🧪 Verify Scripts Static
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
