@@ -249,6 +249,12 @@ jobs:
       PGUSER: nocobase
       PGPASSWORD: test_password
       PGDATABASE: nocobase
+      # backup_service._postgres_dump 读 POSTGRES_*（非 PG*）
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: nocobase
+      POSTGRES_USER: nocobase
+      POSTGRES_PASSWORD: test_password
     steps:
       - uses: actions/checkout@v4
 
@@ -650,6 +656,30 @@ jobs:
         run: python3 scripts/no-fake-impl-verify.py
 
       # 需要运行中服务的 E2E 脚本
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv & deps (export service)
+        working-directory: backend-python
+        run: |
+          pip install uv
+          uv sync --all-extras
+
+      - name: Start Python export service
+        working-directory: backend-python
+        run: |
+          POSTGRES_HOST=localhost \
+          POSTGRES_PORT=5432 \
+          POSTGRES_DB=nocobase \
+          POSTGRES_USER=nocobase \
+          POSTGRES_PASSWORD=test_password \
+          REDIS_URL=redis://localhost:6379/0 \
+          JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+          nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log 2>&1 &
+          echo $! > /tmp/python.pid
+
       - name: smoke (PHASE89)
         run: python3 scripts/smoke.py
 
