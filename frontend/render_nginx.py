@@ -17,6 +17,16 @@ OUTPUT = "/etc/nginx/conf.d/default.conf"
 INDEX_HTML = "/usr/share/nginx/html/index.html"
 NONCE_PLACEHOLDER = "__CSP_NONCE__"
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "").strip()
+
+# Wave4 待办池 #13：蓝绿发布 —— 后端服务名按 BACKEND_COLOR 切换。
+# blue 用现网 backend-java / backend-python；green 用 *-green 副本（蓝绿切换时
+# 由 scripts/blue-green-deploy.sh 在 nginx 容器内重写并重载，容器重启时本脚本
+# 按 BACKEND_COLOR 保持一致）。
+BACKEND_COLOR = os.environ.get("BACKEND_COLOR", "blue").strip().lower()
+if BACKEND_COLOR not in {"blue", "green"}:
+    BACKEND_COLOR = "blue"
+JAVA_BACKEND = "backend-java-green" if BACKEND_COLOR == "green" else "backend-java"
+PYTHON_BACKEND = "backend-python-green" if BACKEND_COLOR == "green" else "backend-python"
 SERVER_NAME = PUBLIC_HOST if PUBLIC_HOST else "_"
 ENABLE_TLS = "1" if PUBLIC_HOST else "0"
 
@@ -126,7 +136,7 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "    gzip_min_length 1024;\n" \
     "\n" \
     "    location /api/ {\n" \
-    "        proxy_pass http://backend-java:8080;\n" \
+    "        proxy_pass http://" + JAVA_BACKEND + ":8080;\n" \
     "        proxy_set_header Host $host;\n" \
     "        proxy_set_header X-Real-IP $remote_addr;\n" \
     "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n" \
@@ -134,7 +144,7 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "    }\n" \
     "\n" \
     "    location /api/ai/ {\n" \
-    "        proxy_pass http://backend-python:8000;\n" \
+    "        proxy_pass http://" + PYTHON_BACKEND + ":8000;\n" \
     "        proxy_set_header Host $host;\n" \
     "        proxy_set_header X-Real-IP $remote_addr;\n" \
     "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n" \

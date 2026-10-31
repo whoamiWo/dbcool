@@ -28,7 +28,7 @@
 | 10 | 租户隔离 | `tenant-isolation-e2e-verify.py` | 16/16 |
 | 11 | 备份/PITR | `backup-e2e-verify.py` | 30/30 |
 | 12 | 上线终验 | `launch-final-verify.py` | 8/8 |
-| 13 | 文档数字校准 | `doc-numbers-verify.py` | 与 target/gate-numbers.json 一致（--fix 回填；反向自检 exit 1） |
+| 13 | 灰度蓝绿 | ✅ 完成（2026-10-31：Docker Compose 单机**应用层蓝绿**（docker-compose.blue-green.yml + scripts/blue-green-deploy.sh）：green 副本并行 → 就绪判定 → sed 切 nginx upstream → 切后强校验 → 失败自动回切 blue + 清理 green；**实测三路径**：成功（20s 就绪→upstream 切 green→exit 0）/ 失败（镜像不存在→exit 1，现网保持 blue 且健康）/ 回切（upstream 回 blue→exit 0）；实测中修正 3 个真实缺陷（容器内 render_nginx.py 旧版导致切换假成功 → 改 sed 直改 default.conf + 强校验 upstream；green 带 build 导致任意 tag 都能本地构建"成功" → 移除 build 仅用预构建镜像；重渲染破坏 CSP nonce 回退）；**K8s 侧蓝绿/灰度未做**（当前仅 RollingUpdate replicas=3 + readinessProbe），docs/blue-green-deploy.md 已注明） |
 
 ## 三、每周批次模板（复制后填写）
 
@@ -65,7 +65,7 @@ commit & push：待授权 / 已授权（<hash>）
 | 10 | 钉钉审批回调闭环 | ✅ 完成（2026-10-31 收尾：新增 WorkflowTaskService（approve/reject/下游节点推进从 WorkflowController 逐行搬迁，Controller 改为委托，行为不变）；钉钉回调改为**事件解耦**（发布 DingTalkApprovalCallbackEvent —— 直接注入会形成 ApprovalService→TaskService→Engine→Handler→ApprovalService 构造循环依赖，Spring 无法启动，实测）；agree 回调经事件→approveByExternalBinding→approveTask **续跑下游节点**，与平台内审批同一逻辑；测试：Closure 4/4（含会签保持 PENDING）+ 反向自检 exit 1；全量 13/13） |
 | 11 | 移动端响应式 5 关键页 | ✅ 完成（2026-10-31：实测发现基础已相当完善（AppLayout 6 入口底导航 44px 触控、IM 布局 768px、表格滚动、PWA 安全区、44px 输入框）；补齐：styles.css 新增 .grid-2（桌面双列→移动单列）与 .page-responsive（页面级横滚兜底），Home/DataSources 内联网格改用类、DataSources 表格包滚动容器；实测：mobile-chromium（iPhone 13）Playwright 13/13 通过，含新增 DataSources 用例（无横滚 + 表格滚动容器 + 网格塌缩单列） |
 | 12 | WAL 归档（生产侧） | ✅ 已修（backup-e2e 30/30） |
-| 13 | 灰度/蓝绿 | ⏳ |
+| 13 | 灰度/蓝绿 | ✅ 部分完成（2026-10-31：Docker Compose 单机**应用层蓝绿**（docker-compose.blue-green.yml + scripts/blue-green-deploy.sh）：green 副本并行 → 就绪判定 → sed 切 nginx upstream → 切后强校验 → 失败自动回切 blue + 清理 green；**实测三路径**：成功（20s 就绪→upstream 切 green→exit 0）/ 失败（镜像不存在→exit 1，现网保持 blue 且健康）/ 回切（upstream 回 blue→exit 0）；实测中修正 3 个真实缺陷（容器内 render_nginx.py 旧版导致切换假成功 → 改 sed 直改 default.conf + 强校验 upstream；green 带 build 导致任意 tag 都能本地构建"成功" → 移除 build 仅用预构建镜像；重渲染破坏 CSP nonce 回退）；**K8s 侧蓝绿/灰度未做**（当前仅 RollingUpdate replicas=3 + readinessProbe）→ 留待后续批次 |
 | 14 | 外部数据源类型扩展 | ⏳ |
 | 15 | 批量操作入口 + 标签管理 UI | ✅ 完成（2026-10-31：勘发现 TableView 批量编辑已完整（全选/逐行/批量改值/批量删除，用 prompt/confirm 有 UI 质量欠账记入下批可选）；剩余缺口=看板标签管理 → 新增 LabelManager 组件消费既有 /api/project-boards/labels* 端点（新建/重命名/删除/颜色），BoardView 头部入口；单测 4/4 + 反向自检；**卡片↔标签关联需新增关联表与端点，属能力扩容已列入例外通道候选**） |
 | 16 | 文档站数字自动校准 | ⏳ |

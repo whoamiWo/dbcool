@@ -32,6 +32,7 @@ export default defineConfig({
           { text: '备份与恢复', link: '/pages/backup-restore-runbook' },
           { text: '密钥轮换', link: '/pages/key-rotation-runbook' },
           { text: '密钥管理（Sealed Secrets）', link: '/pages/secrets-management' },
+          { text: '蓝绿发布（零停机）', link: '/pages/blue-green-deploy' },
           { text: '发布回滚', link: '/pages/release-rollout-runbook' },
         ],
       },
