@@ -268,10 +268,18 @@ class TestBackupRestoreErrors:
 class TestScheduledBackupFailureAlert:
     """PHASE101 T6: 定时备份失败必须显式告警。"""
 
-    def test_scheduled_backup_failure_emits_alert(self, workspace, redis_stubbed):
-        """当 create_backup 抛出异常时，run_scheduled_backup 应该 emit 告警。"""
+    def test_scheduled_backup_failure_emits_alert(self, workspace, redis_stubbed, monkeypatch):
+        """当 create_backup 抛出异常时，run_scheduled_backup 应该 emit 告警。
+
+        v2.1.3：此前直接赋值 backup_service._postgres_dump（未恢复）→ 污染后续
+        TestRealPostgresDump（CI 上真实 pg_dump 用例报 "pg_dump failed"）。
+        改用 monkeypatch.setattr，测试结束自动恢复。
+        """
         work, _ = workspace
-        backup_service._postgres_dump = lambda: (_ for _ in ()).throw(RuntimeError("pg_dump failed"))
+        monkeypatch.setattr(
+            backup_service, "_postgres_dump",
+            lambda: (_ for _ in ()).throw(RuntimeError("pg_dump failed")),
+        )
 
         from nocobase_py.services.alerts import get_collector
 
