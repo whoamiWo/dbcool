@@ -30,7 +30,7 @@
 
 ### 2.1 门禁基线（本次实跑）
 
-> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2588 run / 0F / 0E（BUNDLE LINE 0.8007），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/13、租户隔离 16/16。
+> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2604 run / 0F / 0E（BUNDLE LINE 80.16），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/13、租户隔离 16/16。
 
 | 项 | 命令 | 实测结果 |
 |---|---|---|
@@ -195,8 +195,8 @@ Wave 4    持续迭代节奏            长期
 
 | 门禁 | 命令 | 基线（实测于 2026-10-30 @02b3a59） |
 |---|---|---|
-| 后端 | `cd backend-java && mvn -o verify` | 2588 run / 0F / 0E；JaCoCo BUNDLE line 0.8007（红线 ≥ 0.79） |
-| 前端单测 | `cd frontend && npm run test:run` | 964 passed / 0 failed / **0 unhandled errors**；行覆盖率 77.12% |
+| 后端 | `cd backend-java && mvn -o verify` | 2604 run / 0F / 0E；JaCoCo BUNDLE line 0.8007（红线 ≥ 0.79） |
+| 前端单测 | `cd frontend && npm run test:run` | 972 passed / 0 failed / **0 unhandled errors**；行覆盖率 77.12% |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors |
 | E2E | `cd frontend && npx playwright test` | 上次实测 159/159；**本轮未实测，按实际报** |
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 68 passed / 1 skipped |
