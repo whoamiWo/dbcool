@@ -1,0 +1,135 @@
+# =====================================================================
+# Wave4 待办池 #13 — 蓝绿发布（应用层）
+#
+# 用法（配合 scripts/blue-green-deploy.sh）：
+#   docker compose -f docker-compose.yml -f docker-compose.blue-green.yml \
+#     --profile bg up -d backend-java-green backend-python-green crdt-service-green
+#
+# 设计：
+# - 基础设施（postgres/redis/minio/rabbitmq）保持单套，仅应用层蓝绿并行
+# - green 副本不暴露宿主端口，仅接入 nocobase-net（前端 nginx 通过服务名切换）
+# - green 的环境变量与主栈**完全一致**（由 docker-compose.yml 的 backend-java /
+#   backend-python / crdt-service 的 environment 原样复制，避免配置漂移）
+# - 切换：nocobase-frontend 内重渲染 nginx upstream（BACKEND_COLOR=green）→ reload
+# - 注意：green 与 blue 共享同一份 DB —— 若新版本含破坏性迁移，回切后需恢复备份
+#   （scripts/upgrade.sh 的备份机制可复用）
+# =====================================================================
+services:
+  backend-java-green:
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${TO_TAG:-${APP_VERSION:-2.1.2}}
+    container_name: nocobase-backend-java-green
+    profiles:
+    - bg
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      EXPORT_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      AI_SERVICE_URL: http://backend-python:8000
+      AI_PYTHON_URL: http://backend-python:8000
+      AI_ENABLED: 'true'
+      RATELIMIT_LOGIN_LIMIT: ${RATELIMIT_LOGIN_LIMIT:-5}
+      CRDT_SERVICE_URL: http://crdt-service:3100
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:?未设置 RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?未设置 RABBITMQ_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET，请用 openssl rand -base64 32 生成后写入 .env}
+      JAVA_PORT: 8080
+      NOCOBASE_ALERTS_PATH: /data/alerts.db
+      MINIO_ENABLED: ${MINIO_ENABLED:-true}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_EXTERNAL_URL: ${MINIO_EXTERNAL_URL:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
+      DINGTALK_APP_SECRET: ${DINGTALK_APP_SECRET:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      FEISHU_APP_ID: ${FEISHU_APP_ID:-}
+      FEISHU_APP_SECRET: ${FEISHU_APP_SECRET:-}
+      FEISHU_REDIRECT_URI: ${FEISHU_REDIRECT_URI:-}
+      FEISHU_ENCRYPT_KEY: ${FEISHU_ENCRYPT_KEY:-}
+      WECOM_CORP_ID: ${WECOM_CORP_ID:-}
+      WECOM_AGENT_ID: ${WECOM_AGENT_ID:-}
+      WECOM_SECRET: ${WECOM_SECRET:-}
+      WECOM_REDIRECT_URI: ${WECOM_REDIRECT_URI:-}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_REDIRECT_URI: ${WECHAT_REDIRECT_URI:-}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_TEAM_ID: ${SLACK_TEAM_ID:-}
+      SLACK_REDIRECT_URI: ${SLACK_REDIRECT_URI:-}
+      RATELIMIT_IM_LIMIT: ${RATELIMIT_IM_LIMIT:-30}
+      RATELIMIT_FILEUPLOAD_LIMIT: ${RATELIMIT_FILEUPLOAD_LIMIT:-10}
+      DB_POOL_MAX: ${DB_POOL_MAX:-80}
+      DB_POOL_MIN: ${DB_POOL_MIN:-10}
+      INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID: ${INTEGRATION_INBOUND_DEFAULT_CHANNEL_ID:-}
+      INTEGRATION_CREDENTIAL_MASTER_KEY: ${INTEGRATION_CREDENTIAL_MASTER_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+    - nocobase-net
+  backend-python-green:
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${TO_TAG:-${APP_VERSION:-2.1.2}}
+    container_name: nocobase-backend-python-green
+    profiles:
+    - bg
+    environment:
+      JAVA_BACKEND_URL: http://backend-java:8080
+      JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET}
+      INTEGRATION_CREDENTIAL_MASTER_KEY: ${INTEGRATION_CREDENTIAL_MASTER_KEY:-}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nocobase}
+      POSTGRES_USER: ${POSTGRES_USER:-nocobase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENABLED: 'true'
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?未设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nocobase}
+      NOCOBASE_ALERTS_PATH: /data/alerts.db
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      ALERT_WEBHOOK_KIND: ${ALERT_WEBHOOK_KIND:-generic}
+      ALERT_WEBHOOK_SECRET: ${ALERT_WEBHOOK_SECRET:-}
+      BACKUP_DIR: /app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+    - nocobase-net
+  crdt-service-green:
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${TO_TAG:-${APP_VERSION:-2.1.2}}
+    container_name: nocobase-crdt-green
+    profiles:
+    - bg
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: ${POSTGRES_DB:-nocobase}
+      PG_USER: ${POSTGRES_USER:-nocobase}
+      PG_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}
+    networks:
+    - nocobase-net
+networks:
+  nocobase-net:
+    external: true
+    name: nocobase-net
