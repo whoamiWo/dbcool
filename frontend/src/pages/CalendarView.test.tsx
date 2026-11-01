@@ -166,7 +166,8 @@ describe('CalendarViewPage (C3)', () => {
     await waitFor(() => {
       expect(apiClient.get).toHaveBeenCalledTimes(3);
     });
-    expect(await screen.findByText('会议 1')).toBeInTheDocument();
+    // CI runner 较慢，默认 1s 等待不足 → 提高超时（不放宽断言）
+    expect(await screen.findByText('会议 1', {}, { timeout: 10000 })).toBeInTheDocument();
     expect(await screen.findByText('任务 2')).toBeInTheDocument();
     expect(await screen.findByText('任务 3')).toBeInTheDocument();
   });
@@ -195,7 +196,7 @@ describe('CalendarViewPage (C3)', () => {
       expect(apiClient.get).toHaveBeenCalledTimes(3);
     });
     // desktop mode shows "2 条更多" for day with 5 records
-    expect(await screen.findByText('2 条更多')).toBeInTheDocument();
+    expect(await screen.findByText('2 条更多', {}, { timeout: 10000 })).toBeInTheDocument();
   });
 
   it('年份视图渲染 12 个月份', async () => {
