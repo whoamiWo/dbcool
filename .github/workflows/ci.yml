@@ -434,180 +434,164 @@ jobs:
           done
 
   frontend-e2e:
-    name: 🎭 Frontend E2E (Playwright)
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    services:
-      # v2.1.3：E2E 需真实后端 —— 起完整服务栈（Java + Python + Redis + RabbitMQ + pgvector）
-      redis:
-        image: redis:7.4-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      rabbitmq:
-        image: rabbitmq:3.13.7-management-alpine
-        ports:
-          - 5672:5672
-        options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_DB: nocobase
-          POSTGRES_USER: nocobase
-          POSTGRES_PASSWORD: test_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - uses: actions/checkout@v4
+  name: 🎭 Frontend E2E (Playwright)
+  continue-on-error: true
+  runs-on: ubuntu-latest
+  services:
+    redis:
+      image: redis:7.4-alpine
+      ports:
+      - 6379:6379
+      options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout
+        5s --health-retries 5
+    rabbitmq:
+      image: rabbitmq:3.13.7-management-alpine
+      ports:
+      - 5672:5672
+      options: --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 10s --health-timeout
+        5s --health-retries 5
+    postgres:
+      image: pgvector/pgvector:pg16
+      env:
+        POSTGRES_DB: nocobase
+        POSTGRES_USER: nocobase
+        POSTGRES_PASSWORD: test_password
+      ports:
+      - 5432:5432
+      options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries
+        5
+  steps:
+  - uses: actions/checkout@v4
+  - name: Set up JDK 21
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '21'
+      cache: maven
+  - name: Build Java jar
+    working-directory: backend-java
+    run: mvn clean package -DskipTests
+  - name: Start Java backend
+    working-directory: backend-java
+    run: 'SPRING_PROFILES_ACTIVE=dev \
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
+      POSTGRES_HOST=localhost \
 
-      - name: Build Java jar
-      - name: Build Java jar
-        working-directory: backend-java
-        run: mvn clean package -DskipTests
+      POSTGRES_PORT=5432 \
 
-      - name: Start Java backend
-        working-directory: backend-java
-        run: |
-          SPRING_PROFILES_ACTIVE=dev \
-          POSTGRES_HOST=localhost \
-          POSTGRES_PORT=5432 \
-          POSTGRES_DB=nocobase \
-          POSTGRES_USER=nocobase \
-          POSTGRES_PASSWORD=test_password \
-          JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
-          INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
-          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
-          nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
-          echo $! > /tmp/java.pid
+      POSTGRES_DB=nocobase \
 
-      - name: Wait for Java to be ready
-        run: |
-          for i in {1..150}; do
-            if curl -sf http://localhost:8080/api/health > /dev/null; then
-              echo "Java ready after ${i}s"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Java failed to start"
-          cat /tmp/java.log
-          exit 1
+      POSTGRES_USER=nocobase \
 
-      - name: Start Python export service
-        working-directory: backend-python
-        run: |
-          pip install uv
-          uv sync --all-extras
-          POSTGRES_HOST=localhost \
-          POSTGRES_PORT=5432 \
-          POSTGRES_DB=nocobase \
-          POSTGRES_USER=nocobase \
-          POSTGRES_PASSWORD=test_password \
-          REDIS_URL=redis://localhost:6379/0 \
-          JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
-          INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
-          nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log 2>&1 &
-          echo $! > /tmp/python.pid
+      POSTGRES_PASSWORD=test_password \
 
-      - name: Wait for Python export service
-        run: |
-          for i in {1..90}; do
-            if curl -sf http://localhost:8000/health > /dev/null 2>&1 || curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
-              echo "Python ready after ${i}s"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Python failed to start"
-          cat /tmp/python.log
-          exit 1
-      - name: Install CRDT service deps
-        working-directory: crdt-service
-        run: npm ci --no-audit --no-fund
+      JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
 
-      - name: Start CRDT service
-        working-directory: crdt-service
-        run: |
-          PG_HOST=localhost \
-          PG_PORT=5432 \
-          PG_DB=nocobase \
-          PG_USER=nocobase \
-          PG_PASSWORD=test_password \
-          PORT=3100 \
-          nohup node index.js > /tmp/crdt.log 2>&1 &
-          echo $! > /tmp/crdt.pid
+      INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+      \
 
-      - name: Wait for CRDT service
-        run: |
-          for i in {1..30}; do
-            if curl -sf http://localhost:3100/health > /dev/null 2>&1; then
-              echo "CRDT ready after ${i}s"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "CRDT failed to start"
-          cat /tmp/crdt.log
-          exit 1
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+      INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
 
+      nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
 
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
+      echo $! > /tmp/java.pid
 
-      - name: Install Playwright browsers
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
+      '
+  - name: Wait for Java to be ready
+    run: "for i in {1..150}; do\n  if curl -sf http://localhost:8080/api/health >\
+      \ /dev/null; then\n    echo \"Java ready after ${i}s\"\n    exit 0\n  fi\n \
+      \ sleep 2\ndone\necho \"Java failed to start\"\ncat /tmp/java.log\nexit 1\n"
+  - name: Start Python export service
+    working-directory: backend-python
+    run: 'pip install uv
 
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
+      uv sync --all-extras
 
-      - name: Run E2E tests
-        working-directory: frontend
-        run: npx playwright test
+      POSTGRES_HOST=localhost \
 
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: frontend/playwright-report/
-          retention-days: 7
+      POSTGRES_PORT=5432 \
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-test-results
-          path: frontend/test-results/
-          retention-days: 7
+      POSTGRES_DB=nocobase \
+
+      POSTGRES_USER=nocobase \
+
+      POSTGRES_PASSWORD=test_password \
+
+      REDIS_URL=redis://localhost:6379/0 \
+
+      JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
+
+      INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+
+      nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log
+      2>&1 &
+
+      echo $! > /tmp/python.pid
+
+      '
+  - name: Wait for Python export service
+    run: "for i in {1..90}; do\n  if curl -sf http://localhost:8000/health > /dev/null\
+      \ 2>&1 || curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then\n\
+      \    echo \"Python ready after ${i}s\"\n    exit 0\n  fi\n  sleep 2\ndone\n\
+      echo \"Python failed to start\"\ncat /tmp/python.log\nexit 1\n"
+  - name: Install CRDT service deps
+    working-directory: crdt-service
+    run: npm ci --no-audit --no-fund
+  - name: Start CRDT service
+    working-directory: crdt-service
+    run: 'PG_HOST=localhost \
+
+      PG_PORT=5432 \
+
+      PG_DB=nocobase \
+
+      PG_USER=nocobase \
+
+      PG_PASSWORD=test_password \
+
+      PORT=3100 \
+
+      nohup node index.js > /tmp/crdt.log 2>&1 &
+
+      echo $! > /tmp/crdt.pid
+
+      '
+  - name: Wait for CRDT service
+    run: "for i in {1..30}; do\n  if curl -sf http://localhost:3100/health > /dev/null\
+      \ 2>&1; then\n    echo \"CRDT ready after ${i}s\"\n    exit 0\n  fi\n  sleep\
+      \ 2\ndone\necho \"CRDT failed to start\"\ncat /tmp/crdt.log\nexit 1\n"
+  - name: Set up Node 20
+    uses: actions/setup-node@v4
+    with:
+      node-version: '20'
+      cache: npm
+      cache-dependency-path: frontend/package-lock.json
+  - name: Install dependencies
+    working-directory: frontend
+    run: npm ci
+  - name: Install Playwright browsers
+    working-directory: frontend
+    run: npx playwright install --with-deps chromium
+  - name: Build frontend
+    working-directory: frontend
+    run: npm run build
+  - name: Run E2E tests
+    working-directory: frontend
+    run: npx playwright test
+  - name: Upload Playwright report
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: playwright-report
+      path: frontend/playwright-report/
+      retention-days: 7
+  - name: Upload test results
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: playwright-test-results
+      path: frontend/test-results/
+      retention-days: 7
 
   build:
     name: 🏗 Build
