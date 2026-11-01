@@ -181,6 +181,12 @@ jobs:
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_EXTERNAL_URL=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -397,6 +403,12 @@ jobs:
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_EXTERNAL_URL=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -426,6 +438,11 @@ jobs:
           REDIS_URL=redis://localhost:6379/0 \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log 2>&1 &
           echo $! > /tmp/python.pid
           for i in {1..30}; do
@@ -496,6 +513,12 @@ jobs:
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_EXTERNAL_URL=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -525,6 +548,11 @@ jobs:
           REDIS_URL=redis://localhost:6379/0 \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log 2>&1 &
           echo $! > /tmp/python.pid
 
@@ -736,6 +764,12 @@ jobs:
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_EXTERNAL_URL=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -863,6 +897,12 @@ jobs:
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_EXTERNAL_URL=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
@@ -914,6 +954,11 @@ jobs:
           REDIS_URL=redis://localhost:6379/0 \
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          MINIO_ENABLED=true \
+          MINIO_ENDPOINT=http://localhost:9000 \
+          MINIO_ACCESS_KEY=ci_minio \
+          MINIO_SECRET_KEY=ci_minio_secret_password \
+          MINIO_BUCKET=nocobase \
           nohup uv run uvicorn nocobase_py.main:app --host 0.0.0.0 --port 8000 > /tmp/python.log 2>&1 &
           echo $! > /tmp/python.pid
 
