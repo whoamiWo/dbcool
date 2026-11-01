@@ -158,3 +158,17 @@ pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
    "workflow file issue"），而 PyYAML 与 actionlint **均无法复现**（actionlint 仅 shellcheck info）；
    二分定位：E2E 后端栈单独应用正常、拆分单独应用即被拒收 → 暂缓拆分（保留原 job）。
 4. **E2E 已从 0 通过提升到 112 passed**（前端真实后端栈：Java+Python+Redis+RabbitMQ+pgvector+CRDT）。
+
+**2026-11-01 E2E 剩余 68 失败的完整结论（CI 无法获得对象存储）**：
+- 根因：`AttachmentController` 在**租户校验之前**就检查 `storage.isEnabled()`，未启用时抛 501
+  "对象存储未启用" → 跨租户 403 期望变 501，附件/预览/导出类用例全部失败。
+- 需要在 CI 编排 MinIO，但三条路都实测不通：
+  1. `minio/minio:*`（Docker Hub）→ **pull access denied**（该仓库在 Docker Hub 侧受限）；
+  2. `quay.io/minio/minio:latest` → 拉取反复重试后 **Initialize containers 失败**（超时）；
+  3. 自建镜像推 GHCR → `gh auth token` **无 packages:write scope**（permission_denied）。
+  另注：minio 官方镜像**不含 curl**，health-cmd 须用 `mc ready local`（用 curl 会恒失败并连累整个 job）。
+- 候选方案（下一轮择一）：
+  - ① CI job 内**直接下载 minio 二进制**运行（不依赖容器镜像）；
+  - ② Java 附件存储增加**本地磁盘实现**（开发/CI 模式）——属能力新增，需走例外通道；
+  - ③ 申请 GHCR 包写权限后自建镜像推 GHCR（CI 已验证 GHCR 拉取正常）。
+- 现状：MinIO 编排已回退，CI 主干保持 7 项绿；E2E 保留 continue-on-error（信号不丢）。
