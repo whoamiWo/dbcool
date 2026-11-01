@@ -5,23 +5,26 @@
  * 
  * 测试策略：
  * 1. 使用 real backend (http://localhost:4173) → 触发实际 API 调用
- * 2. 使用已存在的 smoke 测试 collection (smoke060c44f2_form)
+ * 2. beforeAll 动态创建带随机前缀的 collection 并写入一条记录
+ *    （不再硬编码 smoke 集合名：smoke.py 的前缀是每次运行的随机 UUID，
+ *     硬编码会命中不存在的集合 → ACL 层返回 403，测试必然失败）
  * 3. 验证 HTTP 响应头、Content-Disposition、CSV 内容结构
  * 
  * 注意：
  * - export-file (xlsx/pdf) 依赖 Python 导出服务；未启动时后端返回 503，
  *   本测试对此做容错断言（200 或 503 均视为契约正确）。
  * - 不存在的集合当前返回 403（鉴权层先行拦截），非 404。
- */
+*/
 import { test, expect } from '@playwright/test';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
 const TOKEN_FILE = path.resolve(process.cwd(), 'e2e/.auth/token.json');
 const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:4173';
 
-// 使用 E2E 真实存在的 smoke 测试 collection（有数据且字段定义完整）
-const TEST_COLLECTION = 'smoke9dc165decol';
+// 运行时创建，避免依赖外部 seed 数据（见文件头注释）
+const TEST_COLLECTION = 'smoke' + crypto.randomBytes(4).toString('hex') + 'col';
 
 function adminToken(): string {
   const raw = fs.readFileSync(TOKEN_FILE, 'utf-8');
@@ -34,9 +37,29 @@ test.describe('表单导出 API 契约', () => {
   let token: string;
   let authHeaders: { Authorization: string };
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ request }) => {
     token = adminToken();
     authHeaders = { Authorization: `Bearer ${token}` };
+
+    // 创建测试集合（含 title 字段），并写入 1 条记录，保证导出内容非空
+    const createRes = await request.post(`${BASE_URL}/api/collections`, {
+      headers: authHeaders,
+      data: { name: TEST_COLLECTION, fields: [{ name: 'title', type: 'text' }] },
+    });
+    expect([200, 201]).toContain(createRes.status());
+
+    const recRes = await request.post(`${BASE_URL}/api/collections/${TEST_COLLECTION}/records`, {
+      headers: authHeaders,
+      data: { title: 'export contract record' },
+    });
+    expect([200, 201]).toContain(recRes.status());
+  });
+
+  test.afterAll(async ({ request }) => {
+    // 清理，避免污染后续运行
+    await request.delete(`${BASE_URL}/api/collections/${TEST_COLLECTION}`, {
+      headers: authHeaders,
+    }).catch(() => undefined);
   });
 
   test('GET /api/collections/:name/export → 200 + CSV + Content-Disposition', async ({ request }) => {
