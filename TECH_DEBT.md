@@ -172,3 +172,10 @@ pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
   - ② Java 附件存储增加**本地磁盘实现**（开发/CI 模式）——属能力新增，需走例外通道；
   - ③ 申请 GHCR 包写权限后自建镜像推 GHCR（CI 已验证 GHCR 拉取正常）。
 - 现状：MinIO 编排已回退，CI 主干保持 7 项绿；E2E 保留 continue-on-error（信号不丢）。
+
+**2026-11-01 续**：dl.min.io 的 linux-amd64 直链**全面 410 Gone**（MinIO 官方分发变更）；
+release asset 上传被 403（个人 token 无 release 写权限）。语义修正已落地：
+`thumbnail/download/getMetadata` 的**租户归属校验先于"存储未启用"检查**（501 不再掩盖 403，
+跨租户探测不再泄露存储启用状态；AttachmentControllerTest 16/16）。E2E 附件/导出用例的
+彻底修复待：① `gh auth refresh -s write:packages` 授权后推 GHCR 自建 MinIO 镜像；或
+② Java 附件存储增加本地磁盘实现（CI 用）；择一即可，无需两者。
