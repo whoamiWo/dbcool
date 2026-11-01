@@ -475,7 +475,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       minio:
-        image: minio/minio:latest
+        image: quay.io/minio/minio:latest
         env:
           MINIO_ROOT_USER: ci_minio
           MINIO_ROOT_PASSWORD: ci_minio_secret_password
@@ -732,7 +732,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       minio:
-        image: minio/minio:latest
+        image: quay.io/minio/minio:latest
         env:
           MINIO_ROOT_USER: ci_minio
           MINIO_ROOT_PASSWORD: ci_minio_secret_password
