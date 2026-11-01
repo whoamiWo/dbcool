@@ -146,3 +146,15 @@ pytest tests/  →  68 passed, 1 skipped（2026-10-30 实测）
    需在 frontend-e2e job 增加 crdt 服务构建与启动步骤。
 2. `form-export-api`（Expected 200/503 Received 501）—— 导出链路依赖 Python 导出服务（已起）但
    /api/export 501，疑 Java 端 INTERNAL_SERVICE_TOKEN 校验或 Python 端点路径（需本地复现确认）。
+
+**2026-11-01 本轮新增（CI 修复）**：
+1. **CalendarView 测试时炸弹**：测试数据硬编码 `2026-10-05/12`，日历按当前月渲染 → 11 月 1 日起
+   2 个用例超时（本地与 CI 同时失败，非 flaky）。已改为**动态当月日期**（本地 7/7、前端全量 972 绿）。
+2. **E2E 剩余 68 失败**：根因是 **对象存储未启用**（AttachmentController 在租户校验前抛 501
+   "对象存储未启用" → 跨租户 403 期望变 501、附件/导出用例全挂）。修复需在 CI 编排 MinIO：
+   官方 minio 镜像**不含 curl**（health-cmd 恒失败曾连累 4 个 job），改 `mc ready local` 仍不稳，
+   本轮已回退该编排 → 方案与坑记于此，下一轮用「起 MinIO 容器 + 应用内建桶」方式落地。
+3. **verify-scripts 拆分为两个 job**：GitHub 拒收该 workflow 变更（run 0 秒红、jobs=0、报
+   "workflow file issue"），而 PyYAML 与 actionlint **均无法复现**（actionlint 仅 shellcheck info）；
+   二分定位：E2E 后端栈单独应用正常、拆分单独应用即被拒收 → 暂缓拆分（保留原 job）。
+4. **E2E 已从 0 通过提升到 112 passed**（前端真实后端栈：Java+Python+Redis+RabbitMQ+pgvector+CRDT）。
