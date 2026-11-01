@@ -475,7 +475,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       minio:
-        image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+        image: minio/minio:latest
         env:
           MINIO_ROOT_USER: ci_minio
           MINIO_ROOT_PASSWORD: ci_minio_secret_password
@@ -732,7 +732,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       minio:
-        image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+        image: minio/minio:latest
         env:
           MINIO_ROOT_USER: ci_minio
           MINIO_ROOT_PASSWORD: ci_minio_secret_password
