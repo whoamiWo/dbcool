@@ -143,11 +143,18 @@ describe('CalendarViewPage (C3)', () => {
     expect(screen.getByText('Year')).toBeInTheDocument();
   });
 
+  // v2.1.3 时炸弹修复：硬编码 2026-10-xx 在 11 月初失效（日历按当前月渲染）
+  const d = (day: number) => {
+    const n = new Date();
+    const mm = String(n.getMonth() + 1).padStart(2, '0');
+    return `${n.getFullYear()}-${mm}-${String(day).padStart(2, '0')}`;
+  };
+
   it('有记录时渲染日历网格和记录标题', async () => {
     const mockRecords = [
-      { id: 'r1', date: '2026-10-05', title: '会议 1' },
-      { id: 'r2', date: '2026-10-12', title: '任务 2' },
-      { id: 'r3', date: '2026-10-12', title: '任务 3' },
+      { id: 'r1', date: d(5), title: '会议 1' },
+      { id: 'r2', date: d(12), title: '任务 2' },
+      { id: 'r3', date: d(12), title: '任务 3' },
     ];
     (apiClient.get as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -175,7 +182,7 @@ describe('CalendarViewPage (C3)', () => {
   it('单列超过 3 条记录时显示"N 条更多"', async () => {
     const mockRecords = Array.from({ length: 5 }).map((_, i) => ({
       id: `r${i}`,
-      date: '2026-10-12',
+      date: d(12),
       title: `任务${i + 1}`,
     }));
     (apiClient.get as ReturnType<typeof vi.fn>)
