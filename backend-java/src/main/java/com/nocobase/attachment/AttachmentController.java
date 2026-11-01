@@ -94,14 +94,16 @@ public class AttachmentController {
     @PreAuthorize("isAuthenticated()")
     @GetMapping(params = "storageKey")
     public ResponseEntity<Map<String, Object>> getMetadata(@RequestParam String storageKey) {
-        if (!storage.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
-                    "对象存储未启用");
-        }
         String tenantId = TenantContext.currentTenantId();
+        // Wave4 v2.1.3 语义修正：跨租户拒绝（403）必须先于"存储未启用"（501）——
+        // 否则未启用存储的部署会把"跨租户探测"与"功能未配置"区分开（信息泄露）。
         if (!storageKey.startsWith(tenantId + "/")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "无权访问该附件");
+        }
+        if (!storage.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
+                    "对象存储未启用");
         }
         String url = storage.presignedDownloadUrl(storageKey);
         return ResponseEntity.ok(Map.of(
@@ -162,11 +164,12 @@ public class AttachmentController {
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/download")
     public ResponseEntity<Void> download(@RequestParam String storageKey) {
+        // Wave4 v2.1.3：租户校验先于"存储未启用"（同上，避免 501 掩盖 403）
+        validateStorageKey(storageKey);
         if (!storage.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
                     "对象存储未启用 — 配置 app.storage.minio.enabled=true 后可用 (D1.4)");
         }
-        validateStorageKey(storageKey);
         String url = storage.presignedDownloadUrl(storageKey);
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.LOCATION, url)
@@ -209,6 +212,10 @@ public class AttachmentController {
     @GetMapping("/thumbnail")
     @Operation(summary = "附件缩略图", description = "返回缩放后的 JPEG 字节流(最长边 200px)")
     public ResponseEntity<byte[]> thumbnail(@RequestParam String storageKey) {
+        // Wave4 v2.1.3 语义修正：租户归属校验必须**先于任何 storage 调用**——
+        // 否则对象存储未启用时（501）会掩盖跨租户拒绝（403），既让前端拿不到正确
+        // 语义，也使"存储是否启用"成为可探测的侧信道。
+        validateStorageKey(storageKey);
         if (!storage.isImageContentType(inferContentTypeFromKey(storageKey))) {
             // 非图片:返 415,前端降级为类型图标
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
