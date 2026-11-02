@@ -469,6 +469,11 @@ def finish():
         print(f"\n⚠️  有 {skipped} 步因可选依赖未启用而跳过（非失败）：")
         for reason in skip_reasons:
             print(f"   - {reason}")
+        # CI 中提升可见性：绿色步骤不代表全部链路已验证。
+        # GitHub Actions 会解析 ::warning:: 并在 PR/run 摘要中高亮。
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            print(f"::warning::冒烟有 {skipped} 步因可选依赖未启用而跳过，相关链路未验证："
+                  + "; ".join(skip_reasons)[:500])
         print("\n💡 启用方式：")
         print("   1. 对象存储：设置 app.storage.minio.enabled=true 并提供 endpoint/accessKey/secretKey")
         print("   2. 导出服务：启动 backend-python 导出服务并使其可被后端访问")

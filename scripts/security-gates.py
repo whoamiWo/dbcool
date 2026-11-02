@@ -90,12 +90,21 @@ def _sev_report(cmd: list[str], fail_on: list[str], json_out: Path, label: str) 
     return 1 if block else 0
 
 
+def _image_exists(image: str) -> bool:
+    """本地是否已有该镜像（trivy image 只扫本地镜像，缺失时它会直接报错）。"""
+    rc, _ = _run(["docker", "image", "inspect", image], timeout=60)
+    return rc == 0
+
+
 def cmd_scan_images(args: argparse.Namespace) -> int:
-    if not _has("trivy") and not _has("docker"):
+    # 镜像扫描需要 trivy（扫描器）与 docker（读取本地镜像），缺一不可
+    if not _has("trivy") or not _has("docker"):
         print("❌ 需要 trivy 与 docker 两者都存在", file=sys.stderr)
         return 2
     fail_on = [s.strip().upper() for s in args.fail_on.split(",")]
     rc_total = 0
+    scanned = 0
+    skipped: list[str] = []
     for df in DOCKERFILES:
         svc = df.parent.name
         image = f"noco/{svc}:latest"
@@ -107,6 +116,13 @@ def cmd_scan_images(args: argparse.Namespace) -> int:
             if rc != 0:
                 print(f"❌ docker build 失败: {out[-500:]}", file=sys.stderr)
                 return 2
+        elif not _image_exists(image):
+            # --skip-build 且镜像不存在：环境未准备，不是代码缺陷 → SKIP 而非失败。
+            # （此前会直接调 trivy image 并报错，导致 CI 镜像扫描永远失败，
+            #   再被 job 级 continue-on-error 吞掉，形成"看似扫描实则从未扫描"。）
+            print(f"⏭️  SKIP: 镜像 {image} 不存在（--skip-build 不复用构建），跳过 {svc} 镜像扫描")
+            skipped.append(svc)
+            continue
         # 2) trivy image 扫描
         print(f"🔍 trivy image 扫描 {image} ...")
         rc = _sev_report(["trivy", "image", image,
@@ -114,7 +130,12 @@ def cmd_scan_images(args: argparse.Namespace) -> int:
                           "--ignorefile", str(BASE / ".trivyignore")],
                          fail_on, BASE / "target" / f"trivy-{svc}.json",
                          f"{svc} 镜像")
+        scanned += 1
         rc_total = max(rc_total, rc)
+    if scanned == 0 and skipped:
+        print(f"⚠️  全部 {len(skipped)} 个服务镜像均不存在，未执行镜像扫描：{', '.join(skipped)}")
+        print("   （属环境未准备，跳过；如需真实扫描请去掉 --skip-build 或在 CI 中先 build）")
+        return 0
     return rc_total
 
 
