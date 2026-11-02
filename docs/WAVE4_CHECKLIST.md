@@ -85,9 +85,9 @@ commit & push：待授权 / 已授权（<hash>）
 | 11 | 移动端响应式 5 关键页 | ✅ 完成（2026-10-31：实测发现基础已相当完善（AppLayout 6 入口底导航 44px 触控、IM 布局 768px、表格滚动、PWA 安全区、44px 输入框）；补齐：styles.css 新增 .grid-2（桌面双列→移动单列）与 .page-responsive（页面级横滚兜底），Home/DataSources 内联网格改用类、DataSources 表格包滚动容器；实测：mobile-chromium（iPhone 13）Playwright 13/13 通过，含新增 DataSources 用例（无横滚 + 表格滚动容器 + 网格塌缩单列）） |
 | 12 | WAL 归档（生产侧） | ✅ 已修（backup-e2e 30/30） |
 | 13 | 灰度/蓝绿 | ✅ 部分完成（2026-10-31：Docker Compose 单机**应用层蓝绿**（docker-compose.blue-green.yml + scripts/blue-green-deploy.sh）；**K8s 侧蓝绿/灰度未做**（当前仅 RollingUpdate replicas=3 + readinessProbe）→ 留待后续批次） |
-| 14 | 外部数据源类型扩展 | ✅ 完成（2026-11-03 证据校准：`backend-java/src/main/java/com/nocobase/integration/datasource/ExternalDataSourceConnectionFactory.java` 的 `familyOf()`（第 82-91 行）支持 MySQL 家族 mysql/mariadb/oceanbase 与 PostgreSQL 家族 postgresql/kingbase/opengauss；`frontend/src/pages/DataSources.tsx:317-320` 下拉选项同步（SQL Server/Oracle 仍禁用，后端未实现）；**复用既有 JDBC 驱动，零新增依赖**，特殊驱动可用 `driver_class_name` 覆盖） |
+| 14 | 外部数据源类型扩展 | ✅ 完成（2026-11-03 二次校准：`ExternalDataSourceConnectionFactory.familyOf()`（第 82-91 行）映射 MySQL 家族 mysql/mariadb/oceanbase → `com.mysql.cj.jdbc.Driver`、PostgreSQL 家族 postgresql/kingbase/opengauss → `org.postgresql.Driver`；`frontend/src/pages/DataSources.tsx:317-322` 下拉同步，SQL Server/Oracle 显式 `disabled`（后端未实现）。**审计发现原 pom 仅有 postgresql 驱动，mysql 家族首次连接必抛 `ClassNotFoundException` → 已补 `com.mysql:mysql-connector-j`(runtime)，非"零新增依赖"**；kingbase 默认按 PG 协议尝试，未开 PG 兼容模式时需 `driver_class_name` + 官方驱动） |
 | 15 | 批量操作入口 + 标签管理 UI | ✅ 完成（2026-10-31：勘发现 TableView 批量编辑已完整（全选/逐行/批量改值/批量删除）；剩余缺口=看板标签管理 → 新增 LabelManager 组件消费既有 /api/project-boards/labels* 端点（新建/重命名/删除/颜色），BoardView 头部入口；单测 4/4 + 反向自检；**卡片↔标签关联需新增关联表与端点，属能力扩容已列入例外通道候选**） |
-| 16 | 文档站数字自动校准 | ✅ 完成（2026-11-03 证据校准：`scripts/monthly-gate.py` 的 `write_gate_numbers()`（第 53-139 行）采集实测数字写入 `target/gate-numbers.json`，`main()` 第 176-179 行在**非 quick 模式**下调用 `python3 scripts/doc-numbers-verify.py --fix` 校验并回填文档锚点；独立执行 `python3 scripts/doc-numbers-verify.py` 可只做校验） |
+| 16 | 文档站数字自动校准 | ✅ 完成（2026-11-03 二次校准：`scripts/monthly-gate.py` 中 `collect_numbers()`（第 61 行）采集各门禁输出、`write_numbers()`（第 135 行）写入 `target/gate-numbers.json`；`main()`（第 142 行）在第 178 行于**非 quick 模式**下调用 `python3 scripts/doc-numbers-verify.py --fix` 校验并回填文档锚点；独立执行 `python3 scripts/doc-numbers-verify.py` 只做校验） |
 
 ## 五、每月批次归档
 

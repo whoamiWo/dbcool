@@ -17,8 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>驱动选择：
  * <ul>
- *   <li>{@code postgresql}：使用 Spring Boot 内置的 PostgreSQL 驱动（已有依赖）</li>
- *   <li>{@code mysql}：反射加载 MySQL 8 驱动（可选 runtime 依赖）</li>
+ *   <li>{@code postgresql} 家族：PostgreSQL JDBC 驱动（pom runtime 依赖）</li>
+ *   <li>{@code mysql} 家族：MySQL Connector/J（pom runtime 依赖，v2.1.4 补齐）</li>
  * </ul>
  *
  * <p>安全红线：密码解密由调用方（Service）完成，本工厂只接收明文密码字符串。
@@ -71,13 +71,15 @@ public class ExternalDataSourceConnectionFactory {
     /**
      * Wave4 待办池 #14：vendor → 驱动家族归一。
      *
-     * <p>支持的 vendor（全部**复用既有驱动，零新增依赖**）：
+     * <p>支持的 vendor 与所需驱动（pom 已同时声明 postgresql 与 mysql-connector-j）：
      * <ul>
-     *   <li>MySQL 家族：mysql / mariadb / oceanbase → MySQL Connector/J 驱动</li>
-     *   <li>PostgreSQL 家族：postgresql / kingbase（人大金仓）/ opengauss → PostgreSQL JDBC 驱动</li>
+     *   <li>MySQL 家族：mysql / mariadb / oceanbase → {@code com.mysql.cj.jdbc.Driver}</li>
+     *   <li>PostgreSQL 家族：postgresql / opengauss → {@code org.postgresql.Driver}</li>
+     *   <li>kingbase（人大金仓）：默认按 PostgreSQL 协议尝试；若目标实例未开启 PG 兼容模式，
+     *       需通过 {@code driver_class_name} + 自定义 JDBC URL 使用官方 kingbase8 驱动</li>
      * </ul>
-     * 这些库与对应上游产品协议兼容，JDBC URL 与元数据 SQL 与家族主库一致。
-     * 若实际部署需要厂商专用驱动，可通过实体的 driver_class_name 覆盖（已有机制）。
+     * 上述兼容性为「协议级复用」，<b>不等于零配置可用</b>：数据库侧需开启对应兼容模式，
+     * 且账号需具备目标库的读权限。厂商专用驱动可通过 driver_class_name 覆盖（已有机制）。
      */
     static String familyOf(String vendor) {
         if (vendor == null || vendor.isBlank()) {

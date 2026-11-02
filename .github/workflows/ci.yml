@@ -110,6 +110,12 @@ jobs:
             else
               echo "trivy_available=false" >> $GITHUB_OUTPUT
               echo "::notice::SKIP: runner 无法安装 Trivy（网络/证书受限），跳过扫描（非失败）"
+              {
+                echo "### ⏭️ Trivy 扫描未执行"
+                echo ""
+                echo "runner 无法安装 Trivy 二进制（网络/证书受限），本 job **未做任何扫描**。"
+                echo "阻断级依赖审计仍由 \`java-test\` job 中的 \`java-dependency-audit.py\` 承担。"
+              } >> $GITHUB_STEP_SUMMARY
             fi
           fi
 
@@ -183,6 +189,12 @@ jobs:
           else
             echo "network_available=false" >> $GITHUB_OUTPUT
             echo "::notice::SKIP: runner 无法下载 ZAP 安装包（网络受限），跳过 ZAP 基线扫描（非失败）"
+            {
+              echo "### ⏭️ ZAP Baseline 未执行"
+              echo ""
+              echo "runner 无法下载 ZAP 安装包，本 job **未做任何安全扫描**（Java 构建与启动亦被跳过）。"
+              echo "该 job 绿色只代表「环境不具备扫描条件」，不代表「扫描通过」。"
+            } >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
