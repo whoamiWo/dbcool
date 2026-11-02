@@ -97,47 +97,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check Docker availability (skip if runner lacks Docker)
+      - name: Check Trivy prerequisites
+        id: trivy_check
+        run: |
+          if command -v trivy >/dev/null 2>&1; then
+            echo "trivy_available=true" >> $GITHUB_OUTPUT
+          else
+            # Trivy 不在 Ubuntu 官方仓库，用官方 install.sh；失败才 SKIP（网络受限）
+            if curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+                 | sudo sh -s -- -b /usr/local/bin >/dev/null 2>&1 && command -v trivy >/dev/null 2>&1; then
+              echo "trivy_available=true" >> $GITHUB_OUTPUT
+            else
+              echo "trivy_available=false" >> $GITHUB_OUTPUT
+              echo "::notice::SKIP: runner 无法安装 Trivy（网络/证书受限），跳过扫描（非失败）"
+            fi
+          fi
+
+      - name: Check Docker availability (for image scan only)
         id: docker_check
         run: |
           if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
             echo "available=true" >> $GITHUB_OUTPUT
           else
             echo "available=false" >> $GITHUB_OUTPUT
-            echo "::notice::SKIP: runner 无 Docker 能力，跳过镜像/依赖扫描（非失败）"
+            echo "::notice::SKIP: runner 无 Docker 能力，跳过镜像扫描（非失败）"
           fi
 
       - name: Set up Python 3.12
-        if: steps.docker_check.outputs.available == 'true'
+        if: steps.trivy_check.outputs.trivy_available == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install Trivy
-        if: steps.docker_check.outputs.available == 'true'
-        run: |
-          sudo apt-get update && sudo apt-get install -y wget
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update && sudo apt-get install -y trivy
-
-      - name: Install Docker (for image scanning)
-        if: steps.docker_check.outputs.available == 'true'
-        run: |
-          sudo apt-get install -y docker.io
-          sudo systemctl start docker
-          sudo usermod -aG docker $USER
-          newgrp docker
-
       - name: Run Trivy image scans
-        if: steps.docker_check.outputs.available == 'true'
+        if: steps.trivy_check.outputs.trivy_available == 'true' && steps.docker_check.outputs.available == 'true'
         run: |
           python3 scripts/security-gates.py scan-images \
             --fail-on HIGH,CRITICAL \
             --skip-build
 
       - name: Run Trivy dependency scans
-        if: steps.docker_check.outputs.available == 'true'
+        if: steps.trivy_check.outputs.trivy_available == 'true'
         run: |
           python3 scripts/security-gates.py scan-deps \
             --fail-on HIGH,CRITICAL
@@ -176,11 +176,13 @@ jobs:
       - name: Check ZAP installation prerequisites (skip if network unavailable)
         id: zap_check
         run: |
-          if wget -q --spider https://github.com/zaproxy/zaproxy/releases; then
+          # 探测真实下载地址（而非 releases 首页）—— 首页可达不代表 tar 包可取
+          ZAP_URL=https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
+          if curl -fsSL -o /dev/null --max-time 60 "$ZAP_URL"; then
             echo "network_available=true" >> $GITHUB_OUTPUT
           else
             echo "network_available=false" >> $GITHUB_OUTPUT
-            echo "::notice::SKIP: runner 无法访问 ZAP 发布页（网络受限），跳过 ZAP 基线扫描（非失败）"
+            echo "::notice::SKIP: runner 无法下载 ZAP 安装包（网络受限），跳过 ZAP 基线扫描（非失败）"
           fi
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
@@ -229,7 +231,9 @@ jobs:
       - name: Install OWASP ZAP
         if: steps.zap_check.outputs.network_available == 'true'
         run: |
-          sudo apt-get update && sudo apt-get install -y openjdk-11-jre-headless
+          # Ubuntu 24.04 (noble) 已移除 openjdk-11-jre-headless → 用 JDK 21（ZAP 2.14 支持）
+          # setup-java 已装 temurin 21；此处仅确保 JRE 可用，不重复安装 11
+          java -version || sudo apt-get install -y openjdk-21-jre-headless
           wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.14.0/ZAP_2.14.0_Linux.tar.gz
           tar -xzf ZAP_2.14.0_Linux.tar.gz
           sudo mv ZAP_2.14.0 /opt/zap

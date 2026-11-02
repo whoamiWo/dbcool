@@ -379,11 +379,21 @@ def step13_export(token, collection_name):
             raw = r.read()
             assert raw.startswith(b"PK"), "xlsx 文件头不是 ZIP"
     except urllib.error.HTTPError as e:
-        if e.code in (501, 503):
+        body = None
+        try:
+            body = json.loads(e.read())
+        except Exception:
+            pass
+        code_val = body.get("code") if isinstance(body, dict) else None
+
+        # 5003 = 服务不可用（Python 导出服务未启动，可选依赖缺失）→ SKIP
+        # 5004 = 表头空 / 格式不支持 / Python 返空（真实缺陷）→ FAIL
+        # 无 code 的 5xx（如网关 503）同样计 FAIL，避免掩盖真实故障
+        if code_val == 5003:
             raise StepSkipped(
-                "Python 导出服务未启动（可选依赖），导出链路未验证；服务端返回: {}".format(e.code)
+                "Python 导出服务未启动（可选依赖），导出链路未验证；服务端返回 code={}".format(code_val)
             )
-        raise
+        raise AssertionError(f"导出失败 status={e.code} code={code_val}: {body}")
     return collection_name
 
 
