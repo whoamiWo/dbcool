@@ -48,28 +48,48 @@ public class ExportFileService {
     private boolean enabled;
 
     /**
+     * 导出结果封装（替代原来的简单 byte[] 返回值）。
+     */
+    public static class Result {
+        private final byte[] data;
+        private final ExportFailureReason reason;
+
+        private Result(byte[] data, ExportFailureReason reason) {
+            this.data = data;
+            this.reason = reason;
+        }
+
+        public static Result ok(byte[] data) { return new Result(data, null); }
+        public static Result fail(ExportFailureReason reason) { return new Result(null, reason); }
+
+        public byte[] data() { return data; }
+        public ExportFailureReason reason() { return reason; }
+        public boolean isSuccess() { return reason == null; }
+    }
+
+    /**
      * 生成导出文件。
      *
      * @param format xlsx 或 pdf（小写）
      * @param headers 列名（有序）
      * @param rows 二维数据
      * @param title 报表标题（同时作为文件名）
-     * @return 文件字节流；不可用时返回 null（由调用方降级为提示）
+     * @return 导出结果（成功时有 data，失败时有 reason）
      */
-    public byte[] build(String format, List<String> headers,
+    public Result build(String format, List<String> headers,
                         List<List<Object>> rows, String title) {
         if (!enabled) {
             log.warn("[导出] export.enabled=false，跳过文件生成 (format={})", format);
-            return null;
+            return Result.fail(ExportFailureReason.DISABLED_BY_CONFIG);
         }
         if (headers == null || headers.isEmpty()) {
             log.warn("[导出] 表头为空，拒绝生成 {}", format);
-            return null;
+            return Result.fail(ExportFailureReason.EMPTY_HEADERS);
         }
         String fmt = format == null ? "" : format.toLowerCase();
         if (!fmt.equals("xlsx") && !fmt.equals("pdf")) {
             log.warn("[导出] 不支持的格式：{}（仅支持 xlsx / pdf）", format);
-            return null;
+            return Result.fail(ExportFailureReason.UNSUPPORTED_FORMAT);
         }
 
         Map<String, Object> body = Map.of(
@@ -95,15 +115,15 @@ public class ExportFileService {
             byte[] data = resp.getBody();
             if (data == null || data.length == 0) {
                 log.error("[导出] Python 返回空内容 (format={})", fmt);
-                return null;
+                return Result.fail(ExportFailureReason.EMPTY_CONTENT_FROM_PYTHON);
             }
             log.info("[导出] 生成成功 format={} bytes={} rows={}", fmt, data.length,
                     rows == null ? 0 : rows.size());
-            return data;
+            return Result.ok(data);
         } catch (RestClientException e) {
             log.error("[导出] 调用 Python 导出服务失败 url={} format={} err={}",
                     pythonUrl, fmt, e.getMessage());
-            return null;
+            return Result.fail(ExportFailureReason.SERVICE_UNAVAILABLE);
         }
     }
 

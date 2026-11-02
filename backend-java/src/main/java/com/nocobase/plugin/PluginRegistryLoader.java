@@ -58,10 +58,17 @@ public class PluginRegistryLoader implements ApplicationRunner {
                 try {
                     PluginManifest manifest = PluginManifest.fromYaml(entity.getManifestYaml());
                     if (pluginRegistry.isRegistered(manifest.name())) {
+                        // 注册表以插件名为全局唯一键；多租户装同名插件时后到者不生效，
+                        // 必须显式告警（而非静默丢弃），便于运维定位"已安装却不生效"。
+                        log.warning("[plugin-registry] 启动装载 同名冲突跳过: plugin=" + manifest.name()
+                                + " 已由其他租户装载，跳过 tenant=" + entity.getTenantId()
+                                + " appKey=" + entity.getAppKey());
                         skipped++;
                         continue;
                     }
-                    pluginRegistry.register(manifest, entity.getAppKey());
+                    // sourcePath 传空串：appKey 不是文件路径，写入会污染
+                    // PluginRegistry#findNameBySourcePath 的热重载删除匹配语义。
+                    pluginRegistry.register(manifest, "");
                     registered++;
                 } catch (Exception e) {
                     log.log(Level.WARNING,

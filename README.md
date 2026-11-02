@@ -8,8 +8,8 @@
 
 [![Version](https://img.shields.io/badge/version-2.1.1-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-3552%20(backend%202622%20%2F%20frontend%20972)-brightgreen)](#-质量)
-[![Backend CI](https://img.shields.io/badge/Java%20coverage-80.30%25-success)](#-质量)
+[![Tests](https://img.shields.io/badge/tests-3552%20(backend%202623%20%2F%20frontend%20972)-brightgreen)](#-质量)
+[![Backend CI](https://img.shields.io/badge/Java%20coverage-80.29%25-success)](#-质量)
 
 **Apache-2.0 开源 · 可私有化部署 · 支持订阅与企业版附加**
 
@@ -85,12 +85,12 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 
 | 门禁 | 结果 |
 |---|---|
-| Java `mvn -o verify` | ✅ 2622 tests / 0 Failures / 0 Errors；JaCoCo BUNDLE 行覆盖 **80.30%**（红线 0.79） |
+| Java `mvn -o verify` | ✅ 2623 tests / 0 Failures / 0 Errors；JaCoCo BUNDLE 行覆盖 **80.29%**（红线 0.79） |
 | 前端 `npm run test:run` | ✅ 119 files / **972 passed / 0 failed / 0 unhandled errors**；行覆盖 77.12% |
 | TypeScript `tsc --noEmit` | ✅ 0 errors |
 | 前后端契约 | ✅ 438 后端端点 × 130 前端调用 → **0 漂移**（含反向自检） |
 | 备份/PITR 演练 | ✅ 30/30（含真实时间点恢复） |
-| 冒烟 / 租户隔离 | ✅ 12/13 · 16/16 |
+| 冒烟 / 租户隔离 | ✅ 13/13 · 16/16 |
 | 上线终验 | ✅ 8/8 |
 | Playwright E2E | 159 用例（上次实测通过；最近批次未复跑，以 CI 为准） |
 

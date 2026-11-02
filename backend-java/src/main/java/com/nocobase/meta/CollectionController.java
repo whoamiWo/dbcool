@@ -831,17 +831,25 @@ public class CollectionController {
             rows.add(row);
         }
 
-        // 6. 调 Python 生成文件；失败明确返回 503（不返回空/损坏文件）
+        // 6. 调 Python 生成文件；按失败原因区分 code（5003 依赖缺失 / 5004 数据或契约问题）
         String filename = name + "_" + java.time.LocalDate.now()
                 + com.nocobase.export.ExportFileService.extensionOf(format);
-        byte[] data = exportFileService.build(format, headers, rows, name);
-        if (data == null) {
-            log.error("[文件导出] 生成失败 collection={} format={} —— Python 导出服务不可用",
-                    name, format);
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("code", 5003, "message",
-                            "导出服务暂不可用，请确认 Python 导出服务已启用", "data", Map.of()));
+        com.nocobase.export.ExportFileService.Result result =
+                exportFileService.build(format, headers, rows, name);
+        if (!result.isSuccess()) {
+            com.nocobase.export.ExportFailureReason reason = result.reason();
+            log.error("[文件导出] 生成失败 collection={} format={} reason={}",
+                    name, format, reason);
+            // 5003 = 服务不可用（可选依赖缺失，冒烟可 SKIP）
+            // 5004 = 数据或契约问题（表头空 / 格式不支持 / Python 返空，属真实缺陷，冒烟应 FAIL）
+            HttpStatus status = reason.getCode() == 5003
+                    ? HttpStatus.SERVICE_UNAVAILABLE
+                    : HttpStatus.INTERNAL_SERVER_ERROR;
+            return ResponseEntity.status(status)
+                    .body(Map.of("code", reason.getCode(), "message",
+                            reason.getMessage(), "data", Map.of()));
         }
+        byte[] data = result.data();
 
         // 7. 审计（与 exportCsv 一致，额外记录 format）
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
