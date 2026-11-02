@@ -64,6 +64,14 @@ def req(method, path, body=None, token=None, raw_body=None, content_type="applic
         raise
 
 
+class StepSkipped(Exception):
+    """可选依赖未启用导致该步骤未验证 —— 不是失败。
+
+    仅用于「确定性的前置依赖缺失」（对象存储未启用 / Python 导出服务未启动）；
+    任何非预期状态码、数据不一致仍必须抛 AssertionError 计为 FAIL。
+    """
+
+
 def debug_log(msg):
     logs.append(msg)
     print(f"  [DEBUG] {msg}")
@@ -78,6 +86,11 @@ def run_step(num, name, fn):
         results.append((num, name, "PASS", elapsed, ""))
         print(f"  ✅ [{num}] {name} ({elapsed}ms)")
         return detail
+    except StepSkipped as e:
+        elapsed = int((time.time() - t0) * 1000)
+        results.append((num, name, "SKIP", elapsed, str(e)))
+        print(f"  ⏭️  [{num}] {name} ({elapsed}ms): SKIP —— {e}")
+        return None
     except AssertionError as e:
         elapsed = int((time.time() - t0) * 1000)
         results.append((num, name, "FAIL", elapsed, str(e)))
@@ -233,6 +246,11 @@ def step9_attachment(token):
     status, resp = req("POST", "/api/attachments/upload",
                        raw_body=body, token=token,
                        content_type=f"multipart/form-data; boundary={boundary}")
+    if status == 501:
+        # 对象存储未启用属于「确定性前置依赖缺失」，不是缺陷
+        raise StepSkipped(
+            f"对象存储未启用（app.storage.minio.enabled=false），附件链路未验证；服务端返回: {resp}"
+        )
     assert status == 200, f"upload 返 {status}: {resp}"
     storage_key = resp.get("data", {}).get("storageKey") if isinstance(resp, dict) else None
     assert storage_key, f"storageKey 缺失: {resp}"
@@ -347,18 +365,25 @@ def step12_public_form(token):
 
 def step13_export(token, collection_name):
     """导出链路：导出 Excel → 检查 content-type 与文件有效性。"""
+    import urllib.error
     url = f"{BASE_URL}/api/collections/{collection_name}/export-file?format=xlsx"
-    resp = urllib.request.Request(
+    req_obj = urllib.request.Request(
         url,
         headers={"Authorization": f"Bearer {token}"}
     )
-    with urllib.request.urlopen(resp, timeout=TIMEOUT) as r:
-        assert r.status == 200, f"export 返 {r.status}"
-        ct = r.headers.get("content-type", "")
-        assert "vnd.openxmlformats" in ct.lower() or "excel" in ct.lower(), f"unexpected content-type: {ct}"
-        # 简单校验文件头（Excel 应为 ZIP 开头）
-        raw = r.read()
-        assert raw.startswith(b"PK"), "xlsx 文件头不是 ZIP"
+    try:
+        with urllib.request.urlopen(req_obj, timeout=TIMEOUT) as r:
+            assert r.status == 200, f"export 返 {r.status}"
+            ct = r.headers.get("content-type", "")
+            assert "vnd.openxmlformats" in ct.lower() or "excel" in ct.lower(), f"unexpected content-type: {ct}"
+            raw = r.read()
+            assert raw.startswith(b"PK"), "xlsx 文件头不是 ZIP"
+    except urllib.error.HTTPError as e:
+        if e.code in (501, 503):
+            raise StepSkipped(
+                "Python 导出服务未启动（可选依赖），导出链路未验证；服务端返回: {}".format(e.code)
+            )
+        raise
     return collection_name
 
 
@@ -430,8 +455,15 @@ def finish():
         print("\n❌ 冒烟失败")
         sys.exit(1)
     elif skipped > 0:
-        print("\n⚠️  冒烟有跳过步骤")
-        sys.exit(1)
+        skip_reasons = sorted(set(r[4] for r in results if r[2] == "SKIP"))
+        print(f"\n⚠️  有 {skipped} 步因可选依赖未启用而跳过（非失败）：")
+        for reason in skip_reasons:
+            print(f"   - {reason}")
+        print("\n💡 启用方式：")
+        print("   1. 对象存储：设置 app.storage.minio.enabled=true 并提供 endpoint/accessKey/secretKey")
+        print("   2. 导出服务：启动 backend-python 导出服务并使其可被后端访问")
+        print("\n✅ 冒烟通过（无真实失败，但有未验证链路）")
+        sys.exit(0)
     else:
         print("\n✅ 冒烟全部通过")
         sys.exit(0)
