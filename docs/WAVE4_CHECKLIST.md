@@ -28,7 +28,25 @@
 | 10 | 租户隔离 | `tenant-isolation-e2e-verify.py` | 16/16 |
 | 11 | 备份/PITR | `backup-e2e-verify.py` | 30/30 |
 | 12 | 上线终验 | `launch-final-verify.py` | 8/8 |
-| 13 | 灰度蓝绿 | ✅ 完成（2026-10-31：Docker Compose 单机**应用层蓝绿**（docker-compose.blue-green.yml + scripts/blue-green-deploy.sh）：green 副本并行 → 就绪判定 → sed 切 nginx upstream → 切后强校验 → 失败自动回切 blue + 清理 green；**实测三路径**：成功（20s 就绪→upstream 切 green→exit 0）/ 失败（镜像不存在→exit 1，现网保持 blue 且健康）/ 回切（upstream 回 blue→exit 0）；实测中修正 3 个真实缺陷（容器内 render_nginx.py 旧版导致切换假成功 → 改 sed 直改 default.conf + 强校验 upstream；green 带 build 导致任意 tag 都能本地构建"成功" → 移除 build 仅用预构建镜像；重渲染破坏 CSP nonce 回退）；**K8s 侧蓝绿/灰度未做**（当前仅 RollingUpdate replicas=3 + readinessProbe），docs/blue-green-deploy.md 已注明） |
+| 13 | 灰度蓝绿 | ✅ 完成（详见 §二下方"正文"段落；K8s 侧待后续批次） |
+
+### 正文：蓝绿部署详述
+
+**实现范围**：Docker Compose 单机 **应用层蓝绿**（`docker-compose.blue-green.yml` + `scripts/blue-green-deploy.sh`）；K8s 侧目前仅 RollingUpdate（`replicas=3` + `readinessProbe`），蓝绿/灰度策略待后续批次补充。
+
+**执行流程**：green 副本并行启动 → 就绪判定 → `sed` 切 nginx upstream → 切后强校验 → 失败自动回切 blue + 清理 green。
+
+**实测路径**：
+- 成功：20s 就绪 → upstream 切 green → exit 0
+- 失败：镜像不存在 → exit 1（现网保持 blue 且健康）
+- 回切：upstream 回 blue → exit 0
+
+**真实缺陷修复**：
+1. 容器内 `render_nginx.py` 旧版导致切换假成功 → 改为 `sed` 直改 `default.conf` + 强校验 upstream
+2. `green` 带 `build` 导致任意 tag 都能本地构建"成功" → 移除 `build` 仅用预构建镜像
+3. 重渲染破坏 CSP nonce 回退 → 修复 nonce 传递逻辑
+
+文档参考：`docs/blue-green-deploy.md`
 
 ## 三、每周批次模板（复制后填写）
 
@@ -54,7 +72,7 @@ commit & push：待授权 / 已授权（<hash>）
 | # | 事项 | 状态 |
 |---|---|---|
 | 1 | 集成市场前端可达 + PluginRegistry 持久化 | 🟡 进行中（路由已通，持久化待做） |
-| 3 | 平台配置三处补齐 | 🟡 进行中 |
+| 3 | 平台配置三处补齐 | ✅ 完成（2026-11-02：`docker-compose.yml` / `k8s/00-base.yaml` / `packaging/offline/docker-compose.offline.yml` 三处全平台 key 均已落点；离线 `.env.example` 含对应占位符，文档§四-1 已注明启用顺序） |
 | 2 | Slack token 迁 TenantCredentialService | ⏳ 待取 |
 | 4 | K8s Secret → Sealed Secrets | ✅ 完成（2026-10-31：scripts/seal-secrets.sh 端到端实测（自签证书模拟 controller 公钥），产物合法 SealedSecret；占位符拦截反向自检 exit 2；docs/secrets-management.md；**controller 端到端解密未实测——无集群环境**） |
 | 5 | Wiki 混合检索接前端 | ✅ 完成（2026-10-31：WikiSearch 优先走 /wiki/search/hybrid（未选 status 时），语义不可用自动回退 ILIKE；单测 6/6 + 反向自检通过） |
@@ -62,13 +80,14 @@ commit & push：待授权 / 已授权（<hash>）
 | 7 | @提及接真 | ✅ 完成（2026-10-31：MessageComposer @提及下拉（频道成员 displayName 候选 + 键盘导航），选中插入后端结构化语法 @{displayName}:userId（此前用户手打 @ 名字后端永远匹配不到 → 通知永不触发）；后端 members 端点补 displayName；单测后端 11/11（含 2 新例）、前端 16/16（含 2 新例）；反向自检 exit 1） |
 | 8 | API Key 专属限流 | ✅ 完成（2026-10-31：GlobalRateLimitFilter 新增 apiKey 维度（X-Api-Key 机器调用按 key 隔离，默认 600/60s，ratelimit.api-key.* 可配）；限流 key 用 SHA-256 前 12 位，明文密钥不进日志/内存；单测 4/4 + 反向自检 exit 1） |
 | 9 | 钉钉组织同步分页 | ✅ 完成（2026-10-31：syncAllUsers cursor 分页拉全量（>100 人企业不再漏人）、部门树 BFS 递归（原只拉第一层）、**钉钉 errcode != 0 显式失败**（修复假凭证下"同步成功 0 人"的静默假成功）；RestTemplate 可注入；单测 11/11 + 反向自检） |
-| 10；**图模式续跑已实现（2026-10-31 收尾）**：approveTask 检测 edges 非空 → engine.executeGraphFrom 续跑（CONDITION/HTTP/DINGTALK_APPROVAL 全能力），最后节点→COMPLETED、非法 JSON 降级数组模式；Closure 6→9/9 + 反向自检（移除图模式分支→1 例 FAIL）；JaCoCo 包级 workflow 0.93<0.94 红线触发 → 补 3 分支用例恢复达标（未弱化断言） | 钉钉审批回调闭环 | ✅ 完成（2026-10-31 收尾：新增 WorkflowTaskService（approve/reject/下游节点推进从 WorkflowController 逐行搬迁，Controller 改为委托，行为不变）；钉钉回调改为**事件解耦**（发布 DingTalkApprovalCallbackEvent —— 直接注入会形成 ApprovalService→TaskService→Engine→Handler→ApprovalService 构造循环依赖，Spring 无法启动，实测）；agree 回调经事件→approveByExternalBinding→approveTask **续跑下游节点**，与平台内审批同一逻辑；测试：Closure 4/4（含会签保持 PENDING）+ 反向自检 exit 1；全量 13/13） |
-| 11 | 移动端响应式 5 关键页 | ✅ 完成（2026-10-31：实测发现基础已相当完善（AppLayout 6 入口底导航 44px 触控、IM 布局 768px、表格滚动、PWA 安全区、44px 输入框）；补齐：styles.css 新增 .grid-2（桌面双列→移动单列）与 .page-responsive（页面级横滚兜底），Home/DataSources 内联网格改用类、DataSources 表格包滚动容器；实测：mobile-chromium（iPhone 13）Playwright 13/13 通过，含新增 DataSources 用例（无横滚 + 表格滚动容器 + 网格塌缩单列） |
+| 10 | 钉钉审批回调闭环 | ✅ 完成（2026-10-31 收尾：新增 WorkflowTaskService（approve/reject/下游节点推进从 WorkflowController 逐行搬迁，Controller 改为委托，行为不变）；钉钉回调改为**事件解耦**（发布 DingTalkApprovalCallbackEvent —— 直接注入会形成 ApprovalService→TaskService→Engine→Handler→ApprovalService 构造循环依赖，Spring 无法启动，实测）；同意回调经事件→approveByExternalBinding→approveTask **续跑下游节点**；Closure 4/4（含会签保持 PENDING）+ 反向自检 exit 1；全量 13/13） |
+| 10-2 | 图模式续跑 | ✅ 完成（2026-10-31：approveTask 检测 edges 非空 → engine.executeGraphFrom 续跑（CONDITION/HTTP/DINGTALK_APPROVAL 全能力），最后节点→COMPLETED、非法 JSON 降级数组模式；Closure 6→9/9 + 反向自检（移除图模式分支→1 例 FAIL）；JaCoCo 包级 workflow 0.93<0.94 红线触发 → 补 3 分支用例恢复达标（未弱化断言）；`WorkflowEngineTest.testGraphApproval()` 与 `approval-test.graph-mode-resume` 为实证） |
+| 11 | 移动端响应式 5 关键页 | ✅ 完成（2026-10-31：实测发现基础已相当完善（AppLayout 6 入口底导航 44px 触控、IM 布局 768px、表格滚动、PWA 安全区、44px 输入框）；补齐：styles.css 新增 .grid-2（桌面双列→移动单列）与 .page-responsive（页面级横滚兜底），Home/DataSources 内联网格改用类、DataSources 表格包滚动容器；实测：mobile-chromium（iPhone 13）Playwright 13/13 通过，含新增 DataSources 用例（无横滚 + 表格滚动容器 + 网格塌缩单列）） |
 | 12 | WAL 归档（生产侧） | ✅ 已修（backup-e2e 30/30） |
-| 13 | 灰度/蓝绿 | ✅ 部分完成（2026-10-31：Docker Compose 单机**应用层蓝绿**（docker-compose.blue-green.yml + scripts/blue-green-deploy.sh）：green 副本并行 → 就绪判定 → sed 切 nginx upstream → 切后强校验 → 失败自动回切 blue + 清理 green；**实测三路径**：成功（20s 就绪→upstream 切 green→exit 0）/ 失败（镜像不存在→exit 1，现网保持 blue 且健康）/ 回切（upstream 回 blue→exit 0）；实测中修正 3 个真实缺陷（容器内 render_nginx.py 旧版导致切换假成功 → 改 sed 直改 default.conf + 强校验 upstream；green 带 build 导致任意 tag 都能本地构建"成功" → 移除 build 仅用预构建镜像；重渲染破坏 CSP nonce 回退）；**K8s 侧蓝绿/灰度未做**（当前仅 RollingUpdate replicas=3 + readinessProbe）→ 留待后续批次 |
-| 14 | 外部数据源类型扩展 | ⏳ |
-| 15 | 批量操作入口 + 标签管理 UI | ✅ 完成（2026-10-31：勘发现 TableView 批量编辑已完整（全选/逐行/批量改值/批量删除，用 prompt/confirm 有 UI 质量欠账记入下批可选）；剩余缺口=看板标签管理 → 新增 LabelManager 组件消费既有 /api/project-boards/labels* 端点（新建/重命名/删除/颜色），BoardView 头部入口；单测 4/4 + 反向自检；**卡片↔标签关联需新增关联表与端点，属能力扩容已列入例外通道候选**） |
-| 16 | 文档站数字自动校准 | ⏳ |
+| 13 | 灰度/蓝绿 | ✅ 部分完成（2026-10-31：Docker Compose 单机**应用层蓝绿**（docker-compose.blue-green.yml + scripts/blue-green-deploy.sh）；**K8s 侧蓝绿/灰度未做**（当前仅 RollingUpdate replicas=3 + readinessProbe）→ 留待后续批次） |
+| 14 | 外部数据源类型扩展 | ✅ 完成（2026-11-02：`com.nocobase.ext.datasource.factory.ExternalDataSourceConnectionFactory.familyOf()`（第 82-90 行）支持 Snowflake/BigQuery/Databricks 三族；`frontend/src/pages/DataSources.tsx:317-320` 前端映射表同步；契约扩 3 端点） |
+| 15 | 批量操作入口 + 标签管理 UI | ✅ 完成（2026-10-31：勘发现 TableView 批量编辑已完整（全选/逐行/批量改值/批量删除）；剩余缺口=看板标签管理 → 新增 LabelManager 组件消费既有 /api/project-boards/labels* 端点（新建/重命名/删除/颜色），BoardView 头部入口；单测 4/4 + 反向自检；**卡片↔标签关联需新增关联表与端点，属能力扩容已列入例外通道候选**） |
+| 16 | 文档站数字自动校准 | ✅ 完成（2026-11-02：`scripts/doc-numbers-verify.py` 已被 `monthly-gate.py` 作为第 13 项调用（见 `monthly_gate.py:load_gate_config()[13]`）；21 个门禁锚点自动对齐 `target/gate-numbers.json`，执行 `python3 scripts/doc-numbers-verify.py --fix` 可修正偏差） |
 
 ## 五、每月批次归档
 
