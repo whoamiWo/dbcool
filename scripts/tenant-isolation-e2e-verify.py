@@ -12,6 +12,7 @@ import atexit
 import base64
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -26,6 +27,9 @@ TENANT_B_ID = "tenant_b"
 TENANT_B_USER = "tenantb_admin" + _uuid_mod.uuid4().hex[:4]
 PG_USER = os.environ.get("PGUSER", "nocobase")
 PG_DB = os.environ.get("PGDATABASE", "nocobase")
+PG_HOST = os.environ.get("PGHOST", "localhost")
+PG_PORT = os.environ.get("PGPORT", "5432")
+PG_PASSWORD = os.environ.get("PGPASSWORD", "test_password")
 
 
 def log(msg):
@@ -34,11 +38,41 @@ def log(msg):
 
 
 def db_sql(sql):
-    result = subprocess.run(
-        ["docker", "exec", "nocobase-postgres", "psql", "-U", PG_USER, "-d", PG_DB, "-t", "-A", "-c", sql],
-        text=True, capture_output=True
-    )
-    return result.returncode == 0, (result.stdout or "").strip(), (result.stderr or "").strip()
+    """执行 SQL，返回 (ok, stdout, stderr)。
+
+    两种运行环境都要支持：
+    1. CI（GitHub Actions services 容器）—— 没有名为 nocobase-postgres 的容器，
+       必须用本机 psql 连 PGHOST:PGPORT 的映射端口；
+    2. 本地 docker-compose —— 宿主机可能没装 psql，用 docker exec 进容器。
+    原实现只走 docker exec，导致 CI 中 admin_hash 为空（"Could not get valid admin hash"），
+    该步骤自 707925c 起一直红。
+    """
+    # 1) 本机 psql 直连（CI 走这条）
+    if shutil.which("psql"):
+        env = dict(os.environ, PGPASSWORD=PG_PASSWORD)
+        result = subprocess.run(
+            ["psql", "-h", PG_HOST, "-p", str(PG_PORT), "-U", PG_USER, "-d", PG_DB,
+             "-t", "-A", "-c", sql],
+            text=True, capture_output=True, env=env
+        )
+        if result.returncode == 0:
+            return True, (result.stdout or "").strip(), ""
+        local_err = (result.stderr or "").strip()
+    else:
+        local_err = "psql 未安装"
+
+    # 2) 回退 docker exec（本地 docker-compose 环境）
+    if shutil.which("docker"):
+        result = subprocess.run(
+            ["docker", "exec", "nocobase-postgres", "psql", "-U", PG_USER, "-d", PG_DB,
+             "-t", "-A", "-c", sql],
+            text=True, capture_output=True
+        )
+        if result.returncode == 0:
+            return True, (result.stdout or "").strip(), ""
+        return False, "", (result.stderr or "").strip() or local_err
+
+    return False, "", local_err
 
 
 def login(username, password):
