@@ -68,6 +68,28 @@ def check(name, ok, detail=""):
     return bool(ok)
 
 
+# CI（GitHub Actions）没有备份调度服务，postgres service 也未开启 WAL 归档，
+# 因此「存在备份文件」「archive_mode=on」这类前置条件在 CI 中不成立 ——
+# 属环境不具备，应 SKIP 而非 FAIL；本地/生产环境仍按 FAIL 严格判定，
+# 否则会把「备份文件真的丢了」这种严重问题当成环境差异放过去。
+IS_CI = os.environ.get("GITHUB_ACTIONS") == "true"
+skipped_items: list[tuple[str, str]] = []
+
+
+def skip(name, detail=""):
+    """记录一项因环境不具备而跳过（仅 CI 使用）。"""
+    skipped_items.append((name, detail))
+    print(f"  ⏭️  SKIP {name}" + (f" — {detail}" if detail else ""))
+    return True
+
+
+def check_or_skip(name, ok, detail="", ci_skip_reason=None):
+    """CI 下前置条件不成立时 SKIP，其它情况一律按 FAIL 记录。"""
+    if not ok and ci_skip_reason and IS_CI:
+        return skip(name, ci_skip_reason)
+    return check(name, ok, detail)
+
+
 def psql(container, sql, user=POSTGRES_USER, db="nocobase"):
     rc, out, err = run(["docker", "exec", container, "psql", "-U", user, "-d", db,
                         "-t", "-A", "-c", sql], check=False)
@@ -96,7 +118,8 @@ def rm_volume(name):
 def test_t1_backup_exists():
     print("\n=== T1: 实际备份验证 ===")
     if not TAR_FILE or not os.path.exists(TAR_FILE):
-        check("备份文件存在", False, f"not found in {BACKUP_DIR}")
+        check_or_skip("备份文件存在", False, f"not found in {BACKUP_DIR}",
+                      ci_skip_reason="CI 无备份调度服务，未生成备份文件")
         return
     size = os.path.getsize(TAR_FILE)
     check("备份文件存在", size > 1_000_000, f"{size} bytes")
@@ -118,7 +141,8 @@ def test_t2_restore_realtime():
     """T2：把备份里的 dump **真的**恢复到独立容器，并校验数据真的回来。"""
     print("\n=== T2: 恢复演练（真恢复 + 数据校验，独立容器）===")
     if not TAR_FILE:
-        check("备份可用", False, "无备份文件")
+        check_or_skip("备份可用", False, "无备份文件",
+                      ci_skip_reason="CI 无备份调度服务，未生成备份文件")
         return
 
     dump_path = "/tmp/phase94_restore_dump.pg"
@@ -243,7 +267,13 @@ def test_t3_pitr():
     # 先确认生产库归档已开启（配置层面）
     rc, out, _ = run(["docker", "exec", SRC_CONTAINER, "psql", "-U", POSTGRES_USER,
                       "-d", "nocobase", "-t", "-A", "-c", "SHOW archive_mode;"], check=False)
-    check("生产库 archive_mode = on", "on" in out.strip().lower(), out.strip())
+    archive_on = "on" in out.strip().lower()
+    check_or_skip("生产库 archive_mode = on", archive_on, out.strip(),
+                  ci_skip_reason="CI 的 postgres service 未配置 WAL 归档（PITR 无法演练）")
+    if IS_CI and not archive_on:
+        # 归档未开启时后续 archived_count / 恢复演练必然无意义，直接结束 T3
+        print("  ⏭️  SKIP T3 其余检查（依赖 WAL 归档，CI 环境不具备）")
+        return
 
     # 只 ls 归档目录不够：目录里有文件 ≠ 归档成功（归档失败时目录是空的，
     # 而曾经成功过的旧文件会让人误判）。真正的证据是 pg_stat_archiver。
@@ -427,7 +457,8 @@ def test_t4_replica_restore():
     """T4：副本恢复 —— 把备份复制到独立位置，从副本解出同样的 dump。"""
     print("\n=== T4: 副本恢复验证 ===")
     if not TAR_FILE:
-        check("副本可用", False, "无备份文件")
+        check_or_skip("副本可用", False, "无备份文件",
+                      ci_skip_reason="CI 无备份调度服务，未生成备份文件")
         return
     replica = "/tmp/phase94_backup_replica.tar.gz"
     run(["cp", TAR_FILE, replica], check=False)
@@ -461,9 +492,22 @@ def main():
     test_t4_replica_restore()
 
     failed = [r for r in results if not r[1]]
+    total = len(results)
     print("\n" + "=" * 60)
-    print(f"总计: {len(results)} | PASS: {len(results) - len(failed)} | FAIL: {len(failed)}")
+    print(f"总计: {total} | PASS: {total - len(failed)} | FAIL: {len(failed)}"
+          f" | SKIP: {len(skipped_items)}")
     print("=" * 60)
+
+    if skipped_items:
+        print("\n⏭️  因环境不具备而跳过（非失败）：")
+        for name, detail in skipped_items:
+            print(f"   - {name}：{detail}")
+        print("   → 备份/恢复/PITR 的完整验证请在本地或生产环境执行"
+              "（monthly-gate.py 的「备份/PITR 演练」会跑）")
+        if IS_CI:
+            print(f"::warning::backup-e2e 有 {len(skipped_items)} 项因 CI 环境不具备而跳过，"
+                  f"本 job 未验证备份恢复能力")
+
     return 1 if failed else 0
 
 
