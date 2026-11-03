@@ -71,6 +71,9 @@ def http(method, path, data=None, headers=None):
 def login(username, password):
     status, body = http("POST", "/api/auth/login", {"username": username, "password": password})
     if status != 200:
+        # 必须打印状态码：此前静默返回 None，CI 里只能看到"admin 登录失败"，
+        # 无法区分 401（凭据错）/ 429（限流）/ 5xx（服务故障）。
+        log(f"  ⚠️ 登录失败 username={username} status={status} body={str(body)[:200]}")
         return None
     try:
         return json.loads(body).get("data", {}).get("access_token")
@@ -186,22 +189,51 @@ def t3_integration_audit(admin_token):
     check("T3.5 入站审计 action 已定义（代码插桩）", True, "由 IntegrationAuditTest / InboundMessageService 插桩保证")
 
 
+def _redis_cli(args):
+    """执行 redis-cli，兼容两种环境：
+    1. 本机装了 redis-cli（直接连 localhost:6379）；
+    2. CI（redis 是 GitHub Actions services 容器，无 compose 项目名）
+       / 本地 compose —— 找任意 redis 容器 docker exec。
+    """
+    import shutil as _sh
+    if _sh.which("redis-cli"):
+        return subprocess.run(["redis-cli", "-h", "localhost", "-p", "6379", *args],
+                              capture_output=True, text=True)
+    if _sh.which("docker"):
+        ps = subprocess.run(["docker", "ps", "--format", "{{.ID}}\t{{.Image}}"],
+                            capture_output=True, text=True)
+        for line in (ps.stdout or "").splitlines():
+            cid, _, image = line.partition("\t")
+            if "redis" in image.lower():
+                return subprocess.run(["docker", "exec", cid, "redis-cli", *args],
+                                      capture_output=True, text=True)
+    return None
+
+
+def _clear_login_rate_limit():
+    """清掉登录相关限流 key（仅测试环境用；不触碰其它业务 key）。"""
+    try:
+        listed = _redis_cli(["KEYS", "ratelimit:*"])
+        if listed is None:
+            log("  ⚠️ 无法连接 Redis，跳过限流清理（若登录 429 请检查 Redis 可达性）")
+            return
+        keys = [k for k in (listed.stdout or "").split() if "login" in k]
+        if keys:
+            _redis_cli(["DEL", *keys])
+            log(f"  🧹 已清理 {len(keys)} 个登录限流 key")
+    except Exception as e:  # noqa: BLE001
+        log(f"  ⚠️ 限流清理异常（忽略）：{e}")
+
+
 def main():
     log("=" * 70)
     log("PHASE99: 对外 SaaS 必补三项验收")
     log("=" * 70)
 
-    # 清理自己产生的限流 key，避免与其他脚本互扰（PHASE109）
-    import subprocess as _sp
-    try:
-        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
-                 "ratelimit:ip:127.0.0.1:/api/auth/login"],
-                check=False, capture_output=True)
-        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
-                 "ratelimit:ip:172.18.0.1:/api/auth/login"],
-                check=False, capture_output=True)
-    except Exception:
-        pass
+    # 清理限流 key，避免与本 job 内前序脚本（tenant-isolation 会做大量登录）互扰。
+    # 原实现只用 `docker compose exec redis`，但 CI 中 redis 是 GitHub Actions
+    # services 容器（无 compose 项目）→ 命令必然失败 → 限流未清 → admin 登录 429。
+    _clear_login_rate_limit()
 
     # 登录拿 admin token
     admin_token = login("admin", "admin123")

@@ -216,7 +216,11 @@ def cleanup_tenant_default_resources():
     db_sql("DELETE FROM user_roles WHERE user_id IN (SELECT id FROM users WHERE tenant_id='tenant_default' AND username LIKE 'testuser_a_%');")
     db_sql("DELETE FROM users WHERE tenant_id='tenant_default' AND username LIKE 'testuser_a_%';")
     # Clean automation rules created in tenant_default
-    db_sql("DELETE FROM automation_rules WHERE tenant_id='tenant_default' AND name LIKE 'rule-a%' OR name LIKE '%-a-%';")
+    # 必须给 OR 分支加括号：AND 优先级高于 OR，原写法等价于
+    #   WHERE (tenant_id='tenant_default' AND name LIKE 'rule-a%') OR (name LIKE '%-a-%')
+    # 第二个分支没有租户限制 → 会删除所有租户中名字含 "-a-" 的自动化规则。
+    db_sql("DELETE FROM automation_rules WHERE tenant_id='tenant_default' "
+           "AND (name LIKE 'rule-a%' OR name LIKE '%-a-%');")
     # Clean wiki pages (CASCADE will delete associated blocks)
     db_sql("DELETE FROM wiki_pages WHERE tenant_id='tenant_default' AND slug LIKE 'page-a-%';")
     # Clean wiki knowledge bases (CASCADE will delete pages and categories)
