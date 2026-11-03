@@ -97,6 +97,11 @@ def _run_trivy() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = ["trivy", "fs", "--format", "json", "--output", str(out),
            "--skip-dirs", "target", str(POM_DIR)]
+    # 与 security-gates.py 的镜像扫描共用同一份忽略清单，避免「镜像扫描认为可忽略、
+    # 依赖审计却报红」的判断分裂。清单内每条都必须写明依据与复审条件。
+    ignore_file = POM_DIR.parent / ".trivyignore"
+    if ignore_file.exists():
+        cmd += ["--ignorefile", str(ignore_file)]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True,
                               timeout=OFFICIAL_TIMEOUT)

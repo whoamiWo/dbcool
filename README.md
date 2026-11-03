@@ -103,6 +103,7 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 | 文档 | 内容 |
 |---|---|
 | [`docs/PRODUCTIZATION_ROADMAP.md`](docs/PRODUCTIZATION_ROADMAP.md) | 产品化路线图（唯一权威）：展示 / 私有化 / 企业支持 |
+| [`docs/VOICE_IOT_PLAN_v2.2.md`](docs/VOICE_IOT_PLAN_v2.2.md) | 语音设备平台（Voice IoT）建设方案：小智音箱私有接入 / IM 虚拟成员 / 录音转日志 / 声纹降噪 |
 | [`docs/WAVE1_PRIVATE_DELIVERY_TASKS.md`](docs/WAVE1_PRIVATE_DELIVERY_TASKS.md) | 私有化交付包任务书（镜像/离线包/Helm/升级） |
 | [`docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`](docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md) | 七强对标实证与差距清单 |
 | [`docs/backup-restore-runbook.md`](docs/backup-restore-runbook.md) / [`docs/key-rotation-runbook.md`](docs/key-rotation-runbook.md) | 备份恢复 / 密钥轮换 |
