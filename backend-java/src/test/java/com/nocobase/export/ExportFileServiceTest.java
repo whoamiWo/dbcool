@@ -151,25 +151,50 @@ class ExportFileServiceTest {
     }
 
     @Test
-    void build_clientError_returnsServiceUnavailableReason() {
+    void build_unauthorized_returnsAuthFailedReason() {
+        when(restTemplate.exchange(any(String.class), any(), any(HttpEntity.class), eq(byte[].class)))
+                .thenThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED));
+
+        ExportFileService.Result result = service.build("xlsx", List.of("col1"), List.of(), "t");
+
+        assertFalse(result.isSuccess());
+        // 401 = 服务间令牌未配置/两侧不一致 → 配置缺陷，必须 FAIL 而非 SKIP
+        assertEquals(ExportFailureReason.UPSTREAM_AUTH_FAILED, result.reason());
+        assertEquals(5004, result.reason().getCode());
+    }
+
+    @Test
+    void build_forbidden_returnsAuthFailedReason() {
+        when(restTemplate.exchange(any(String.class), any(), any(HttpEntity.class), eq(byte[].class)))
+                .thenThrow(new HttpClientErrorException(HttpStatus.FORBIDDEN));
+
+        ExportFileService.Result result = service.build("xlsx", List.of("col1"), List.of(), "t");
+
+        assertEquals(ExportFailureReason.UPSTREAM_AUTH_FAILED, result.reason());
+    }
+
+    @Test
+    void build_clientError_returnsUpstreamRejectedReason() {
         when(restTemplate.exchange(any(String.class), any(), any(HttpEntity.class), eq(byte[].class)))
                 .thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST));
 
         ExportFileService.Result result = service.build("xlsx", List.of("col1"), List.of(), "t");
 
         assertFalse(result.isSuccess());
-        assertEquals(ExportFailureReason.SERVICE_UNAVAILABLE, result.reason());
+        // 400 = 请求体/参数不符合契约 → 真实缺陷，不得归为"服务不可用"
+        assertEquals(ExportFailureReason.UPSTREAM_REJECTED, result.reason());
     }
 
     @Test
-    void build_serverError_returnsServiceUnavailableReason() {
+    void build_serverError_returnsUpstreamErrorReason() {
         when(restTemplate.exchange(any(String.class), any(), any(HttpEntity.class), eq(byte[].class)))
                 .thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR));
 
         ExportFileService.Result result = service.build("xlsx", List.of("col1"), List.of(), "t");
 
         assertFalse(result.isSuccess());
-        assertEquals(ExportFailureReason.SERVICE_UNAVAILABLE, result.reason());
+        // 5xx = Python 侧内部缺陷 → FAIL
+        assertEquals(ExportFailureReason.UPSTREAM_ERROR, result.reason());
     }
 
     @Test
@@ -221,12 +246,32 @@ class ExportFileServiceTest {
 
     @Test
     void failureReason_codes_splitInto503And500() {
-        // 5003：服务不可用 / 配置关闭 → smoke 可 SKIP
+        // 5003：仅「连不上」与「配置关闭」两类 → smoke 可 SKIP
         assertEquals(5003, ExportFailureReason.SERVICE_UNAVAILABLE.getCode());
         assertEquals(5003, ExportFailureReason.DISABLED_BY_CONFIG.getCode());
-        // 5004：表头空 / 格式不支持 / Python 返空 → 真实缺陷，smoke 须 FAIL
+        // 5004：数据/契约/鉴权/上游缺陷 → 真实缺陷，smoke 须 FAIL
         assertEquals(5004, ExportFailureReason.EMPTY_HEADERS.getCode());
         assertEquals(5004, ExportFailureReason.UNSUPPORTED_FORMAT.getCode());
         assertEquals(5004, ExportFailureReason.EMPTY_CONTENT_FROM_PYTHON.getCode());
+        assertEquals(5004, ExportFailureReason.UPSTREAM_AUTH_FAILED.getCode());
+        assertEquals(5004, ExportFailureReason.UPSTREAM_REJECTED.getCode());
+        assertEquals(5004, ExportFailureReason.UPSTREAM_ERROR.getCode());
+    }
+
+    @Test
+    void internalToken_readsFromInternalServiceTokenEnvCompatibleChain() {
+        // 回归：原默认链缺少 INTERNAL_SERVICE_TOKEN，导致 CI 中不发送 Authorization → Python 401
+        String src = "";
+        try {
+            src = new String(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(
+                    "src/main/java/com/nocobase/export/ExportFileService.java")),
+                    java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            // 工作目录不同则跳过（CI 中 cwd=backend-java）
+            return;
+        }
+        assertTrue(src.contains("INTERNAL_SERVICE_TOKEN"),
+                "ExportFileService.internalToken 默认链必须包含 INTERNAL_SERVICE_TOKEN，"
+                        + "否则与 Python 侧 internal_service_token 无法对齐（CI 401）");
     }
 }
