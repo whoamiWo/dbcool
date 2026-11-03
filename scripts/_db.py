@@ -43,11 +43,16 @@ def _docker_container() -> str | None:
         return None
 
     rows = [ln.split("\t") for ln in out.splitlines() if ln.count("\t") == 2]
+    # 1) 本地 compose 的固定容器名
     for cid, name, _img in rows:
         if name == _COMPOSE_CONTAINER:
             return cid
+    # 2) 按镜像特征匹配。注意 CI 的 services 镜像是 pgvector/pgvector:pg16，
+    #    镜像名里并没有 "postgres" 字样，只匹配 postgres 会漏掉它。
+    _IMAGE_HINTS = ("postgres", "pgvector", "postgis", "timescale")
     for cid, _name, img in rows:
-        if "postgres" in img.lower():
+        low = img.lower()
+        if any(h in low for h in _IMAGE_HINTS):
             return cid
     return None
 
