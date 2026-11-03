@@ -730,7 +730,9 @@ jobs:
       PGHOST: localhost
       PGPORT: "5432"
       PGUSER: nocobase
-      PGPASSWORD: test_password
+      # 必须与下方 postgres service 的 POSTGRES_PASSWORD 一致（dev_password）；
+      # 原为 test_password，导致任何用 PGPASSWORD 直连的脚本认证失败。
+      PGPASSWORD: dev_password
       PGDATABASE: nocobase
     runs-on: ubuntu-latest
     needs: [java-test]
@@ -847,7 +849,10 @@ jobs:
       PGHOST: localhost
       PGPORT: "5432"
       PGUSER: nocobase
-      PGPASSWORD: test_password
+      # 必须与下方 postgres service 的 POSTGRES_PASSWORD 一致（dev_password）。
+      # 原为 test_password：tenant-isolation-e2e-verify 用 PGPASSWORD 直连取 admin
+      # password_hash 时认证失败 → "Could not get valid admin hash"（自 707925c 起一直红）。
+      PGPASSWORD: dev_password
       PGDATABASE: nocobase
     runs-on: ubuntu-latest
     needs: [java-test]
