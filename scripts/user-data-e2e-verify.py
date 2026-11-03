@@ -58,17 +58,10 @@ def check(name, ok, detail=""):
     print(("  ✅ " if ok else "  ❌ ") + name + (("  — " + detail) if detail else ""))
 
 
-def db_sql(sql):
-    """直连 Postgres 准备/校验数据（与 saas-readiness-verify.py 同风格）。
-
-    用于 AI 会话匿名化的端到端验证：fixture 只负责"造一条真实会话"，
-    被测的删除与校验仍走真实 HTTP + 真实库，不 mock。
-    """
-    r = subprocess.run(
-        ["docker", "exec", "nocobase-postgres", "psql",
-         "-U", PG_USER, "-d", PG_DB, "-t", "-A", "-c", sql],
-        text=True, capture_output=True)
-    return r.returncode == 0, (r.stdout or "").strip(), (r.stderr or "").strip()
+# 直连 Postgres 准备/校验数据：fixture 只负责"造一条真实会话"，
+# 被测的删除与校验仍走真实 HTTP + 真实库，不 mock。
+# 连接方式由 _db 统一（CI 用 psql 直连，本地回退 docker exec）。
+from _db import db_sql  # noqa: E402
 
 
 def main():
