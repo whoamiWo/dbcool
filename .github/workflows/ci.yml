@@ -91,7 +91,11 @@ jobs:
     # v2.1.3：Trivy 需下载官方二进制与漏洞库（CI 网络/证书受限，exit 100）；
     # 阻断级依赖审计已由 scripts/java-dependency-audit.py（java-test job）承担，
     # 此处保留为非阻断告警。
-    continue-on-error: true
+    #
+    # 注意 continue-on-error 已从 job 级**下移到具体扫描步骤**：
+    #   - 镜像构建失败（Dockerfile 坏/构建参数缺）是真缺陷 → 必须让 job 红；
+    #   - 扫描命中 HIGH/CRITICAL 暂不阻断（避免基础镜像存量 CVE 一次把 CI 打红），
+    #     但报告仍上传、结果写进 job summary，可据此逐步收紧。
     runs-on: ubuntu-latest
     needs: [java-test, python-test, frontend-test]
     steps:
@@ -135,14 +139,66 @@ jobs:
         with:
           python-version: "3.12"
 
+      # backend-java/Dockerfile 的多阶段构建里 COPY target/nocobase-backend-*.jar，
+      # 即 jar 必须由宿主机预先产出（alpine 构建阶段不跑 maven）。
+      # frontend / crdt-service / backend-python 的 Dockerfile 自包含，无需前置产物。
+      - name: Set up JDK 21 (backend-java image needs host jar)
+        if: steps.trivy_check.outputs.trivy_available == 'true' && steps.docker_check.outputs.available == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Package backend-java jar for image build
+        if: steps.trivy_check.outputs.trivy_available == 'true' && steps.docker_check.outputs.available == 'true'
+        run: |
+          cd backend-java
+          mvn -B -q -DskipTests -Djacoco.skip=true package
+          ls -lh target/nocobase-backend-*.jar
+
+      - name: Set up Docker Buildx (for image scanning)
+        if: steps.trivy_check.outputs.trivy_available == 'true' && steps.docker_check.outputs.available == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      # 必须先真实构建镜像：此前 scan-images 用 --skip-build，而 CI 里没有任何
+      # docker build 步骤 → 4 个镜像全不存在 → security-gates.py 逐个 SKIP →
+      # 镜像扫描名存实亡（看似绿，实则一个镜像都没扫）。
+      # 用 gha 层缓存：命中后约 1-3 分钟，首次未命中约 5-10 分钟。
+      # 本步骤不加 continue-on-error：构建失败是真缺陷（Dockerfile 坏/构建参数缺）。
+      - name: Build service images for scanning
+        if: steps.trivy_check.outputs.trivy_available == 'true' && steps.docker_check.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          for svc in backend-java backend-python crdt-service frontend; do
+            echo "::group::build noco/$svc:latest"
+            docker buildx build \
+              --tag "noco/$svc:latest" \
+              --load \
+              --cache-from "type=gha,scope=$svc" \
+              --cache-to "type=gha,mode=max,scope=$svc" \
+              "$svc"
+            echo "::endgroup::"
+          done
+          echo "--- 已构建镜像 ---"
+          docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}' | grep '^noco/'
+
       - name: Run Trivy image scans
+        # 扫出 HIGH/CRITICAL 暂不阻断 job（基础镜像存量 CVE 会一次打红 CI），
+        # 但报告会上传、结果会写进 summary，据此再决定是否收紧为阻断。
+        continue-on-error: true
         if: steps.trivy_check.outputs.trivy_available == 'true' && steps.docker_check.outputs.available == 'true'
         run: |
           python3 scripts/security-gates.py scan-images \
             --fail-on HIGH,CRITICAL \
             --skip-build
+          echo "### 🛡️ 镜像扫描已完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "已扫描 4 个服务镜像（backend-java / backend-python / crdt-service / frontend）。" >> $GITHUB_STEP_SUMMARY
+          echo "失败阈值 HIGH,CRITICAL；明细见 artifact \`trivy-reports\`。" >> $GITHUB_STEP_SUMMARY
 
       - name: Run Trivy dependency scans
+        continue-on-error: true
         if: steps.trivy_check.outputs.trivy_available == 'true'
         run: |
           python3 scripts/security-gates.py scan-deps \
