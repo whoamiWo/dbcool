@@ -52,6 +52,15 @@ def _docker_container() -> str | None:
     return None
 
 
+def pg_container() -> str | None:
+    """返回可用的 Postgres 容器 ID（供 backup-e2e 之类需要 docker exec 的脚本用）。
+
+    CI 中返回 GitHub Actions services 容器；本地返回 docker-compose 的
+    nocobase-postgres。找不到返回 None。
+    """
+    return _docker_container()
+
+
 def db_sql(sql: str, timeout: int = 120):
     """执行 SQL，返回 (ok, stdout, stderr)。
 

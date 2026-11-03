@@ -37,6 +37,11 @@ tar_files = sorted([f for f in os.listdir(BACKUP_DIR) if f.endswith(".tar.gz")],
 TAR_FILE = os.path.join(BACKUP_DIR, tar_files[0]) if tar_files else None
 
 POSTGRES_USER = "nocobase"
+# 源库容器：CI 为 GitHub Actions services 容器（无 nocobase-postgres 名称），
+# 本地为 docker-compose 容器 —— 由 _db.pg_container() 统一发现。
+# 硬编码容器名会让 CI 中 pg_dump / docker cp 全部失败。
+from _db import pg_container  # noqa: E402
+SRC_CONTAINER = pg_container() or "nocobase-postgres"
 POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "dev_password")
 PG_IMAGE = "pgvector/pgvector:pg16"
 RESTORE_CONTAINER = "postgres-restore-test"
@@ -140,16 +145,16 @@ def test_t2_restore_realtime():
     # 二进制不经 stdout：在容器内落文件再 docker cp 出来，避免 text=True 解码损坏。
     live_dump = "/tmp/phase95_live_dump.pg"
     live_in_ct = "/tmp/phase95_live_dump.pg"
-    rc_live, _, err_live = run(["docker", "exec", "nocobase-postgres", "pg_dump",
+    rc_live, _, err_live = run(["docker", "exec", SRC_CONTAINER, "pg_dump",
                                 "-U", POSTGRES_USER, "-d", "nocobase",
                                 "-Fc", "-f", live_in_ct], check=False)
     if rc_live == 0:
-        run(["docker", "cp", f"nocobase-postgres:{live_in_ct}", live_dump], check=False)
-    run(["docker", "exec", "nocobase-postgres", "rm", "-f", live_in_ct], check=False)
+        run(["docker", "cp", f"{SRC_CONTAINER}:{live_in_ct}", live_dump], check=False)
+    run(["docker", "exec", SRC_CONTAINER, "rm", "-f", live_in_ct], check=False)
     live_size = os.path.getsize(live_dump) if os.path.exists(live_dump) else 0
     src_at_dump = {}
     for table in ("users", "tenant"):
-        src_at_dump[table] = psql("nocobase-postgres", f"select count(*) from {table}")
+        src_at_dump[table] = psql(SRC_CONTAINER, f"select count(*) from {table}")
     check("当场生成源库 dump（记录数一致的比对基准）",
           rc_live == 0 and live_size > 0,
           f"rc={rc_live}, {live_size} bytes"
@@ -176,14 +181,14 @@ def test_t2_restore_realtime():
     print(f"     （pg_restore rc={rc}，继续校验数据）")
 
     # 校验：表数量
-    src_tables = psql("nocobase-postgres",
+    src_tables = psql(SRC_CONTAINER,
                       "select count(*) from information_schema.tables where table_schema='public'")
     got_tables = psql(RESTORE_CONTAINER,
                       "select count(*) from information_schema.tables where table_schema='public'")
     # 备份是**某个时点的快照**：备份之后在源库新建的表，本来就不该出现在恢复结果里。
     # 所以主断言是"关键表都在"，表总数差异只作提示（并列出差异表以便核对）。
     if src_tables != got_tables:
-        src_set = set(psql("nocobase-postgres",
+        src_set = set(psql(SRC_CONTAINER,
                            "select table_name from information_schema.tables where table_schema='public'").split())
         got_set = set(psql(RESTORE_CONTAINER,
                            "select table_name from information_schema.tables where table_schema='public'").split())
@@ -206,7 +211,7 @@ def test_t2_restore_realtime():
               f"导出时源库={exp_n} 恢复库={got_n}")
 
     # 校验：具体一条记录的内容（不是只看数量）
-    src_user = psql("nocobase-postgres", "select username from users order by username limit 1")
+    src_user = psql(SRC_CONTAINER, "select username from users order by username limit 1")
     got_user = psql(RESTORE_CONTAINER, "select username from users order by username limit 1")
     check("具体记录内容一致（首条用户名）",
           src_user != "" and src_user == got_user, f"源库={src_user} 恢复库={got_user}")
@@ -236,7 +241,7 @@ def test_t3_pitr():
     print("\n=== T3: PITR 时间点恢复演练（独立容器）===")
 
     # 先确认生产库归档已开启（配置层面）
-    rc, out, _ = run(["docker", "exec", "nocobase-postgres", "psql", "-U", POSTGRES_USER,
+    rc, out, _ = run(["docker", "exec", SRC_CONTAINER, "psql", "-U", POSTGRES_USER,
                       "-d", "nocobase", "-t", "-A", "-c", "SHOW archive_mode;"], check=False)
     check("生产库 archive_mode = on", "on" in out.strip().lower(), out.strip())
 
@@ -248,9 +253,9 @@ def test_t3_pitr():
     # 门禁会因"时序抖动"误报 FAIL（archived_count=0 但归档配置完全正常）。
     # 这里主动 checkpoint + switch，给 archiver 一个真实的归档机会（最多等 20s），
     # 然后仍要求 archived_count > 0：归档没成功照样 FAIL，非弱化断言。
-    psql("nocobase-postgres", "checkpoint; select pg_switch_wal()")
+    psql(SRC_CONTAINER, "checkpoint; select pg_switch_wal()")
     for _ in range(10):
-        stat = psql("nocobase-postgres",
+        stat = psql(SRC_CONTAINER,
                     "select archived_count || '|' || failed_count from pg_stat_archiver")
         if stat and stat.split("|")[0].strip().isdigit() and int(stat.split("|")[0]) > 0:
             break
