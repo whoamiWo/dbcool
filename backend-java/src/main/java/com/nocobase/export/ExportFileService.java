@@ -39,8 +39,16 @@ public class ExportFileService {
     @Value("${export.python-url:${ai.python-url:http://localhost:8000}}")
     private String pythonUrl;
 
-    /** 服务间调用令牌（Python 侧 internal_service_token）。 */
-    @Value("${export.internal-token:${export.internal-token:${AI_INTERNAL_TOKEN:${EXPORT_INTERNAL_TOKEN:}}}}")
+    /**
+     * 服务间调用令牌（Python 侧 {@code internal_service_token}）。
+     *
+     * <p>取值优先级：{@code export.internal-token} → {@code INTERNAL_SERVICE_TOKEN}
+     * → {@code AI_INTERNAL_TOKEN} → {@code EXPORT_INTERNAL_TOKEN}。
+     * 必须包含 {@code INTERNAL_SERVICE_TOKEN}：Python 侧 SDK 与 CI/docker-compose 都用该变量名，
+     * 原配置只读 AI_INTERNAL_TOKEN/EXPORT_INTERNAL_TOKEN，导致 CI 中 Java 不带 Authorization
+     * → Python 返回 401 → 导出链路被误判为"服务不可用"而 SKIP（实测于 CI regression job）。
+     */
+    @Value("${export.internal-token:${INTERNAL_SERVICE_TOKEN:${AI_INTERNAL_TOKEN:${EXPORT_INTERNAL_TOKEN:}}}}")
     private String internalToken;
 
     /** 导出开关：false 时直接返回空，避免无谓的外部调用。 */
@@ -120,6 +128,24 @@ public class ExportFileService {
             log.info("[导出] 生成成功 format={} bytes={} rows={}", fmt, data.length,
                     rows == null ? 0 : rows.size());
             return Result.ok(data);
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // 连不上 / 超时：Python 服务未就绪 —— 这才是真正的"可选依赖缺失"
+            log.error("[导出] 无法连接 Python 导出服务 url={} format={} err={}",
+                    pythonUrl, fmt, e.getMessage());
+            return Result.fail(ExportFailureReason.SERVICE_UNAVAILABLE);
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            // 4xx：401/403 是令牌配置不一致，其它 4xx 是请求契约问题，均属真实缺陷
+            int sc = e.getStatusCode().value();
+            log.error("[导出] Python 返回 {} url={} format={} body={}",
+                    sc, pythonUrl, fmt, e.getResponseBodyAsString());
+            return Result.fail(sc == 401 || sc == 403
+                    ? ExportFailureReason.UPSTREAM_AUTH_FAILED
+                    : ExportFailureReason.UPSTREAM_REJECTED);
+        } catch (org.springframework.web.client.HttpServerErrorException e) {
+            // 5xx：Python 侧内部缺陷
+            log.error("[导出] Python 内部错误 {} url={} format={} body={}",
+                    e.getStatusCode().value(), pythonUrl, fmt, e.getResponseBodyAsString());
+            return Result.fail(ExportFailureReason.UPSTREAM_ERROR);
         } catch (RestClientException e) {
             log.error("[导出] 调用 Python 导出服务失败 url={} format={} err={}",
                     pythonUrl, fmt, e.getMessage());

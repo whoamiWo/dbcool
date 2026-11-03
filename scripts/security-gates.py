@@ -64,11 +64,57 @@ def _run(cmd: list[str], timeout: int = TIMEOUT_SEC) -> tuple[int, str]:
         return 2, f"超时({timeout}s): {' '.join(cmd[:3])}..."
 
 
+# 外部依赖受限的标记：命中的是"环境不具备扫描条件"，不是代码缺陷 → SKIP 而非失败。
+# 例：CI 中 trivy 解析 pom.xml 需访问 Maven Central，遇 429 限流会 FATAL 退出。
+_ENV_LIMIT_MARKERS = (
+    "429 Too Many Requests",
+    "Retry-After:",
+    "no such host",
+    "PKIX path building failed",
+    "tls: handshake failure",
+    "dial tcp",
+    "network is unreachable",
+)
+
+
+def _env_limited(out: str) -> bool:
+    lowered = out.lower()
+    return any(m.lower() in lowered for m in _ENV_LIMIT_MARKERS)
+
+
+def _merge_rc(state: dict, rc: int) -> None:
+    """累积扫描状态。
+
+    不能用 max()：漏洞(1)与执行错误(2)同时出现时 max 会取 2，
+    把「确实扫出了 HIGH 漏洞」这一更强的阻断信号覆盖成「执行出错」，
+    导致真实漏洞被当成工具故障忽略。
+    """
+    if rc == 1:
+        state["vuln"] = True
+    elif rc == 2:
+        state["error"] = True
+
+
+def _final_rc(state: dict) -> int:
+    # 有确认漏洞则优先阻断；其次才报执行错误
+    return 1 if state["vuln"] else (2 if state["error"] else 0)
+
+
 def _sev_report(cmd: list[str], fail_on: list[str], json_out: Path, label: str) -> int:
-    """通用 trivy 报告解析 + 命中判定。"""
+    """通用 trivy 报告解析 + 命中判定。
+
+    返回值：0 = 干净或环境受限跳过；1 = 命中阻断级漏洞；2 = 执行错误。
+    """
     json_out.parent.mkdir(parents=True, exist_ok=True)
     rc, out = _run(cmd + ["--format", "json", "--output", str(json_out)])
     if rc != 0:
+        if _env_limited(out):
+            print(f"⏭️  SKIP: {label} 受外部仓库/网络限制无法解析依赖（非代码缺陷）")
+            snippet = [ln for ln in out.splitlines() if "Too Many Requests" in ln or "no such host" in ln
+                       or "PKIX" in ln or "dial tcp" in ln]
+            for ln in snippet[:3]:
+                print(f"     {ln.strip()[:200]}")
+            return 0
         print(f"❌ {label} 失败 rc={rc}", file=sys.stderr)
         print(out[-1500:], file=sys.stderr)
         return 2
@@ -102,7 +148,7 @@ def cmd_scan_images(args: argparse.Namespace) -> int:
         print("❌ 需要 trivy 与 docker 两者都存在", file=sys.stderr)
         return 2
     fail_on = [s.strip().upper() for s in args.fail_on.split(",")]
-    rc_total = 0
+    state = {"vuln": False, "error": False}
     scanned = 0
     skipped: list[str] = []
     for df in DOCKERFILES:
@@ -131,12 +177,12 @@ def cmd_scan_images(args: argparse.Namespace) -> int:
                          fail_on, BASE / "target" / f"trivy-{svc}.json",
                          f"{svc} 镜像")
         scanned += 1
-        rc_total = max(rc_total, rc)
+        _merge_rc(state, rc)
     if scanned == 0 and skipped:
         print(f"⚠️  全部 {len(skipped)} 个服务镜像均不存在，未执行镜像扫描：{', '.join(skipped)}")
         print("   （属环境未准备，跳过；如需真实扫描请去掉 --skip-build 或在 CI 中先 build）")
         return 0
-    return rc_total
+    return _final_rc(state)
 
 
 def cmd_scan_deps(args: argparse.Namespace) -> int:
@@ -144,7 +190,7 @@ def cmd_scan_deps(args: argparse.Namespace) -> int:
         print("❌ 未找到 trivy 二进制", file=sys.stderr)
         return 2
     fail_on = [s.strip().upper() for s in args.fail_on.split(",")]
-    rc_total = 0
+    state = {"vuln": False, "error": False}
     for kind, rel in DEP_TARGETS:
         target = BASE / rel
         if not target.exists():
@@ -157,8 +203,8 @@ def cmd_scan_deps(args: argparse.Namespace) -> int:
                           str(target.parent)],
                          fail_on, BASE / "target" / f"trivy-{kind}.json",
                          f"{kind} 依赖")
-        rc_total = max(rc_total, rc)
-    return rc_total
+        _merge_rc(state, rc)
+    return _final_rc(state)
 
 
 def cmd_zap_baseline(args: argparse.Namespace) -> int:

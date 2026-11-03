@@ -10,10 +10,19 @@ package com.nocobase.export;
 public enum ExportFailureReason {
     /** Python 服务未响应 / 连接超时 → 可选依赖缺失。 */
     SERVICE_UNAVAILABLE(5003, "导出服务暂不可用，请确认 Python 导出服务已启用"),
-    
+
     /** export.enabled=false (配置关闭) → 可选依赖缺失。 */
     DISABLED_BY_CONFIG(5003, "导出功能已禁用（export.enabled=false）"),
-    
+
+    /** 401/403：服务间令牌未配置或两侧不一致 → 配置缺陷，必须暴露而非跳过。 */
+    UPSTREAM_AUTH_FAILED(5004, "导出服务鉴权失败（服务间令牌未配置或与 Python 侧不一致）"),
+
+    /** 其它 4xx：请求体/参数不符合契约 → 契约缺陷。 */
+    UPSTREAM_REJECTED(5004, "导出服务拒绝了请求（请求参数或数据不符合契约）"),
+
+    /** 5xx：Python 侧内部缺陷。 */
+    UPSTREAM_ERROR(5004, "导出服务内部错误，请查看 Python 侧日志"),
+
     /** 表头为空 → 数据缺陷。 */
     EMPTY_HEADERS(5004, "表头为空，无法生成导出文件"),
     
