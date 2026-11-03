@@ -35,3 +35,13 @@ id_ed25519
 logs/
 .cache/
 __pycache__/
+
+# === 已评估的具体 CVE（必须逐条写明依据，禁止写 CVE-* 或 * 通配）===
+# CVE-2026-116689 (HIGH) — follow-redirects@1.16.2（npm 最新版，无更高修复版本）
+# 依据：axios 的 package.json "browser" 字段将 "./lib/adapters/http.js" 映射为
+#       "./lib/helpers/null.js"，而 follow-redirects 仅被 lib/adapters/http.js 引用
+#       → 浏览器生产 bundle 不包含该模块，漏洞仅 Node 侧（vitest/playwright 工具链）可达。
+# 其余 3 条（CVE-2026-111755 / 111756 / 116689 旧范围）已通过 package.json overrides
+#       将 follow-redirects 由 1.16.0 升至 1.16.2 消除，不在此列。
+# 评估记录：RISK_REGISTER.md §四 风险评估矩阵。复审条件：上游发布 >1.16.2 时立即移除本条。
+CVE-2026-116689

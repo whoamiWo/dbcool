@@ -111,6 +111,7 @@
 | MUI v5/v9 混用类型报错 | 中 | 中 | 🟡 中 | ⏳ 执行中 |
 | 钉钉审核延迟 | 中 | 高 | 🟡 中 | 预留缓冲时间 |
 | 单兵开发进度紧张 | 高 | 高 | 🟡 中 | 砍功能优先 |
+| follow-redirects CVE-2026-116689（HIGH） | 低 | 低 | 🟢 低 | ✅ 已评估：`axios` 的 `browser` 字段把 `lib/adapters/http.js` 映射为 `null.js`，而 follow-redirects 仅被该文件引用 → **浏览器 bundle 不含此模块**，仅 Node 侧（测试工具链）可达；且 1.16.2 为 npm 最新版（无更高修复版）。已在 `.trivyignore` 注明依据，其余 3 条 CVE（111755/111756）已通过 overrides 升至 1.16.2 消除 |
 
 ---
 
