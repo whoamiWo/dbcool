@@ -215,8 +215,10 @@ jobs:
 
   security-zap:
     name: 🛡️ Security (ZAP Baseline)
-    runs-on: ubuntu-latest
-    needs: [security-trivy]
+    # ZAP 自己执行 mvn clean package，与 Trivy 无产物依赖，不再串行等待镜像构建。
+    # 若改为 needs: [java-test] 则与 Trivy 并行（约短 6 至 10 分钟），
+    # 若保持 needs: [security-trivy] 则 Trivy 排队结束后才开始。
+    needs: [java-test]
     services:
       postgres:
         image: pgvector/pgvector:pg16

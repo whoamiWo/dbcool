@@ -112,8 +112,10 @@
 | 钉钉审核延迟 | 中 | 高 | 🟡 中 | 预留缓冲时间 |
 | 单兵开发进度紧张 | 高 | 高 | 🟡 中 | 砍功能优先 |
 | follow-redirects CVE-2026-116689（HIGH） | 低 | 低 | 🟢 低 | ✅ 已评估：`axios` 的 `browser` 字段把 `lib/adapters/http.js` 映射为 `null.js`，而 follow-redirects 仅被该文件引用 → **浏览器 bundle 不含此模块**，仅 Node 侧（测试工具链）可达；且 1.16.2 为 npm 最新版（无更高修复版）。已在 `.trivyignore` 注明依据，其余 3 条 CVE（111755/111756）已通过 overrides 升至 1.16.2 消除 |
-| 镜像扫描：基础镜像存量 CVE（131 条 HIGH/CRITICAL） | 中 | 中 | 🟡 中 | ✅ 2026-11-03 用 Trivy 0.76.1 实测分类：frontend 53 条全来自 `nginx:1.27-alpine`；backend-python 70 条中 68 条来自 `python:3.12-slim`（其中 53 条上游暂无修复版本）；crdt-service 4 条来自 OS 层；backend-java 6 条来自 `eclipse-temurin:21-jre-alpine`。另有 crdt-service 的 22 条来自 Node.js 内置 npm 依赖、backend-python 2 条语言级依赖。处置：随基础镜像/Node 运行时升级收敛（需同步回归 smoke，属独立变更），本轮不收紧为阻断 |
+| 镜像扫描：基础镜像存量 CVE（160 条 HIGH/CRITICAL） | 中 | 中 | 🟡 中 | ✅ 2026-11-03 用 Trivy 0.76.1 实测分类：frontend 53 条全来自 `nginx:1.27-alpine`；backend-python 70 条中 68 条来自 `python:3.12-slim`（其中 53 条上游暂无修复版本）；crdt-service 26 条（os-pkgs 4 + lang-pkgs 22，后者来自 Node.js 内置 npm 依赖）；backend-java 11 条（os-pkgs 6 来自 `eclipse-temurin:21-jre-alpine`，lang-pkgs 5 来自应用依赖）。处置：随基础镜像/Node 运行时升级收敛（需同步回归 smoke，属独立变更），本轮不收紧为阻断 |
 | 镜像扫描：backend-java 残留 5 条 | 低 | 中 | 🟢 低 | 已由 81 条降至 11 条（Boot 3.5.16 + 覆盖 tomcat/netty/jackson/amqp/postgresql/guava/bouncycastle/snappy/httpcore5）。残留 `spring-webmvc`+`spring-webflux` 各 2 条需 Boot 4；`minio:8.5.17` 1 条升 8.6.0 需连带迁移 okhttp3 |
+| 镜像扫描：CVE-2026-47884 / CVE-2026-47890 / CVE-2026-47892 | 低 | 中 | 🟢 低 | `spring-webmvc` / `spring-webflux` 6.2.19 6.2.16，仅 7.0.9（Spring Framework 7，即 Boot 4）修复；需独立排期升 Boot 4 并全量回归 |
+| 镜像扫描：CVE-2025-59952 | 低 | 中 | 🟢 低 | `minio:8.5.17` 升 8.6.0 会因 okhttp3 传递依赖变更导致编译失败（class file for okhttp3.HttpUrl not found），需连带引入/迁移 okhttp |
 
 ---
 
