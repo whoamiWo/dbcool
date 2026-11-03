@@ -44,12 +44,7 @@ def check(name, ok, detail=""):
         log(f"  ❌ {name} — {detail}")
 
 
-def db_sql(sql):
-    result = subprocess.run(
-        ["docker", "exec", "nocobase-postgres", "psql", "-U", PG_USER, "-d", PG_DB, "-t", "-A", "-c", sql],
-        text=True, capture_output=True
-    )
-    return result.returncode == 0, (result.stdout or "").strip(), (result.stderr or "").strip()
+from _db import db_sql  # noqa: E402  （scripts/ 为脚本目录，直接同目录导入）
 
 
 def http(method, path, data=None, headers=None):
