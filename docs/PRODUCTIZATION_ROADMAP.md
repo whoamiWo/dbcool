@@ -30,7 +30,7 @@
 
 ### 2.1 门禁基线（本次实跑）
 
-> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2626 run / 0F / 0E（BUNDLE LINE 80.29），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/13、租户隔离 16/16。
+> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2713 run / 0F / 0E（BUNDLE LINE 75.03），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/13、租户隔离 16/16。
 
 | 项 | 命令 | 实测结果 |
 |---|---|---|
@@ -73,6 +73,26 @@ issue 模板/SECURITY 披露流程，`NOTICE` 表述与新方向冲突）。
 **判定规则**：任务一旦触碰业务行为代码 → 停下来确认是否破例。
 **例外通道（能力扩容白名单）**：仅当①已有客户明确书面需求，②单项工作 ≤2 人日，③不改变既有数据模型语义，
 ④需用户逐条书面批准。四条缺一不得开工。
+
+#### 3.1 E1–E4 白名单（企业自用闭环，2026-11-04 用户批准）
+
+「不新增业务功能」的冻结**仅对下列 E1–E4 四项开例外**，其余禁止项（架构重构、性能优化、为展示改产品行为
+等）全部保留。
+
+| 编号 | 能力 | 交付范围 | 依据 |
+|---|---|---|---|
+| **E1** | 组织架构与通讯录 | `org_unit` 部门树 + `users` 组织字段 + 通讯录页 + 管理员组织结构页 | 企业"谁是谁"不存在 → 审批/权限无法落地 |
+| **E2** | 审批单据 | `approval_template/request/cc` + 审批中心（发起/待办/抄送）+ 审批链由 WorkflowEngine 驱动 | 企业"要批什么"无法发起 |
+| **E3** | 通知中心 | `messages` 加列 + `NotifyDispatcher` + 7 类模板 + 顶栏铃铛/通知中心页 | 企业"通知到人"未统一 |
+| **E4** | 统一搜索 | 索引写入语义重写 + 搜索侧 ACL 下推 + 全局搜索框/结果页 | 业务记录"既搜不到也判不了权限" |
+
+- **权威任务书**：[`docs/PLANS/enterprise-suite-capability-plan.md`](./PLANS/enterprise-suite-capability-plan.md)
+  （若未归档则以 `.kilo/plans/1793748579863-enterprise-suite-capability-plan.md` 为准）。
+- **前置止血**：上述四项之下压着 7 个静默失效缺陷（A-1..A-7，见计划 §2），必须先修完再开新功能；
+  A-1..A-6 为独立止血批次（T1），A-7 随审批（T3）一并修。
+- 白名单**不含**：日程/会议、移动工作台、xlsx 导入迁移、后台治理页补齐、RocketChat 互通、会签/或签/加签/转办、
+  真实支付网关。这些仍按 §3 主表禁止，重新启用条件见计划 §8。
+- 判定口径不放松：**①存在文件 ≠ ②已接线 ≠ ③端到端可用**，E1–E4 每项都必须带实测输出。
 
 ---
 
@@ -195,7 +215,7 @@ Wave 4    持续迭代节奏            长期
 
 | 门禁 | 命令 | 基线（实测于 2026-10-30 @02b3a59） |
 |---|---|---|
-| 后端 | `cd backend-java && mvn -o verify` | 2626 run / 0F / 0E；JaCoCo BUNDLE line 0.8007（红线 ≥ 0.79） |
+| 后端 | `cd backend-java && mvn -o verify` | 2713 run / 0F / 0E；JaCoCo BUNDLE line 0.8007（红线 ≥ 0.79） |
 | 前端单测 | `cd frontend && npm run test:run` | 972 passed / 0 failed / **0 unhandled errors**；行覆盖率 77.12% |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors |
 | E2E | `cd frontend && npx playwright test` | 上次实测 159/159；**本轮未实测，按实际报** |

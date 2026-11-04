@@ -1,6 +1,9 @@
 package com.nocobase.search;
 
 import com.nocobase.event.RecordChangeEvent;
+import com.nocobase.meta.CollectionMetaEntity;
+import com.nocobase.meta.CollectionService;
+import com.nocobase.meta.FieldDef;
 import com.nocobase.im.entity.ImMessageEntity;
 import com.nocobase.im.MessageService;
 import com.nocobase.project.ProjectTaskEntity;
@@ -15,7 +18,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -37,15 +42,19 @@ public class SearchIndexSyncListener {
     private final WikiPageService wikiPageService;
     private final MessageService messageService;
     private final ProjectService projectService;
+    /** A-6：需要集合元数据来推断可检索字段（业务集合没有 title/content 列）。 */
+    private final CollectionService collectionService;
 
     public SearchIndexSyncListener(UnifiedSearchService searchService,
                                     WikiPageService wikiPageService,
                                     MessageService messageService,
-                                    ProjectService projectService) {
+                                    ProjectService projectService,
+                                    CollectionService collectionService) {
         this.searchService = searchService;
         this.wikiPageService = wikiPageService;
         this.messageService = messageService;
         this.projectService = projectService;
+        this.collectionService = collectionService;
     }
 
     @Async
@@ -152,16 +161,104 @@ public class SearchIndexSyncListener {
         }
     }
 
+    /**
+     * A-6 修复：业务记录索引写入。
+     *
+     * <p>修复前只取 {@code data.title} / {@code data.content} —— 业务集合的字段名
+     * 通常是 {@code name}/{@code customer_name}/{@code remark}…，取不到就写空，
+     * 于是"业务记录搜不出来"；而 {@code metadata} 直接塞整条记录，既泄露全字段，
+     * 又丢了所属 collection 信息（搜索侧无法做 ACL 判定）。
+     *
+     * <p>现在的推断规则（决策 D10，纯推断，不新增元数据配置）：
+     * <ol>
+     *   <li>标题：优先字段名 {@code name}/{@code title} 的文本字段；否则第一个
+     *       {@code text} 字段；再否则 {@code {集合名} #{recordId 前 8 位}}</li>
+     *   <li>正文：拼接所有文本类字段值（text/email/url/phone/select/multiSelect），
+     *       截断 4096 字符</li>
+     *   <li>元数据白名单：{@code collection / recordId / displayValue}，不放整条记录</li>
+     * </ol>
+     */
+    /**
+     * 存量重建入口（T5.1）：用与增量同步**完全相同**的推断逻辑重建一条记录索引。
+     *
+     * <p>只给 {@code SearchReindexRunner} 使用，避免维护第二套字段推断代码。
+     */
+    public void reindexRecord(String collection, String recordId, String tenantId,
+                              Map<String, Object> data) {
+        syncRecord(new RecordChangeEvent(RecordChangeEvent.ChangeType.UPDATE,
+                collection, recordId, data, tenantId, null));
+    }
+
     private void syncRecord(RecordChangeEvent event) {
-        // Collection 记录走统一 record 类型索引
-        Map<String, Object> data = event.getData();
-        String title = data != null ? String.valueOf(data.getOrDefault("title", "")) : "";
-        String content = data != null ? String.valueOf(data.getOrDefault("content", "")) : "";
         if (event.getChangeType() == RecordChangeEvent.ChangeType.DELETE) {
             searchService.removeEntity("record", event.getRecordId(), event.getTenantId());
-        } else {
-            searchService.indexEntity("record", event.getRecordId(), event.getTenantId(),
-                    title, content, data);
+            return;
         }
+        Map<String, Object> data = event.getData() == null ? Map.of() : event.getData();
+        String collection = event.getCollectionName();
+        List<FieldDef> fields = resolveFields(collection, event.getTenantId());
+
+        String title = inferTitle(data, fields, collection, event.getRecordId());
+        String content = buildContent(data, fields);
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("collection", collection);
+        meta.put("recordId", event.getRecordId());
+        meta.put("displayValue", title);
+
+        searchService.indexEntity("record", event.getRecordId(), event.getTenantId(),
+                title, content, meta);
+    }
+
+    private List<FieldDef> resolveFields(String collection, String tenantId) {
+        if (collection == null) return List.of();
+        try {
+            CollectionMetaEntity meta = collectionService.get(collection, tenantId);
+            return meta == null ? List.of() : collectionService.parseFields(meta);
+        } catch (Exception e) {
+            log.warn("集合元数据解析失败 collection={} error={}", collection, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private static final Set<String> SEARCHABLE_TYPES = Set.of(
+            "text", "email", "url", "phone", "select", "multiSelect", "longText");
+
+    private static String inferTitle(Map<String, Object> data, List<FieldDef> fields,
+                                     String collection, String recordId) {
+        for (String preferred : List.of("name", "title")) {
+            Object v = data.get(preferred);
+            if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v);
+        }
+        for (FieldDef f : fields) {
+            if ("text".equalsIgnoreCase(f.type())) {
+                Object v = data.get(f.name());
+                if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v);
+            }
+        }
+        String idPart = recordId == null ? "unknown"
+                : recordId.length() > 8 ? recordId.substring(0, 8) : recordId;
+        String label = collection == null || collection.isBlank() ? "记录" : collection;
+        return label + " #" + idPart;
+    }
+
+    private static String buildContent(Map<String, Object> data, List<FieldDef> fields) {
+        StringBuilder sb = new StringBuilder();
+        if (fields.isEmpty()) {
+            // 元数据不可得时退化为全部标量值（至少比空内容强），但不写进 metadata
+            data.values().stream().filter(v -> v instanceof CharSequence || v instanceof Number)
+                    .forEach(v -> sb.append(v).append(' '));
+        } else {
+            for (FieldDef f : fields) {
+                if (!SEARCHABLE_TYPES.contains(f.type())) continue;
+                Object v = data.get(f.name());
+                if (v == null) continue;
+                String text = String.valueOf(v);
+                if (text.isBlank()) continue;
+                if (f.label() != null && !f.label().isBlank()) sb.append(f.label()).append('：');
+                sb.append(text).append(' ');
+            }
+        }
+        String content = sb.toString().trim();
+        return content.length() > 4096 ? content.substring(0, 4096) : content;
     }
 }

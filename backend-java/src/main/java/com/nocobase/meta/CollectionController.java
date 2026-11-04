@@ -414,8 +414,17 @@ public class CollectionController {
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
         // Week 17: 解析 filter query string 为 FilterRule 列表
         List<com.nocobase.meta.CollectionService.FilterRule> filters = parseFilters(filter);
+        // T1.3：数据范围 SQL 下推（SELF/DEPT）+ 行级策略存在时放大取数窗口，
+        // 避免"先 LIMIT 再过滤"导致分页口径失真（P2-7 的核心问题）。
+        com.nocobase.auth.AclEnforcer.DataScopePlan scopePlan =
+                aclEnforcer.resolveDataScopePlan(user.userId(), user.tenantId(), "created_by");
+        boolean rowPolicies = rowAclService.hasPolicies(user.tenantId(), name, "read");
+        boolean needsWiderWindow = rowPolicies || scopePlan.predicate() != null || scopePlan.customFallback();
+        int fetchLimit = needsWiderWindow ? Math.min(limit * 5, 500) : limit;
         List<Map<String, Object>> records = service.listRecords(
-                name, user.tenantId(), limit, sort, filters);
+                name, user.tenantId(), fetchLimit, sort, filters,
+                scopePlan.predicate() == null ? null : scopePlan.predicate().sql(),
+                scopePlan.predicate() == null ? java.util.List.of() : scopePlan.predicate().params());
         // Week 41 D2:展开 belongsTo/hasMany 关联字段为 {id, title}
         List<FieldDef> fields = fieldsOf(name);
         if (fields != null && !fields.isEmpty()) {
@@ -427,13 +436,20 @@ public class CollectionController {
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
                 .toList();
-        // B7 返工:按角色 data_scope 做行级过滤(修复前 dataScopeType/CUSTOM 全仓无调用,
-        // SELF/DEPT/CUSTOM 是死代码,记录列表从未按归属人/部门裁剪)
-        records = aclEnforcer.filterRecordsByDataScope(
-                user.userId(), user.tenantId(), name, records);
+        // B7/T1.3：SELF/DEPT 已在 SQL 下推；仅 CUSTOM（不可安全参数化）保留内存判定。
+        if (scopePlan.customFallback()) {
+            log.warn("[acl] collection={} 使用 CUSTOM data_scope，无法下推 SQL，采用内存过滤"
+                    + "（分页结果可能少于 limit）", name);
+            records = aclEnforcer.filterRecordsByDataScope(
+                    user.userId(), user.tenantId(), name, records);
+        }
         // ROW ACL 过滤:每条记录过表达式策略(Week 14.5)
         records = rowAclService.filterReadable(
                 user.tenantId(), name, records, rowAclPrincipal(user));
+        // 放大取数后截断到请求的 limit
+        if (records.size() > limit) {
+            records = new java.util.ArrayList<>(records.subList(0, limit));
+        }
         return Map.of(
                 "code", 0, "message", "success",
                 "data", records

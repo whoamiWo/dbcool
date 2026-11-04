@@ -39,6 +39,8 @@ public class AclEnforcer {
     private final UserRoleRepository userRoleRepository;
     private final AclPolicyRepository policyRepository;
     private final RoleRepository roleRepository;
+    /** A-1：真实部门子树解析（替代坏的 DEPT SQL 片段与恒错误的内存判定） */
+    private final DeptScopeResolver deptScopeResolver;
 
     /**
      * fail-open 开关(Stage 1 安全收口).
@@ -53,10 +55,12 @@ public class AclEnforcer {
     public AclEnforcer(UserRoleRepository userRoleRepository,
                        AclPolicyRepository policyRepository,
                        RoleRepository roleRepository,
+                       DeptScopeResolver deptScopeResolver,
                        @org.springframework.beans.factory.annotation.Value("${app.acl.fail-open:false}") boolean failOpen) {
         this.userRoleRepository = userRoleRepository;
         this.policyRepository = policyRepository;
         this.roleRepository = roleRepository;
+        this.deptScopeResolver = deptScopeResolver;
         this.failOpen = failOpen;
         if (!failOpen) {
             log.info("[acl] fail-closed 生效:无策略/异常一律拒绝(默认)");
@@ -162,22 +166,129 @@ public class AclEnforcer {
      * <ul>
      *   <li>无数据范围约束 → 原样返回</li>
      *   <li>SELF → 仅保留 {@code created_by == userId} 的行</li>
-     *   <li>DEPT → 仅保留与用户同部门（{@code department_id} 匹配）的行</li>
+     *   <li>DEPT → 仅保留「所在部门<b>子树</b>内成员」创建的行（A-1 修复；
+     *       修复前是 {@code department_id != null} —— 业务表根本没有该列，
+     *       判定形同虚设）。用户无部门 → 收敛为 SELF（决策 D6）。</li>
      *   <li>CUSTOM → 保守：记录含 {@code _data_scope_match=true} 才保留</li>
      * </ul>
      */
     public List<Map<String, Object>> filterRecordsByDataScope(UUID userId, String tenantId,
-                                                              String collectionName,
-                                                              List<Map<String, Object>> records) {
+                                                               String collectionName,
+                                                               List<Map<String, Object>> records) {
         if (records == null || records.isEmpty()) return records;
-        String scopeSql = resolveDataScopeSql(userId, tenantId, "created_by");
-        if (scopeSql == null || scopeSql.isBlank()) return records;
+        return filterRecordsByDataScopeImpl(userId, tenantId, "created_by", records);
+    }
+
+    private List<Map<String, Object>> filterRecordsByDataScopeImpl(UUID userId, String tenantId,
+                                                                    String creatorField,
+                                                                    List<Map<String, Object>> records) {
+        ScopeKind kind = resolveScopeKind(userId, tenantId);
+        if (kind == null || kind == ScopeKind.ALL) return records;
+        if (kind == ScopeKind.DEPT) {
+            // A-1：DEPT 一次查出「可见创建者集合」（部门子树 ∪ 本人），再逐行匹配
+            Set<UUID> visible = deptScopeResolver.resolveVisibleCreatorIds(userId, tenantId);
+            return records.stream()
+                    .filter(r -> createdByIn(r, creatorField, visible))
+                    .toList();
+        }
+        if (kind == ScopeKind.CUSTOM) {
+            // CUSTOM：保守——记录带 _data_scope_match=true 才保留（沿用既有语义）
+            return records.stream()
+                    .filter(r -> Boolean.TRUE.equals(r.get("_data_scope_match")))
+                    .toList();
+        }
+        // SELF：仅本人
         return records.stream()
-                .filter(r -> dataScopeSqlMatches(scopeSql, r))
+                .filter(r -> createdByIn(r, creatorField, Set.of(userId)))
                 .toList();
     }
 
-    /** 判断一条记录是否匹配数据范围谓词（Java 端内存过滤）。 */
+    private boolean createdByIn(Map<String, Object> record, String field, Set<UUID> allowed) {
+        Object created = record.get(field);
+        if (created == null) return false;
+        try {
+            return allowed.contains(UUID.fromString(created.toString()));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /** 数据范围种类（内部分派用；ALL 与 null 都表示不过滤）。 */
+    enum ScopeKind { ALL, SELF, DEPT, CUSTOM }
+
+    /**
+     * 可下推的数据范围谓词 + 是否需要内存兜底。
+     *
+     * <p>T1.3 要求：DEPT/SELF 必须下推 SQL，避免"先分页再过滤"导致分页口径失真；
+     * CUSTOM 的表达式无法安全参数化，只能保留内存判定（调用方需 log.warn）。
+     */
+    public record SqlPredicate(String sql, List<Object> params) {}
+
+    /** @param predicate 为 null 表示无需下推（ALL）；@param customFallback 为 true 表示必须内存判定 */
+    public record DataScopePlan(SqlPredicate predicate, boolean customFallback) {}
+
+    /**
+     * 计算数据范围下推计划。
+     *
+     * <p>参数化 SQL（不使用字符串拼接），字段名严格白名单校验。
+     */
+    public DataScopePlan resolveDataScopePlan(UUID userId, String tenantId, String creatorField) {
+        ScopeKind kind = resolveScopeKind(userId, tenantId);
+        if (kind == null || kind == ScopeKind.ALL) {
+            return new DataScopePlan(null, false);
+        }
+        String field = safeIdentifier(creatorField);
+        if (kind == ScopeKind.SELF) {
+            return new DataScopePlan(new SqlPredicate(field + " = ?", List.of(userId)), false);
+        }
+        if (kind == ScopeKind.DEPT) {
+            String path = deptScopeResolver.resolveUserDeptPath(userId, tenantId);
+            if (path == null) {
+                // D6：无部门 → SELF
+                return new DataScopePlan(new SqlPredicate(field + " = ?", List.of(userId)), false);
+            }
+            String sql = field + " IN (SELECT u.id FROM users u "
+                    + "JOIN org_unit o ON u.department_id = o.id "
+                    + "WHERE o.tenant_id = ? AND o.deleted = FALSE AND o.path LIKE ?)";
+            return new DataScopePlan(new SqlPredicate(sql, List.of(tenantId, path + "%")), false);
+        }
+        // CUSTOM：表达式不可安全参数化 → 不下推
+        return new DataScopePlan(null, true);
+    }
+
+    private static String safeIdentifier(String raw) {
+        String field = (raw == null || raw.isBlank()) ? "created_by" : raw;
+        if (!field.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+            throw new IllegalArgumentException("非法字段名: " + field);
+        }
+        return field;
+    }
+
+    private ScopeKind resolveScopeKind(UUID userId, String tenantId) {
+        List<UUID> roleIds = loadRoleIdsIncludingInheritance(userId, tenantId);
+        if (roleIds.isEmpty()) return null;
+        for (UUID rid : roleIds) {
+            for (AclPolicyEntity p : policyRepository.findByRoleIdAndTenantId(rid, tenantId)) {
+                AclPolicyEntity.DataScopeType t = p.getDataScopeType();
+                if (t == null || t == AclPolicyEntity.DataScopeType.ALL) continue;
+                return switch (t) {
+                    case SELF -> ScopeKind.SELF;
+                    case DEPT -> ScopeKind.DEPT;
+                    case CUSTOM -> ScopeKind.CUSTOM;
+                    default -> null;
+                };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断一条记录是否匹配数据范围谓词。
+     *
+     * @deprecated A-1 修复后由 {@link #filterRecordsByDataScope} 内部直接判定；
+     *   保留此方法仅为兼容既有调用（内部改走 {@link DeptScopeResolver}）。
+     */
+    @Deprecated
     public boolean dataScopeSqlMatches(String scopeSql, Map<String, Object> record) {
         if (scopeSql == null || scopeSql.isBlank() || record == null) return true;
         String s = scopeSql.trim();
@@ -187,13 +298,9 @@ public class AclEnforcer {
             String expected = s.replaceAll("(?i)^created_by\\s*=\\s*'", "").replace("'", "").trim();
             return created != null && expected.equalsIgnoreCase(created.toString());
         }
-        // DEPT：EXISTS (... department_id ...)
-        if (s.toLowerCase().contains("department_id")) {
-            return record.get("department_id") != null;
-        }
-        // CUSTOM：依赖记录上的 _data_scope_match 标记
-        Object flag = record.get("_data_scope_match");
-        return flag == null || Boolean.TRUE.equals(flag);
+        // DEPT / 其它子查询形态：无法离线判定子查询真假 → 保守拒绝（fail-closed）。
+        // 修复前这里返回 record.get("department_id") != null，恒 null 恒 false，形同虚设。
+        return false;
     }
 
     /**
@@ -370,16 +477,17 @@ public class AclEnforcer {
         return switch (scopePolicy.getDataScopeType()) {
             case SELF -> field + " = '" + userId + "'";
             case DEPT -> {
-                // DEPT：当前用户所属部门下所有创建者（取 user 主表的 department_id 列匹配）
-                yield "EXISTS (SELECT 1 FROM user_u u WHERE u.id = " + field
-                        + " AND u.department_id = (SELECT department_id FROM user_u WHERE id = '" + userId + "'))";
+                // A-1 修复：修复前引用不存在的表 user_u（应为 users），且只比部门叶子
+                // 不含子树。现由 DeptScopeResolver 生成基于 org_unit.path 前缀的真实
+                // 子树谓词；无部门时降级为 SELF（决策 D6）。
+                String deptSql = deptScopeResolver.buildDeptScopeSql(userId, tenantId, field);
+                yield deptSql != null ? deptSql : field + " = '" + userId + "'";
             }
             case CUSTOM -> buildCustomScope(scopePolicy, userId);
             default -> null; // ALL
         };
     }
 
-    /** CUSTOM 类型：解析 dataScopeConfigJson 中的 sql / userExpression。 */
     private String buildCustomScope(AclPolicyEntity policy, UUID userId) {
         if (policy.getDataScopeConfigJson() == null) return null;
         try {
@@ -392,7 +500,8 @@ public class AclEnforcer {
                 return e.replace("${userId}", "'" + userId + "'");
             }
         } catch (Exception ex) {
-            log.error("[acl] CUSTOM data_scope 解析失败 policy={}", policy.getId(), ex);
+            log.error("[acl] CUSTOM data_scope 解析失败 policy={}——调用回退到 SELF",
+                    policy.getId(), ex);
         }
         return null;
     }

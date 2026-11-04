@@ -46,7 +46,10 @@
     "notifications": "通知渠道",
     "apiDocs": "API 文档",
     "inAppMessages": "站内消息",
-    "integrations": "集成市场"
+    "integrations": "集成市场",
+    "directory": "通讯录",
+    "approvals": "审批中心",
+    "orgStructure": "组织结构"
   },
   "home": {
     "welcome": "欢迎",

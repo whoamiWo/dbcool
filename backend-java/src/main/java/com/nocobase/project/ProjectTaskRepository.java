@@ -3,6 +3,7 @@ package com.nocobase.project;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +35,9 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTaskEntity, 
             String tenantId, UUID projectId, java.time.Instant windowEnd, java.time.Instant windowStart);
 
     /** 过期任务：endDate < now 且 status != DONE */
+    /** E3 提醒：未来窗口内到期且未完成的任务（跨租户，调度器按结果逐条通知）。 */
+    List<ProjectTaskEntity> findByEndDateBetweenAndStatusNot(Instant from, Instant to, String status);
+
     List<ProjectTaskEntity> findByTenantIdAndEndDateBeforeAndStatusNotOrderByEndDateAsc(
             String tenantId, java.time.Instant now, String status);
 }

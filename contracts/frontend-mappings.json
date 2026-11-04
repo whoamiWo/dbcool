@@ -85,6 +85,21 @@
     "line": 310
   },
   {
+    "path": "/approvals",
+    "file": "frontend/src/pages/approval/ApprovalCenterPage.tsx",
+    "line": 116
+  },
+  {
+    "path": "/approvals/templates/from-preset",
+    "file": "frontend/src/pages/approval/ApprovalCenterPage.tsx",
+    "line": 93
+  },
+  {
+    "path": "/approvals/{}/cancel",
+    "file": "frontend/src/pages/approval/ApprovalDetailPage.tsx",
+    "line": 75
+  },
+  {
     "path": "/audit/logs",
     "file": "frontend/src/pages/AuditLogs.tsx",
     "line": 64
@@ -370,14 +385,34 @@
     "line": 122
   },
   {
+    "path": "/messages/read-all",
+    "file": "frontend/src/pages/MessagesInbox.tsx",
+    "line": 117
+  },
+  {
+    "path": "/messages/unread-count",
+    "file": "frontend/src/components/NotificationBell.tsx",
+    "line": 13
+  },
+  {
     "path": "/messages/{}/read",
     "file": "frontend/src/pages/MessagesInbox.tsx",
-    "line": 54
+    "line": 112
   },
   {
     "path": "/messages?",
     "file": "frontend/src/pages/MessagesInbox.tsx",
-    "line": 44
+    "line": 105
+  },
+  {
+    "path": "/org/units",
+    "file": "frontend/src/pages/org/OrgStructurePage.tsx",
+    "line": 40
+  },
+  {
+    "path": "/org/units/{}",
+    "file": "frontend/src/pages/org/OrgStructurePage.tsx",
+    "line": 56
   },
   {
     "path": "/playbooks",
@@ -457,7 +492,7 @@
   {
     "path": "/search",
     "file": "frontend/src/api/search.ts",
-    "line": 38
+    "line": 42
   },
   {
     "path": "/views",

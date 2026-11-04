@@ -66,7 +66,7 @@ public class CollectionServiceRecordBatchTest {
         when(tableManager.deleteRecord(anyString(), anyString())).thenReturn(1);
         when(tableManager.getRecord(anyString(), anyString()))
                 .thenReturn(Optional.of("{\"data\":{\"id\":\"1\",\"amount\":100}}"));
-        when(tableManager.listRecords(anyString(), anyInt(), any(), any()))
+        when(tableManager.listRecords(anyString(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(List.of("{\"data\":{\"id\":\"1\",\"amount\":100}}"));
     }
 

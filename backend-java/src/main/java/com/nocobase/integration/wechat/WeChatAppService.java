@@ -47,6 +47,8 @@ public class WeChatAppService {
 
     /** PHASE96 T1: openid → 本地用户持久映射（微信身份的唯一真相） */
     private final ExternalUserMappingRepository externalUserMappingRepository;
+    /** A-2：外部建号统一路径 */
+    private final com.nocobase.auth.UserProvisioningService provisioningService;
 
     // 以下 @Value 字段保留为**回退默认值**：租户级未配置时使用，存量部署零破坏
     @Value("${wechat.app-id:}")
@@ -64,12 +66,14 @@ public class WeChatAppService {
 
     public WeChatAppService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                             RestTemplate restTemplate, TenantCredentialService credentialService,
-                            ExternalUserMappingRepository externalUserMappingRepository) {
+                            ExternalUserMappingRepository externalUserMappingRepository,
+                            com.nocobase.auth.UserProvisioningService provisioningService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.restTemplate = restTemplate;
         this.credentialService = credentialService;
         this.externalUserMappingRepository = externalUserMappingRepository;
+        this.provisioningService = provisioningService;
     }
 
     /**
@@ -208,17 +212,9 @@ public class WeChatAppService {
             return existing;
         }
 
-        // 创建本地用户（密码随机，不走密码登录；与企微 wecom_ 前缀模式对称）
-        String randomPassword = UUID.randomUUID().toString();
-        UserEntity user = new UserEntity();
-        user.setId(UUID.randomUUID());
-        user.setUsername(username);
-        user.setPasswordHash(passwordEncoder.encode(randomPassword));
-        user.setTenantId("system");
-        user.setDisplayName(nickname);
-        user.setEnabled(true);
-        user.setCreatedAt(Instant.now());
-        userRepository.save(user);
+        // A-2：统一建号路径 —— 微信托管账号无本地密码（此前写 bcrypt(random)）
+        UserEntity user = provisioningService.createExternal(
+                "system", username, nickname, null, "WECHAT");
         persistMapping("wechat", openid, "system", user.getId(), nickname);
         log.info("[WeChat] 新建用户+映射：username={}, openid={}", username, openid);
         return user;
@@ -317,17 +313,9 @@ public class WeChatAppService {
             return existing;
         }
 
-        // 创建本地用户（密码随机，不走密码登录）
-        String randomPassword = UUID.randomUUID().toString();
-        UserEntity user = new UserEntity();
-        user.setId(UUID.randomUUID());
-        user.setUsername(username);
-        user.setPasswordHash(passwordEncoder.encode(randomPassword));
-        user.setTenantId("system");
-        user.setDisplayName("微信用户");
-        user.setEnabled(true);
-        user.setCreatedAt(Instant.now());
-        userRepository.save(user);
+        // A-2：统一建号路径 —— 小程序托管账号无本地密码
+        UserEntity user = provisioningService.createExternal(
+                "system", username, "微信用户", null, "WECHAT");
         persistMapping("wechat", openid, "system", user.getId(), "微信用户");
         log.info("[MiniProgram] 新建用户+映射：username={}, openid={}", username, openid);
         return user;

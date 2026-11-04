@@ -161,6 +161,20 @@ public class DynamicTableManager {
     public List<String> listRecords(String collectionName, int limit,
                                     String sortExpr,
                                     List<com.nocobase.meta.FieldDef> fields) {
+        return listRecords(collectionName, limit, sortExpr, fields, null, java.util.List.of());
+    }
+
+    /**
+     * T1.3：带数据范围谓词的列表查询（SQL 下推）。
+     *
+     * @param dataScopeWhere 已参数化的附加谓词（null=不带）
+     * @param dataScopeParams 谓词参数（顺序与 `?` 一致）
+     */
+    public List<String> listRecords(String collectionName, int limit,
+                                    String sortExpr,
+                                    List<com.nocobase.meta.FieldDef> fields,
+                                    String dataScopeWhere,
+                                    java.util.List<Object> dataScopeParams) {
         validateIdentifier(collectionName); // PHASE116 加固
         // PHASE71: id 是独立列(extra 里没有),必须注入返回 JSON,
         // 否则前端拿不到 id(无法编辑/删除/建立关联),rollup 也无法定位关联记录。
@@ -171,6 +185,9 @@ public class DynamicTableManager {
                 .append(physicalTableName(collectionName))
                 // PHASE125:列表默认排除已软删记录(回收站记录由 listDeleted 单独查询)
                 .append(" WHERE deleted_at IS NULL");
+        if (dataScopeWhere != null && !dataScopeWhere.isBlank()) {
+            sql.append(" AND (").append(dataScopeWhere).append(')');
+        }
         String orderBy = buildOrderBy(sortExpr, fields);
         if (orderBy != null) {
             sql.append(" ORDER BY ").append(orderBy);
@@ -178,7 +195,10 @@ public class DynamicTableManager {
             sql.append(" ORDER BY created_at DESC");
         }
         sql.append(" LIMIT ?");
-        return jdbc.queryForList(sql.toString(), String.class, Math.min(limit, 500));
+        java.util.List<Object> args = new java.util.ArrayList<>();
+        if (dataScopeParams != null) args.addAll(dataScopeParams);
+        args.add(Math.min(limit, 500));
+        return jdbc.queryForList(sql.toString(), String.class, args.toArray());
     }
 
     /**

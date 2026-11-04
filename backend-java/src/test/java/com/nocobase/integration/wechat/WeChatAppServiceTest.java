@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,8 +60,22 @@ class WeChatAppServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
+        com.nocobase.auth.UserProvisioningService provisioning =
+                mock(com.nocobase.auth.UserProvisioningService.class);
+        // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    UserEntity u = new UserEntity();
+                    u.setId(UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    u.setEnabled(true);
+                    return u;
+                });
         service = new WeChatAppService(userRepository, passwordEncoder, restTemplate,
-                credentialService, mappingRepository);
+                credentialService, mappingRepository, provisioning);
         setField(service, "appId", "wx_test_appid");
         setField(service, "appSecret", "wx_test_secret");
     }

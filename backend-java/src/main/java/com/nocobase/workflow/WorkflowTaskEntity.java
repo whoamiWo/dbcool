@@ -13,7 +13,7 @@ import java.util.UUID;
 @Table(name = "workflow_tasks")
 public class WorkflowTaskEntity {
 
-    public enum Status { PENDING, APPROVED, REJECTED, COMPLETED }
+    public enum Status { PENDING, APPROVED, REJECTED, COMPLETED, CANCELED }
 
     @Id
     @Column(name = "id", nullable = false)

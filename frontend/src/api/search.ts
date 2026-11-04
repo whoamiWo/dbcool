@@ -1,11 +1,14 @@
 import apiClient from './client';
 
 export interface SearchResult {
-  type: 'wiki' | 'record' | 'im' | 'project' | 'automation';
+  type: 'wiki' | 'record' | 'im' | 'project' | 'automation' | 'approval';
   id: string;
   title: string;
   snippet: string;
   createdAt: string;
+  /** E4：后端返回的点击跳转路径（记录/文档优先使用） */
+  deeplink?: string;
+  collection?: string;
   [key: string]: unknown;
 }
 
@@ -22,6 +25,7 @@ export interface SearchResponse {
       im: number;
       project: number;
       automation: number;
+      approval?: number;
     };
   };
 }
@@ -53,6 +57,7 @@ export const SEARCH_FACET_COLORS: Record<string, string> = {
   im: 'var(--color-secondary-500)',
   project: 'var(--color-success-500)',
   automation: 'var(--color-warning-500)',
+  approval: 'var(--color-success-500)',
 };
 
 export const SEARCH_FACET_LABELS: Record<string, string> = {
@@ -61,4 +66,5 @@ export const SEARCH_FACET_LABELS: Record<string, string> = {
   im: '消息',
   project: '任务',
   automation: '流程',
+  approval: '审批',
 };

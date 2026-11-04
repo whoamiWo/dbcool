@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { disconnectStomp } from '@/lib/stompClient';
 import { GlobalSearchPanel } from '@/components/GlobalSearchPanel';
+import { NotificationBell } from '@/components/NotificationBell';
 import { EmbeddedSdkProvider } from '@/components/EmbeddedSdkProvider';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage } from '@/i18n';
@@ -45,9 +46,12 @@ export function AppLayout() {
     { path: '/wiki/kb', labelKey: 'nav.wiki' },
     { path: '/im', labelKey: 'nav.im' },
     { path: '/projects', labelKey: 'nav.projects' },
+    { path: '/directory', labelKey: 'nav.directory' },
+    { path: '/approvals', labelKey: 'nav.approvals' },
     { path: '/designer/workflows', labelKey: 'nav.workflows' },
     { path: '/agent', labelKey: 'nav.agent' },
     { path: '/admin/users', labelKey: 'nav.users' },
+    { path: '/admin/org', labelKey: 'nav.orgStructure' },
     { path: '/admin/roles', labelKey: 'nav.roles' },
     { path: '/admin/acl', labelKey: 'nav.permissions' },
     { path: '/admin/audit', labelKey: 'nav.audit' },
@@ -118,6 +122,7 @@ export function AppLayout() {
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <GlobalSearchPanel />
+          <NotificationBell />
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
             {user?.username ?? t('im.guest')}({user?.roles.join(', ') ?? t('im.noRole')})
           </span>

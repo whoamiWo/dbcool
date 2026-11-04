@@ -672,12 +672,24 @@ public class CollectionService {
     public List<Map<String, Object>> listRecords(String collectionName, String tenantId,
                                                 int limit, String sortExpr,
                                                 List<FilterRule> filters) {
+        return listRecords(collectionName, tenantId, limit, sortExpr, filters, null, java.util.List.of());
+    }
+
+    /**
+     * T1.3：带数据范围谓词的列表查询（谓词直接进 SQL WHERE，不再先分页后过滤）。
+     */
+    public List<Map<String, Object>> listRecords(String collectionName, String tenantId,
+                                                int limit, String sortExpr,
+                                                List<FilterRule> filters,
+                                                String dataScopeWhere,
+                                                java.util.List<Object> dataScopeParams) {
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
         List<FieldDef> fields = parseFields(meta);
-        List<String> jsonRecords = tableManager.listRecords(collectionName, limit, sortExpr, fields);
+        List<String> jsonRecords = tableManager.listRecords(
+                collectionName, limit, sortExpr, fields, dataScopeWhere, dataScopeParams);
         List<Map<String, Object>> records = jsonRecords.stream()
                 .map(json -> {
                     try {

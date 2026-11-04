@@ -91,7 +91,10 @@ class WorkflowEngineStrategyIntegrationTest {
                 notificationService,
                 objectMapper,
                 new WorkflowNodeHandlerRegistry(List.of(
-                        new ApprovalNodeHandler(instanceRepository, taskRepository),
+                        new ApprovalNodeHandler(instanceRepository, taskRepository,
+                        mock(com.nocobase.auth.UserRepository.class),
+                        mock(com.nocobase.auth.UserRoleRepository.class),
+                        mock(com.nocobase.auth.RoleRepository.class)),
                         new NotificationNodeHandler(workflowRepository, messageRepository, notificationService),
                         httpHandler,
                         new ConditionNodeHandler())));

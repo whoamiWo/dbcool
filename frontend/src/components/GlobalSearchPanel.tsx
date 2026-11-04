@@ -29,7 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import { searchApi, SEARCH_FACET_COLORS, type SearchResult } from '@/api/search';
 
 /** 搜索结果项组件 */
-function SearchResultItem({ result, onClick, t }: { result: SearchResult; onClick: () => void; t: (k: string) => string }) {
+function SearchResultItem({ result, onClick, t, active }: { result: SearchResult; onClick: () => void; t: (k: string) => string; active?: boolean }) {
   const getTypeIcon = () => {
     switch (result.type) {
       case 'wiki': return <WikiIcon />;
@@ -48,6 +48,7 @@ function SearchResultItem({ result, onClick, t }: { result: SearchResult; onClic
       onClick={onClick}
       sx={{
         cursor: 'pointer',
+        bgcolor: active ? 'rgba(99,102,241,0.16)' : 'transparent',
         '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}
@@ -85,8 +86,22 @@ function SearchResultItem({ result, onClick, t }: { result: SearchResult; onClic
 export function GlobalSearchPanel() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
+
+  // E4：Ctrl/Cmd+K 打开搜索（移动端不启用，移动端走独立搜索页入口）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (window.innerWidth <= 768) return;
+        e.preventDefault();
+        setOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['search', query],
@@ -94,7 +109,10 @@ export function GlobalSearchPanel() {
     enabled: false, // 手动触发
   });
 
-  const handleOpen = () => setOpen(true);
+  const handleOpen = () => {
+    setActiveIdx(0);
+    setOpen(true);
+  };
   const handleClose = () => {
     setOpen(false);
     setQuery('');
@@ -113,7 +131,7 @@ export function GlobalSearchPanel() {
         navigate(`/wiki/${result.slug || result.id}`);
         break;
       case 'record':
-        navigate(`/views/${result.id}/run`);
+        navigate(result.collection ? `/records/${result.collection}/${result.id}` : '/');
         break;
       case 'im':
         navigate(`/im`);
@@ -174,7 +192,24 @@ export function GlobalSearchPanel() {
             fullWidth
             placeholder={t('globalSearch.placeholder')}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActiveIdx(0);
+            }}
+            onKeyDown={(e) => {
+              const total = data?.data.results.length ?? 0;
+              if (e.key === 'ArrowDown' && total > 0) {
+                e.preventDefault();
+                setActiveIdx((i) => (i + 1) % total);
+              } else if (e.key === 'ArrowUp' && total > 0) {
+                e.preventDefault();
+                setActiveIdx((i) => (i - 1 + total) % total);
+              } else if (e.key === 'Enter' && total > 0) {
+                e.preventDefault();
+                const target = data?.data.results[activeIdx];
+                if (target) handleResultClick(target);
+              }
+            }}
             variant="outlined"
             size="small"
             sx={{ mb: 2 }}
@@ -199,15 +234,25 @@ export function GlobalSearchPanel() {
                 {t('globalSearch.resultsCount', { count: data.data.total })}
               </Typography>
               <List sx={{ pt: 1 }}>
-                {data.data.results.map((r) => (
+                {data.data.results.map((r, index) => (
                   <SearchResultItem
-                    key={r.id}
+                    key={`${r.type}-${r.id}`}
                     result={r}
+                    active={index === activeIdx}
                     onClick={() => handleResultClick(r)}
                     t={t}
                   />
                 ))}
               </List>
+              <Button
+                fullWidth
+                onClick={() => {
+                  setOpen(false);
+                  navigate(`/search?q=${encodeURIComponent(query)}`);
+                }}
+              >
+                查看全部结果
+              </Button>
             </>
           )}
           {query.trim() && !isFetching && (!data || data.data.results.length === 0) && (

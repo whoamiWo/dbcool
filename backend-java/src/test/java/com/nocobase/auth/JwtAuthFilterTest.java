@@ -29,7 +29,10 @@ class JwtAuthFilterTest {
     @BeforeEach
     void setUp() {
         jwtService = mock(JwtService.class);
-        filter = new JwtAuthFilter(jwtService);
+        UserStatusService statusService = mock(UserStatusService.class);
+        // A-5：默认所有账号活跃；失效场景在专门用例里单独打桩
+        when(statusService.isActive(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        filter = new JwtAuthFilter(jwtService, statusService);
         chainCalled = false;
     }
 
@@ -114,5 +117,24 @@ class JwtAuthFilterTest {
         List<String> authorities = SecurityContextHolder.getContext().getAuthentication()
                 .getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
         assertThat(authorities).containsExactly("ROLE_USER");
+    }
+
+    @Test
+    @DisplayName("A-5：账号不活跃（禁用/离职）→ 签名有效也不得设置认证")
+    void inactiveUser_tokenRejectedDespiteValidSignature() throws Exception {
+        UserStatusService statusService = mock(UserStatusService.class);
+        when(statusService.isActive(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        filter = new JwtAuthFilter(jwtService, statusService);
+
+        Claims goodClaims = claims("eve", "t1", List.of());
+        when(jwtService.parseAccessToken("valid-but-disabled")).thenReturn(goodClaims);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer valid-but-disabled");
+        runFilter(request);
+
+        // 链必须继续（否则 404 混淆视听），但认证上下文必须为空 → 后续 @PreAuthorize 拒绝
+        assertThat(chainCalled).isTrue();
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 }

@@ -71,7 +71,10 @@ class WorkflowControllerB2Test {
         controller = new WorkflowController(workflowRepository, instanceRepository,
                 taskRepository, new ObjectMapper(), engine, auditService,
                 new WorkflowGraphValidator(),
-                new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository, engine, auditService, new ObjectMapper()));
+                new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository, engine, auditService, new ObjectMapper(),
+                mock(com.nocobase.approval.ApprovalRequestRepository.class),
+                mock(com.nocobase.approval.ApprovalCcRepository.class),
+                mock(com.nocobase.notification.NotifyDispatcher.class)));
 
         testUser = new AuthenticatedUser(UUID.randomUUID(), "alice", "tenant_default");
         SecurityContextHolder.setContext(new SecurityContextImpl(

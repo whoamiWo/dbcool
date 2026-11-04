@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.SetOperations;
 
 /**
  * RefreshTokenService 单测(Week 30).
@@ -40,6 +41,10 @@ class RefreshTokenServiceTest {
         ValueOperations v = mock(ValueOperations.class);
         ops = v;
         when(redis.opsForValue()).thenReturn(ops);
+        // A-5：新增了 userId → tokens 反向索引（opsForSet），单测需给出非 null 的 SetOperations
+        @SuppressWarnings("unchecked")
+        SetOperations<String, String> setOps = mock(SetOperations.class);
+        when(redis.opsForSet()).thenReturn(setOps);
         service = new RefreshTokenService(redis, 7L);
     }
 

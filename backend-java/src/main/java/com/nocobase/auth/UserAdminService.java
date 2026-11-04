@@ -22,17 +22,21 @@ public class UserAdminService {
     private final UserRoleRepository userRoleRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    /** A-5：禁用/删除时立即失效会话（含 refresh token） */
+    private final UserStatusService userStatusService;
 
     public UserAdminService(
             UserRepository userRepository,
             UserRoleRepository userRoleRepository,
             RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            UserStatusService userStatusService
     ) {
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.userStatusService = userStatusService;
     }
 
     public List<UserEntity> listAll(String tenantId) {
@@ -58,6 +62,7 @@ public class UserAdminService {
         u.setId(UUID.randomUUID());
         u.setUsername(username);
         u.setPasswordHash(passwordEncoder.encode(password));
+        u.setPasswordSet(true);
         // Week 41 复核:改用 TenantContext,不再硬编码。
         // [PHASE78 R1] 显式传 tenantId,与 update/resetPassword/delete 对齐(不依赖 ThreadLocal)
         u.setTenantId(tenantId != null ? tenantId : TenantContext.currentTenantId());
@@ -71,14 +76,53 @@ public class UserAdminService {
     public UserEntity update(UUID id, String displayName, Boolean enabled, String tenantId) {
         UserEntity u = get(id, tenantId);
         if (displayName != null) u.setDisplayName(displayName);
+        boolean disabling = enabled != null && !enabled && u.isEnabled();
         if (enabled != null) u.setEnabled(enabled);
-        return userRepository.save(u);
+        UserEntity saved = userRepository.save(u);
+        // A-5：禁用立即失效（缓存 + 全部 refresh token），不等 60s 窗口
+        if (disabling) userStatusService.invalidate(id);
+        return saved;
     }
+
+    /**
+     * 扩展资料更新（E1 组织字段）。
+     *
+     * <p>手机号等字段由管理端（ADMIN）维护；通讯录侧的可见性由 D7 字段级过滤控制。
+     */
+    @Transactional
+    public UserEntity updateProfile(UUID id, String tenantId, UserProfilePatch patch) {
+        UserEntity u = get(id, tenantId);
+        if (patch.displayName() != null) u.setDisplayName(patch.displayName());
+        if (patch.email() != null) u.setEmail(patch.email());
+        if (patch.phone() != null) u.setPhone(patch.phone());
+        if (patch.position() != null) u.setPosition(patch.position());
+        if (patch.employeeNo() != null) u.setEmployeeNo(patch.employeeNo());
+        if (patch.avatarUrl() != null) u.setAvatarUrl(patch.avatarUrl());
+        if (patch.managerId() != null) u.setManagerId(patch.managerId());
+        if (patch.departmentId() != null) u.setDepartmentId(patch.departmentId());
+        if (patch.status() != null) u.setStatus(patch.status());
+        boolean disabling = patch.enabled() != null && !patch.enabled() && u.isEnabled();
+        if (patch.enabled() != null) u.setEnabled(patch.enabled());
+        if (UserStatus.RESIGNED.equals(u.getStatus()) || UserStatus.DISABLED.equals(u.getStatus())) {
+            u.setEnabled(false);
+            disabling = true;
+        }
+        UserEntity saved = userRepository.save(u);
+        if (disabling) userStatusService.invalidate(id);
+        return saved;
+    }
+
+    /** 用户资料增量更新（null = 不修改）。 */
+    public record UserProfilePatch(
+            String displayName, String email, String phone, String position,
+            String employeeNo, String avatarUrl, UUID managerId, UUID departmentId,
+            String status, Boolean enabled) {}
 
     @Transactional
     public void resetPassword(UUID id, String newPassword, String tenantId) {
         UserEntity u = get(id, tenantId);
         u.setPasswordHash(passwordEncoder.encode(newPassword));
+        u.setPasswordSet(true);
         userRepository.save(u);
     }
 
@@ -86,6 +130,8 @@ public class UserAdminService {
     public void delete(UUID id, String tenantId) {
         UserEntity u = get(id, tenantId);
         userRepository.delete(u);
+        // A-5：删除后旧 token / refresh 立即失效
+        userStatusService.invalidate(id);
     }
 
     public List<RoleEntity> getUserRoles(UUID userId) {

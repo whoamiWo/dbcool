@@ -16,6 +16,8 @@ public interface WorkflowTaskRepository extends JpaRepository<WorkflowTaskEntity
      * <p><b>必须使用本方法替代 {@code findByAssigneeAndStatus}</b>:后者不带租户条件,
      * 用户经 UserTenantEntity 切换到其他租户后仍会查到原租户的待办(跨租户越权)。
      */
+    boolean existsByInstanceIdAndAssignee(UUID instanceId, UUID assignee);
+
     List<WorkflowTaskEntity> findByTenantIdAndAssigneeAndStatus(
             String tenantId, UUID assignee, WorkflowTaskEntity.Status status);
 

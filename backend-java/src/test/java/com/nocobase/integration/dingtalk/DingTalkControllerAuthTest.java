@@ -163,13 +163,16 @@ class DingTalkControllerAuthTest {
     }
 
     @Test
-    void syncOrg_delegatesToAdapter() {
-        when(adapter.syncOrganization("tenant1")).thenReturn(Map.of("code", 0, "synced", 42));
+    void syncOrg_delegatesToOrgSyncService() {
+        // A-4：/sync-org 曾落到 DingTalkAppService 的占位实现（直接 code=0 什么都没做），
+        // 现必须走真实组织同步服务。
+        when(orgSyncService.syncOrganization("tenant1"))
+                .thenReturn(Map.of("code", 0, "synced", 42));
 
         Map<String, Object> r = controller.syncOrg(Map.of("tenantId", "tenant1"));
 
         assertEquals(0, r.get("code"));
-        verify(adapter).syncOrganization("tenant1");
+        verify(orgSyncService).syncOrganization("tenant1");
     }
 
     @Test
@@ -186,16 +189,18 @@ class DingTalkControllerAuthTest {
     }
 
     @Test
-    void getSyncStatus_returnsPlaceholder() {
-        Map<String, Object> r = controller.getSyncStatus();
+    void getSyncStatus_reportsRealCounts() {
+        Map<String, Object> r = controller.getSyncStatus("tenant_default");
 
         assertEquals(0, r.get("code"));
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) r.get("data");
-        // lastSyncTime 允许为 null（未持久化同步历史），测试预期为 null
+        // 未同步过：不谎称有同步时间，计数为 0
         assertNull(data.get("lastSyncTime"));
+        assertEquals(0, data.get("usersSynced"));
+        assertEquals(0, data.get("usersFailed"));
         // syncEnabled 反映凭证配置状态
-        assertEquals(appService.isConfigured(), data.get("syncEnabled"));
+        assertEquals(appService.isConfigured("tenant_default"), data.get("syncEnabled"));
     }
 
     @Test

@@ -43,6 +43,8 @@ public class LdapSyncService {
     private final UserRepository userRepository;
     private final LdapTemplate ldapTemplate;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    /** A-2：外部建号统一路径 */
+    private final com.nocobase.auth.UserProvisioningService provisioningService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public LdapSyncService(
@@ -50,13 +52,15 @@ public class LdapSyncService {
             LdapUserMappingRepository ldapUserMappingRepository,
             UserRepository userRepository,
             LdapTemplate ldapTemplate,
-            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
+            com.nocobase.auth.UserProvisioningService provisioningService
     ) {
         this.ldapConfigRepository = ldapConfigRepository;
         this.ldapUserMappingRepository = ldapUserMappingRepository;
         this.userRepository = userRepository;
         this.ldapTemplate = ldapTemplate;
         this.passwordEncoder = passwordEncoder;
+        this.provisioningService = provisioningService;
     }
 
     /**
@@ -219,16 +223,10 @@ public class LdapSyncService {
                 String email = (String) ldapUser.getOrDefault("email", uid + "@local");
                 UserEntity localUser = userRepository.findByUsername(uid).orElse(null);
                 if (localUser == null) {
-                    localUser = new UserEntity();
-                    localUser.setId(UUID.randomUUID());
-                    localUser.setUsername(uid);
-                    localUser.setDisplayName(displayName);
-                    localUser.setEmail(email);
-                    localUser.setTenantId(tenantId);
-                    // PHASE96 T6: 随机不可登录口令（此前为全库统一的 "LDAP_SYNCED"）
-                    localUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
-                    localUser.setCreatedAt(Instant.now());
-                    userRepository.save(localUser);
+                    // A-2：LDAP 托管账号无本地密码（此前写 bcrypt(随机 UUID) —— 语义上仍是
+                    // 「有密码的账号」，且 PHASE96 之前更糟：全库统一字面量 "LDAP_SYNCED"）
+                    localUser = provisioningService.createExternal(
+                            tenantId, uid, displayName, email, "LDAP");
                     mapping.setLocalUserId(localUser.getId());
                 } else {
                     mapping.setLocalUserId(localUser.getId());

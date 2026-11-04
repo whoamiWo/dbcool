@@ -42,7 +42,10 @@ class DingTalkApprovalCallbackClosureTest {
         taskService = new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository,
                 mock(com.nocobase.workflow.WorkflowEngine.class),
                 mock(com.nocobase.audit.AuditService.class),
-                new com.fasterxml.jackson.databind.ObjectMapper());
+                new com.fasterxml.jackson.databind.ObjectMapper(),
+                mock(com.nocobase.approval.ApprovalRequestRepository.class),
+                mock(com.nocobase.approval.ApprovalCcRepository.class),
+                mock(com.nocobase.notification.NotifyDispatcher.class));
     }
 
     private WorkflowInstanceEntity instance() {

@@ -46,6 +46,7 @@ class InboundMessageServiceMappingTest {
     private ExternalMessageLogRepository externalMessageLogRepository;
     private ExternalUserMappingRepository mappingRepository;
     private UserRepository userRepository;
+    private com.nocobase.auth.UserProvisioningService provisioning;
 
     private InboundMessageService service;
 
@@ -58,11 +59,26 @@ class InboundMessageServiceMappingTest {
         mappingRepository = mock(ExternalUserMappingRepository.class);
         userRepository = mock(UserRepository.class);
 
+        provisioning = mock(com.nocobase.auth.UserProvisioningService.class);
+        // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    UserEntity u = new UserEntity();
+                    u.setId(UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    u.setEmail(inv.getArgument(3));
+                    return u;
+                });
+
         service = new InboundMessageService(
                 messageRepository, memberRepository, bridge, externalMessageLogRepository,
                 mappingRepository, userRepository, new BCryptPasswordEncoder(),
                 // PHASE99 T3: 入站消息审计依赖，mock 隔离
-                mock(com.nocobase.audit.AuditService.class));
+                mock(com.nocobase.audit.AuditService.class),
+                provisioning);
         ReflectionTestUtils.setField(service, "inboundEnabled", true);
         ReflectionTestUtils.setField(service, "autoProvisionUser", false);
     }
@@ -169,9 +185,11 @@ class InboundMessageServiceMappingTest {
         assertThat(saved).isNotNull();
         assertThat(saved.getSenderId()).isNotEqualTo(otherTenantUser.getId());
 
-        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
-        verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getTenantId()).isEqualTo(TENANT);
+        // A-2：建号走统一路径，租户必须是当前租户（不得复用其它租户的同名用户）
+        ArgumentCaptor<String> tenantCaptor = ArgumentCaptor.forClass(String.class);
+        verify(provisioning).createExternal(tenantCaptor.capture(),
+                anyString(), anyString(), any(), anyString());
+        assertThat(tenantCaptor.getValue()).isEqualTo(TENANT);
     }
 
     /** 自动建号开启：两个不同外部用户 → 两个不同本地用户。 */
@@ -201,23 +219,31 @@ class InboundMessageServiceMappingTest {
         verify(mappingRepository, org.mockito.Mockito.times(2)).save(any(ExternalUserMappingEntity.class));
     }
 
-    /** 自动建号时口令必须是不可预测的随机值（不是可本地登录的占位口令）。 */
+    /** A-2：自动建号时第三方用户不得持有可本地登录的口令。 */
     @Test
     void autoProvision_passwordIsRandom_notPredictable() {
         ReflectionTestUtils.setField(service, "autoProvisionUser", true);
         when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(anyString(), anyString(), eq(TENANT)))
                 .thenReturn(Optional.empty());
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
-        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(messageRepository.save(any(ImMessageEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(memberRepository.existsByChannelIdAndUserId(any(), any())).thenReturn(true);
+        when(mappingRepository.save(any(ExternalUserMappingEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
 
-        service.processInboundMessage(TENANT, UUID.randomUUID(), "slack", "Ev-pw", "U-pw", "x", null);
+        ImMessageEntity saved = service.processInboundMessage(
+                TENANT, UUID.randomUUID(), "slack", "Ev-pw", "U-pw", "x", null);
+        assertThat(saved).isNotNull();
 
-        var captor = org.mockito.ArgumentCaptor.forClass(UserEntity.class);
-        verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getPasswordHash())
-                .isNotEqualTo("LDAP_SYNCED")
-                .isNotBlank()
-                .startsWith("$2"); // bcrypt
+        // 走了统一建号路径，且入参 email=null（A-2：托管账号无本地密码）
+        var provCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(provisioning, org.mockito.Mockito.times(1))
+                .createExternal(org.mockito.ArgumentMatchers.any(),
+                        provCaptor.capture(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.isNull(),
+                        org.mockito.ArgumentMatchers.any());
+        assertThat(provCaptor.getValue()).isEqualTo("slack:U-pw");
     }
 
     private ExternalUserMappingEntity mapping(UUID localUserId) {

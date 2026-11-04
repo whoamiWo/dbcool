@@ -78,7 +78,7 @@ class MessageControllerTest {
         when(repo.findByRecipientOrderByCreatedAtDesc(testUser.userId())).thenReturn(msgs);
         when(repo.countByRecipientAndRead(testUser.userId(), false)).thenReturn(1L);
 
-        Map<String, Object> resp = controller.list(testUser, false, 20, null);
+        Map<String, Object> resp = controller.list(testUser, false, 20, null, null);
 
         assertEquals(0, resp.get("code"));
         @SuppressWarnings("unchecked")
@@ -96,7 +96,7 @@ class MessageControllerTest {
                 .thenReturn(List.of(makeMsg(false, "a")));
         when(repo.countByRecipientAndRead(testUser.userId(), false)).thenReturn(1L);
 
-        Map<String, Object> resp = controller.list(testUser, true, 20, null);
+        Map<String, Object> resp = controller.list(testUser, true, 20, null, null);
 
         assertEquals(1L, ((Map<?, ?>) resp.get("data")).get("unread_count"));
     }
@@ -109,7 +109,7 @@ class MessageControllerTest {
                 .thenReturn(List.of(makeMsg(false, "older")));
         when(repo.countByRecipientAndRead(any(), anyBoolean())).thenReturn(0L);
 
-        Map<String, Object> resp = controller.list(testUser, false, 20, cursor);
+        Map<String, Object> resp = controller.list(testUser, false, 20, cursor, null);
 
         assertEquals(0, resp.get("code"));
     }
@@ -122,14 +122,14 @@ class MessageControllerTest {
                 .thenReturn(List.of(makeMsg(false, "older-unread")));
         when(repo.countByRecipientAndRead(any(), anyBoolean())).thenReturn(1L);
 
-        Map<String, Object> resp = controller.list(testUser, true, 20, cursor);
+        Map<String, Object> resp = controller.list(testUser, true, 20, cursor, null);
 
         assertEquals(1L, ((Map<?, ?>) resp.get("data")).get("unread_count"));
     }
 
     @Test
     void list_invalidCursor_returns400() {
-        Map<String, Object> resp = controller.list(testUser, false, 20, "not-an-instant");
+        Map<String, Object> resp = controller.list(testUser, false, 20, "not-an-instant", null);
 
         assertEquals(400, resp.get("code"));
         assertTrue(resp.get("message").toString().contains("ISO-8601"));
@@ -143,7 +143,7 @@ class MessageControllerTest {
         when(repo.findByRecipientOrderByCreatedAtDesc(testUser.userId())).thenReturn(many);
         when(repo.countByRecipientAndRead(any(), anyBoolean())).thenReturn(0L);
 
-        Map<String, Object> resp = controller.list(testUser, false, 9999, null);
+        Map<String, Object> resp = controller.list(testUser, false, 9999, null, null);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) resp.get("data");
@@ -157,7 +157,7 @@ class MessageControllerTest {
         when(repo.findByRecipientOrderByCreatedAtDesc(testUser.userId())).thenReturn(msgs);
         when(repo.countByRecipientAndRead(any(), anyBoolean())).thenReturn(0L);
 
-        Map<String, Object> resp = controller.list(testUser, false, 0, null);
+        Map<String, Object> resp = controller.list(testUser, false, 0, null, null);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) resp.get("data");
@@ -169,7 +169,7 @@ class MessageControllerTest {
         when(repo.findByRecipientOrderByCreatedAtDesc(testUser.userId())).thenReturn(List.of());
         when(repo.countByRecipientAndRead(any(), anyBoolean())).thenReturn(0L);
 
-        Map<String, Object> resp = controller.list(testUser, false, 20, null);
+        Map<String, Object> resp = controller.list(testUser, false, 20, null, null);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) resp.get("data");
@@ -181,7 +181,7 @@ class MessageControllerTest {
     @Test
     void list_unreadWithCursor_invalidButEmpty_returns400() {
         // 当 cursor 非法,即使 unreadOnly=true 也走 catch
-        Map<String, Object> resp = controller.list(testUser, true, 20, "bad-cursor");
+        Map<String, Object> resp = controller.list(testUser, true, 20, "bad-cursor", null);
         assertEquals(400, resp.get("code"));
     }
 
@@ -219,5 +219,78 @@ class MessageControllerTest {
 
         assertEquals(404, resp.get("code"));
         assertEquals(false, m.isRead());  // 不应被标记
+    }
+
+    // ============ E3: 类型筛选 / 未读数 / 全部已读 ============
+
+    @Test
+    void list_typeFilter_usesTypeQuery() {
+        MessageEntity msg = makeMsg(false, "approval");
+        msg.setType("APPROVAL_TODO");
+        when(repo.findByRecipientAndTypeOrderByCreatedAtDesc(testUser.userId(), "APPROVAL_TODO"))
+                .thenReturn(List.of(msg));
+        when(repo.countByRecipientAndRead(testUser.userId(), false)).thenReturn(1L);
+
+        Map<String, Object> resp = controller.list(testUser, false, 20, null, "approval_todo");
+
+        assertEquals(0, resp.get("code"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) data.get("messages");
+        assertEquals(1, messages.size());
+        assertEquals("APPROVAL_TODO", messages.get(0).get("type"));
+    }
+
+    @Test
+    void unreadCount_returnsTenantScopedCount() {
+        when(repo.countByRecipientAndTenantIdAndRead(testUser.userId(), "tenant_default", false))
+                .thenReturn(7L);
+
+        Map<String, Object> resp = controller.unreadCount(testUser);
+
+        assertEquals(0, resp.get("code"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        assertEquals(7L, data.get("unread"));
+    }
+
+    @Test
+    void readAll_marksUnreadOfSameTenantOnly() {
+        MessageEntity mine = makeMsg(false, "mine");
+        MessageEntity otherTenant = makeMsg(false, "other");
+        otherTenant.setTenantId("tenant_other");
+        when(repo.findByRecipientAndReadFalse(testUser.userId()))
+                .thenReturn(List.of(mine, otherTenant));
+
+        Map<String, Object> resp = controller.readAll(testUser);
+
+        assertTrue(mine.isRead());
+        assertEquals(false, otherTenant.isRead());
+        assertNotNull(mine.getReadAt());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        // 只统计本租户被标记的数量
+        assertEquals(1, data.get("marked"));
+    }
+
+    @Test
+    void list_serializesDeeplinkAndPriority() {
+        MessageEntity msg = makeMsg(false, "deeplink");
+        msg.setDeeplink("/approvals/abc");
+        msg.setPriority("HIGH");
+        msg.setDigestCount(3);
+        when(repo.findByRecipientOrderByCreatedAtDesc(testUser.userId())).thenReturn(List.of(msg));
+        when(repo.countByRecipientAndRead(testUser.userId(), false)).thenReturn(1L);
+
+        Map<String, Object> resp = controller.list(testUser, false, 20, null, null);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) resp.get("data");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) data.get("messages");
+        assertEquals("/approvals/abc", messages.get(0).get("deeplink"));
+        assertEquals("HIGH", messages.get(0).get("priority"));
+        assertEquals(3, messages.get(0).get("digest_count"));
     }
 }

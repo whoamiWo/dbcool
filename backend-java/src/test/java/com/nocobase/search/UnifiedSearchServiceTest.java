@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 /**
  * 全局搜索服务测试 — 验证"真接真"：
  * 1. 写入索引后搜索能命中（五类）
- * 2. facets 含全部五键（im/wiki/record/project/automation）
+ * 2. facets 含全部六键（im/wiki/record/project/automation/approval）
  * 3. 关键词过滤对 automation 生效（不再无条件全返回）
  * 4. wiki 仅返回 PUBLISHED 页面
  */
@@ -45,7 +45,12 @@ class UnifiedSearchServiceTest {
     private ProjectService projectService;
     private ImChannelMemberRepository channelMemberRepository;
     private ObjectMapper objectMapper;
+    private com.nocobase.auth.AclEnforcer aclEnforcer;
+    private com.nocobase.acl.RowAclService rowAclService;
+    private com.nocobase.auth.RoleRepository roleRepository;
+    private com.nocobase.wiki.WikiPermissionService wikiPermissionService;
     private UnifiedSearchService service;
+    private static final UUID USER = UUID.randomUUID();
 
     private final String tenantId = "tenant_default";
     private final UUID wikiId = UUID.randomUUID();
@@ -63,10 +68,28 @@ class UnifiedSearchServiceTest {
         projectService = mock(ProjectService.class);
         channelMemberRepository = mock(ImChannelMemberRepository.class);
         objectMapper = new ObjectMapper();
+        aclEnforcer = mock(com.nocobase.auth.AclEnforcer.class);
+        rowAclService = mock(com.nocobase.acl.RowAclService.class);
+        roleRepository = mock(com.nocobase.auth.RoleRepository.class);
+        wikiPermissionService = mock(com.nocobase.wiki.WikiPermissionService.class);
+        // A-3：默认放行（无策略 = 放行），越权拒绝在专门用例中断言
+        when(aclEnforcer.isAllowed(any(), any(), any(), any())).thenReturn(true);
+        when(rowAclService.evaluateRead(any(), any(), any(), any())).thenReturn(true);
+        when(roleRepository.findRoleNamesByUserId(any(), any())).thenReturn(java.util.List.of("USER"));
+        when(aclEnforcer.filterRecordsByDataScope(any(), any(), any(), any()))
+                .thenAnswer(inv -> inv.getArgument(3));
+        when(wikiPermissionService.hasPagePermission(any(), any(), any(), any())).thenReturn(true);
+        when(channelMemberRepository.existsByChannelIdAndUserId(any(), any())).thenReturn(true);
+        when(collectionService.getRecord(any(), any(), any()))
+                .thenAnswer(inv -> new java.util.HashMap<>(Map.of("id", inv.getArgument(1))));
         service = new UnifiedSearchService(
                 messageService, wikiPageService, collectionService,
                 automationRuleService, projectService, indexRepo,
-                channelMemberRepository, objectMapper);
+                channelMemberRepository, objectMapper,
+                aclEnforcer, rowAclService, roleRepository, wikiPermissionService,
+                mock(com.nocobase.approval.ApprovalRequestRepository.class),
+                mock(com.nocobase.approval.ApprovalCcRepository.class),
+                mock(com.nocobase.workflow.WorkflowTaskRepository.class));
     }
 
     // ---- 辅助：构造索引命中实体 ----
@@ -78,6 +101,9 @@ class UnifiedSearchServiceTest {
         e.setEntityType(entityType);
         e.setEntityId(entityId);
         e.setTenantId(tenantId);
+        if ("record".equals(entityType)) {
+            e.setMetadataJson("{\"collection\":\"orders\",\"recordId\":\"" + entityId + "\"}");
+        }
         e.setTitle(title);
         e.setContent(content);
         e.setSnippet(content);
@@ -141,10 +167,10 @@ class UnifiedSearchServiceTest {
             return t;
         });
 
-        Map<String, Object> result = service.search("content", tenantId, null, null, 20);
+        Map<String, Object> result = service.search("content", tenantId, USER, null, 20);
         assertThat(result.get("total")).isEqualTo(5);
         assertThat(facets(result).keySet())
-                .containsExactlyInAnyOrder("im", "wiki", "record", "project", "automation");
+                .containsExactlyInAnyOrder("im", "wiki", "record", "project", "automation", "approval");
         assertThat(facets(result).get("wiki")).isEqualTo(1L);
         assertThat(facets(result).get("im")).isEqualTo(1L);
         assertThat(facets(result).get("record")).isEqualTo(1L);
@@ -165,12 +191,12 @@ class UnifiedSearchServiceTest {
                 idx("automation", ruleId.toString(), "订单自动流转", "当创建订单时自动流转")
         ));
 
-        Map<String, Object> hit = service.search("订单", tenantId, null, List.of("automation"), 10);
+        Map<String, Object> hit = service.search("订单", tenantId, USER, List.of("automation"), 10);
         assertThat(results(hit)).hasSize(1);
         assertThat(results(hit).get(0).get("title")).isEqualTo("订单自动流转");
 
         // 不相关关键词 → 结果为空
-        Map<String, Object> miss = service.search("zzz", tenantId, null, List.of("automation"), 10);
+        Map<String, Object> miss = service.search("zzz", tenantId, USER, List.of("automation"), 10);
         assertThat(results(miss)).isEmpty();
     }
 
@@ -187,13 +213,13 @@ class UnifiedSearchServiceTest {
                 idx("wiki", wikiId.toString(), "公开文档", "公开内容")
         ));
 
-        Map<String, Object> result = service.search("公开", tenantId, null, List.of("wiki"), 10);
+        Map<String, Object> result = service.search("公开", tenantId, USER, List.of("wiki"), 10);
         assertThat(results(result)).hasSize(1);
         assertThat(results(result).get(0).get("title")).isEqualTo("公开文档");
 
         // 页面已删除/不存在 → 被过滤
         when(wikiPageService.get(wikiId)).thenReturn(null);
-        Map<String, Object> empty = service.search("公开", tenantId, null, List.of("wiki"), 10);
+        Map<String, Object> empty = service.search("公开", tenantId, USER, List.of("wiki"), 10);
         assertThat(results(empty)).isEmpty();
     }
 
@@ -205,18 +231,25 @@ class UnifiedSearchServiceTest {
         msg.setChannelId(UUID.randomUUID());
         msg.setCreatedAt(Instant.now());
         when(messageService.mustGet(msgId)).thenReturn(msg);
+        com.nocobase.im.entity.ImChannelMemberEntity member =
+                new com.nocobase.im.entity.ImChannelMemberEntity();
+        member.setChannelId(msg.getChannelId());
+        member.setUserId(USER);
+        member.setTenantId(tenantId);
+        when(channelMemberRepository.findByTenantIdAndUserId(tenantId, USER))
+                .thenReturn(List.of(member));
         givenIndexHits(List.of(
                 idx("im", msgId.toString(), "频道消息", "频道内容")
         ));
 
-        Map<String, Object> result = service.search("频道", tenantId, null, List.of("im"), 10);
+        Map<String, Object> result = service.search("频道", tenantId, USER, List.of("im"), 10);
         assertThat(results(result)).hasSize(1);
         assertThat(results(result).get(0).get("type")).isEqualTo("im");
         assertThat(results(result).get(0).get("id")).isEqualTo(msgId);
 
         // 消息不存在 → 被过滤
         when(messageService.mustGet(msgId)).thenThrow(new RuntimeException("404"));
-        Map<String, Object> empty = service.search("频道", tenantId, null, List.of("im"), 10);
+        Map<String, Object> empty = service.search("频道", tenantId, USER, List.of("im"), 10);
         assertThat(results(empty)).isEmpty();
     }
 
@@ -245,18 +278,18 @@ class UnifiedSearchServiceTest {
                     return List.of();
                 });
 
-        Map<String, Object> result = service.search("kw", tenantId, null, List.of("record"), 10);
+        Map<String, Object> result = service.search("kw", tenantId, USER, List.of("record"), 10);
         assertThat(result.get("total")).isEqualTo(0);
     }
 
     @Test
     void search_searchProject_taskNotFound_filteredOut() {
         UUID taskId = UUID.randomUUID();
-        when(indexRepo.searchByKeywordAndType(eq("project"), eq("kw"), eq(tenantId), eq(2)))
+        when(indexRepo.searchByKeywordAndType(eq("project"), eq("kw"), eq(tenantId), eq(10)))
                 .thenReturn(List.of(idx("project", taskId.toString(), "任务", "snippet")));
         when(projectService.get(eq(taskId), eq(tenantId))).thenReturn(null);
 
-        Map<String, Object> result = service.search("kw", tenantId, null, List.of("project"), 10);
+        Map<String, Object> result = service.search("kw", tenantId, USER, List.of("project"), 10);
 
         assertThat(results(result)).isEmpty();
     }
@@ -264,7 +297,7 @@ class UnifiedSearchServiceTest {
     @Test
     void search_searchProject_taskFound_included() {
         UUID taskId = UUID.randomUUID();
-        when(indexRepo.searchByKeywordAndType(eq("project"), eq("kw"), eq(tenantId), eq(2)))
+        when(indexRepo.searchByKeywordAndType(eq("project"), eq("kw"), eq(tenantId), eq(10)))
                 .thenReturn(List.of(idx("project", taskId.toString(), "任务", "snippet")));
         ProjectTaskEntity task = new ProjectTaskEntity();
         task.setId(taskId);
@@ -272,7 +305,7 @@ class UnifiedSearchServiceTest {
         task.setCreatedAt(Instant.now());
         when(projectService.get(eq(taskId), eq(tenantId))).thenReturn(task);
 
-        Map<String, Object> result = service.search("kw", tenantId, null, List.of("project"), 10);
+        Map<String, Object> result = service.search("kw", tenantId, USER, List.of("project"), 10);
 
         List<Map<String, Object>> rows = results(result);
         assertThat(rows).hasSize(1);

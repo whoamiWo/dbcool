@@ -45,7 +45,8 @@ public class MessageController {
             @AuthenticationPrincipal AuthenticatedUser user,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean unreadOnly,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int limit,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String before
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String before,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String type
     ) {
         int safeLimit = Math.max(1, Math.min(limit, 100));
         List<MessageEntity> msgs;
@@ -60,6 +61,13 @@ public class MessageController {
             } catch (Exception e) {
                 return Map.of("code", 400, "message", "before 必须是 ISO-8601 instant");
             }
+        } else if (type != null && !type.isBlank()) {
+            msgs = messageRepository.findByRecipientAndTypeOrderByCreatedAtDesc(
+                    user.userId(), type.toUpperCase());
+            if (unreadOnly) {
+                msgs = msgs.stream().filter(m -> !m.isRead()).toList();
+            }
+            if (msgs.size() > safeLimit) msgs = msgs.subList(0, safeLimit);
         } else {
             msgs = unreadOnly
                     ? messageRepository.findByRecipientAndReadOrderByCreatedAtDesc(user.userId(), false)
@@ -93,11 +101,44 @@ public class MessageController {
             return Map.of("code", 404, "message", "message 不存在");
         }
         m.setRead(true);
+        m.setReadAt(Instant.now());
         messageRepository.save(m);
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "message.mark_read", "message", id.toString(),
                 Map.of("messageId", id.toString()));
         return Map.of("code", 0, "message", "marked read");
+    }
+
+    /** 未读数（顶栏铃铛轮询 30s）。 */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/unread-count")
+    public Map<String, Object> unreadCount(@AuthenticationPrincipal AuthenticatedUser user) {
+        long count = messageRepository.countByRecipientAndTenantIdAndRead(
+                user.userId(), user.tenantId(), false);
+        return Map.of("code", 0, "message", "success", "data", Map.of("unread", count));
+    }
+
+    /** 全部已读。 */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/read-all")
+    @Transactional
+    public Map<String, Object> readAll(@AuthenticationPrincipal AuthenticatedUser user) {
+        List<MessageEntity> unread = messageRepository.findByRecipientAndReadFalse(user.userId());
+        Instant now = Instant.now();
+        int marked = 0;
+        for (MessageEntity m : unread) {
+            // 只标记当前租户（跨租户脏数据不改写、也不计入返回数量）
+            if (!user.tenantId().equals(m.getTenantId())) continue;
+            m.setRead(true);
+            m.setReadAt(now);
+            marked++;
+        }
+        messageRepository.saveAll(unread);
+        auditService.log(user.tenantId(), user.userId(), user.username(),
+                "message.read_all", "message", null,
+                Map.of("marked", marked));
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("marked", marked));
     }
 
     private Map<String, Object> toDto(MessageEntity m) {
@@ -107,7 +148,11 @@ public class MessageController {
         dto.put("title", m.getTitle());
         dto.put("body", m.getBody());
         dto.put("related_id", m.getRelatedId());
+        dto.put("deeplink", m.getDeeplink());
+        dto.put("priority", m.getPriority());
+        dto.put("digest_count", m.getDigestCount());
         dto.put("read", m.isRead());
+        dto.put("read_at", m.getReadAt() == null ? null : m.getReadAt().toString());
         dto.put("created_at", m.getCreatedAt().toString());
         return dto;
     }

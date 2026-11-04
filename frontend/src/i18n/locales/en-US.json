@@ -46,7 +46,10 @@
     "notifications": "Notification Channels",
     "apiDocs": "API Docs",
     "inAppMessages": "Inbox",
-    "integrations": "Integrations"
+    "integrations": "Integrations",
+    "directory": "Directory",
+    "approvals": "Approvals",
+    "orgStructure": "Organization"
   },
   "home": {
     "welcome": "Welcome",

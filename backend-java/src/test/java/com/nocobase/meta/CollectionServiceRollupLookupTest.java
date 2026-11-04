@@ -58,7 +58,7 @@ public class CollectionServiceRollupLookupTest {
         Mockito.doNothing().when(tableManager).addPhysicalColumn(anyString(), anyString(), anyString());
         when(tableManager.updateRecord(anyString(), anyString(), anyString())).thenReturn(1);
         when(tableManager.deleteRecord(anyString(), anyString())).thenReturn(1);
-        when(tableManager.listRecords(anyString(), anyInt(), any(), anyList()))
+        when(tableManager.listRecords(anyString(), anyInt(), any(), anyList(), any(), anyList()))
                 .thenReturn(List.of());
     }
 

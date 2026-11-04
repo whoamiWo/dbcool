@@ -35,17 +35,21 @@ public class WorkflowTriggerListener {
     private final WorkflowRepository workflowRepository;
     /** Week 41 D4a.3:触发器频率限制(防死循环,报告 C-R04)。 */
     private final TriggerRateLimiter rateLimiter;
+    /** E3：工作流执行失败通知（WORKFLOW_FAILED）。 */
+    private final com.nocobase.notification.NotifyDispatcher notifyDispatcher;
 
     public WorkflowTriggerListener(
             WorkflowTriggerMatcher matcher,
             WorkflowEngine engine,
             WorkflowRepository workflowRepository,
-            TriggerRateLimiter rateLimiter
+            TriggerRateLimiter rateLimiter,
+            com.nocobase.notification.NotifyDispatcher notifyDispatcher
     ) {
         this.matcher = matcher;
         this.engine = engine;
         this.workflowRepository = workflowRepository;
         this.rateLimiter = rateLimiter;
+        this.notifyDispatcher = notifyDispatcher;
     }
 
     /**
@@ -127,6 +131,22 @@ public class WorkflowTriggerListener {
                     w.getName(), event.getChangeType(), result);
         } catch (Exception e) {
             log.error("D4a: 工作流 {} 执行失败: {}", w.getName(), e.getMessage(), e);
+            // E3：执行失败必须通知到创建人，避免"静默失败"
+            try {
+                if (w.getCreatedBy() != null) {
+                    notifyDispatcher.notifyOne(
+                            com.nocobase.notification.NotifyDispatcher.WORKFLOW_FAILED,
+                            w.getCreatedBy(),
+                            new com.nocobase.notification.NotifyDispatcher.Payload(
+                                    w.getTenantId(), "工作流执行失败",
+                                    "工作流「" + w.getName() + "」执行失败：" + e.getMessage(),
+                                    w.getId().toString(),
+                                    "/designer/instances/" + instance.getId(),
+                                    "HIGH", "workflow-failed:" + instance.getId()));
+                }
+            } catch (Exception notifyError) {
+                log.warn("[workflow] 失败通知发送失败: {}", notifyError.getMessage());
+            }
         }
     }
 

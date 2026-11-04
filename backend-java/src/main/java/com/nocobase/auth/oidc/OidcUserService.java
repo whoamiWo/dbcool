@@ -3,7 +3,6 @@ package com.nocobase.auth.oidc;
 import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
 import com.nocobase.tenant.TenantContext;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,9 +38,12 @@ public class OidcUserService {
     private static final Logger log = LoggerFactory.getLogger(OidcUserService.class);
 
     private final UserRepository userRepository;
+    private final com.nocobase.auth.UserProvisioningService provisioningService;
 
-    public OidcUserService(UserRepository userRepository) {
+    public OidcUserService(UserRepository userRepository,
+                           com.nocobase.auth.UserProvisioningService provisioningService) {
         this.userRepository = userRepository;
+        this.provisioningService = provisioningService;
     }
 
     /**
@@ -102,18 +104,13 @@ public class OidcUserService {
             finalUsername = finalUsername + "_" + UUID.randomUUID().toString().substring(0, 6);
         }
 
-        UserEntity user = new UserEntity();
-        user.setId(UUID.randomUUID());
-        user.setUsername(finalUsername);
-        // 不设密码：JIT 用户只能通过 OIDC 登录
-        user.setPasswordHash(null);
-        user.setTenantId(tenantId);
-        user.setDisplayName(oidcUser.getFullName() != null ? oidcUser.getFullName() : finalUsername);
-        user.setEmail(email);
-        user.setEnabled(true);
-        user.setCreatedAt(Instant.now());
-
-        UserEntity saved = userRepository.save(user);
+        // A-2：统一走 UserProvisioningService —— passwordHash=null 且 passwordSet=false。
+        // 修复前此处手工 new + setPasswordHash(null)，而当时 password_hash 是 NOT NULL，
+        // OIDC 首次登录必然 500（且被上层吞成「登录失败」）。
+        UserEntity saved = provisioningService.createExternal(
+                tenantId, finalUsername,
+                oidcUser.getFullName() != null ? oidcUser.getFullName() : finalUsername,
+                email, "OIDC");
         log.info("[OIDC] JIT 建号成功 userId={} username={} tenant={}",
                 saved.getId(), finalUsername, tenantId);
         return saved;

@@ -35,6 +35,23 @@ const FormPublicFillPage = lazy(() =>
   import('./pages/FormPublicFill').then(m => ({ default: m.FormPublicFillPage } as { default: React.ComponentType })),
 );
 
+// E1/E2/E4: 组织架构、通讯录、审批中心、搜索结果
+const DirectoryPage = lazy(() =>
+  import('./pages/org/DirectoryPage').then(m => ({ default: m.DirectoryPage } as { default: React.ComponentType })),
+);
+const OrgStructurePage = lazy(() =>
+  import('./pages/org/OrgStructurePage').then(m => ({ default: m.OrgStructurePage } as { default: React.ComponentType })),
+);
+const ApprovalCenterPage = lazy(() =>
+  import('./pages/approval/ApprovalCenterPage').then(m => ({ default: m.ApprovalCenterPage } as { default: React.ComponentType })),
+);
+const ApprovalDetailPage = lazy(() =>
+  import('./pages/approval/ApprovalDetailPage').then(m => ({ default: m.ApprovalDetailPage } as { default: React.ComponentType })),
+);
+const SearchResultsPage = lazy(() =>
+  import('./pages/SearchResultsPage').then(m => ({ default: m.SearchResultsPage } as { default: React.ComponentType })),
+);
+
 const FormTemplatesListPage = lazy(() =>
   import('./pages/FormTemplatesList').then(m => ({ default: m.FormTemplatesListPage } as { default: React.ComponentType })),
 );
@@ -73,9 +90,6 @@ const WorkflowDesignerPageWithProvider = lazy(() =>
 );
 const WorkflowInstancesPage = lazy(() =>
   import('./pages/WorkflowInstances').then(m => ({ default: m.WorkflowInstancesPage } as { default: React.ComponentType })),
-);
-const MyTasksPage = lazy(() =>
-  import('./pages/MyTasks').then(m => ({ default: m.MyTasksPage } as { default: React.ComponentType })),
 );
 const ProfilePage = lazy(() =>
   import('./pages/Profile').then(m => ({ default: m.ProfilePage } as { default: React.ComponentType })),
@@ -220,11 +234,17 @@ export const router = createBrowserRouter([
       { path: 'designer/workflows', element: <Lazy><WorkflowsListPage /></Lazy> },
       { path: 'designer/instances', element: <Lazy><WorkflowInstancesPage /></Lazy> },
       { path: 'designer/instances/:id', element: <Lazy><WorkflowInstancesPage /></Lazy> },
-      { path: 'tasks/my', element: <Lazy><MyTasksPage /></Lazy> },
+      // T3.3：待办已并入审批中心（旧路由重定向，避免断链）
+      { path: 'tasks/my', element: <Navigate to="/approvals" replace /> },
       { path: 'designer/workflows/new', element: <Lazy><WorkflowDesignerPageWithProvider /></Lazy> },
       { path: 'designer/workflows/:id/edit', element: <Lazy><WorkflowDesignerPageWithProvider /></Lazy> },
       { path: 'profile', element: <Lazy><ProfilePage /></Lazy> },
       { path: 'messages', element: <Lazy><MessagesInboxPage /></Lazy> },
+      { path: 'directory', element: <Lazy><DirectoryPage /></Lazy> },
+      { path: 'admin/org', element: <Lazy><OrgStructurePage /></Lazy> },
+      { path: 'approvals', element: <Lazy><ApprovalCenterPage /></Lazy> },
+      { path: 'approvals/:id', element: <Lazy><ApprovalDetailPage /></Lazy> },
+      { path: 'search', element: <Lazy><SearchResultsPage /></Lazy> },
       { path: 'admin/roles', element: <Lazy><RolesListPage /></Lazy> },
       { path: 'admin/acl', element: <Lazy><AclEditorPage /></Lazy> },
       { path: 'admin/audit', element: <Lazy><AuditLogsPage /></Lazy> },

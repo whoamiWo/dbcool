@@ -87,11 +87,31 @@ public class AuthController {
                     "该账号由 LDAP 同步创建，请通过企业身份提供商（IdP）登录");
         }
 
+        // A-2：外部托管账号（钉钉/企微/飞书/LDAP/OIDC）没有本地密码，必须走 SSO。
+        // 修复前这里直接落到 passwordEncoder.matches(password, null) —— BCrypt 对 null 哈希
+        // 只返回 false 并打一条 WARN，用户看到的是笼统的「账号或密码错误」，
+        // 无法判断到底是密码错还是「本就不该用密码登录」。
+        if (!user.isPasswordSet() || user.getPasswordHash() == null) {
+            auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
+                    "auth.login.failed", "auth", user.getId().toString(),
+                    Map.of("username", user.getUsername(), "reason", "externally_managed_account"));
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "该账号由企业平台托管，请使用 SSO 登录");
+        }
+
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
                     "auth.login.failed", "auth", user.getId().toString(),
                     Map.of("username", user.getUsername(), "reason", "bad_password"));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "账号或密码错误");
+        }
+
+        // A-5：禁用/离职账号不得再获得新会话（签发前拦截，避免"签完再失效"的窗口）
+        if (!user.isActiveEmployee()) {
+            auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
+                    "auth.login.failed", "auth", user.getId().toString(),
+                    Map.of("username", user.getUsername(), "reason", "account_disabled"));
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "账号已被禁用或已离职");
         }
 
         // 🔒-SaaS-P0 R1: 从角色体系加载 roles，写入 JWT claims
@@ -151,6 +171,16 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户不存在");
         }
 
+        // A-5：禁用/离职账号的 refresh 同样必须失效，否则等于永久有效
+        // （access 只有 15 分钟，refresh 有 7 天 —— 只拦 access 是不够的）。
+        if (!user.isActiveEmployee()) {
+            auditService.log(user.getTenantId(), user.getId().toString(), user.getUsername(),
+                    "auth.refresh.failed", "auth", user.getId().toString(),
+                    Map.of("username", user.getUsername(), "reason", "account_disabled"));
+            refreshTokenService.revokeAll(user.getId());
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "账号已被禁用或已离职");
+        }
+
         // 🔒-SaaS-P0 R1: 从角色体系加载 roles，写入 JWT claims
         // R5: 用批量查询替代 N+1，传入 tenantId 作租户维度
         var refreshRoleNames = roleRepository.findRoleNamesByUserId(user.getId(), user.getTenantId());
@@ -195,10 +225,16 @@ public class AuthController {
     ) {
         var dbUser = userRepository.findById(user.userId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User 不存在"));
+        // A-2：外部托管账号没有本地密码，改密前提（旧密码校验）不成立
+        if (!dbUser.isPasswordSet() || dbUser.getPasswordHash() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "该账号由企业平台托管，请使用 SSO 登录");
+        }
         if (!passwordEncoder.matches(request.oldPassword(), dbUser.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "旧密码错误");
         }
         dbUser.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        dbUser.setPasswordSet(true);
         userRepository.save(dbUser);
         return Map.of("code", 0, "message", "密码修改成功");
     }

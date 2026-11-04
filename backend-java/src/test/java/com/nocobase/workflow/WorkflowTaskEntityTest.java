@@ -61,7 +61,9 @@ class WorkflowTaskEntityTest {
                         WorkflowTaskEntity.Status.PENDING,
                         WorkflowTaskEntity.Status.APPROVED,
                         WorkflowTaskEntity.Status.REJECTED,
-                        WorkflowTaskEntity.Status.COMPLETED
+                        WorkflowTaskEntity.Status.COMPLETED,
+                        // E2：撤回审批时关闭未完成任务（新增枚举值，DB 列为 varchar 无需迁移）
+                        WorkflowTaskEntity.Status.CANCELED
                 },
                 WorkflowTaskEntity.Status.values()
         );

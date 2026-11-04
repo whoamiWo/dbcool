@@ -15,10 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.security.SecureRandom;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * 企业微信应用服务 — 授权、code 交换与用户同步。
@@ -39,9 +37,12 @@ public class WeComAppService {
     private final PasswordEncoder passwordEncoder;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
     /** PHASE99 T1: 租户级凭证服务（优先于全局 @Value） */
     private final TenantCredentialService credentialService;
+    /** A-2：外部建号统一路径 */
+    private final com.nocobase.auth.UserProvisioningService provisioningService;
+    /** E1：部门树写入 org_unit（外部来源只读镜像） */
+    private final com.nocobase.org.OrgUnitService orgUnitService;
 
     // 以下 @Value 字段保留为**回退默认值**：租户级未配置时使用，存量部署零破坏
     @Value("${wecom.corp-id:}")
@@ -61,11 +62,15 @@ public class WeComAppService {
     private volatile long cachedTokenExpireAt = 0;
 
     public WeComAppService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                           RestTemplate restTemplate, TenantCredentialService credentialService) {
+                           RestTemplate restTemplate, TenantCredentialService credentialService,
+                           com.nocobase.auth.UserProvisioningService provisioningService,
+                           com.nocobase.org.OrgUnitService orgUnitService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.restTemplate = restTemplate;
         this.credentialService = credentialService;
+        this.provisioningService = provisioningService;
+        this.orgUnitService = orgUnitService;
     }
 
     /**
@@ -195,24 +200,21 @@ public class WeComAppService {
 
         // 按 unionId 哈希后的用户名查找本地用户
         String username = "wecom_" + safeTail(unionId, 12);
+        final String tenantId = "system";
         UserEntity existing = userRepository.findByUsername(username).orElse(null);
         if (existing != null) {
+            // 归属校验：企业微信账号固定归属 system 租户；命中其他租户同名账号
+            // 说明用户名哈希碰撞或数据被篡改，必须拒绝而不是跨租户复用。
+            if (!existing.getTenantId().equals(tenantId)) {
+                throw new IllegalStateException("企业微信账号存在跨租户冲突: " + username);
+            }
             log.info("[WeCom] 用户已存在: username={}", username);
             return existing;
         }
 
-        // 创建本地用户（密码随机，不走密码登录；与钉钉 dt_ 前缀模式对称）
-        String randomPassword = UUID.randomUUID().toString();
-        UserEntity user = new UserEntity();
-        user.setId(UUID.randomUUID());
-        user.setUsername(username);
-        user.setPasswordHash(passwordEncoder.encode(randomPassword));
-        user.setTenantId("system");
-        user.setDisplayName(name);
-        user.setEmail(email);
-        user.setEnabled(true);
-        user.setCreatedAt(Instant.now());
-        userRepository.save(user);
+        // A-2：统一建号路径 —— 企业微信托管账号无本地密码（此前写 bcrypt(random)）
+        UserEntity user = provisioningService.createExternal(
+                tenantId, username, name, email, "WECOM");
         log.info("[WeCom] 新建用户: username={}, unionId={}", username, unionId);
         return user;
     }
@@ -244,12 +246,24 @@ public class WeComAppService {
             throw new RuntimeException("解析部门列表失败", e);
         }
         int deptCount = 0;
+        java.util.Map<String, java.util.UUID> localDeptIds = new java.util.HashMap<>();
         if (deptJson.has("department") && deptJson.get("department").isArray()) {
             deptCount = deptJson.get("department").size();
+            // E1：按 parentid 顺序写 org_unit（企微返回列表通常父在子前；
+            // 父未落库时先按根处理，稍后由 path 修复）
             for (JsonNode dept : deptJson.get("department")) {
-                log.info("[WeCom] 部门: id={} name={}",
-                        dept.path("id").asText(""),
-                        dept.path("name").asText(""));
+                String extId = dept.path("id").asText("");
+                if (extId.isBlank()) continue;
+                String parentExt = dept.path("parentid").asText("");
+                try {
+                    var unit = orgUnitService.upsertExternal(
+                            "system", "WECOM", extId, dept.path("name").asText(extId),
+                            parentExt.isBlank() || "0".equals(parentExt) ? null : parentExt,
+                            dept.path("order").asInt(0));
+                    localDeptIds.put(extId, unit.getId());
+                } catch (Exception e) {
+                    log.warn("[WeCom] 部门 {} 写入 org_unit 失败: {}", extId, e.getMessage());
+                }
             }
         }
 
@@ -275,16 +289,18 @@ public class WeComAppService {
                     String uusername = "wecom_" + safeTail(uid, 12);
                     if (userRepository.findByUsername(uusername).isEmpty() &&
                             userRepository.findByEmail(uemail).isEmpty()) {
-                        UserEntity user = new UserEntity();
-                        user.setId(UUID.randomUUID());
-                        user.setUsername(uusername);
-                        user.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
-                        user.setTenantId("system");
-                        user.setDisplayName(uname);
-                        user.setEmail(uemail);
-                        user.setEnabled(true);
-                        user.setCreatedAt(Instant.now());
-                        userRepository.save(user);
+                        // A-2：统一建号路径
+                        var created = provisioningService.createExternal(
+                                "system", uusername, uname, uemail, "WECOM");
+                        // E1：写入部门归属（simplelist 的 department 数组首个 id）
+                        JsonNode deptArr = u.path("department");
+                        if (created != null && deptArr.isArray() && !deptArr.isEmpty()) {
+                            java.util.UUID local = localDeptIds.get(deptArr.get(0).asText(""));
+                            if (local != null) {
+                                created.setDepartmentId(local);
+                                userRepository.save(created);
+                            }
+                        }
                         userCount++;
                     }
                 }
