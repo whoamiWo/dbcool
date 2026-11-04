@@ -128,6 +128,44 @@ class AuthControllerTest {
     }
 
     @Test
+    void login_externallyManagedAccount_returns401_withExplicitMessage() throws Exception {
+        // A-2：外部托管账号（钉钉/OIDC/LDAP…）没有本地密码。
+        // 修复前会落到 passwordEncoder.matches(pw, null)，只返回 false，
+        // 用户看到笼统的"账号或密码错误"，无法判断应走 SSO。
+        UUID uid = UUID.randomUUID();
+        UserEntity ext = user(uid, "dt_user");
+        ext.setPasswordHash(null);
+        ext.setPasswordSet(false);
+        when(userRepository.findByUsername("dt_user")).thenReturn(Optional.of(ext));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"dt_user","password":"pw"}
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        verify(passwordEncoder, never()).matches(anyString(), any());
+    }
+
+    @Test
+    void login_disabledAccount_returns403() throws Exception {
+        // A-5：禁用/离职账号不得再获得新会话
+        UUID uid = UUID.randomUUID();
+        UserEntity disabled = user(uid, "gone");
+        disabled.setEnabled(false);
+        when(userRepository.findByUsername("gone")).thenReturn(Optional.of(disabled));
+        when(passwordEncoder.matches("pw", "$2a$10$hash")).thenReturn(true);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"gone","password":"pw"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void login_wrongPassword_returns401() throws Exception {
         UUID uid = UUID.randomUUID();
         when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user(uid, "alice")));

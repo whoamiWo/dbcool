@@ -22,9 +22,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
     private final JwtService jwtService;
+    /** A-5：禁用/离职账号的旧 token 即刻失效（Redis 60s 缓存 + 主动失效） */
+    private final UserStatusService userStatusService;
 
-    public JwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter(JwtService jwtService, UserStatusService userStatusService) {
         this.jwtService = jwtService;
+        this.userStatusService = userStatusService;
     }
 
     @Override
@@ -40,6 +43,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 Claims claims = jwtService.parseAccessToken(token);
                 if (claims != null) {
                     UUID userId = UUID.fromString(claims.getSubject());
+                    // A-5：签名有效 ≠ 账号活跃。禁用/离职后旧 token 最多再用 60 秒
+                    // （Redis 缓存窗口），且 refresh 已被吊销，无法续命。
+                    if (!userStatusService.isActive(userId)) {
+                        log.debug("[jwt] 账号不活跃，拒绝 token userId={}", userId);
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
                     String username = (String) claims.get("username");
                     String tenantId = (String) claims.get("tid");
 

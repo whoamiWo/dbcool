@@ -182,7 +182,8 @@ class UserAdminControllerTest {
     void update_partialFields_returnsUpdatedUser() throws Exception {
         UUID uid = UUID.randomUUID();
         when(userService.get(uid, "tenant_admin")).thenReturn(user(uid, "alice"));
-        when(userService.update(eq(uid), eq("New Name"), eq(false), eq("tenant_admin")))
+        when(userService.updateProfile(eq(uid), eq("tenant_admin"),
+                any(UserAdminService.UserProfilePatch.class)))
                 .thenReturn(user(uid, "alice"));
 
         String body = """
@@ -205,7 +206,8 @@ class UserAdminControllerTest {
     @Test
     void update_wrongTenant_returns404() throws Exception {
         UUID uid = UUID.randomUUID();
-        when(userService.update(eq(uid), any(), any(), eq("tenant_other")))
+        when(userService.updateProfile(eq(uid), eq("tenant_other"),
+                any(UserAdminService.UserProfilePatch.class)))
                 .thenThrow(new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "User 不存在"));
 

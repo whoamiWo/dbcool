@@ -90,6 +90,10 @@ class CollectionControllerTest {
                 .thenAnswer(inv -> inv.getArgument(3));
         when(aclEnforcer.filterRecordsByDataScope(any(), anyString(), anyString(), any()))
                 .thenAnswer(inv -> inv.getArgument(3));
+        // T1.3：默认无数据范围下推（走既有内存路径），具体用例可覆盖
+        when(aclEnforcer.resolveDataScopePlan(any(), anyString(), anyString()))
+                .thenReturn(new AclEnforcer.DataScopePlan(null, false));
+        when(rowAclService.hasPolicies(anyString(), anyString(), anyString())).thenReturn(false);
         when(rowAclService.filterReadable(anyString(), anyString(), any(), any()))
                 .thenAnswer(inv -> inv.getArgument(2));
         when(rowAclService.evaluateRead(anyString(), anyString(), any(), any())).thenReturn(true);
@@ -341,7 +345,7 @@ class CollectionControllerTest {
     @Test
     void listRecords_withFilter_returnsServiceResult() {
         when(service.listRecords(eq("posts"), eq("tenant_default"), eq(50),
-                any(), any())).thenReturn(List.of(Map.of("title", "A")));
+                any(), any(), any(), any())).thenReturn(List.of(Map.of("title", "A")));
 
         Map<String, Object> resp = controller.listRecords("posts", 50, null, null, testUser);
 
@@ -352,7 +356,7 @@ class CollectionControllerTest {
     @Test
     void listRecords_withComplexFilter_parsesCorrectly() {
         when(service.listRecords(eq("posts"), eq("tenant_default"), eq(50),
-                any(), any())).thenReturn(List.of());
+                any(), any(), any(), any())).thenReturn(List.of());
 
         // filter=name:contains:Al,age:gt:20,email:empty
         controller.listRecords("posts", 50, null,
@@ -361,7 +365,7 @@ class CollectionControllerTest {
         ArgumentCaptor<List<CollectionService.FilterRule>> cap =
                 ArgumentCaptor.forClass(List.class);
         verify(service).listRecords(eq("posts"), eq("tenant_default"), eq(50),
-                any(), cap.capture());
+                any(), cap.capture(), any(), any());
         List<CollectionService.FilterRule> rules = cap.getValue();
         assertEquals(3, rules.size());
         assertEquals("contains", rules.get(0).op());
@@ -372,7 +376,7 @@ class CollectionControllerTest {
     @Test
     void listRecords_invalidFilterSkipped_parsesValid() {
         when(service.listRecords(eq("posts"), eq("tenant_default"), anyInt(),
-                any(), any())).thenReturn(List.of());
+                any(), any(), any(), any())).thenReturn(List.of());
 
         // 非法 op:invalid + 合法 eq:Alice
         controller.listRecords("posts", 50, null, "op:invalid:x,name:eq:Alice", testUser);
@@ -380,7 +384,7 @@ class CollectionControllerTest {
         ArgumentCaptor<List<CollectionService.FilterRule>> cap =
                 ArgumentCaptor.forClass(List.class);
         verify(service).listRecords(eq("posts"), eq("tenant_default"), anyInt(),
-                any(), cap.capture());
+                any(), cap.capture(), any(), any());
         // 只有 eq:Alice 通过
         assertEquals(1, cap.getValue().size());
         assertEquals("name", cap.getValue().get(0).field());

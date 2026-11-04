@@ -36,13 +36,26 @@ class OidcUserServiceTest {
 
     private UserRepository userRepository;
     private OidcUserService service;
+    private com.nocobase.auth.UserProvisioningService provisioningMock;
 
     private static final String TENANT = "tenant_default";
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
-        service = new OidcUserService(userRepository);
+        provisioningMock = mock(com.nocobase.auth.UserProvisioningService.class);
+        when(provisioningMock.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
+                    u.setId(java.util.UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    u.setEmail(inv.getArgument(3));
+                    return u;
+                });
+        service = new OidcUserService(userRepository, provisioningMock);
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -95,6 +108,7 @@ class OidcUserServiceTest {
         assertEquals(existing.getId(), result.getId());
     }
 
+    /** JIT 建号 —— 托管账号无本地密码，只能走 OIDC 登录。 */
     @Test
     void mapOrCreate_createsUser_whenNoMatch() {
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
@@ -106,7 +120,7 @@ class OidcUserServiceTest {
         assertNotNull(created.getId());
         assertEquals("newuser", created.getUsername());
         assertEquals("new@corp.com", created.getEmail());
-        // JIT 用户不得设置密码 —— 只能走 OIDC 登录
+        // A-2：JIT 用户不得设置密码
         assertNull(created.getPasswordHash());
         assertNotNull(created.getTenantId());
     }

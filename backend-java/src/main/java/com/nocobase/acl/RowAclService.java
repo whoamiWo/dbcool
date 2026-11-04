@@ -42,6 +42,16 @@ public class RowAclService {
      *
      * @return true 允许 / false 拒绝
      */
+    /** 是否存在该集合上的行级策略（用于决定是否放大取数窗口）。 */
+    public boolean hasPolicies(String tenantId, String collection, String action) {
+        try {
+            return !repository.findApplicable(tenantId, collection, action).isEmpty();
+        } catch (Exception e) {
+            log.warn("[row-acl] 策略查询失败 collection={}: {}", collection, e.getMessage());
+            return true; // 查询失败按"有策略"处理 → 放大取数，避免少返回
+        }
+    }
+
     public boolean evaluateRead(String tenantId,
                                 String collection,
                                 Map<String, Object> record,

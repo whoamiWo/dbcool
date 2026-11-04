@@ -15,7 +15,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "workflow_instances")
 public class WorkflowInstanceEntity {
 
-    public enum Status { PENDING, RUNNING, COMPLETED, FAILED }
+    public enum Status { PENDING, RUNNING, COMPLETED, FAILED, TERMINATED }
 
     @Id
     @Column(name = "id", nullable = false)

@@ -39,6 +39,7 @@ class LdapSyncServiceTest {
     private LdapUserMappingRepository mappingRepository;
     private UserRepository userRepository;
     private LdapTemplate ldapTemplate;
+    private com.nocobase.auth.UserProvisioningService provisioning;
     private LdapSyncService service;
 
     @BeforeEach
@@ -47,9 +48,23 @@ class LdapSyncServiceTest {
         mappingRepository = mock(LdapUserMappingRepository.class);
         userRepository = mock(UserRepository.class);
         ldapTemplate = mock(LdapTemplate.class);
+        provisioning = mock(com.nocobase.auth.UserProvisioningService.class);
+        when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    UserEntity u = new UserEntity();
+                    u.setId(UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    return u;
+                });
         service = new LdapSyncService(
                 configRepository, mappingRepository, userRepository, ldapTemplate,
-                new BCryptPasswordEncoder());
+                new BCryptPasswordEncoder(),
+                provisioning);
     }
 
     private LdapConfigEntity config(String tenantId, String name) {
@@ -61,44 +76,66 @@ class LdapSyncServiceTest {
         return c;
     }
 
-    /** 同步创建的本地用户口令必须是随机不可登录值，不能是可预测的 "LDAP_SYNCED"。 */
+    /** A-2：同步创建的本地用户是无本地密码的托管账号，不能再写可预测占位串。 */
     @Test
     void syncUser_passwordIsRandom_notPlaceholder() {
         LdapConfigEntity cfg = config("tenant_a", "cfg-a");
         when(mappingRepository.findByLdapUidAndTenantId(eq("uid-1"), eq("tenant_a")))
                 .thenReturn(Optional.empty());
         when(userRepository.findByUsername("uid-1")).thenReturn(Optional.empty());
-        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    UserEntity u = new UserEntity();
+                    u.setId(UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    return u;
+                });
 
-        service.syncUser(cfg, Map.of(
+        var mapping = service.syncUser(cfg, Map.of(
                 "uid", "uid-1",
                 "dn", "cn=uid-1,dc=example,dc=com",
                 "displayName", "UID One"), "tenant_a");
 
-        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
-        verify(userRepository).save(captor.capture());
-        String hash = captor.getValue().getPasswordHash();
-        // 不是已知占位串、不是空、且是 bcrypt 哈希（不可逆）
-        assertThat(hash).isNotEqualTo("LDAP_SYNCED").isNotBlank().startsWith("$2");
+        // A-2：统一建号路径被调用，且本地用户 id 已回写映射
+        assertThat(mapping.getLocalUserId()).isNotNull();
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(provisioning).createExternal(
+                org.mockito.ArgumentMatchers.any(), captor.capture(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("LDAP"));
+        assertThat(captor.getValue()).isEqualTo("uid-1");
     }
 
-    /** 两次同步不同用户 → 口令不同（证明是随机而非固定值）。 */
+    /** A-2：两次同步不同用户均走统一建号路径（无本地口令，不存在可预测哈希问题）。 */
     @Test
     void syncUser_twoUsers_haveDifferentPasswords() {
         when(mappingRepository.findByLdapUidAndTenantId(any(), any())).thenReturn(Optional.empty());
         when(userRepository.findByUsername(any())).thenReturn(Optional.empty());
-        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    UserEntity u = new UserEntity();
+                    u.setId(UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    return u;
+                });
 
         LdapConfigEntity cfg = config("tenant_a", "cfg-a");
-        service.syncUser(cfg, Map.of("uid", "u1", "dn", "cn=u1"), "tenant_a");
-        service.syncUser(cfg, Map.of("uid", "u2", "dn", "cn=u2"), "tenant_a");
+        var m1 = service.syncUser(cfg, Map.of("uid", "u1", "dn", "cn=u1"), "tenant_a");
+        var m2 = service.syncUser(cfg, Map.of("uid", "u2", "dn", "cn=u2"), "tenant_a");
 
-        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
-        verify(userRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-        assertThat(captor.getAllValues().get(0).getPasswordHash())
-                .isNotEqualTo(captor.getAllValues().get(1).getPasswordHash());
+        assertThat(m1.getLocalUserId()).isNotNull();
+        assertThat(m2.getLocalUserId()).isNotNull();
+        assertThat(m1.getLocalUserId()).isNotEqualTo(m2.getLocalUserId());
+        org.mockito.Mockito.verify(provisioning, org.mockito.Mockito.times(2))
+                .createExternal(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.eq("LDAP"));
     }
 
     /** 定时同步必须遍历所有启用配置，而不是只查 system 租户。 */
@@ -190,7 +227,9 @@ class LdapSyncServiceTest {
         LdapConfigEntity cfg = config("t1", "cfg");
         when(mappingRepository.findByLdapUidAndTenantId("uid-err", "t1")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("uid-err")).thenReturn(Optional.empty());
-        when(userRepository.save(any(UserEntity.class))).thenThrow(new RuntimeException("db down"));
+        // A-2 后建号经由 UserProvisioningService —— 失败点随之迁移到 createExternal
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("db down"));
         when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.syncUser(cfg, Map.of("uid", "uid-err", "dn", "cn=x"), "t1");

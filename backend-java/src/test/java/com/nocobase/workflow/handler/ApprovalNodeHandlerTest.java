@@ -25,7 +25,11 @@ class ApprovalNodeHandlerTest {
 
     private final WorkflowInstanceRepository instanceRepository = mock(WorkflowInstanceRepository.class);
     private final WorkflowTaskRepository taskRepository = mock(WorkflowTaskRepository.class);
-    private final ApprovalNodeHandler handler = new ApprovalNodeHandler(instanceRepository, taskRepository);
+    private final com.nocobase.auth.UserRepository userRepository = mock(com.nocobase.auth.UserRepository.class);
+    private final com.nocobase.auth.UserRoleRepository userRoleRepository = mock(com.nocobase.auth.UserRoleRepository.class);
+    private final com.nocobase.auth.RoleRepository roleRepository = mock(com.nocobase.auth.RoleRepository.class);
+    private final ApprovalNodeHandler handler = new ApprovalNodeHandler(
+            instanceRepository, taskRepository, userRepository, userRoleRepository, roleRepository);
 
     @Test
     void singleAssignee_createsOneTask() {
@@ -125,25 +129,92 @@ class ApprovalNodeHandlerTest {
     }
 
     @Test
-    void nullTenantId_usesGeneratedUuidFromDefaultTenant() {
+    void unresolvableAssignee_failsInstance_withoutGhostTask() {
+        // A-7 负向用例：无 assignee / approverType / defaultAssignee 时，
+        // 修复前会 nameUUIDFromBytes(tenantId) 造幽灵审批人 → 任务永久悬挂。
         UUID instanceId = UUID.randomUUID();
         UUID nodeId = UUID.randomUUID();
         WorkflowInstanceEntity instance = new WorkflowInstanceEntity();
         instance.setId(instanceId);
-        instance.setTenantId(null);
+        instance.setTenantId("tenant_1");
         instance.setStatus(WorkflowInstanceEntity.Status.RUNNING);
 
         NodeExecutionContext ctx = mock(NodeExecutionContext.class);
         when(ctx.instance()).thenReturn(instance);
         when(ctx.node()).thenReturn(Map.of("id", nodeId.toString(), "config", Map.of()));
         when(ctx.defaultAssignee()).thenReturn(null);
+        when(instanceRepository.save(any(WorkflowInstanceEntity.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        NodeOutcome outcome = handler.execute(ctx);
+
+        assertEquals(NodeOutcome.FAILED, outcome);
+        verify(taskRepository, never()).save(any(WorkflowTaskEntity.class));
+        verify(instanceRepository).save(argThat(inst ->
+                inst.getStatus() == WorkflowInstanceEntity.Status.FAILED
+                        && inst.getErrorMessage() != null));
+    }
+
+    @Test
+    void managerApprover_usesApplicantManagerId() {
+        UUID instanceId = UUID.randomUUID();
+        UUID nodeId = UUID.randomUUID();
+        UUID applicant = UUID.randomUUID();
+        UUID manager = UUID.randomUUID();
+        WorkflowInstanceEntity instance = new WorkflowInstanceEntity();
+        instance.setId(instanceId);
+        instance.setTenantId("tenant_1");
+        instance.setStatus(WorkflowInstanceEntity.Status.RUNNING);
+        instance.setTriggerDataJson("{\"data\":{\"applicantId\":\"" + applicant + "\"}}");
+
+        com.nocobase.auth.UserEntity applicantUser = new com.nocobase.auth.UserEntity();
+        applicantUser.setId(applicant);
+        applicantUser.setDisplayName("申请人");
+        applicantUser.setManagerId(manager);
+        com.nocobase.auth.UserEntity managerUser = new com.nocobase.auth.UserEntity();
+        managerUser.setId(manager);
+        managerUser.setEnabled(true);
+        when(userRepository.findById(applicant)).thenReturn(Optional.of(applicantUser));
+        when(userRepository.findById(manager)).thenReturn(Optional.of(managerUser));
+
+        NodeExecutionContext ctx = mock(NodeExecutionContext.class);
+        when(ctx.instance()).thenReturn(instance);
+        when(ctx.node()).thenReturn(Map.of("id", nodeId.toString(), "config",
+                Map.of("approverType", "MANAGER")));
         when(taskRepository.save(any(WorkflowTaskEntity.class))).thenAnswer(i -> i.getArguments()[0]);
         when(instanceRepository.save(any(WorkflowInstanceEntity.class))).thenAnswer(i -> i.getArguments()[0]);
 
         NodeOutcome outcome = handler.execute(ctx);
 
         assertEquals(NodeOutcome.NEEDS_APPROVAL, outcome);
-        verify(taskRepository).save(any(WorkflowTaskEntity.class));
+        verify(taskRepository).save(argThat(task -> task.getAssignee().equals(manager)));
+    }
+
+    @Test
+    void managerApprover_missingManager_failsWithoutTask() {
+        UUID instanceId = UUID.randomUUID();
+        UUID nodeId = UUID.randomUUID();
+        UUID applicant = UUID.randomUUID();
+        WorkflowInstanceEntity instance = new WorkflowInstanceEntity();
+        instance.setId(instanceId);
+        instance.setTenantId("tenant_1");
+        instance.setStatus(WorkflowInstanceEntity.Status.RUNNING);
+        instance.setTriggerDataJson("{\"data\":{\"applicantId\":\"" + applicant + "\"}}");
+
+        com.nocobase.auth.UserEntity applicantUser = new com.nocobase.auth.UserEntity();
+        applicantUser.setId(applicant);
+        applicantUser.setDisplayName("无上级");
+        when(userRepository.findById(applicant)).thenReturn(Optional.of(applicantUser));
+        when(instanceRepository.save(any(WorkflowInstanceEntity.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        NodeExecutionContext ctx = mock(NodeExecutionContext.class);
+        when(ctx.instance()).thenReturn(instance);
+        when(ctx.node()).thenReturn(Map.of("id", nodeId.toString(), "config",
+                Map.of("approverType", "MANAGER")));
+
+        NodeOutcome outcome = handler.execute(ctx);
+
+        assertEquals(NodeOutcome.FAILED, outcome);
+        verify(taskRepository, never()).save(any(WorkflowTaskEntity.class));
     }
 
     @Test

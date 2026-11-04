@@ -42,7 +42,8 @@ class WorkflowTriggerListenerTest {
         // 默认允许触发,死循环测试单独 mock
         org.mockito.Mockito.when(rateLimiter.allowTrigger(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(true);
-        listener = new WorkflowTriggerListener(matcher, engine, repository, rateLimiter);
+        listener = new WorkflowTriggerListener(matcher, engine, repository, rateLimiter,
+                mock(com.nocobase.notification.NotifyDispatcher.class));
     }
 
     private WorkflowEntity workflow() {

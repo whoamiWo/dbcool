@@ -49,7 +49,10 @@ class NodeHandlerIntegrationTest {
         when(workflowRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
 
         registry = new WorkflowNodeHandlerRegistry(List.of(
-                new ApprovalNodeHandler(instanceRepository, taskRepository),
+                new ApprovalNodeHandler(instanceRepository, taskRepository,
+                        mock(com.nocobase.auth.UserRepository.class),
+                        mock(com.nocobase.auth.UserRoleRepository.class),
+                        mock(com.nocobase.auth.RoleRepository.class)),
                 // Week 41 复核:通知 handler 需注入站内信与多渠道依赖
                 new NotificationNodeHandler(workflowRepository, messageRepository, notificationService),
                 new ConditionNodeHandler(),

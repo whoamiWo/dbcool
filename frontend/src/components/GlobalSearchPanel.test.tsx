@@ -102,10 +102,15 @@ describe('GlobalSearchPanel', () => {
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/wiki/my-page'));
   });
 
-  it('点击 record 结果跳转 /views/:id/run', async () => {
+  it('点击 record 结果优先使用后端 deeplink（E4）', async () => {
     mockedSearch.mockResolvedValue({
       code: 0,
-      data: { keyword: 'x', total: 1, results: [result('record')], facets: {} },
+      data: {
+        keyword: 'x',
+        total: 1,
+        results: [result('record', { deeplink: '/records/orders/record-1', collection: 'orders' })],
+        facets: {},
+      },
     });
     renderPanel();
     fireEvent.click(screen.getAllByRole('button')[0]);
@@ -113,7 +118,7 @@ describe('GlobalSearchPanel', () => {
     fireEvent.change(input, { target: { value: 'x' } });
     await waitFor(() => expect(screen.getByText(/record hit/)).toBeInTheDocument());
     fireEvent.click(screen.getByText(/record hit/));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/views/record-1/run'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/records/orders/record-1'));
   });
 
   it('点击 im / project / automation 结果分别跳转对应路由', async () => {

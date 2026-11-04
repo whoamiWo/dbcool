@@ -76,7 +76,10 @@ class InboundMessageServiceIntegrationTest {
                 messageRepository, memberRepository, bridge, externalMessageLogRepository,
                 externalUserMappingRepository, userRepository, passwordEncoder,
                 // PHASE99 T3: 入站消息审计依赖，非被测主路径，mock 隔离
-                org.mockito.Mockito.mock(com.nocobase.audit.AuditService.class));
+                org.mockito.Mockito.mock(com.nocobase.audit.AuditService.class),
+                // A-2: 建号路径用**真实实现 + 真实 DB**（本类就是落库集成测试，
+                // mock 掉 provisioning 会把「password_hash NOT NULL 建号失败」重新藏起来）
+                new com.nocobase.auth.UserProvisioningService(userRepository));
         ReflectionTestUtils.setField(service, "defaultChannelId", channelId.toString());
         ReflectionTestUtils.setField(service, "inboundEnabled", true);
         ReflectionTestUtils.setField(service, "autoProvisionUser", false);

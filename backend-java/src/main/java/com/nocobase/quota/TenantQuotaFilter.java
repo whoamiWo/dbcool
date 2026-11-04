@@ -82,6 +82,8 @@ public class TenantQuotaFilter extends OncePerRequestFilter implements Applicati
                 int status = e.getStatusCode().value();
                 log.warn("[quota] 配额拦截 tenant={} status={} path={}",
                         tenantId, status, request.getRequestURI());
+                // E3：配额超限通知租户管理员（按天聚合，避免每个 429 都发一条）
+                notifyQuotaExceeded(tenantId, e.getReason());
                 response.setStatus(status);
                 response.setContentType("application/json;charset=UTF-8");
                 response.getWriter().write(
@@ -94,6 +96,38 @@ public class TenantQuotaFilter extends OncePerRequestFilter implements Applicati
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /**
+     * E3 接入点：配额超限通知租户 ADMIN。
+     *
+     * <p>延迟从容器取 Bean（与 quotaService 同样的原因：切片测试没有这些 Bean）。
+     * 通知失败绝不影响 429 响应。
+     */
+    private void notifyQuotaExceeded(String tenantId, String reason) {
+        if (applicationContext == null) return;
+        try {
+            var dispatcher = applicationContext.getBean(
+                    com.nocobase.notification.NotifyDispatcher.class);
+            var roleRepository = applicationContext.getBean(
+                    com.nocobase.auth.RoleRepository.class);
+            var userRoleRepository = applicationContext.getBean(
+                    com.nocobase.auth.UserRoleRepository.class);
+            var role = roleRepository.findByNameAndTenantId("ADMIN", tenantId).orElse(null);
+            if (role == null) return;
+            String day = java.time.LocalDate.now().toString();
+            for (var ur : userRoleRepository.findByIdRoleId(role.getId())) {
+                dispatcher.notifyOne(com.nocobase.notification.NotifyDispatcher.QUOTA,
+                        ur.getId().getUserId(),
+                        new com.nocobase.notification.NotifyDispatcher.Payload(
+                                tenantId, "配额已超限",
+                                reason == null ? "租户配额已超限，相关请求被拒绝" : reason,
+                                null, "/admin/tenants", "HIGH",
+                                "quota:" + tenantId + ":" + day));
+            }
+        } catch (Exception e) {
+            log.debug("[quota] 超限通知发送失败: {}", e.getMessage());
+        }
     }
 
     private long contentLength(HttpServletRequest request) {

@@ -74,7 +74,11 @@ public class UserAdminController {
             @RequestBody UpdateUserRequest req,
             @AuthenticationPrincipal AuthenticatedUser user) {
         UserEntity before = userService.get(id, user.tenantId());
-        UserEntity u = userService.update(id, req.displayName(), req.enabled(), user.tenantId());
+        UserEntity u = userService.updateProfile(id, user.tenantId(),
+                new UserAdminService.UserProfilePatch(
+                        req.displayName(), req.email(), req.phone(), req.position(),
+                        req.employeeNo(), req.avatarUrl(), req.managerId(),
+                        req.departmentId(), req.status(), req.enabled()));
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
                 "user.update", "user", id.toString(),
                 Map.of("before", toDto(before), "after", toDto(u)));
@@ -152,7 +156,18 @@ public class UserAdminController {
         dto.put("display_name", u.getDisplayName() != null ? u.getDisplayName() : u.getUsername());
         dto.put("tenant_id", u.getTenantId());
         dto.put("enabled", u.isEnabled());
-        dto.put("created_at", u.getCreatedAt().toString());
+        dto.put("created_at", u.getCreatedAt() != null ? u.getCreatedAt().toString() : null);
+        // E1 组织/档案字段（管理端可见，含手机号 —— 本端点已限定 ADMIN）
+        dto.put("email", u.getEmail());
+        dto.put("phone", u.getPhone());
+        dto.put("position", u.getPosition());
+        dto.put("employee_no", u.getEmployeeNo());
+        dto.put("avatar_url", u.getAvatarUrl());
+        dto.put("status", u.getStatus());
+        dto.put("password_set", u.isPasswordSet());
+        dto.put("department_id", u.getDepartmentId() == null ? null : u.getDepartmentId().toString());
+        dto.put("manager_id", u.getManagerId() == null ? null : u.getManagerId().toString());
+        dto.put("joined_at", u.getJoinedAt() == null ? null : u.getJoinedAt().toString());
         return dto;
     }
 
@@ -172,6 +187,14 @@ public class UserAdminController {
 
     public record UpdateUserRequest(
             String displayName,
-            Boolean enabled
+            Boolean enabled,
+            String email,
+            String phone,
+            String position,
+            String employeeNo,
+            String avatarUrl,
+            UUID managerId,
+            UUID departmentId,
+            String status
     ) {}
 }

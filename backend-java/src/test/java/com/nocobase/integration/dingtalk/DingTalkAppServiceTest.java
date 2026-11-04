@@ -28,7 +28,21 @@ class DingTalkAppServiceTest {
         userRepository = mock(UserRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
         credentialService = mock(TenantCredentialService.class);
-        service = new DingTalkAppService(userRepository, passwordEncoder, credentialService);
+        com.nocobase.auth.UserProvisioningService provisioning =
+                mock(com.nocobase.auth.UserProvisioningService.class);
+        // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
+                    u.setId(java.util.UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    return u;
+                });
+        service = new DingTalkAppService(userRepository, passwordEncoder, credentialService,
+                provisioning);
     }
 
     private void setField(String name, String value) throws Exception {
@@ -146,15 +160,15 @@ class DingTalkAppServiceTest {
     }
 
     @Test
-    void syncUserFromDingTalk_newUser_createsWithRandomPassword() throws Exception {
+    void syncUserFromDingTalk_newUser_createsExternalManagedAccount() throws Exception {
         when(userRepository.findByUsername("dt_xyz789")).thenReturn(java.util.Optional.empty());
-        when(passwordEncoder.encode(any())).thenReturn("hashed");
-        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         var user = service.syncUserFromDingTalk("xyz789", "Display", "t1");
-        assertThat(user.getUsername()).startsWith("dt_");
+        assertThat(user.getUsername()).isEqualTo("dt_xyz789");
         assertThat(user.getDisplayName()).isEqualTo("Display");
         assertThat(user.getTenantId()).isEqualTo("t1");
+        // A-2：钉钉托管账号无本地密码
+        assertThat(user.getPasswordHash()).isNull();
     }
 
     @Test
@@ -186,12 +200,5 @@ class DingTalkAppServiceTest {
         assertThat((String)m.invoke(null, "abcdef", 3)).isEqualTo("def");
     }
 
-    @Test
-    void randomPassword_generatesBase64Url() throws Exception {
-        Method m = DingTalkAppService.class.getDeclaredMethod("randomPassword");
-        m.setAccessible(true);
-
-        String pwd = (String) m.invoke(null);
-        assertThat(pwd).matches("^[A-Za-z0-9_-]{32}$");
-    }
+    // （原 randomPassword 测试随 A-2 移除：钉钉托管账号不再生成本地密码）
 }

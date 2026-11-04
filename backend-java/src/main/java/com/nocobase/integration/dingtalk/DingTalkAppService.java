@@ -13,10 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * 钉钉微应用服务 — 授权、code 交换与用户同步。
@@ -39,6 +37,8 @@ public class DingTalkAppService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    /** A-2：外部建号统一路径 */
+    private final com.nocobase.auth.UserProvisioningService provisioningService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     /** PHASE99 T1: 租户级凭证服务（优先于全局 @Value） */
     private final TenantCredentialService credentialService;
@@ -57,10 +57,12 @@ public class DingTalkAppService {
     private String redirectUri;
 
     public DingTalkAppService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                              TenantCredentialService credentialService) {
+                              TenantCredentialService credentialService,
+                              com.nocobase.auth.UserProvisioningService provisioningService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.credentialService = credentialService;
+        this.provisioningService = provisioningService;
     }
 
     /** 是否已配置钉钉应用凭证（租户级或全局任一即可）。 */
@@ -100,6 +102,36 @@ public class DingTalkAppService {
     /** 获取 appSecret（用于签名校验）。 */
     public String getAppSecret(String tenantId) {
         return resolveForKey("app-secret", tenantId).orElse("");
+    }
+
+    /**
+     * 获取租户级应用 access_token（组织同步用）。
+     *
+     * <p>与登录换码用的 oauth2 token 不同：这里需要的是企业内部应用的
+     * {@code /topapi/*} 调用凭证，必须用 appkey/appsecret 走 {@code /gettoken}。
+     *
+     * @return access_token；凭证缺失或钉钉返回错误时返回空串（调用方按配置错误处理）
+     */
+    public String getAppAccessToken(String tenantId) {
+        String key = resolveForKey("app-key", tenantId).orElse("");
+        String secret = resolveForKey("app-secret", tenantId).orElse("");
+        if (key.isBlank() || secret.isBlank()) return "";
+        try {
+            String url = "https://oapi.dingtalk.com/gettoken?appkey=" + key + "&appsecret=" + secret;
+            String body = new org.springframework.web.client.RestTemplate().getForObject(url, String.class);
+            com.fasterxml.jackson.databind.JsonNode json =
+                    objectMapper.readTree(body == null ? "{}" : body);
+            int errcode = json.path("errcode").asInt(0);
+            if (errcode != 0) {
+                log.warn("[DingTalk] gettoken 失败 errcode={} errmsg={}", errcode,
+                        json.path("errmsg").asText(""));
+                return "";
+            }
+            return json.path("access_token").asText("");
+        } catch (Exception e) {
+            log.warn("[DingTalk] gettoken 异常: {}", e.getMessage());
+            return "";
+        }
     }
 
     /** 兼容旧签名：无租户上下文时只取全局配置 */
@@ -202,17 +234,11 @@ public class DingTalkAppService {
                     return existing;
                 })
                 .orElseGet(() -> {
-                    UserEntity u = new UserEntity();
-                    u.setId(UUID.randomUUID());
-                    u.setUsername(username);
-                    u.setPasswordHash(passwordEncoder.encode(randomPassword()));
-                    u.setDisplayName(nickname == null || nickname.isBlank() ? username : nickname);
-                    u.setTenantId(tenantId);
-                    u.setEnabled(true);
-                    u.setCreatedAt(java.time.Instant.now());
-                    UserEntity saved = userRepository.save(u);
+                    // A-2：统一建号路径 —— 外部托管账号无本地密码（此前写 bcrypt(随机)）
+                    UserEntity saved = provisioningService.createExternal(
+                            tenantId, username, nickname, null, "DINGTALK");
                     log.info("[DingTalk] 新建钉钉账号: {} (tenant={}, display={})",
-                            username, tenantId, u.getDisplayName());
+                            username, tenantId, saved.getDisplayName());
                     return saved;
                 });
     }
@@ -248,12 +274,5 @@ public class DingTalkAppService {
         String s = raw == null ? "" : raw.replaceAll("[^a-zA-Z0-9]", "");
         if (s.isEmpty()) s = "unknown";
         return s.length() <= max ? s : s.substring(s.length() - max);
-    }
-
-    /** 随机密码(SSO 账号不使用,仅满足非空约束)。 */
-    private static String randomPassword() {
-        byte[] buf = new byte[24];
-        RANDOM.nextBytes(buf);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(buf);
     }
 }

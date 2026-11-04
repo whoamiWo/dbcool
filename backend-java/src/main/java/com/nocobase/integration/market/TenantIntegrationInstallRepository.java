@@ -21,6 +21,11 @@ public interface TenantIntegrationInstallRepository extends JpaRepository<Tenant
     Optional<TenantIntegrationInstallEntity> findByTenantIdAndAppKey(String tenantId, String appKey);
 
     /**
+     * 按 appKey 列出全部租户安装记录（定时任务遍历租户用）。
+     */
+    List<TenantIntegrationInstallEntity> findByAppKey(String appKey);
+
+    /**
      * 检查是否已安装。
      */
     boolean existsByTenantIdAndAppKey(String tenantId, String appKey);

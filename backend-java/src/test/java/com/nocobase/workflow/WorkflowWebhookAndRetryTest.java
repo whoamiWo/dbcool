@@ -39,7 +39,10 @@ class WorkflowWebhookAndRetryTest {
         auditService = mock(AuditService.class);
         controller = new WorkflowController(workflowRepository, instanceRepository, taskRepository,
                 new ObjectMapper(), engine, auditService, new WorkflowGraphValidator(),
-                new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository, engine, auditService, new ObjectMapper()));
+                new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository, engine, auditService, new ObjectMapper(),
+                mock(com.nocobase.approval.ApprovalRequestRepository.class),
+                mock(com.nocobase.approval.ApprovalCcRepository.class),
+                mock(com.nocobase.notification.NotifyDispatcher.class)));
         when(instanceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(workflowRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }

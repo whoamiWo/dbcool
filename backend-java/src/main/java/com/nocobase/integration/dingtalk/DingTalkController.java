@@ -297,7 +297,9 @@ public class DingTalkController {
     public Map<String, Object> syncOrg(@RequestBody(required = false) Map<String, Object> body) {
         String tenantId = body == null ? "tenant_default"
                 : String.valueOf(body.getOrDefault("tenantId", "tenant_default"));
-        return adapter.syncOrganization(tenantId);
+        // A-4：此前经 adapter 落到 DingTalkAppService.syncOrganization 的占位实现，
+        // 直接返回 code=0 且什么都没同步（又一处假成功）。现走真实组织同步。
+        return orgSyncService.syncOrganization(tenantId);
     }
 
     /**
@@ -324,18 +326,27 @@ public class DingTalkController {
      */
     @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @GetMapping("/sync-status")
-    public Map<String, Object> getSyncStatus() {
-        boolean configured = appService.isConfigured();
-        // lastSyncTime 允许为 null（未持久化同步历史），而 Map.of 拒绝 null 值，故用 HashMap。
+    public Map<String, Object> getSyncStatus(
+            @RequestParam(required = false, defaultValue = "tenant_default") String tenantId) {
+        boolean configured = appService.isConfigured(tenantId);
         Map<String, Object> data = new java.util.HashMap<>();
-        data.put("lastSyncTime", null);
         data.put("syncEnabled", configured);
         data.put("cron", "0 0 * * * ?");
         data.put("configured", configured);
+        // A-4：返回最近一次同步的真实计数（departmentsSynced/usersSynced/usersFailed/errors），
+        // 未同步过时 lastSyncTime 为 null 且计数为 0，不再谎称成功。
+        Map<String, Object> last = orgSyncService.getLastSyncResult(tenantId);
+        data.put("lastSyncTime", last == null ? null : last.get("timestamp"));
+        data.put("departmentsSynced", last == null ? 0 : last.getOrDefault("departmentsSynced", 0));
+        data.put("usersSynced", last == null ? 0 : last.getOrDefault("usersSynced", 0));
+        data.put("usersFailed", last == null ? 0 : last.getOrDefault("usersFailed", 0));
+        data.put("usersResigned", last == null ? 0 : last.getOrDefault("usersResigned", 0));
+        data.put("errors", last == null ? java.util.List.of() : last.getOrDefault("errors", java.util.List.of()));
         data.put("notes", configured
                 ? "凭证已配置。手动触发: POST /api/dingtalk/sync-org; 定时每小时自动执行。"
-                : "未配置钉钉凭证 (dingtalk.app-key / app-secret)，定时任务不会真正同步，仅打日志。");
-        return Map.of("code", 0, "message", "success", "data", data);
+                : "未配置钉钉凭证，定时任务不会真正同步。");
+        int failed = (int) data.get("usersFailed");
+        return Map.of("code", failed > 0 ? 1 : 0, "message", "success", "data", data);
     }
 
     /**

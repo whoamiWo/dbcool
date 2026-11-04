@@ -12,6 +12,39 @@
 
 ---
 
+## 前情：已完成批次与新增差距清单（2026-11-04 追加）
+
+> 本节由「企业自用闭环」批次（E1–E4）追加。**阅读后文的差距清单时必须先读本节**，
+> 否则会按旧清单返工已完成项。
+
+### P.0 已完成批次（状态以 `docs/WAVE4_CHECKLIST.md` 为准，不重复标注数字）
+
+| 批次 | 范围 | 状态 |
+|---|---|---|
+| Wave 0（W0-T1..T4） | 版本单一真相源、门禁数字基线、清红灯、CHANGELOG | ✅ 全部完成 |
+| Wave 0.5（A-1..A-8） | 块编辑器带 JWT、CRDT 初始化通道、IM Pin、阅后即焚回执、Checklist 路径、日历翻月、前端 unhandled errors、端点契约测试 | ✅ 全部完成（A-7 见路线图 W0-T3） |
+| Wave 4 待办池 #1..#16 | 见 `docs/WAVE4_CHECKLIST.md` §四 | ✅ #3/#4/#5/#6/#7/#8/#9/#10/#10-2/#11/#12/#14/#15/#16 完成；**#1 部分（持久化待做）、#2 未取、#13 部分（K8s 侧未做）** |
+
+> 说明：本文不宣称 Wave4 全 16 项完成 —— #1/#2/#13 的未完成部分已在清单里逐条写明，
+> 保持"数字必须实测"的既有红线。
+
+### P.1 新增差距 A-1..A-7（企业自用闭环前置止血，2026-11-04 实测）
+
+| # | 缺陷 | 证据（文件:行） | 后果 |
+|---|---|---|---|
+| **A-1** | DEPT 数据范围静默失效 | `auth/AclEnforcer.java:374-375` 生成 SQL 引用不存在的表 `user_u` 与列 `department_id`；`AclEnforcer.java:191-193` 内存侧仅判 `record.get("department_id") != null` | 配「本部门可见」→ 一条都看不到 |
+| **A-2** | 外部建号缺 password_hash → 建号必失败 | `users.password_hash NOT NULL`（`V1__init.sql:14`）；`integration/dingtalk/DingTalkOrgSyncService.java:265-273` 建号未设密码；`auth/oidc/OidcUserService.java:109` 显式 `setPasswordHash(null)` | 钉钉「同步 N 人」实为 0 人；OIDC 首登 500，被 `catch` 吞成假成功 |
+| **A-3** | 统一搜索对记录不做 ACL | `search/UnifiedSearchService.java:231-239`（`searchRecord` 无权限校验）；`:137-150` 全局路径只过滤 IM；Wiki 仅判 `PUBLISHED` | 搜索返回无权记录 = 数据泄露 |
+| **A-4** | 组织同步只覆盖根部门、不更新、租户硬编码 | `DingTalkOrgSyncService.java:205-209` 只拉 `dept_id=1`；`:259-262` 已存在用户原样返回；`:117-125` 硬编码 `tenant_default`；无离职处理 | 多部门企业漏人、改名不生效、多租户单租户 |
+| **A-5** | 禁用/离职账号仍可访问 | `auth/JwtAuthFilter.java` 全文件无 `enabled` 校验；`auth/JwtService.java:39` access TTL 15 分钟 | 离职人员凭旧 token 继续操作 |
+| **A-6** | 搜索索引写入器对业务记录写空 | `search/SearchIndexSyncListener.java:155-166` 只取 `data.title/content`（业务集合通常无此字段名）；`metadata` 塞整条记录且不含 collection 名 | 业务记录搜不出来，且无法判定所属 collection |
+| **A-7** | 审批节点会造「幽灵审批人」 | `workflow/handler/ApprovalNodeHandler.java:103-117`：无 `assignee` 时用 `nameUUIDFromBytes(tenantId)` 合成 UUID 当审批人 | 任务挂在不存在的用户上，流程永久悬挂 |
+
+**任务书**：`docs/PLANS/enterprise-suite-capability-plan.md`（源文件 `.kilo/plans/1793748579863-enterprise-suite-capability-plan.md`）。
+**A-1..A-6 归属 T1 止血批次；A-7 随 T3 审批一并修**（与审批人解析同源）。
+
+---
+
 ## 0. 实测门禁基线（全部为本次实际命令输出）
 
 | 项 | 命令 | 实测结果（实测于 2026-10-30 @02b3a59） |
@@ -142,12 +175,13 @@
 | P2-4 | 公式函数 24 个，DATEDIFF 用 `Period.getDays()` 跨月算错；缺 MONTH/TODAY/IFERROR | `FormulaFunctions.java:458-465` |
 | P2-5 | Wiki 版本对比（diff）无端点无 UI；Wiki 分享无 API；收藏/导出完全缺失 | `WikiPageService.java:424-444` |
 | P2-6 | 批量插入 API 无前端调用点；CSV 导入逐条 insert 非批量事务 | `TableView.tsx:325`；`CollectionController.java:860-913` |
-| P2-7 | 行级/字段级 ACL 为应用层过滤，未下推 SQL（limit 先裁剪再过滤，分页口径可能失真） | `CollectionController.java:432-436` |
+| P2-7 | **部分修复（2026-11-04，第二次）**：① DEPT 语义改为真实部门子树（`DeptScopeResolver` + `org_unit.path`）；② 记录列表数据范围 **SELF/DEPT 已下推 SQL**（`AclEnforcer.resolveDataScopePlan` → `CollectionService.listRecords(…, where, params)` → `DynamicTableManager` 参数化 `AND (...)`），并把取数窗口放大 ×5 后再截断；③ 搜索侧集合/行级/部门三重判权 + 取数窗口 ×5。**仍存在**：ROW 表达式策略与 CUSTOM 数据范围仍为内存过滤（需表达式 DSL 编译器，本轮未做），此时分页口径仍可能少于 limit（已 `log.warn`）。 | `CollectionController.java`（数据范围下推）、`auth/AclEnforcer.java#resolveDataScopePlan`、`meta/DynamicTableManager.java#listRecords`、`search/UnifiedSearchService.java` |
 | P2-8 | 看板新建卡片用 `prompt()` 且乐观插入 id='new' 不回填真实 ID | `BoardView.tsx:175,182` |
 | P2-9 | labels 仅展示无管理 UI | `BoardColumn.tsx:100` |
 | P2-10 | 计费无真实支付平台实现（无微信支付/支付宝/Stripe 签名与回调验签），HttpPaymentGateway 为通用 HTTP 适配且默认关闭 | `HttpPaymentGateway.java:74-76`；`application.yml:279` |
 | P2-11 | 飞书签名比较非常量时间（`equals`），与钉钉 `MessageDigest.isEqual` 标准不一致 | `FeishuAppService.java:173` |
 | P2-12 | 前端测试 **5 个 unhandled errors**（ErDiagram.test.tsx 等），虽 0 failed 但需在门禁中显式处理 | 实测 `npm run test:run` 输出 `Errors 5 errors` |
+| **P2-13** | **已修复**：`V50` 迁移 `DROP TRIGGER trg_update_search_vector` 后未重建，导致 `unified_search_index.content_tsv` 恒为 NULL、全文检索恒空（与 A-6 叠加成双重失效）。`V80__restore_search_vector_trigger.sql` 重建触发器并回填存量行。 | 真实 PG 复现：`scripts/verify-enterprise-suite.py`（11 项断言） |
 
 ### ⚪ P3：生态代差（维护模式下不追赶）
 

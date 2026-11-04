@@ -68,7 +68,7 @@ public class CollectionServiceCRUDTest {
 
         when(tableManager.updateRecord(anyString(), anyString(), anyString())).thenReturn(1);
         when(tableManager.deleteRecord(anyString(), anyString())).thenReturn(1);
-        when(tableManager.listRecords(anyString(), anyInt(), any(), anyList()))
+        when(tableManager.listRecords(anyString(), anyInt(), any(), anyList(), any(), anyList()))
                 .thenReturn(List.of("{\"data\":{\"id\":\"1\",\"amount\":100}}"));
         when(tableManager.getRecord(anyString(), anyString()))
                 .thenReturn(Optional.of("{\"data\":{\"id\":\"1\",\"amount\":100}}"));
@@ -115,7 +115,7 @@ public class CollectionServiceCRUDTest {
 
     @Test
     void listRecords_withFilter_matches() {
-        when(tableManager.listRecords(anyString(), anyInt(), any(), anyList()))
+        when(tableManager.listRecords(anyString(), anyInt(), any(), anyList(), any(), anyList()))
                 .thenReturn(List.of(
                         "{\"data\":{\"id\":\"1\",\"status\":\"active\"}}",
                         "{\"data\":{\"id\":\"2\",\"status\":\"inactive\"}}"));

@@ -1,5 +1,7 @@
 package com.nocobase.workflow;
 
+import com.nocobase.notification.NotifyDispatcher;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocobase.audit.AuditService;
@@ -40,18 +42,28 @@ public class WorkflowTaskService {
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
 
+    private final com.nocobase.approval.ApprovalRequestRepository approvalRequestRepository;
+    private final com.nocobase.approval.ApprovalCcRepository approvalCcRepository;
+    private final com.nocobase.notification.NotifyDispatcher notifyDispatcher;
+
     public WorkflowTaskService(WorkflowTaskRepository taskRepository,
                                WorkflowInstanceRepository instanceRepository,
                                WorkflowRepository workflowRepository,
                                WorkflowEngine engine,
                                AuditService auditService,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               com.nocobase.approval.ApprovalRequestRepository approvalRequestRepository,
+                               com.nocobase.approval.ApprovalCcRepository approvalCcRepository,
+                               com.nocobase.notification.NotifyDispatcher notifyDispatcher) {
         this.taskRepository = taskRepository;
         this.instanceRepository = instanceRepository;
         this.workflowRepository = workflowRepository;
         this.engine = engine;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.approvalRequestRepository = approvalRequestRepository;
+        this.approvalCcRepository = approvalCcRepository;
+        this.notifyDispatcher = notifyDispatcher;
     }
 
     /** 审批结果：instance=更新后的实例；waitingForOthers=会签剩余；pendingCount=剩余未审批数。 */
@@ -126,6 +138,7 @@ public class WorkflowTaskService {
             WorkflowEngine.NodeResult result =
                     engine.executeGraphFrom(instance, graphNodes, graphEdges, startId, w.getCreatedBy());
             log.info("[workflow-task] 图模式推进完成 instance={} result={}", instance.getId(), result);
+            afterAdvance(instance, result);
             return new ApproveOutcome(instance, false, 0);
         }
 
@@ -159,6 +172,7 @@ public class WorkflowTaskService {
 
                 instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
                 instanceRepository.save(instance);
+                notifyTodoTasks(instance);
                 return new ApproveOutcome(instance, false, 0);
             } else if ("NOTIFICATION".equals(nodeType)) {
                 log.info("[workflow {} node {}] notification: {}", w.getId(), i, node.get("config"));
@@ -169,6 +183,7 @@ public class WorkflowTaskService {
         instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
         instance.setFinishedAt(Instant.now());
         instanceRepository.save(instance);
+        notifyResult(instance, true);
 
         return new ApproveOutcome(instance, false, 0);
     }
@@ -238,6 +253,14 @@ public class WorkflowTaskService {
         }
         boolean handled = false;
         for (WorkflowInstanceEntity instance : instances) {
+            // R6：回调幂等 —— 已终结的实例不再推进（重复回调/多副本重投均安全）
+            if (instance.getStatus() == WorkflowInstanceEntity.Status.COMPLETED
+                    || instance.getStatus() == WorkflowInstanceEntity.Status.FAILED
+                    || instance.getStatus() == WorkflowInstanceEntity.Status.TERMINATED) {
+                log.info("[workflow-task] 实例 {} 已终结({}), 忽略重复回调",
+                        instance.getId(), instance.getStatus());
+                continue;
+            }
             List<WorkflowTaskEntity> tasks = taskRepository.findByInstanceId(instance.getId());
             WorkflowTaskEntity pending = tasks.stream()
                     .filter(t -> t.getStatus() == WorkflowTaskEntity.Status.PENDING)
@@ -255,5 +278,64 @@ public class WorkflowTaskService {
             log.info("[workflow-task] 外部审批已推进实例={} agree={}", instance.getId(), agree);
         }
         return handled;
+    }
+
+    // ============================================================
+    //  E3 通知（审批待办 / 审批结果）
+    // ============================================================
+
+    private void afterAdvance(WorkflowInstanceEntity instance, WorkflowEngine.NodeResult result) {
+        if (result == WorkflowEngine.NodeResult.NEEDS_APPROVAL) {
+            notifyTodoTasks(instance);
+        } else if (result == WorkflowEngine.NodeResult.CONTINUE
+                && instance.getStatus() == WorkflowInstanceEntity.Status.COMPLETED) {
+            notifyResult(instance, true);
+        } else if (result == WorkflowEngine.NodeResult.FAILED) {
+            notifyResult(instance, false);
+        }
+    }
+
+    /** 给当前所有 PENDING 任务的处理人发「待审批」。 */
+    private void notifyTodoTasks(WorkflowInstanceEntity instance) {
+        try {
+            List<WorkflowTaskEntity> pending = taskRepository.findByInstanceIdAndStatus(
+                    instance.getId(), WorkflowTaskEntity.Status.PENDING);
+            if (pending.isEmpty()) return;
+            String deeplink = approvalRequestRepository.findByInstanceId(instance.getId())
+                    .map(r -> "/approvals/" + r.getId())
+                    .orElse("/tasks");
+            for (WorkflowTaskEntity task : pending) {
+                if (task.getAssignee() == null) continue;
+                notifyDispatcher.notifyOne(NotifyDispatcher.APPROVAL_TODO, task.getAssignee(),
+                        new NotifyDispatcher.Payload(instance.getTenantId(),
+                                "待你审批", "有一条新的审批待办",
+                                instance.getId().toString(), deeplink, "HIGH",
+                                "approval-todo:" + task.getId()));
+            }
+        } catch (Exception e) {
+            log.warn("[workflow-task] 待办通知失败 instance={}: {}", instance.getId(), e.getMessage());
+        }
+    }
+
+    /** 审批结束时通知申请人 + 抄送人（APPROVAL_RESULT）。 */
+    private void notifyResult(WorkflowInstanceEntity instance, boolean approved) {
+        try {
+            var req = approvalRequestRepository.findByInstanceId(instance.getId()).orElse(null);
+            if (req == null) return;
+            String title = approved ? "审批已通过" : "审批被驳回";
+            String deeplink = "/approvals/" + req.getId();
+            notifyDispatcher.notifyOne(NotifyDispatcher.APPROVAL_RESULT, req.getApplicantId(),
+                    new NotifyDispatcher.Payload(instance.getTenantId(), title, title,
+                            req.getId().toString(), deeplink, "NORMAL",
+                            "approval-result:" + req.getId()));
+            for (var cc : approvalCcRepository.findByRequestId(req.getId())) {
+                notifyDispatcher.notifyOne(NotifyDispatcher.APPROVAL_RESULT, cc.getUserId(),
+                        new NotifyDispatcher.Payload(instance.getTenantId(), title,
+                                "你关注的一条审批已结束", req.getId().toString(), deeplink,
+                                "NORMAL", "approval-cc:" + req.getId()));
+            }
+        } catch (Exception e) {
+            log.warn("[workflow-task] 审批结果通知失败 instance={}: {}", instance.getId(), e.getMessage());
+        }
     }
 }

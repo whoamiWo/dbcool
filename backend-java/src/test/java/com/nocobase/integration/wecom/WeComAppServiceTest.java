@@ -36,8 +36,23 @@ class WeComAppServiceTest {
         passwordEncoder = mock(PasswordEncoder.class);
         when(passwordEncoder.encode(anyString())).thenAnswer(inv -> "encoded_" + inv.getArgument(0));
         restTemplate = mock(RestTemplate.class);
+        com.nocobase.auth.UserProvisioningService provisioning =
+                mock(com.nocobase.auth.UserProvisioningService.class);
+        // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
+        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    UserEntity u = new UserEntity();
+                    u.setId(UUID.randomUUID());
+                    u.setUsername(inv.getArgument(1));
+                    u.setPasswordHash(null);
+                    u.setTenantId(inv.getArgument(0));
+                    u.setDisplayName(inv.getArgument(2));
+                    u.setEnabled(true);
+                    return u;
+                });
         service = new WeComAppService(userRepository, passwordEncoder, restTemplate,
-                mock(TenantCredentialService.class));
+                mock(TenantCredentialService.class), provisioning,
+                mock(com.nocobase.org.OrgUnitService.class));
         setField(service, "corpId", "testCorpId");
         setField(service, "agentId", "12345");
         setField(service, "secret", "testSecret");
@@ -107,6 +122,8 @@ class WeComAppServiceTest {
         UserEntity existing = new UserEntity();
         existing.setId(UUID.randomUUID());
         existing.setUsername("wecom_zhangsan");
+        // 企业微信账号固定归属 system 租户；归属校验（跨租户冲突拒绝）依赖该字段
+        existing.setTenantId("system");
         existing.setDisplayName("张三（旧）");
         when(userRepository.findByUsername("wecom_zhangsan")).thenReturn(Optional.of(existing));
 

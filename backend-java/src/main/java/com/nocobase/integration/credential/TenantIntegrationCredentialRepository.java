@@ -24,6 +24,9 @@ public interface TenantIntegrationCredentialRepository
     /** 按租户 + provider 列出全部凭证（管理界面/排查） */
     List<TenantIntegrationCredentialEntity> findByTenantIdAndProvider(String tenantId, String provider);
 
+    /** 按 provider 列出全部租户凭证（定时任务/运维排查） */
+    List<TenantIntegrationCredentialEntity> findByProvider(String provider);
+
     /** 按租户列出全部 provider（管理界面） */
     List<TenantIntegrationCredentialEntity> findByTenantId(String tenantId);
 

@@ -32,7 +32,12 @@ class DingTalkOrgSyncServiceTest {
         service = new DingTalkOrgSyncService(
                 appService,
                 mock(com.nocobase.auth.UserRepository.class),
-                mock(UserMappingService.class));
+                mock(UserMappingService.class),
+                mock(com.nocobase.auth.UserProvisioningService.class),
+                mock(com.nocobase.org.OrgUnitService.class),
+                mock(com.nocobase.auth.UserStatusService.class),
+                mock(com.nocobase.integration.market.TenantIntegrationInstallRepository.class),
+                mock(com.nocobase.integration.credential.TenantIntegrationCredentialRepository.class));
     }
 
     private void configureCredentials(String appKey, String appSecret) {
@@ -131,15 +136,21 @@ class DingTalkOrgSyncServiceTest {
                 (com.nocobase.auth.UserRepository) ReflectionTestUtils.getField(service, "userRepository");
         UserMappingService mappingService =
                 (UserMappingService) ReflectionTestUtils.getField(service, "userMappingService");
+        com.nocobase.auth.UserProvisioningService provisioning =
+                (com.nocobase.auth.UserProvisioningService)
+                        ReflectionTestUtils.getField(service, "provisioningService");
         when(userRepo.findByUsername("dt_u1")).thenReturn(Optional.empty());
         com.nocobase.auth.UserEntity created = new com.nocobase.auth.UserEntity();
         created.setId(UUID.randomUUID());
-        when(userRepo.save(any())).thenReturn(created);
+        created.setUsername("dt_u1");
+        created.setPasswordHash(null);
+        // A-2：建号统一走 provisioning（无本地密码）
+        when(provisioning.createExternal(any(), any(), any(), any(), any())).thenReturn(created);
 
         com.nocobase.auth.UserEntity result = service.syncSingleUser("u1", "张三", "t1");
 
         assertThat(result).isNotNull();
-        verify(userRepo).save(any());
+        assertThat(result.getPasswordHash()).isNull();
         verify(mappingService).mapUser(eq("u1"), any(), eq("t1"));
     }
     // ============================================================
@@ -156,28 +167,34 @@ class DingTalkOrgSyncServiceTest {
     }
 
     @Test
-    void syncAllUsers_pagination_pullsAllPages() throws Exception {
-        stubHttp("v2/user/list", """
+    void collectAllDepartments_pagination_pullsAllPages() throws Exception {
+        // 用户级分页（120 人两页）在 DingTalkOrgSyncServiceMultiDeptTest 中按公开 API 断言；
+        // 这里保留部门列表本身的 cursor 分页回归。
+        stubHttp("parent_dept_id=1&page_size=100&cursor=0", """
             {"errcode":0,"result":{"list":[
-              {"userid":"u001","name":"甲"},{"userid":"u002","name":"乙"}],
+              {"dept_id":10,"name":"技术部","parent_dept_id":1}],
               "has_more":true,"next_cursor":100}}
             """);
-        org.mockito.Mockito.when(rest.getForObject(
-                org.mockito.ArgumentMatchers.contains("cursor=100"),
-                org.mockito.ArgumentMatchers.eq(String.class))).thenReturn("""
+        stubHttp("parent_dept_id=1&page_size=100&cursor=100", """
             {"errcode":0,"result":{"list":[
-              {"userid":"u003","name":"丙"}],"has_more":false}}
+              {"dept_id":11,"name":"市场部","parent_dept_id":1}],"has_more":false}}
             """);
-        com.nocobase.auth.UserRepository ur = (com.nocobase.auth.UserRepository)
-                org.springframework.test.util.ReflectionTestUtils.getField(service, "userRepository");
-        when(ur.findByUsername(any())).thenReturn(Optional.empty());
-        when(ur.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubHttp("parent_dept_id=10", """
+            {"errcode":0,"result":{"list":[],"has_more":false}}
+            """);
+        stubHttp("parent_dept_id=11", """
+            {"errcode":0,"result":{"list":[],"has_more":false}}
+            """);
+        ReflectionTestUtils.setField(service, "restTemplate", rest);
 
-        int count = (int) org.springframework.test.util.ReflectionTestUtils
-                .invokeMethod(service, "syncAllUsers", "tok", "tenant_default");
+        @SuppressWarnings("unchecked")
+        java.util.List<java.util.Map<String, Object>> depts =
+                (java.util.List<java.util.Map<String, Object>>)
+                        ReflectionTestUtils.invokeMethod(service, "collectAllDepartments", "tok");
 
-        assertThat(count).isEqualTo(3);
-        verify(rest).getForObject(org.mockito.ArgumentMatchers.contains("cursor=100"),
+        assertThat(depts).hasSize(2);
+        verify(rest).getForObject(
+                org.mockito.ArgumentMatchers.contains("cursor=100"),
                 org.mockito.ArgumentMatchers.eq(String.class));
     }
 

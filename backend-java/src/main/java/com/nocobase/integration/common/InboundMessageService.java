@@ -41,6 +41,8 @@ public class InboundMessageService {
     private final ExternalUserMappingRepository externalUserMappingRepository;
     private final com.nocobase.auth.UserRepository userRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    /** A-2：外部建号统一路径 */
+    private final com.nocobase.auth.UserProvisioningService provisioningService;
     /** PHASE99 T3: 入站消息审计 */
     private final AuditService auditService;
 
@@ -63,7 +65,8 @@ public class InboundMessageService {
                                   ExternalUserMappingRepository externalUserMappingRepository,
                                   com.nocobase.auth.UserRepository userRepository,
                                   org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
-                                  AuditService auditService) {
+                                  AuditService auditService,
+                                  com.nocobase.auth.UserProvisioningService provisioningService) {
         this.messageRepository = messageRepository;
         this.memberRepository = memberRepository;
         this.bridge = bridge;
@@ -72,6 +75,7 @@ public class InboundMessageService {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
+        this.provisioningService = provisioningService;
     }
 
     /**
@@ -251,20 +255,13 @@ public class InboundMessageService {
         // Slack workspace）会命中对方租户已建的同名用户，再回写出一条
         // "tenantId=B 但 localUserId 属于 A" 的错配映射（跨租户串号）。
         // 因此必须按 tenantId 过滤，不匹配就按"不存在"处理并新建本租户用户。
+        // A-2：统一建号路径 —— 第三方同步用户无本地密码（此前写 bcrypt(随机 UUID)，
+        // 语义上仍是「有密码的账号」，与「第三方用户不得本地登录」的注释自相矛盾）
         final com.nocobase.auth.UserEntity user =
                 userRepository.findByUsername(username)
                         .filter(u -> tenantId.equals(u.getTenantId()))
-                        .orElseGet(() -> {
-            com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
-            u.setId(UUID.randomUUID());
-            u.setUsername(username);
-            // 第三方同步用户不得持有可本地登录的口令
-            u.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
-            u.setTenantId(tenantId);
-            u.setDisplayName(username);
-            u.setCreatedAt(java.time.Instant.now());
-            return userRepository.save(u);
-        });
+                        .orElseGet(() -> provisioningService.createExternal(
+                                tenantId, username, username, null, source));
 
         ExternalUserMappingEntity mapping = new ExternalUserMappingEntity();
         mapping.setId(UUID.randomUUID());

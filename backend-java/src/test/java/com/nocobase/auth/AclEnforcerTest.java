@@ -31,6 +31,8 @@ class AclEnforcerTest {
     private RoleRepository roleRepo;
     private AclEnforcer enforcer;       // fail-closed (default)
     private AclEnforcer enforcerOpen;   // fail-open (灰度回滚窗口)
+    /** A-1：用于 DEPT 范围解析的模拟服务（未返回真实 DB；调整 unit test 的 behavior） */
+    private com.nocobase.auth.DeptScopeResolver deptScopeResolverMock;
 
     private static final UUID USER = UUID.randomUUID();
     private static final UUID ROLE = UUID.randomUUID();
@@ -43,8 +45,9 @@ class AclEnforcerTest {
         userRoleRepo = mock(UserRoleRepository.class);
         policyRepo = mock(AclPolicyRepository.class);
         roleRepo = mock(RoleRepository.class);
-        enforcer = new AclEnforcer(userRoleRepo, policyRepo, roleRepo, false);
-        enforcerOpen = new AclEnforcer(userRoleRepo, policyRepo, roleRepo, true);
+        deptScopeResolverMock = mock(DeptScopeResolver.class);
+        enforcer = new AclEnforcer(userRoleRepo, policyRepo, roleRepo, deptScopeResolverMock, false);
+        enforcerOpen = new AclEnforcer(userRoleRepo, policyRepo, roleRepo, deptScopeResolverMock, true);
 
         var ur = mock(UserRoleEntity.class);
         var urId = mock(UserRoleEntity.UserRoleId.class);

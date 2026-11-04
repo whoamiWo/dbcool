@@ -52,6 +52,14 @@ public class UnifiedSearchService {
     private final UnifiedSearchIndexRepository searchIndexRepository;
     private final ImChannelMemberRepository channelMemberRepository;
     private final ObjectMapper objectMapper;
+    /** A-3：搜索侧必须与列表接口同源判权，不得"能搜到但打不开"。 */
+    private final com.nocobase.auth.AclEnforcer aclEnforcer;
+    private final com.nocobase.acl.RowAclService rowAclService;
+    private final com.nocobase.auth.RoleRepository roleRepository;
+    private final com.nocobase.wiki.WikiPermissionService wikiPermissionService;
+    private final com.nocobase.approval.ApprovalRequestRepository approvalRequestRepository;
+    private final com.nocobase.approval.ApprovalCcRepository approvalCcRepository;
+    private final com.nocobase.workflow.WorkflowTaskRepository taskRepository;
 
     public UnifiedSearchService(
             MessageService messageService,
@@ -61,7 +69,14 @@ public class UnifiedSearchService {
             ProjectService projectService,
             UnifiedSearchIndexRepository searchIndexRepository,
             ImChannelMemberRepository channelMemberRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            com.nocobase.auth.AclEnforcer aclEnforcer,
+            com.nocobase.acl.RowAclService rowAclService,
+            com.nocobase.auth.RoleRepository roleRepository,
+            com.nocobase.wiki.WikiPermissionService wikiPermissionService,
+            com.nocobase.approval.ApprovalRequestRepository approvalRequestRepository,
+            com.nocobase.approval.ApprovalCcRepository approvalCcRepository,
+            com.nocobase.workflow.WorkflowTaskRepository taskRepository
     ) {
         this.messageService = messageService;
         this.wikiPageService = wikiPageService;
@@ -71,6 +86,13 @@ public class UnifiedSearchService {
         this.searchIndexRepository = searchIndexRepository;
         this.channelMemberRepository = channelMemberRepository;
         this.objectMapper = objectMapper;
+        this.aclEnforcer = aclEnforcer;
+        this.rowAclService = rowAclService;
+        this.roleRepository = roleRepository;
+        this.wikiPermissionService = wikiPermissionService;
+        this.approvalRequestRepository = approvalRequestRepository;
+        this.approvalCcRepository = approvalCcRepository;
+        this.taskRepository = taskRepository;
     }
 
     /**
@@ -91,13 +113,16 @@ public class UnifiedSearchService {
 
         int safeLimit = Math.max(1, Math.min(limit, 100));
         int perTypeLimit = Math.max(1, safeLimit / 5);
+        // T5.2：先放大取数窗口（×5），ACL 过滤后再截断，避免"先裁再过滤"少返回
+        int fetchLimit = Math.min(safeLimit * 5, 200);
+        int perTypeFetchLimit = Math.min(perTypeLimit * 5, 200);
 
         // 全部类型：走索引统一检索（IM 需按用户已加入频道过滤）
         if (types == null || types.isEmpty()) {
-            allResults.addAll(searchIndex(tenantId, keyword, safeLimit, userId));
+            allResults.addAll(searchIndex(tenantId, keyword, fetchLimit, userId));
         } else {
             for (String type : types) {
-                allResults.addAll(searchByType(tenantId, keyword, type, perTypeLimit, userId));
+                allResults.addAll(searchByType(tenantId, keyword, type, perTypeFetchLimit, userId));
             }
         }
 
@@ -125,7 +150,8 @@ public class UnifiedSearchService {
                 "wiki", countByType(allResults, "wiki"),
                 "record", countByType(allResults, "record"),
                 "project", countByType(allResults, "project"),
-                "automation", countByType(allResults, "automation")
+                "automation", countByType(allResults, "automation"),
+                "approval", countByType(allResults, "approval")
         ));
 
         return result;
@@ -142,6 +168,9 @@ public class UnifiedSearchService {
             if (userId != null) {
                 filterImByChannelMembership(results, userId);
             }
+            // A-3：记录/文档必须做 ACL 过滤（修复前搜索返回无权记录 = 数据泄露）
+            filterRecordsByAcl(results, tenantId, userId);
+            filterWikiByAcl(results, tenantId, userId);
             return results;
         } catch (Exception e) {
             log.warn("[SEARCH] 全局索引检索失败 keyword={} tenantId={} error={}", keyword, tenantId, e.getMessage(), e);
@@ -153,12 +182,17 @@ public class UnifiedSearchService {
      * 按类型检索（走索引 + ts_headline 高亮）。
      */
     private List<Map<String, Object>> searchByType(String tenantId, String keyword, String type, int limit, UUID userId) {
+        // E4：支持 record:<collection> 按集合过滤
+        if (type != null && type.startsWith("record:")) {
+            return searchRecord(tenantId, keyword, limit, userId, type.substring("record:".length()));
+        }
         return switch (type) {
-            case "wiki" -> searchWiki(tenantId, keyword, limit);
+            case "wiki" -> searchWiki(tenantId, keyword, limit, userId);
             case "im" -> searchIm(tenantId, keyword, limit, userId);
-            case "record" -> searchRecord(tenantId, keyword, limit);
+            case "record" -> searchRecord(tenantId, keyword, limit, userId);
             case "automation" -> searchAutomation(tenantId, keyword, limit);
             case "project" -> searchProject(tenantId, keyword, limit);
+            case "approval" -> searchApproval(tenantId, keyword, limit, userId);
             default -> List.of();
         };
     }
@@ -168,7 +202,7 @@ public class UnifiedSearchService {
     // ============================================================
 
     /** Wiki 页面：走索引 + 权限过滤（仅 PUBLISHED 且用户有读权限的页面）。 */
-    private List<Map<String, Object>> searchWiki(String tenantId, String keyword, int limit) {
+    private List<Map<String, Object>> searchWiki(String tenantId, String keyword, int limit, UUID userId) {
         try {
             List<UnifiedSearchIndexEntity> hits = searchIndexRepository.searchByKeywordAndType("wiki", keyword, tenantId, limit);
             List<Map<String, Object>> results = new ArrayList<>();
@@ -178,12 +212,19 @@ public class UnifiedSearchService {
                 if (page == null || !"PUBLISHED".equals(page.getStatus())) {
                     continue;
                 }
+                // A-3：修复前只判 PUBLISHED，不判读权限
+                if (userId == null || !wikiPermissionService.hasPagePermission(
+                        userId, tenantId, page.getId(),
+                        com.nocobase.wiki.WikiPermissionService.Action.READ)) {
+                    continue;
+                }
                 Map<String, Object> map = new HashMap<>();
                 map.put("type", "wiki");
                 map.put("id", page.getId());
                 map.put("title", page.getTitle());
                 map.put("snippet", idx.getSnippet());
                 map.put("slug", page.getSlug());
+                map.put("deeplink", "/wiki/" + page.getSlug());
                 map.put("createdAt", page.getCreatedAt());
                 results.add(map);
             }
@@ -227,11 +268,21 @@ public class UnifiedSearchService {
         }
     }
 
-    /** Collection 记录：走索引检索。 */
-    private List<Map<String, Object>> searchRecord(String tenantId, String keyword, int limit) {
+    /** Collection 记录：走索引检索 + ACL 过滤（A-3）。 */
+    private List<Map<String, Object>> searchRecord(String tenantId, String keyword, int limit, UUID userId) {
+        return searchRecord(tenantId, keyword, limit, userId, null);
+    }
+
+    private List<Map<String, Object>> searchRecord(String tenantId, String keyword, int limit,
+                                                   UUID userId, String collection) {
         try {
             List<UnifiedSearchIndexEntity> hits = searchIndexRepository.searchByKeywordAndType("record", keyword, tenantId, limit);
-            return toResultMaps(hits);
+            List<Map<String, Object>> results = toResultMaps(hits);
+            if (collection != null && !collection.isBlank()) {
+                results.removeIf(r -> !collection.equals(String.valueOf(r.get("collection"))));
+            }
+            filterRecordsByAcl(results, tenantId, userId);
+            return results;
         } catch (Exception e) {
             log.warn("[SEARCH] record 索引检索失败 tenantId={} keyword={} error={}", tenantId, keyword, e.getMessage(), e);
             return List.of();
@@ -305,9 +356,123 @@ public class UnifiedSearchService {
             map.put("snippet", idx.getSnippet());
             map.put("rank", idx.getRank() != null ? idx.getRank() : 0);
             map.put("createdAt", idx.getUpdatedAt());
+            Map<String, Object> meta = parseMetadata(idx.getMetadataJson());
+            if (meta != null) {
+                Object collection = meta.get("collection");
+                if (collection != null) {
+                    map.put("collection", collection);
+                    map.put("deeplink", "/records/" + collection + "/" + idx.getEntityId());
+                }
+            }
             results.add(map);
         }
         return results;
+    }
+
+    /**
+     * A-3：记录级 ACL —— 与 {@code GET /api/collections/{name}/records} 同源判定：
+     * ①集合 READ 权限（AclEnforcer）②行级策略（RowAclService）③部门数据范围。
+     *
+     * <p>无法判定时一律丢弃（fail-closed），不允许"索引里有就返回"。
+     */
+    private void filterRecordsByAcl(List<Map<String, Object>> results, String tenantId, UUID userId) {
+        results.removeIf(r -> {
+            if (!"record".equals(r.get("type"))) return false;
+            try {
+                if (userId == null) return true;
+                String collection = r.get("collection") == null ? null : r.get("collection").toString();
+                if (collection == null || collection.isBlank()) return true; // 元数据缺失 → 无法判权
+                if (!aclEnforcer.isAllowed(userId, tenantId, collection,
+                        com.nocobase.auth.AclPolicyEntity.Action.READ)) {
+                    return true;
+                }
+                String id = String.valueOf(r.get("id"));
+                Map<String, Object> record = collectionService.getRecord(collection, id, tenantId);
+                if (record == null) return true;
+                List<String> roles = roleRepository.findRoleNamesByUserId(userId, tenantId);
+                var principal = new com.nocobase.acl.RowAclService.Principal(
+                        userId.toString(), roles);
+                if (!rowAclService.evaluateRead(tenantId, collection, record, principal)) {
+                    return true;
+                }
+                // 部门数据范围（A-1 修复后的真实子树判定）
+                return aclEnforcer.filterRecordsByDataScope(userId, tenantId, collection,
+                        List.of(record)).isEmpty();
+            } catch (Exception e) {
+                log.debug("[SEARCH] 记录判权失败，保守丢弃 id={}: {}", r.get("id"), e.getMessage());
+                return true;
+            }
+        });
+    }
+
+    /** A-3：文档 ACL —— 仅返回 PUBLISHED 且用户有读权限的页面。 */
+    private void filterWikiByAcl(List<Map<String, Object>> results, String tenantId, UUID userId) {
+        results.removeIf(r -> {
+            if (!"wiki".equals(r.get("type"))) return false;
+            try {
+                if (userId == null) return true;
+                UUID pageId = UUID.fromString(String.valueOf(r.get("id")));
+                return !wikiPermissionService.hasPagePermission(userId, tenantId, pageId,
+                        com.nocobase.wiki.WikiPermissionService.Action.READ);
+            } catch (Exception e) {
+                return true;
+            }
+        });
+    }
+
+    private Map<String, Object> parseMetadata(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json,
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 审批单据（E2/E4）：仅返回申请人、抄送人、或当前/历史任务处理人可见的单据。
+     */
+    private List<Map<String, Object>> searchApproval(String tenantId, String keyword,
+                                                     int limit, UUID userId) {
+        if (userId == null) return List.of();
+        try {
+            List<UnifiedSearchIndexEntity> hits = searchIndexRepository
+                    .searchByKeywordAndType("approval", keyword, tenantId, limit);
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (UnifiedSearchIndexEntity idx : hits) {
+                UUID requestId;
+                try {
+                    requestId = UUID.fromString(idx.getEntityId());
+                } catch (Exception e) {
+                    continue;
+                }
+                var request = approvalRequestRepository.findByIdAndTenantId(requestId, tenantId)
+                        .orElse(null);
+                if (request == null) continue;
+                boolean allowed = request.getApplicantId().equals(userId)
+                        || approvalCcRepository.findByRequestId(requestId).stream()
+                                .anyMatch(cc -> cc.getUserId().equals(userId))
+                        || (request.getInstanceId() != null
+                                && taskRepository.existsByInstanceIdAndAssignee(
+                                        request.getInstanceId(), userId));
+                if (!allowed) continue;
+                Map<String, Object> map = new HashMap<>();
+                map.put("type", "approval");
+                map.put("id", requestId);
+                map.put("title", idx.getTitle());
+                map.put("snippet", idx.getSnippet());
+                map.put("status", request.getStatus());
+                map.put("deeplink", "/approvals/" + requestId);
+                map.put("createdAt", idx.getUpdatedAt());
+                results.add(map);
+            }
+            return results;
+        } catch (Exception e) {
+            log.warn("[SEARCH] approval 索引检索失败 tenantId={} keyword={} error={}",
+                    tenantId, keyword, e.getMessage(), e);
+            return List.of();
+        }
     }
 
     private long countByType(List<Map<String, Object>> results, String type) {

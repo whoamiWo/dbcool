@@ -43,7 +43,7 @@ class UserAdminServiceTest {
         roleRepository = mock(RoleRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
         service = new UserAdminService(userRepository, userRoleRepository,
-                roleRepository, passwordEncoder);
+                roleRepository, passwordEncoder, mock(UserStatusService.class));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
         when(passwordEncoder.encode(any())).thenReturn("hashed-password");
     }
