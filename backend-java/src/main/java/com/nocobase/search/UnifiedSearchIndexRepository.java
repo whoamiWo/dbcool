@@ -30,22 +30,12 @@ public interface UnifiedSearchIndexRepository extends JpaRepository<UnifiedSearc
      * 使用 PG 内置 ts_rank + ts_headline（配置 'simple' 与触发器一致）。
      */
     @Query(value = """
-        SELECT e.entity_type AS entityType,
-               e.entity_id AS entityId,
-               e.tenant_id AS tenantId,
-               e.title AS title,
-               ts_headline('simple', e.content,
-                   tsquery('simple', :keyword),
-                   'StartSel=&lt;mark&gt;, StopSel=&lt;/mark&gt;, MaxWords=50, MinWords=20, MaxFragments=2, FragmentDelimiter= ... ')
-                   AS snippet,
-               ts_rank(e.content_tsv, tsquery('simple', :keyword)) AS rank,
-               e.updated_at AS updatedAt,
-               e.metadata AS metadataJson
+        SELECT e.*
         FROM unified_search_index e
         WHERE e.tenant_id = :tenantId
           AND e.entity_type = :entityType
-          AND e.content_tsv @@ to_tsquery('simple', :keyword)
-        ORDER BY rank DESC
+          AND e.content_tsv @@ plainto_tsquery('simple', :keyword)
+        ORDER BY ts_rank(e.content_tsv, plainto_tsquery('simple', :keyword)) DESC
         LIMIT :limit
         """,
         nativeQuery = true)
@@ -59,21 +49,11 @@ public interface UnifiedSearchIndexRepository extends JpaRepository<UnifiedSearc
      * 无类型过滤的全局 FTS 检索。
      */
     @Query(value = """
-        SELECT e.entity_type AS entityType,
-               e.entity_id AS entityId,
-               e.tenant_id AS tenantId,
-               e.title AS title,
-               ts_headline('simple', e.content,
-                   tsquery('simple', :keyword),
-                   'StartSel=&lt;mark&gt;, StopSel=&lt;/mark&gt;, MaxWords=50, MinWords=20, MaxFragments=2, FragmentDelimiter= ... ')
-                   AS snippet,
-               ts_rank(e.content_tsv, tsquery('simple', :keyword)) AS rank,
-               e.updated_at AS updatedAt,
-               e.metadata AS metadataJson
+        SELECT e.*
         FROM unified_search_index e
         WHERE e.tenant_id = :tenantId
-          AND e.content_tsv @@ to_tsquery('simple', :keyword)
-        ORDER BY rank DESC
+          AND e.content_tsv @@ plainto_tsquery('simple', :keyword)
+        ORDER BY ts_rank(e.content_tsv, plainto_tsquery('simple', :keyword)) DESC
         LIMIT :limit
         """,
         nativeQuery = true)

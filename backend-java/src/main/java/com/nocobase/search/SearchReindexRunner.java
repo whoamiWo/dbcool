@@ -49,41 +49,73 @@ public class SearchReindexRunner implements ApplicationRunner {
         }
         int collections = 0;
         int records = 0;
-        for (TenantEntity tenant : tenantRepository.findByStatus(TenantEntity.Status.ACTIVE)) {
-            List<CollectionMetaEntity> metas;
+        var tenants = tenantRepository.findByStatus(TenantEntity.Status.ACTIVE);
+        for (TenantEntity tenant : tenants) {
+            // 动态表按租户 schema 定位，重建期间必须显式切换上下文
             try {
-                metas = collectionService.list(tenant.getId());
+                com.nocobase.tenant.TenantContext.set(tenant.getId());
             } catch (Exception e) {
-                log.warn("[reindex] 读取租户 {} 集合失败: {}", tenant.getId(), e.getMessage());
+                log.warn("[reindex] 设置租户上下文失败 tenant={}: {}", tenant.getId(), e.getMessage());
                 continue;
             }
-            for (CollectionMetaEntity meta : metas) {
-                collections++;
+            try {
+                List<CollectionMetaEntity> metas;
                 try {
-                    // 分页重建（PAGE 条/批）；当前 listRecords 不支持 offset，
-                    // 记录量超过 PAGE 时至少保证前 PAGE 条可搜，并在日志中提示。
-                    List<Map<String, Object>> rows = collectionService.listRecords(
-                            meta.getName(), tenant.getId(), PAGE);
-                    for (Map<String, Object> row : rows) {
-                        Object id = row.get("id");
-                        if (id == null) continue;
-                        listener.reindexRecord(meta.getName(), id.toString(),
-                                tenant.getId(), row);
-                        records++;
-                    }
-                    if (rows.size() >= PAGE) {
-                        log.warn("[reindex] collection={} tenant={} 记录数≥{}，"
-                                        + "剩余记录将在下次增量变更时补建",
-                                meta.getName(), tenant.getId(), PAGE);
-                    }
+                    metas = collectionService.list(tenant.getId());
                 } catch (Exception e) {
-                    log.warn("[reindex] collection={} tenant={} 重建失败: {}",
-                            meta.getName(), tenant.getId(), e.getMessage());
+                    log.warn("[reindex] 读取租户 {} 集合失败: {}", tenant.getId(), e.getMessage());
+                    continue;
                 }
+                for (CollectionMetaEntity meta : metas) {
+                    collections++;
+                    try {
+                        // R3：keyset 分页循环直到空页（不再只重建前 500 条）
+                        String afterId = null;
+                        int scanned = 0;
+                        int reindexed = 0;
+                        while (true) {
+                            List<Map<String, Object>> rows = collectionService.listRecordsAfter(
+                                    meta.getName(), tenant.getId(), afterId, PAGE);
+                            if (rows.isEmpty()) break;
+                            String previousAfterId = afterId;
+                            String lastValidId = null;
+                            for (Map<String, Object> row : rows) {
+                                Object id = row.get("id");
+                                if (id == null) continue;
+                                listener.reindexRecord(meta.getName(), id.toString(),
+                                        tenant.getId(), row);
+                                lastValidId = id.toString();
+                                reindexed++;
+                            }
+                            scanned += rows.size();
+                            records += rows.size();
+                            // 本页没有任何有效 id（脏数据/投影异常）→ 游标无法前进，必须终止，
+                            // 否则 while(true) 会反复读取同一页。
+                            if (lastValidId == null) {
+                                log.warn("[reindex] collection={} tenant={} 本页无有效 id，终止遍历",
+                                        meta.getName(), tenant.getId());
+                                break;
+                            }
+                            if (lastValidId.equals(previousAfterId)) {
+                                log.warn("[reindex] collection={} tenant={} 游标未前进（{}），终止遍历",
+                                        meta.getName(), tenant.getId(), lastValidId);
+                                break;
+                            }
+                            afterId = lastValidId;
+                            if (rows.size() < PAGE) break;
+                        }
+                        log.info("[reindex] collection={} tenant={} scanned={} reindexed={}",
+                                meta.getName(), tenant.getId(), scanned, reindexed);
+                    } catch (Exception e) {
+                        log.warn("[reindex] collection={} tenant={} 重建失败: {}",
+                                meta.getName(), tenant.getId(), e.getMessage());
+                    }
+                }
+            } finally {
+                com.nocobase.tenant.TenantContext.clear();
             }
         }
         log.info("[reindex] 完成 tenants={} collections={} records={}",
-                tenantRepository.findByStatus(TenantEntity.Status.ACTIVE).size(),
-                collections, records);
+                tenants.size(), collections, records);
     }
 }
