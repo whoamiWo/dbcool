@@ -92,6 +92,46 @@ public class CollectionController {
     }
 
     /**
+     * R1c：用已解析的 scope 计划做记录级判定；不通过 → 404。
+     * 批量端点必须先 parse 一次 plan，再循环调用本方法（避免 N 次策略查询）。
+     */
+    private void assertInScope(com.nocobase.auth.AclEnforcer.ScopePlan plan,
+                               Map<String, Object> record) {
+        if (record == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
+        if (plan == null || plan.isAll()) return;
+        if (aclEnforcer.filterInScope(plan, List.of(record)).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
+    }
+
+    /**
+     * A0-2：完整记录操作校验。必须在任何写入前同时验证集合 ACL、数据范围与 ROW ACL。
+     */
+    private Map<String, Object> assertRecordAccess(
+            String collection, String id, AuthenticatedUser user,
+            com.nocobase.auth.AclPolicyEntity.Action action,
+            com.nocobase.auth.AclEnforcer.ScopePlan scope) {
+        Map<String, Object> record = service.getRecord(collection, id, user.tenantId());
+        assertInScope(scope, record);
+        boolean allowed = switch (action) {
+            case READ -> rowAclService.evaluateRead(user.tenantId(), collection, record,
+                    rowAclPrincipal(user));
+            case UPDATE -> rowAclService.evaluateUpdate(user.tenantId(), collection, record,
+                    rowAclPrincipal(user));
+            case DELETE -> rowAclService.evaluateDelete(user.tenantId(), collection, record,
+                    rowAclPrincipal(user));
+            default -> false;
+        };
+        if (!allowed) {
+            // 记录存在性统一 404，避免 ROW ACL 成为枚举 oracle。
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
+        return record;
+    }
+
+    /**
      * Week 41 D2:取 collection 的字段定义(供关联展开用)。
      * 解析失败返回 null,让上层跳过 expandRelations(不阻断主流程)。
      */
@@ -309,7 +349,7 @@ public class CollectionController {
         // Week 17: 按 action=CREATE 精确检查(支持"创建后可改"场景)
         aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, data,
                 com.nocobase.auth.AclPolicyEntity.Action.CREATE);
-        UUID id = service.insertRecord(name, data, user.tenantId());
+        UUID id = service.insertRecord(name, data, user.tenantId(), user.userId());
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "CREATE", name, id.toString(), data);
         // Week 41 D4a:发布记录创建事件(供 WorkflowTriggerListener 消费)
@@ -350,13 +390,14 @@ public class CollectionController {
             aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, record,
                     com.nocobase.auth.AclPolicyEntity.Action.CREATE);
         }
-        int count = service.batchInsert(name, data, user.tenantId());
+        int count = service.batchInsert(name, data, user.tenantId(), user.userId());
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "BATCH_CREATE", name, String.valueOf(count), Map.of("count", count));
         return Map.of("code", 0, "message", "success", "data", Map.of("created", count));
     }
 
     /** P1:批量更新。请求体 {@code List<BatchUpdateItem>} 每项含 id + data。 */
+    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/{name}/records/batch")
     public Map<String, Object> batchUpdateRecords(
@@ -369,12 +410,22 @@ public class CollectionController {
         if (items == null || items.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "批量更新 body 不能为空");
         }
-        // 与单条 updateRecord 对齐:逐条做字段级写权限检查
+        // 字段级校验 + 整批预检：任何失败时 service 尚未开始写入。
         for (CollectionService.BatchUpdateItem item : items) {
             aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, item.data(),
                     com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
         }
-        List<String> updated = service.batchUpdate(name, items, user.tenantId());
+        com.nocobase.auth.AclEnforcer.ScopePlan updateScope =
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId());
+        com.nocobase.acl.RowAclService.Principal principal = rowAclPrincipal(user);
+        for (CollectionService.BatchUpdateItem item : items) {
+            Map<String, Object> record = service.getRecord(name, item.id(), user.tenantId());
+            assertInScope(updateScope, record);
+            if (!rowAclService.evaluateUpdate(user.tenantId(), name, record, principal)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+            }
+        }
+        List<String> updated = service.batchUpdate(name, items, user.tenantId(), user.userId());
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "BATCH_UPDATE", name, String.valueOf(updated.size()),
                 Map.of("updated", updated));
@@ -383,6 +434,7 @@ public class CollectionController {
     }
 
     /** P1:批量删除。请求体 {@code List<String>} 为记录 id 列表。 */
+    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{name}/records/batch")
     public Map<String, Object> batchDeleteRecords(
@@ -395,7 +447,18 @@ public class CollectionController {
         if (ids == null || ids.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "批量删除 body 不能为空");
         }
-        int count = service.batchDelete(name, ids, user.tenantId());
+        // A0-2：完整预检数据范围和 ROW delete policy，随后才执行整批写操作。
+        com.nocobase.auth.AclEnforcer.ScopePlan deleteScope =
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId());
+        com.nocobase.acl.RowAclService.Principal principal = rowAclPrincipal(user);
+        for (String id : ids) {
+            Map<String, Object> record = service.getRecord(name, id, user.tenantId());
+            assertInScope(deleteScope, record);
+            if (!rowAclService.evaluateDelete(user.tenantId(), name, record, principal)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+            }
+        }
+        int count = service.batchDelete(name, ids, user.tenantId(), user.userId());
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "BATCH_DELETE", name, String.valueOf(count), Map.of("count", count));
         return Map.of("code", 0, "message", "success", "data", Map.of("deleted", count));
@@ -421,10 +484,10 @@ public class CollectionController {
         boolean rowPolicies = rowAclService.hasPolicies(user.tenantId(), name, "read");
         boolean needsWiderWindow = rowPolicies || scopePlan.predicate() != null || scopePlan.customFallback();
         int fetchLimit = needsWiderWindow ? Math.min(limit * 5, 500) : limit;
-        List<Map<String, Object>> records = service.listRecords(
-                name, user.tenantId(), fetchLimit, sort, filters,
-                scopePlan.predicate() == null ? null : scopePlan.predicate().sql(),
-                scopePlan.predicate() == null ? java.util.List.of() : scopePlan.predicate().params());
+        List<Map<String, Object>> records = scopePlan.predicate() == null
+                ? service.listRecords(name, user.tenantId(), fetchLimit, sort, filters)
+                : service.listRecords(name, user.tenantId(), fetchLimit, sort, filters,
+                        scopePlan.predicate().sql(), scopePlan.predicate().params());
         // Week 41 D2:展开 belongsTo/hasMany 关联字段为 {id, title}
         List<FieldDef> fields = fieldsOf(name);
         if (fields != null && !fields.isEmpty()) {
@@ -432,27 +495,28 @@ public class CollectionController {
                 relationResolver.expandRelations(fields, r, user.tenantId());
             }
         }
-        // FIELD policy 过滤:对每条记录应用隐藏字段
-        records = records.stream()
-                .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
-                .toList();
-        // B7/T1.3：SELF/DEPT 已在 SQL 下推；仅 CUSTOM（不可安全参数化）保留内存判定。
+        // B7/T1.3：SELF/DEPT 已在 SQL 下推；仅 CUSTOM 保留内存判定。
+        // 必须先在字段裁剪前执行 ROW 策略，因为表达式可能依赖被隐藏字段。
         if (scopePlan.customFallback()) {
             log.warn("[acl] collection={} 使用 CUSTOM data_scope，无法下推 SQL，采用内存过滤"
                     + "（分页结果可能少于 limit）", name);
             records = aclEnforcer.filterRecordsByDataScope(
                     user.userId(), user.tenantId(), name, records);
         }
-        // ROW ACL 过滤:每条记录过表达式策略(Week 14.5)
         records = rowAclService.filterReadable(
                 user.tenantId(), name, records, rowAclPrincipal(user));
+        records = records.stream()
+                .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
+                .toList();
         // 放大取数后截断到请求的 limit
         if (records.size() > limit) {
             records = new java.util.ArrayList<>(records.subList(0, limit));
         }
+        // D14：把隐性行为显性化 —— 前端仅在结果少于 limit 时提示"部分记录未展示"
         return Map.of(
                 "code", 0, "message", "success",
-                "data", records
+                "data", records,
+                "dataScopeFiltered", needsWiderWindow
         );
     }
 
@@ -501,14 +565,15 @@ public class CollectionController {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
         Map<String, Object> record = service.getRecord(name, id, user.tenantId());
+        // R1b：记录级权限（读取用 404 隐藏存在性）。
+        aclEnforcer.assertRecordInScope(user.userId(), user.tenantId(), name, record);
+        if (!rowAclService.evaluateRead(user.tenantId(), name, record, rowAclPrincipal(user))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
         // Week 41 D2:展开 belongsTo/hasMany 关联字段为 {id, title}
         List<FieldDef> fields = fieldsOf(name);
         if (fields != null && !fields.isEmpty()) {
             relationResolver.expandRelations(fields, record, user.tenantId());
-        }
-        // ROW ACL 校验
-        if (!rowAclService.evaluateRead(user.tenantId(), name, record, rowAclPrincipal(user))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
         }
         return Map.of(
                 "code", 0, "message", "success",
@@ -529,12 +594,13 @@ public class CollectionController {
         // Week 17: 按 action=UPDATE 精确检查(支持"建表后不能改"场景)
         aclEnforcer.assertCanWriteFields(user.userId(), user.tenantId(), name, data,
                 com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
-        // 先取旧记录做 ROW ACL 拦截评估
+        // A0-2：写入前做集合 ACL、数据范围与 ROW ACL 完整判定。
         Map<String, Object> existing = service.getRecord(name, id, user.tenantId());
+        aclEnforcer.assertRecordInScope(user.userId(), user.tenantId(), name, existing);
         if (!rowAclService.evaluateUpdate(user.tenantId(), name, existing, rowAclPrincipal(user))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ROW ACL 拒绝:不可更新此记录");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
         }
-        boolean ok = service.updateRecord(name, id, data, user.tenantId());
+        boolean ok = service.updateRecord(name, id, data, user.tenantId(), user.userId());
         if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "UPDATE", name, id, Map.of("before", existing, "after", data));
@@ -555,6 +621,7 @@ public class CollectionController {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.DELETE);
         Map<String, Object> existing = service.getRecord(name, id, user.tenantId());
+        aclEnforcer.assertRecordInScope(user.userId(), user.tenantId(), name, existing);
         if (!rowAclService.evaluateDelete(user.tenantId(), name, existing, rowAclPrincipal(user))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ROW ACL 拒绝:不可删除此记录");
         }
@@ -589,11 +656,16 @@ public class CollectionController {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.DELETE);
         List<Map<String, Object>> records = service.listDeletedRecords(name, user.tenantId(), limit);
+        // A0-2：回收站列表同时执行数据范围与 ROW read 策略，避免暴露已删除记录。
+        records = aclEnforcer.filterInScope(
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId()), records);
+        records = rowAclService.filterReadable(user.tenantId(), name, records, rowAclPrincipal(user));
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("collection", name, "records", records, "total", records.size()));
     }
 
     /** 恢复回收站中的记录(deleted_at 置空,记录重回业务列表)。 */
+    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/{name}/recycle/{id}/restore")
     public Map<String, Object> restoreRecord(
@@ -603,6 +675,11 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        Map<String, Object> deleted = service.getRecordIncludingDeleted(name, id, user.tenantId());
+        aclEnforcer.assertRecordInScope(user.userId(), user.tenantId(), name, deleted);
+        if (!rowAclService.evaluateDelete(user.tenantId(), name, deleted, rowAclPrincipal(user))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
         boolean ok = service.restoreRecord(name, id, user.tenantId(), user.userId());
         if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或未被删除");
         auditService.log(user.tenantId(), user.userId(), user.username(),
@@ -616,6 +693,7 @@ public class CollectionController {
     /**
      * 彻底删除(物理删除,<strong>不可恢复</strong>),并清理该记录的版本历史。
      */
+    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{name}/recycle/{id}")
     public Map<String, Object> hardDeleteRecord(
@@ -625,6 +703,11 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.DELETE);
+        Map<String, Object> deleted = service.getRecordIncludingDeleted(name, id, user.tenantId());
+        aclEnforcer.assertRecordInScope(user.userId(), user.tenantId(), name, deleted);
+        if (!rowAclService.evaluateDelete(user.tenantId(), name, deleted, rowAclPrincipal(user))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
         boolean ok = service.hardDeleteRecord(name, id, user.tenantId());
         if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在");
         auditService.log(user.tenantId(), user.userId(), user.username(),
@@ -633,6 +716,7 @@ public class CollectionController {
     }
 
     /** 清空回收站:物理删除全部已软删记录。 */
+    @org.springframework.transaction.annotation.Transactional
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{name}/recycle")
     public Map<String, Object> clearRecycleBin(
@@ -641,7 +725,24 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.DELETE);
-        int removed = service.clearRecycleBin(name, user.tenantId());
+        // A0-2：先完整预检回收站所有待清理项；任一 ROW/data-scope 拒绝则零副作用。
+        com.nocobase.auth.AclEnforcer.ScopePlan scope =
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId());
+        List<Map<String, Object>> deleted = service.listDeletedRecords(name, user.tenantId(), 500);
+        com.nocobase.acl.RowAclService.Principal principal = rowAclPrincipal(user);
+        for (Map<String, Object> rec : deleted) {
+            assertInScope(scope, rec);
+            if (!rowAclService.evaluateDelete(user.tenantId(), name, rec, principal)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+            }
+        }
+        int removed = 0;
+        for (Map<String, Object> rec : deleted) {
+            Object rid = rec.get("id");
+            if (rid != null && service.hardDeleteRecord(name, String.valueOf(rid), user.tenantId())) {
+                removed++;
+            }
+        }
         auditService.log(user.tenantId(), user.userId(), user.username(),
                 "PURGE_ALL", name, null, Map.of("removed", removed));
         return Map.of("code", 0, "message", "cleared", "data", Map.of("removed", removed));
@@ -661,6 +762,9 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
+        // A0-2：版本历史也是记录内容，必须通过 READ + scope + ROW read。
+        assertRecordAccess(name, id, user, com.nocobase.auth.AclPolicyEntity.Action.READ,
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId()));
         List<Map<String, Object>> versions = service.listRecordVersions(name, id, user.tenantId());
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("collection", name, "recordId", id, "versions", versions));
@@ -677,6 +781,11 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.UPDATE);
+        Map<String, Object> current = service.getRecord(name, id, user.tenantId());
+        aclEnforcer.assertRecordInScope(user.userId(), user.tenantId(), name, current);
+        if (!rowAclService.evaluateUpdate(user.tenantId(), name, current, rowAclPrincipal(user))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在或无权访问");
+        }
         boolean ok = service.restoreRecordVersion(name, id, version, user.tenantId(), user.userId());
         if (!ok) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "版本不存在或回滚失败");
         auditService.log(user.tenantId(), user.userId(), user.username(),
@@ -751,12 +860,19 @@ public class CollectionController {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
         CollectionMetaEntity meta = service.get(name, user.tenantId());
-        List<Map<String, Object>> records = service.listRecords(name, user.tenantId(), limit);
+        // R1c：导出口径必须与列表一致（数据范围 + 行级策略）
+        com.nocobase.auth.AclEnforcer.ScopePlan exportScope =
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId());
+        List<Map<String, Object>> records = exportScope.predicate() == null
+                ? service.listRecords(name, user.tenantId(), limit)
+                : service.listRecords(name, user.tenantId(), limit, null, null,
+                        exportScope.predicate().sql(), exportScope.predicate().params());
+        records = aclEnforcer.filterInScope(exportScope, records);
+        records = rowAclService.filterReadable(
+                user.tenantId(), name, records, rowAclPrincipal(user));
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
                 .toList();
-        records = rowAclService.filterReadable(
-                user.tenantId(), name, records, rowAclPrincipal(user));
         // 字段顺序:fields_json 中的顺序
         List<String> headers = new java.util.ArrayList<>();
         try {
@@ -787,9 +903,10 @@ public class CollectionController {
                 "collection.export_csv", "collection", name,
                 Map.of("collection_name", name, "exported_rows", records.size(),
                         "filter", filterInfo));
-        return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
-                .body(csv.toString());
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        if (!exportScope.isAll()) builder.header("X-Data-Scope-Filtered", "true");
+        return builder.body(csv.toString());
     }
 
     /**
@@ -814,14 +931,21 @@ public class CollectionController {
 
         // 2. 取 meta + records
         CollectionMetaEntity meta = service.get(name, user.tenantId());
-        List<Map<String, Object>> records = service.listRecords(name, user.tenantId(), limit);
+        // R1c：数据范围与列表同源
+        com.nocobase.auth.AclEnforcer.ScopePlan exportScope =
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId());
+        List<Map<String, Object>> records = exportScope.predicate() == null
+                ? service.listRecords(name, user.tenantId(), limit)
+                : service.listRecords(name, user.tenantId(), limit, null, null,
+                        exportScope.predicate().sql(), exportScope.predicate().params());
+        records = aclEnforcer.filterInScope(exportScope, records);
 
-        // 3. 字段级过滤 + 行级过滤（与 exportCsv 一致）
+        // 3. 行级表达式可能依赖字段 ACL 隐藏字段，因此先 ROW 过滤再字段裁剪。
+        records = rowAclService.filterReadable(
+                user.tenantId(), name, records, rowAclPrincipal(user));
         records = records.stream()
                 .map(r -> aclEnforcer.filterRecord(user.userId(), user.tenantId(), name, r))
                 .toList();
-        records = rowAclService.filterReadable(
-                user.tenantId(), name, records, rowAclPrincipal(user));
 
         // 4. 解析表头（fields_json 顺序；失败记 WARN 而非静默）
         List<String> headers = new java.util.ArrayList<>();
@@ -873,12 +997,13 @@ public class CollectionController {
                 Map.of("collection_name", name, "exported_rows", records.size(),
                         "format", format, "filter", "limit=" + limit));
 
-        return ResponseEntity.ok()
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE,
                         com.nocobase.export.ExportFileService.mediaTypeOf(format))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + filename + "\"")
-                .body(data);
+                        "attachment; filename=\"" + filename + "\"");
+        if (!exportScope.isAll()) builder.header("X-Data-Scope-Filtered", "true");
+        return builder.body(data);
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -916,7 +1041,7 @@ public class CollectionController {
                         String v = values[i].trim();
                         if (!v.isEmpty()) data.put(headers[i].trim(), v);
                     }
-                    service.insertRecord(name, data, user.tenantId());
+                    service.insertRecord(name, data, user.tenantId(), user.userId());
                     success++;
                 } catch (Exception e) {
                     failed.add(Map.of("row", rowNum, "error", e.getMessage() == null ? e.toString() : e.getMessage()));
@@ -1028,17 +1153,25 @@ public class CollectionController {
     ) {
         aclEnforcer.assertCan(user.userId(), user.tenantId(), name,
                 com.nocobase.auth.AclPolicyEntity.Action.READ);
-        List<Map<String, Object>> result = service.aggregate(
-                name,
-                request.groupByFields,
+        // R1c：聚合无法后过滤，必须把数据范围谓词下推进 SQL
+        com.nocobase.auth.AclEnforcer.ScopePlan scope =
+                aclEnforcer.resolveScopePlan(user.userId(), user.tenantId());
+        if (scope.customFallback() || rowAclService.hasPolicies(user.tenantId(), name, "read")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "当前策略不支持聚合下推（ROW/CUSTOM），请使用受行级过滤的明细导出");
+        }
+        List<com.nocobase.meta.DynamicTableManager.AggSpec> aggSpecs =
                 request.aggSpecs == null ? List.of() : request.aggSpecs.stream()
                         .map(s -> new com.nocobase.meta.DynamicTableManager.AggSpec(s.field, s.agg, null))
-                        .toList(),
+                        .toList();
+        List<com.nocobase.meta.CollectionService.FilterRule> aggFilters =
                 request.filters == null ? List.of() : request.filters.stream()
                         .map(f -> new com.nocobase.meta.CollectionService.FilterRule(f.field, f.op, f.value))
-                        .toList(),
-                user.tenantId()
-        );
+                        .toList();
+        List<Map<String, Object>> result = scope.predicate() == null
+                ? service.aggregate(name, request.groupByFields, aggSpecs, aggFilters, user.tenantId())
+                : service.aggregate(name, user.tenantId(), request.groupByFields, aggSpecs, aggFilters,
+                        scope.predicate().sql(), scope.predicate().params());
         return Map.of("code", 0, "message", "success", "data", result);
     }
 

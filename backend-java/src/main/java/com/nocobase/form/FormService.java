@@ -176,7 +176,12 @@ public class FormService {
         // 泄漏给后续请求（与 JwtAuthFilter 在 finally 中 clear() 同一原则）。
         com.nocobase.tenant.TenantContext.set(form.getTenantId());
         try {
-            return collectionService.insertRecord(form.getCollectionName(), data, form.getTenantId());
+            // D20：公开表单归属到表单创建者（匿名提交也必须可追溯归属）
+            return form.getCreatedBy() == null
+                    ? collectionService.insertRecord(form.getCollectionName(), data,
+                            form.getTenantId())
+                    : collectionService.insertRecord(form.getCollectionName(), data,
+                            form.getTenantId(), form.getCreatedBy());
         } finally {
             com.nocobase.tenant.TenantContext.clear();
         }

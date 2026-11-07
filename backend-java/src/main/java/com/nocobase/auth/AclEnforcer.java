@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 /**
  * ACL 强制服务(US-305/308).
@@ -159,7 +160,7 @@ public class AclEnforcer {
     /**
      * B7 返工：按角色数据范围过滤记录列表（行级过滤）。
      *
-     * <p>修复前 {@link #buildDataScopeCondition} / {@code dataScopeType} 全仓无调用点，
+     * <p>修复前数据范围谓词全仓无生产调用点，
      * SELF/DEPT/CUSTOM 是纯死代码。现由本方法在记录列表读路径真实生效。
      *
      * <p>语义：
@@ -214,7 +215,87 @@ public class AclEnforcer {
     }
 
     /** 数据范围种类（内部分派用；ALL 与 null 都表示不过滤）。 */
-    enum ScopeKind { ALL, SELF, DEPT, CUSTOM }
+    public enum ScopeKind { ALL, SELF, DEPT, CUSTOM }
+
+    /**
+     * R1c：一次解析的数据范围计划 —— 供批量端点（导出/批量改删）复用，
+     * 避免在循环里逐条查角色/部门（R4 同类性能问题）。
+     *
+     * @param kind             范围种类
+     * @param visibleCreatorIds DEPT/SELF 的可见创建者集合；null 表示不过滤
+     * @param predicate        可下推 SQL 谓词；null 表示无需下推
+     * @param customFallback   CUSTOM 需要内存判定
+     */
+    public record ScopePlan(ScopeKind kind, Set<UUID> visibleCreatorIds,
+                            SqlPredicate predicate, boolean customFallback) {
+        public boolean isAll() {
+            return kind == null || kind == ScopeKind.ALL;
+        }
+    }
+
+    /**
+     * R1c：一次解析用户的数据范围（角色/部门只查一次）。
+     */
+    public ScopePlan resolveScopePlan(UUID userId, String tenantId) {
+        ScopeKind kind = resolveScopeKind(userId, tenantId);
+        if (kind == null || kind == ScopeKind.ALL) {
+            return new ScopePlan(ScopeKind.ALL, null, null, false);
+        }
+        if (kind == ScopeKind.DEPT) {
+            // 同一部门路径既用于内存过滤的可见 creator 集合，也用于 SQL 下推，
+            // 避免重复访问 org_unit/users 并确保两条路径使用同一快照。
+            String path = deptScopeResolver.resolveUserDeptPath(userId, tenantId);
+            if (path == null) {
+                // D6 / fail-safe：无部门或路径异常 → SELF
+                return new ScopePlan(ScopeKind.SELF, Set.of(userId),
+                        new SqlPredicate("created_by = ?", List.of(userId)), false);
+            }
+            Set<UUID> visible = deptScopeResolver.resolveVisibleCreatorIdsForPath(
+                    userId, tenantId, path);
+            String sql = "created_by IN (SELECT u.id FROM users u "
+                    + "JOIN org_unit o ON u.department_id = o.id "
+                    + "WHERE o.tenant_id = ? AND o.deleted = FALSE AND o.path LIKE ?)";
+            SqlPredicate predicate = new SqlPredicate(sql, List.of(tenantId, path + "%"));
+            return new ScopePlan(kind, visible, predicate, false);
+        }
+        if (kind == ScopeKind.SELF) {
+            return new ScopePlan(kind, Set.of(userId),
+                    new SqlPredicate("created_by = ?", List.of(userId)), false);
+        }
+        return new ScopePlan(kind, null, null, true);
+    }
+
+    /** R1c：按已解析的计划批量过滤（不重复查库）。 */
+    public List<Map<String, Object>> filterInScope(ScopePlan plan, List<Map<String, Object>> records) {
+        if (plan == null || plan.isAll() || records == null || records.isEmpty()) return records;
+        if (plan.kind() == ScopeKind.CUSTOM) {
+            return records.stream()
+                    .filter(r -> Boolean.TRUE.equals(r.get("_data_scope_match")))
+                    .toList();
+        }
+        Set<UUID> allowed = plan.visibleCreatorIds();
+        if (allowed == null) return records;
+        return records.stream()
+                .filter(r -> createdByIn(r, "created_by", allowed))
+                .toList();
+    }
+
+    /**
+     * R1c：记录级数据范围校验（读写删统一）。不通过 → 404（不泄露记录是否存在）。
+     */
+    public void assertRecordInScope(UUID userId, String tenantId, String collectionName,
+                                    Map<String, Object> record) {
+        ScopePlan plan = resolveScopePlan(userId, tenantId);
+        if (plan.isAll()) return;
+        if (filterInScope(plan, List.of(record)).isEmpty()) {
+            throw new ResponseStatusException(NOT_FOUND, "记录不存在或无权访问");
+        }
+    }
+
+    /** R1c：聚合下推所需的 scope 谓词（只查一次角色/部门）。 */
+    public SqlPredicate dataScopeParams(UUID userId, String tenantId) {
+        return resolveScopePlan(userId, tenantId).predicate();
+    }
 
     /**
      * 可下推的数据范围谓词 + 是否需要内存兜底。
@@ -280,27 +361,6 @@ public class AclEnforcer {
             }
         }
         return null;
-    }
-
-    /**
-     * 判断一条记录是否匹配数据范围谓词。
-     *
-     * @deprecated A-1 修复后由 {@link #filterRecordsByDataScope} 内部直接判定；
-     *   保留此方法仅为兼容既有调用（内部改走 {@link DeptScopeResolver}）。
-     */
-    @Deprecated
-    public boolean dataScopeSqlMatches(String scopeSql, Map<String, Object> record) {
-        if (scopeSql == null || scopeSql.isBlank() || record == null) return true;
-        String s = scopeSql.trim();
-        // SELF：created_by = '<uuid>'
-        if (s.startsWith("created_by")) {
-            Object created = record.get("created_by");
-            String expected = s.replaceAll("(?i)^created_by\\s*=\\s*'", "").replace("'", "").trim();
-            return created != null && expected.equalsIgnoreCase(created.toString());
-        }
-        // DEPT / 其它子查询形态：无法离线判定子查询真假 → 保守拒绝（fail-closed）。
-        // 修复前这里返回 record.get("department_id") != null，恒 null 恒 false，形同虚设。
-        return false;
     }
 
     /**
@@ -401,110 +461,6 @@ public class AclEnforcer {
     // ============================================================
     //  Wave3 B7: 数据范围过滤
     // ============================================================
-
-    /**
-     * 根据角色数据范围配置生成 SQL 过滤条件片段。
-     *
-     * <p>CUSTOM 类型:解析 dataScopeConfigJson 中的自定义规则,返回可直接拼接到 SQL WHERE 的片段。
-     *
-     * @param roleId        用户直接持有的角色 ID
-     * @param tenantId      租户隔离
-     * @param creatorField  创建者字段(默认 "created_by")
-     */
-    public String buildDataScopeCondition(UUID roleId, String tenantId, String creatorField) {
-        List<AclPolicyEntity> policies = policyRepository.findByRoleIdAndTenantId(roleId, tenantId);
-        AclPolicyEntity scopePolicy = policies.stream()
-                .filter(p -> p.getDataScopeType() != null)
-                .findFirst()
-                .orElse(null);
-
-        if (scopePolicy == null || scopePolicy.getDataScopeConfigJson() == null) {
-            return null;
-        }
-
-        try {
-            Map<String, Object> cfg = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readValue(scopePolicy.getDataScopeConfigJson(), Map.class);
-            Object sql = cfg.get("sql");
-            if (sql instanceof String s && !s.isBlank()) {
-                return s;
-            }
-            Object userExpr = cfg.get("userExpression");
-            if (userExpr instanceof String expr) {
-                return expr.replace("${userId}", "'${userId}'");
-            }
-        } catch (Exception ex) {
-            log.error("[acl] 数据范围配置解析失败 roleId={}", roleId, ex);
-        }
-        return null;
-    }
-
-    /**
-     * B7 返工：把角色级数据范围 SQL 片段解析为「可直接嵌入 WHERE 子句的谓词」。
-     *
-     * <p>修复前 {@link #buildDataScopeCondition(UUID, String, String)} 全仓零调用点，
-     * data_scope 字段（ALL/DEPT/SELF/CUSTOM）是纯死代码。现由
-     * {@link #filterRecord(UUID, String, String, Map)} 真实调用，
-     * 把 SELF/DEPT/CUSTOM 范围落到记录级过滤。
-     *
-     * @param userId       当前用户
-     * @param tenantId     租户
-     * @param creatorField 记录中标识归属人的列名（通常 {@code created_by}）
-     * @return 谓词字符串（如 {@code "created_by = '<uuid>'"}）；无数据范围约束时返回 null
-     */
-    public String resolveDataScopeSql(UUID userId, String tenantId, String creatorField) {
-        List<UUID> roleIds = loadRoleIdsIncludingInheritance(userId, tenantId);
-        if (roleIds.isEmpty()) return null;
-
-        // 遍历用户所有角色（含祖先）的 policies，找出首个带 data_scope 的策略
-        AclPolicyEntity scopePolicy = null;
-        UUID scopeRole = null;
-        for (UUID rid : roleIds) {
-            List<AclPolicyEntity> policies = policyRepository.findByRoleIdAndTenantId(rid, tenantId);
-            for (AclPolicyEntity p : policies) {
-                if (p.getDataScopeType() != null && p.getDataScopeType()
-                        != AclPolicyEntity.DataScopeType.ALL) {
-                    scopePolicy = p;
-                    scopeRole = rid;
-                    break;
-                }
-            }
-            if (scopePolicy != null) break;
-        }
-        if (scopePolicy == null) return null;
-
-        String field = creatorField != null && !creatorField.isBlank() ? creatorField : "created_by";
-        return switch (scopePolicy.getDataScopeType()) {
-            case SELF -> field + " = '" + userId + "'";
-            case DEPT -> {
-                // A-1 修复：修复前引用不存在的表 user_u（应为 users），且只比部门叶子
-                // 不含子树。现由 DeptScopeResolver 生成基于 org_unit.path 前缀的真实
-                // 子树谓词；无部门时降级为 SELF（决策 D6）。
-                String deptSql = deptScopeResolver.buildDeptScopeSql(userId, tenantId, field);
-                yield deptSql != null ? deptSql : field + " = '" + userId + "'";
-            }
-            case CUSTOM -> buildCustomScope(scopePolicy, userId);
-            default -> null; // ALL
-        };
-    }
-
-    private String buildCustomScope(AclPolicyEntity policy, UUID userId) {
-        if (policy.getDataScopeConfigJson() == null) return null;
-        try {
-            Map<String, Object> cfg = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readValue(policy.getDataScopeConfigJson(), Map.class);
-            Object sql = cfg.get("sql");
-            if (sql instanceof String s && !s.isBlank()) return s;
-            Object expr = cfg.get("userExpression");
-            if (expr instanceof String e) {
-                return e.replace("${userId}", "'" + userId + "'");
-            }
-        } catch (Exception ex) {
-            log.error("[acl] CUSTOM data_scope 解析失败 policy={}——调用回退到 SELF",
-                    policy.getId(), ex);
-        }
-        return null;
-    }
 
     /**
      * US-308: 加载 user 持有角色 + 所有祖先角色(通过 parent_role_id 链)。

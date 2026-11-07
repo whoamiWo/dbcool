@@ -172,6 +172,7 @@ public class RoleAclController {
         p.setSubject(req.subject());
         if (req.action() != null) p.setAction(AclPolicyEntity.Action.valueOf(req.action().toUpperCase()));
         p.setConfigJson(req.config() != null ? req.config() : "{}");
+        applyDataScopeType(p, req.dataScopeType());
         p.setTenantId(TenantContext.currentTenantId());
         p.setCreatedAt(Instant.now());
         AclPolicyEntity saved = aclRepository.save(p);
@@ -191,6 +192,7 @@ public class RoleAclController {
         Map<String, Object> before = aclDto(p);
         if (req.config() != null) p.setConfigJson(req.config());
         if (req.action() != null) p.setAction(AclPolicyEntity.Action.valueOf(req.action().toUpperCase()));
+        applyDataScopeType(p, req.dataScopeType());
         AclPolicyEntity saved = aclRepository.save(p);
         auditService.log(TenantContext.currentTenantId(), null, "system",
                 "acl.policy.update", "acl.policy", id.toString(),
@@ -293,8 +295,47 @@ public class RoleAclController {
             @NotBlank String type,
             @NotBlank String subject,
             String action,
-            String config
+            String config,
+            @JsonProperty("data_scope_type") String dataScopeType
     ) {}
 
-    public record UpdateAclRequest(String action, String config) {}
+    public record UpdateAclRequest(String action, String config,
+                                   @JsonProperty("data_scope_type") String dataScopeType) {}
+
+    /**
+     * R8：CUSTOM 数据范围当前**没有实现**（字段无写入点、前端无配置）。
+     * 写入路径直接拒绝，避免"配了 CUSTOM → 全量被拒"的隐性故障；
+     * 库中已存在的 CUSTOM 策略由 {@link AclScopeAuditRunner} 启动告警。
+     */
+    private void applyDataScopeType(AclPolicyEntity p, String raw) {
+        if (raw == null || raw.isBlank()) return;
+        String v = raw.trim().toUpperCase();
+        if ("CUSTOM".equals(v)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "自定义数据范围（CUSTOM）暂不支持");
+        }
+        try {
+            p.setDataScopeType(AclPolicyEntity.DataScopeType.valueOf(v));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "非法的 data_scope_type: " + raw);
+        }
+    }
+
+    /** 管理端可见的"不支持的数据范围"清单（不静默拒全量）。 */
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
+    @GetMapping("/acl/unsupported")
+    public Map<String, Object> unsupportedScopes() {
+        List<Map<String, Object>> rows = aclRepository
+                .findByTenantId(TenantContext.currentTenantId()).stream()
+                .filter(p -> p.getDataScopeType() == AclPolicyEntity.DataScopeType.CUSTOM)
+                .map(p -> Map.<String, Object>of(
+                        "id", p.getId().toString(),
+                        "roleId", p.getRoleId().toString(),
+                        "subject", p.getSubject() == null ? "" : p.getSubject(),
+                        "reason", "CUSTOM 数据范围暂不支持（当前按拒绝处理）"))
+                .toList();
+        return Map.of("code", 0, "message", "success",
+                "data", Map.of("unsupportedScopes", rows));
+    }
 }

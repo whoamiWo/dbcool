@@ -87,19 +87,18 @@ class DeptScopeResolverDbTest {
     }
 
     @Test
-    @DisplayName("DEPT SQL 谓词引用真实 users/org_unit 与子树 path，不再出现 user_u")
-    void buildDeptScopeSql_usesRealTables() {
-        String sql = resolver.buildDeptScopeSql(rootManager, TENANT, "created_by");
-
-        assertThat(sql).isNotNull();
-        assertThat(sql).contains("users u").contains("org_unit o").contains("path LIKE");
-        assertThat(sql).doesNotContain("user_u");
-        assertThat(sql).startsWith("created_by IN");
+    @DisplayName("R8：DEPT SQL 只剩一条实现路径（AclEnforcer.resolveDataScopePlan）")
+    void deptSqlLivesOnlyInAclEnforcer() {
+        // DeptScopeResolver 只负责「部门路径/成员集合」；SQL 谓词统一由
+        // AclEnforcer.resolveDataScopePlan 参数化生成，避免第二套拼接版被误用。
+        assertThat(resolver.resolveUserDeptPath(rootManager, TENANT))
+                .isNotNull()
+                .startsWith("/");
     }
 
     @Test
-    @DisplayName("无部门用户 → 不生成 DEPT 谓词（调用方按 SELF 处理）")
-    void buildDeptScopeSql_noDept_returnsNull() {
-        assertThat(resolver.buildDeptScopeSql(deptless, TENANT, "created_by")).isNull();
+    @DisplayName("无部门用户 → 路径为 null（调用方按 SELF 处理）")
+    void noDeptPath_returnsNull() {
+        assertThat(resolver.resolveUserDeptPath(deptless, TENANT)).isNull();
     }
 }
