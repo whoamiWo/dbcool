@@ -15,6 +15,8 @@ import com.nocobase.auth.UserEntity;
 import com.nocobase.auth.UserRepository;
 import com.nocobase.notification.NotifyDispatcher;
 import com.nocobase.workflow.WorkflowEngine;
+import com.nocobase.workflow.WorkflowFailureNotifier;
+import com.nocobase.workflow.WorkflowInstanceEntity;
 import com.nocobase.workflow.WorkflowEntity;
 import com.nocobase.workflow.WorkflowInstanceEntity;
 import com.nocobase.workflow.WorkflowInstanceRepository;
@@ -67,6 +69,7 @@ class ApprovalServiceTest {
                 mock(com.nocobase.integration.dingtalk.DingTalkApprovalService.class),
                 mock(NotifyDispatcher.class),
                 mock(com.nocobase.search.UnifiedSearchService.class),
+                mock(com.nocobase.approval.ApprovalVisibilityService.class),
                 false);
 
         when(requestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -264,5 +267,27 @@ class ApprovalServiceTest {
                 "财务", 1, "ROLE", null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("roleId");
+    }
+
+    @Test
+    @DisplayName("A0-3 提交后实例 FAILED → 通知创建者（6 入口之一）")
+    void submit_instanceFailed_notifiesOwner() {
+        WorkflowEntity w = workflowWithApproval("USER");
+        w.setNodesJson("[{\"id\":\"a1\",\"type\":\"APPROVAL\",\"config\":{\"assignee\":\""
+                + UUID.randomUUID() + "\"}}]");
+        when(templateRepository.findByIdAndTenantId(templateId, TENANT))
+                .thenReturn(Optional.of(template("USER")));
+        when(workflowRepository.findByIdAndTenantId(workflowId, TENANT)).thenReturn(Optional.of(w));
+        when(userRepository.findByIdAndTenantId(applicant, TENANT))
+                .thenReturn(Optional.of(user(applicant, null)));
+        when(engine.executeFrom(any(), any(), anyInt(), any()))
+                .thenReturn(WorkflowEngine.NodeResult.FAILED);
+        WorkflowFailureNotifier notifier = mock(WorkflowFailureNotifier.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "failureNotifier", notifier);
+
+        service.submit(TENANT, applicant, templateId, Map.of("title", "x"), null);
+
+        verify(notifier).notifyIfFailed(any(WorkflowInstanceEntity.class), eq(workflowId),
+                eq(applicant), eq("wf"), eq(TENANT));
     }
 }

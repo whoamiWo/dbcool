@@ -88,7 +88,7 @@ public class ApprovalController {
     public Map<String, Object> detail(@PathVariable UUID id,
                                       @AuthenticationPrincipal AuthenticatedUser user) {
         return Map.of("code", 0, "message", "success",
-                "data", approvalService.detail(user.tenantId(), id));
+                "data", approvalService.detail(user.tenantId(), id, user.userId()));
     }
 
     @PostMapping("/{id}/cancel")

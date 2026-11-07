@@ -78,10 +78,25 @@ class UnifiedSearchServiceTest {
         when(roleRepository.findRoleNamesByUserId(any(), any())).thenReturn(java.util.List.of("USER"));
         when(aclEnforcer.filterRecordsByDataScope(any(), any(), any(), any()))
                 .thenAnswer(inv -> inv.getArgument(3));
+        when(aclEnforcer.resolveScopePlan(any(), any()))
+                .thenReturn(new com.nocobase.auth.AclEnforcer.ScopePlan(
+                        com.nocobase.auth.AclEnforcer.ScopeKind.ALL, null, null, false));
+        when(aclEnforcer.filterInScope(any(), any())).thenAnswer(inv -> inv.getArgument(1));
         when(wikiPermissionService.hasPagePermission(any(), any(), any(), any())).thenReturn(true);
         when(channelMemberRepository.existsByChannelIdAndUserId(any(), any())).thenReturn(true);
         when(collectionService.getRecord(any(), any(), any()))
                 .thenAnswer(inv -> new java.util.HashMap<>(Map.of("id", inv.getArgument(1))));
+        when(collectionService.getRecordsByIds(any(), any(), any()))
+                .thenAnswer(inv -> {
+                    java.util.Collection<String> ids = inv.getArgument(1);
+                    List<Map<String, Object>> out = new java.util.ArrayList<>();
+                    for (String id : ids) {
+                        Map<String, Object> m = new java.util.HashMap<>();
+                        m.put("id", id);
+                        out.add(m);
+                    }
+                    return out;
+                });
         service = new UnifiedSearchService(
                 messageService, wikiPageService, collectionService,
                 automationRuleService, projectService, indexRepo,
@@ -89,7 +104,8 @@ class UnifiedSearchServiceTest {
                 aclEnforcer, rowAclService, roleRepository, wikiPermissionService,
                 mock(com.nocobase.approval.ApprovalRequestRepository.class),
                 mock(com.nocobase.approval.ApprovalCcRepository.class),
-                mock(com.nocobase.workflow.WorkflowTaskRepository.class));
+                mock(com.nocobase.workflow.WorkflowTaskRepository.class),
+                mock(com.nocobase.approval.ApprovalVisibilityService.class));
     }
 
     // ---- 辅助：构造索引命中实体 ----
@@ -179,6 +195,31 @@ class UnifiedSearchServiceTest {
     }
 
     @Test
+    void search_records_aclContextQueriesOncePerRequest() {
+        String r1 = UUID.randomUUID().toString();
+        String r2 = UUID.randomUUID().toString();
+        givenIndexHits(List.of(
+                idx("record", r1, "订单 A", "content"),
+                idx("record", r2, "订单 B", "content")));
+
+        Map<String, Object> result = service.search("content", tenantId, USER,
+                List.of("record"), 20);
+
+        assertThat(result.get("total")).isEqualTo(2);
+        // R4：角色只查 1 次（不是每条命中 1 次）
+        verify(roleRepository, org.mockito.Mockito.times(1))
+                .findRoleNamesByUserId(USER, tenantId);
+        // 批量读取 1 次（不是逐条 getRecord）
+        verify(collectionService, org.mockito.Mockito.times(1))
+                .getRecordsByIds(eq("orders"), any(), eq(tenantId));
+        verify(collectionService, org.mockito.Mockito.never())
+                .getRecord(any(), any(), any());
+        // 集合权限按 collection 记忆化：2 条命中只判 1 次
+        verify(aclEnforcer, org.mockito.Mockito.times(1))
+                .isAllowed(eq(USER), eq(tenantId), eq("orders"), any());
+    }
+
+    @Test
     void search_automation_filtersByKeyword() {
         AutomationRuleEntity rule = new AutomationRuleEntity();
         rule.setId(ruleId);
@@ -255,14 +296,30 @@ class UnifiedSearchServiceTest {
 
     @Test
     void indexAndRemove() {
+        when(indexRepo.findByEntityTypeAndEntityIdAndTenantId("wiki", wikiId.toString(), tenantId))
+                .thenReturn(List.of());
         service.indexEntity("wiki", wikiId.toString(), tenantId, "文档", "内容", null);
         verify(indexRepo).save(any(UnifiedSearchIndexEntity.class));
-        // indexEntity 内部做 upsert（先 delete 再 save），此处不验证 delete 次数
 
         service.removeEntity("wiki", wikiId.toString(), tenantId);
-        // 共调用 2 次 delete（indexEntity 1 + removeEntity 1）
-        verify(indexRepo, org.mockito.Mockito.times(2))
-                .deleteByEntityTypeAndEntityIdAndTenantId("wiki", wikiId.toString(), tenantId);
+        verify(indexRepo).deleteByEntityTypeAndEntityIdAndTenantId(
+                "wiki", wikiId.toString(), tenantId);
+    }
+
+    @Test
+    void indexEntity_existing_reusesId() {
+        UnifiedSearchIndexEntity existing = new UnifiedSearchIndexEntity();
+        existing.setId(UUID.randomUUID());
+        existing.setCreatedAt(java.time.Instant.now());
+        when(indexRepo.findByEntityTypeAndEntityIdAndTenantId("wiki", wikiId.toString(), tenantId))
+                .thenReturn(List.of(existing));
+        UUID originalId = existing.getId();
+
+        service.indexEntity("wiki", wikiId.toString(), tenantId, "新标题", "新内容", null);
+
+        assertThat(existing.getId()).isEqualTo(originalId);
+        assertThat(existing.getTitle()).isEqualTo("新标题");
+        verify(indexRepo).save(existing);
     }
 
     // ==================== PHASE105 补充分支 ====================
@@ -311,5 +368,16 @@ class UnifiedSearchServiceTest {
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).get("id")).isEqualTo(taskId);
         assertThat(rows.get(0).get("title")).isEqualTo("任务A");
+    }
+
+    @Test
+    void searchApproval_expandsCandidateWindowBeforeVisibilityFilter() {
+        when(indexRepo.searchByKeywordAndType(eq("approval"), eq("请假"), eq(tenantId), anyInt()))
+                .thenReturn(List.of());
+
+        service.search("请假", tenantId, USER, List.of("approval"), 5);
+
+        // 可见性在 Java 侧过滤，候选窗口不能等于展示 limit，否则普通用户自己的单据会被截掉
+        verify(indexRepo).searchByKeywordAndType(eq("approval"), eq("请假"), eq(tenantId), eq(100));
     }
 }
