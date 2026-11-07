@@ -51,7 +51,7 @@ public class BiReportController {
         List<CollectionService.FilterRule> filters = parseFilters(body.get("filters"));
 
         Map<String, Object> result = reportService.executePivot(
-                collection, user.tenantId(), rows, columns, values, filters);
+                collection, user.tenantId(), rows, columns, values, filters, user.userId());
 
         return ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", result));
     }
@@ -78,7 +78,7 @@ public class BiReportController {
         List<CollectionService.FilterRule> filters = parseFilters(body.get("filters"));
 
         Map<String, Object> result = reportService.executeChart(
-                collection, user.tenantId(), chartType, xField, yField, seriesField, agg, filters);
+                collection, user.tenantId(), chartType, xField, yField, seriesField, agg, filters, user.userId());
 
         return ResponseEntity.ok(Map.of("code", 0, "message", "success", "data", result));
     }
@@ -136,7 +136,7 @@ public class BiReportController {
 
         if ("flat".equalsIgnoreCase(type)) {
             List<Map<String, Object>> records = reportService
-                    .listFlatRecords(collection, user.tenantId(), filters);
+                    .listFlatRecords(collection, user.tenantId(), filters, user.userId());
             byte[] bytes = isPdf
                     ? reportService.exportFlatToPdf(records, (String) body.getOrDefault("name", "报表"))
                     : reportService.exportFlatToExcel(records, (String) body.getOrDefault("name", "报表"));
@@ -148,7 +148,7 @@ public class BiReportController {
         List<String> columns = castStrList(body.get("columns"));
         List<Map<String, String>> values = castMeasureList(body.get("values"));
         Map<String, Object> pivotResult = reportService.executePivot(
-                collection, user.tenantId(), rows, columns, values, filters);
+                collection, user.tenantId(), rows, columns, values, filters, user.userId());
 
         byte[] bytes = isPdf
                 ? reportService.exportPivotToPdf(pivotResult, (String) body.getOrDefault("name", "报表"))
@@ -177,8 +177,8 @@ public class BiReportController {
 
         boolean isPdf = "pdf".equalsIgnoreCase(format);
         byte[] bytes = isPdf
-                ? reportService.exportToPdf(reportId, user.tenantId())
-                : reportService.exportToExcel(reportId, user.tenantId());
+                ? reportService.exportToPdf(reportId, user.tenantId(), user.userId())
+                : reportService.exportToExcel(reportId, user.tenantId(), user.userId());
 
         String filename = URLEncoder.encode("report-" + id, StandardCharsets.UTF_8)
                 .replaceAll("\\+", "%20");

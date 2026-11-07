@@ -44,7 +44,8 @@ class BiReportControllerTest {
     @Test
     void executePivot_success_returnsResult() {
         when(reportService.executePivot(eq("users"), eq(USER.tenantId()),
-                any(List.class), any(List.class), any(List.class), any(List.class)))
+                any(List.class), any(List.class), any(List.class), any(List.class),
+                eq(USER.userId())))
                 .thenReturn(Map.of("data", "pivot"));
 
         ResponseEntity<Map<String, Object>> resp =
@@ -53,7 +54,8 @@ class BiReportControllerTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("code")).isEqualTo(0);
         verify(reportService).executePivot(eq("users"), eq(USER.tenantId()),
-                any(List.class), any(List.class), any(List.class), any(List.class));
+                any(List.class), any(List.class), any(List.class), any(List.class),
+                eq(USER.userId()));
     }
 
     @Test
@@ -146,7 +148,8 @@ class BiReportControllerTest {
 
     @Test
     void exportReport_flatExcel_usesListRecords() {
-        when(reportService.listFlatRecords(eq("orders"), eq(USER.tenantId()), any(List.class)))
+        when(reportService.listFlatRecords(eq("orders"), eq(USER.tenantId()), any(List.class),
+                eq(USER.userId())))
                 .thenReturn(List.of(Map.of("id", 1)));
         when(reportService.exportFlatToExcel(any(List.class), any())).thenReturn(new byte[]{7});
 
@@ -155,6 +158,7 @@ class BiReportControllerTest {
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).hasSize(1);
-        verify(reportService).listFlatRecords(eq("orders"), eq(USER.tenantId()), any(List.class));
+        verify(reportService).listFlatRecords(eq("orders"), eq(USER.tenantId()), any(List.class),
+                eq(USER.userId()));
     }
 }
