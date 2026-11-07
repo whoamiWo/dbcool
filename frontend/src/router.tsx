@@ -51,6 +51,10 @@ const ApprovalDetailPage = lazy(() =>
 const SearchResultsPage = lazy(() =>
   import('./pages/SearchResultsPage').then(m => ({ default: m.SearchResultsPage } as { default: React.ComponentType })),
 );
+// R1a：搜索 deeplink 的通用记录详情页
+const RecordDetailPage = lazy(() =>
+  import('./pages/RecordDetailPage').then(m => ({ default: m.RecordDetailPage } as { default: React.ComponentType })),
+);
 
 const FormTemplatesListPage = lazy(() =>
   import('./pages/FormTemplatesList').then(m => ({ default: m.FormTemplatesListPage } as { default: React.ComponentType })),
@@ -245,6 +249,7 @@ export const router = createBrowserRouter([
       { path: 'approvals', element: <Lazy><ApprovalCenterPage /></Lazy> },
       { path: 'approvals/:id', element: <Lazy><ApprovalDetailPage /></Lazy> },
       { path: 'search', element: <Lazy><SearchResultsPage /></Lazy> },
+      { path: 'records/:collection/:recordId', element: <Lazy><RecordDetailPage /></Lazy> },
       { path: 'admin/roles', element: <Lazy><RolesListPage /></Lazy> },
       { path: 'admin/acl', element: <Lazy><AclEditorPage /></Lazy> },
       { path: 'admin/audit', element: <Lazy><AuditLogsPage /></Lazy> },

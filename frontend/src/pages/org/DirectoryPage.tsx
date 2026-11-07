@@ -65,8 +65,8 @@ export function DirectoryPage() {
   const flat = useMemo(() => flatten(tree), [tree]);
 
   return (
-    <div style={{ display: 'flex', gap: 20, padding: 20, minHeight: '70vh' }}>
-      <aside style={{ width: 260, flexShrink: 0 }}>
+    <div className="split-layout" style={{ display: 'flex', gap: 20, padding: 20, minHeight: '70vh' }}>
+      <aside className="split-sidebar" style={{ width: 260, flexShrink: 0 }}>
         <h2 style={{ fontSize: 16, marginBottom: 12 }}>通讯录</h2>
         <button
           onClick={() => setSelected(null)}
@@ -96,7 +96,7 @@ export function DirectoryPage() {
         ))}
       </aside>
 
-      <section style={{ flex: 1 }}>
+      <section className="split-main" style={{ flex: 1 }}>
         <input
           value={keyword}
           onChange={e => setKeyword(e.target.value)}

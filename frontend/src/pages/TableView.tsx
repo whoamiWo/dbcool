@@ -11,6 +11,7 @@ import type { ViewFull, SortRule, FilterRule, TableConfig } from '@/types/view';
 import { filtersToQuery, sortToQuery, FilterBar } from '@/components/views/FilterBar';
 
 interface RecordRow { id: string; [k: string]: unknown; }
+type RecordsResponse = RecordRow[] | { data?: RecordRow[]; dataScopeFiltered?: boolean };
 interface GroupedRow { _groupKey: string; _count: number; _aggregations: Record<string, unknown>; _children: RecordRow[]; }
 
 /** 表格视图 (US-201/202/203/206) — Week 9 MVP + R2 T2 group by */
@@ -105,7 +106,7 @@ export function TableViewPage() {
       const fq = filtersToQuery(filters);
       if (sq) params.set('sort', sq);
       if (fq) params.set('filter', fq);
-      return apiClient.get<RecordRow[]>(`/collections/${collectionName}/records?${params}`);
+      return apiClient.get<RecordsResponse>(`/collections/${collectionName}/records?${params}`);
     },
     enabled: !!collectionName,
   });
@@ -113,7 +114,9 @@ export function TableViewPage() {
   const config = (view.config ?? {}) as unknown as TableConfig;
   const fields = collectionData?.fields ?? [];
   // eslint-disable-next-line react-hooks/exhaustive-deps -- 刻意窄依赖/空依赖，避免对象引用变化引发循环
-  const records = recordsData ?? [];
+  // R1 D14：后端返回 {data, dataScopeFiltered}；测试 mock 仍可能是裸数组
+  const records = Array.isArray(recordsData) ? recordsData : (recordsData?.data ?? []);
+  const dataScopeFiltered = !Array.isArray(recordsData) && Boolean(recordsData?.dataScopeFiltered);
   const fieldMap = new Map(fields.map((f) => [f.name, f]));
   
   // C2 冻结列 + 条件格式
@@ -781,6 +784,11 @@ export function TableViewPage() {
         </div>
       )}
 
+      {dataScopeFiltered && records.length < 500 && (
+        <p role="status" style={{ fontSize: 12, color: 'var(--color-warning-500)', marginTop: 8 }}>
+          部分记录因权限未展示
+        </p>
+      )}
       <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 8 }}>
         {t('table.totalRecords', { count: (groupByField ? (groupedData?.length ?? 0) : sorted.length) })}{(groupByField ? ` (${t('table.recordsCount', { count: groupedData?.reduce((a, g) => a + g._count, 0) ?? 0 })})` : '')}
       </p>

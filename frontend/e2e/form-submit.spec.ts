@@ -157,6 +157,9 @@ test.describe('表单提交流程 E2E', () => {
   });
 });
   test('datetime + attachment 字段:Week 41 D1 新类型渲染', async ({ page }) => {
+    // 该用例位于 describe 外，必须自行初始化登录态（否则跳 /login）
+    await mockLoginSuccess(page);
+    await mockMe(page);
     // 覆盖新建 attachment 字段 + datetime 字段的渲染(Week 41 D1.1/D1.2)
     const sampleFormD1 = {
       id: 'f1',

@@ -20,6 +20,26 @@ export const ADMIN_USER: MockUser = {
 
 /** Mock POST /api/auth/login → 200 + token. */
 export async function mockLoginSuccess(page: Page, user: MockUser = ADMIN_USER) {
+  // 应用外壳的轮询接口（桌面/移动端都可能触发）：不 mock 时 preview 返回 401，
+  // 会触发 axios 刷新→登出，导致与业务无关的 E2E 用例跳登录页。
+  await page.route('**/api/messages/unread-count*', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 0, message: 'ok', data: { count: 0 } }),
+    });
+  });
+  await page.route('**/api/auth/refresh', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0, message: 'ok',
+        data: { access_token: 'fake-jwt-token-for-e2e',
+                refresh_token: 'fake-refresh-token' },
+      }),
+    });
+  });
   await page.route('**/api/auth/login', async (route: Route) => {
     await route.fulfill({
       status: 200,

@@ -35,6 +35,7 @@ const TYPE_TABS: { key: string; label: string }[] = [
   { key: 'MENTION', label: '提到我' },
   { key: 'COMMENT', label: '评论' },
   { key: 'DUE_SOON', label: '即将到期' },
+  { key: 'WORKFLOW_NOTICE', label: '流程通知' },
   { key: 'WORKFLOW_FAILED', label: '流程失败' },
   { key: 'QUOTA', label: '额度' },
   { key: 'SYSTEM', label: '系统' },

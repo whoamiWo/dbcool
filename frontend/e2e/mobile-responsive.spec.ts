@@ -15,6 +15,184 @@ test.describe('Mobile Responsive Tests', () => {
     await mockMe(page, ADMIN_USER);
   });
 
+  /** 页面根容器不得横向溢出；优先断言 #root，避免 MUI Portal 干扰 documentElement。 */
+  async function expectNoPageOverflow(page: import('@playwright/test').Page) {
+    const overflow = await page.evaluate(() => {
+      const root = document.querySelector('#root') as HTMLElement | null;
+      const el = root ?? document.documentElement;
+      return el.scrollWidth - el.clientWidth;
+    });
+    expect(overflow).toBeLessThanOrEqual(1);
+  }
+
+  const orgTree = [
+    {
+      id: 'u-root', name: '总公司', parentId: null, source: 'LOCAL',
+      editable: true, sort: 0,
+      children: [
+        { id: 'u-dev', name: '研发部', parentId: 'u-root', source: 'LOCAL', editable: true, sort: 0, children: [] },
+      ],
+    },
+  ];
+
+  const orgMembers = [
+    { id: 'm1', username: 'zhangsan', display_name: '张三', email: 'z@example.com', position: '工程师', department_id: 'u-dev', status: 'ACTIVE' },
+  ];
+
+  async function mockOrg(page: import('@playwright/test').Page) {
+    await page.route('**/api/org/tree', async (route) => {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', data: orgTree }),
+      });
+    });
+    await page.route('**/api/org/members*', async (route) => {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ code: 0, message: 'ok', data: orgMembers }),
+      });
+    });
+  }
+
+  async function mockApprovals(page: import('@playwright/test').Page) {
+    await page.route('**/api/approvals*', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/templates')) {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0, message: 'ok',
+            data: [{ id: 'tpl1', name: '请假单', icon: '', category: 'HR', approverType: 'MANAGER' }],
+          }),
+        });
+        return;
+      }
+      if (url.match(/\/approvals\/[^/?]+$/)) {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0, message: 'ok',
+            data: {
+              id: 'a1', templateName: '请假单', status: 'PENDING',
+              submittedAt: '2026-10-01T00:00:00Z', currentTaskId: 'task-1',
+              formData: { title: '年假申请', reason: '休息' },
+              trail: [{ taskId: 'task-1', nodeId: '直属上级', status: 'PENDING' }],
+              cc: [],
+            },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0, message: 'ok',
+          data: [{
+            id: 'a1', templateId: 'tpl1', templateName: '请假单', status: 'PENDING',
+            submittedAt: '2026-10-01T00:00:00Z', formData: { title: '年假申请' }, taskId: 'task-1',
+          }],
+        }),
+      });
+    });
+  }
+
+  test('Directory page - members stack without horizontal scroll', async ({ page }) => {
+    await mockOrg(page);
+    await page.goto('/directory');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { name: '通讯录' })).toBeVisible();
+    await expect(page.getByText('张三')).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+
+  test('Admin org page - department tree without horizontal scroll', async ({ page }) => {
+    await mockOrg(page);
+    await page.goto('/admin/org');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { name: '组织结构' })).toBeVisible();
+    await expect(page.getByText('研发部')).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+
+  test('Approval center - three tabs without horizontal scroll', async ({ page }) => {
+    await mockApprovals(page);
+    await page.goto('/approvals');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { name: '审批中心' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '待我审批' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '我发起的' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '抄送我的' })).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+
+  test('Approval detail - trail and actions without horizontal scroll', async ({ page }) => {
+    await mockApprovals(page);
+    await page.goto('/approvals/a1');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { name: '请假单' })).toBeVisible();
+    await expect(page.getByText('审批记录')).toBeVisible();
+    await expect(page.getByText('审批操作')).toBeVisible();
+    await expect(page.getByRole('button', { name: '通过' })).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+
+  test('Search results + record detail - readable without horizontal scroll', async ({ page }) => {
+    await page.route('**/api/search*', async (route) => {
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0, message: 'ok',
+          data: {
+            keyword: '年假', total: 1, facets: { record: 1 },
+            results: [{
+              type: 'record', id: 'r1', title: '年假申请记录',
+              snippet: '年假申请', createdAt: '2026-10-01T00:00:00Z',
+              deeplink: '/records/orders/r1', collection: 'orders',
+            }],
+          },
+        }),
+      });
+    });
+    await page.route('**/api/collections/orders*', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/records/r1')) {
+        await route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({
+            code: 0, message: 'ok',
+            data: { id: 'r1', title: '年假申请记录', amount: 100 },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0, message: 'ok',
+          data: {
+            name: 'orders', title: '订单',
+            fields: [{ name: 'title', label: '标题', type: 'text' }, { name: 'amount', label: '金额', type: 'number' }],
+          },
+        }),
+      });
+    });
+
+    await page.goto('/search?q=年假');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('年假申请记录')).toBeVisible();
+    await expectNoPageOverflow(page);
+
+    await page.getByText('年假申请记录').click();
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/records\/orders\/r1/);
+    await expect(page.getByRole('heading', { name: '年假申请记录' })).toBeVisible();
+    await expectNoPageOverflow(page);
+  });
+
   test('Login page - no horizontal scroll, form accessible', async ({ page }) => {
     await page.goto('/login');
 
@@ -316,58 +494,15 @@ test.describe('Mobile Responsive Tests', () => {
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 1);
   });
 
-  test('MyTasks page - table allows horizontal scroll on mobile', async ({ page }) => {
-    await page.route('**/api/workflows/tasks/my*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          data: [
-            {
-              id: 'task-1',
-              workflow_title: '订单审批',
-              node_id: 'approve',
-              status: 'PENDING',
-              instance_id: 'inst-1',
-              created_at: '2026-10-01T00:00:00Z',
-              workflow_name: '订单审批',
-              trigger_data_json: '{}',
-              record_id: 'r1',
-              node_type: 'approval',
-              workflow_id: 'wf-1',
-            },
-          ],
-        }),
-      });
-    });
-    await mockMe(page, ADMIN_USER);
-
+  test('MyTasks redirects to approval center on mobile', async ({ page }) => {
+    // /tasks/my 已重定向到 /approvals（router.tsx），断言真实落地的页面。
+    await mockApprovals(page);
     await page.goto('/tasks/my');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
 
-    // 数据密集型表格允许**表格容器自身**横向滚动，但**页面不得横向滚动**。
-    //
-    // 注：原断言为 `bodyWidth >= clientWidth` —— 该式恒真，等于没断言（见审计记录）。
-    // 正确做法是断言文档级别无横向滚动；表格若需横滚，应由其容器 overflow-x 承担。
-    const docScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-    const docClientWidth = await page.evaluate(() => document.documentElement.clientWidth);
-    expect(docScrollWidth).toBeLessThanOrEqual(docClientWidth + 1);
-
-    // 表格若存在，应包裹在可横向滚动的容器内（局部滚动，不撑破页面）
-    const tableInScrollableContainer = await page.evaluate(() => {
-      const table = document.querySelector('table');
-      if (!table) return true; // 已改为卡片布局，无表格
-      let el = table.parentElement;
-      while (el && el !== document.body) {
-        const overflowX = getComputedStyle(el).overflowX;
-        if (overflowX === 'auto' || overflowX === 'scroll') return true;
-        el = el.parentElement;
-      }
-      return false;
-    });
-    expect(tableInScrollableContainer).toBe(true);
+    await expect(page).toHaveURL(/\/approvals$/);
+    await expect(page.getByRole('heading', { name: '审批中心' })).toBeVisible();
+    await expectNoPageOverflow(page);
   });
 
   test('Calendar view - compact on mobile', async ({ page }) => {

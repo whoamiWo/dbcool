@@ -143,7 +143,7 @@ describe('GlobalSearchPanel', () => {
     }
   });
 
-  it('未知类型跳转首页', async () => {
+  it('未知类型跳转搜索页（D16 fallback=/search）', async () => {
     mockedSearch.mockResolvedValue({
       code: 0,
       data: { keyword: 'x', total: 1, results: [result('weird')], facets: {} },
@@ -154,6 +154,6 @@ describe('GlobalSearchPanel', () => {
     fireEvent.change(input, { target: { value: 'x' } });
     await waitFor(() => expect(screen.getByText(/weird hit/)).toBeInTheDocument());
     fireEvent.click(screen.getByText(/weird hit/));
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/search'));
   });
 });
