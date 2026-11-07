@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GATES = [
     ("版本一致性", "python3 scripts/version-consistency-verify.py", True),
     ("契约 0 漂移", "python3 scripts/api-contract-verify.py", True),
-    ("依赖漏洞审计", "python3 scripts/java-dependency-audit.py", True),
+    ("依赖漏洞审计", "python3 scripts/java-dependency-audit.py --backend offline", True),
     ("后端 mvn -o verify", "cd backend-java && mvn -o verify", False),
     ("前端 npm run test:run", "cd frontend && npm run test:run", False),
     ("前端 tsc --noEmit", "cd frontend && npx tsc --noEmit", False),
@@ -29,6 +29,9 @@ GATES = [
     ("Python pytest", "cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q", False),
     ("冒烟 smoke.py", "python3 scripts/smoke.py", True),
     ("租户隔离", "python3 scripts/tenant-isolation-e2e-verify.py", False),
+    ("归属写入静态门禁", "python3 scripts/actor-writer-verify.py", False),
+    ("企业套件真实 PG (pg IT)", "python3 scripts/pg-it-gate.py", False),
+    ("企业套件 schema smoke", "python3 scripts/verify-enterprise-suite.py", False),
     ("备份/PITR 演练", "python3 scripts/backup-e2e-verify.py", False),
     ("上线终验", "python3 scripts/launch-final-verify.py", False),
 ]
@@ -160,14 +163,20 @@ def main() -> int:
     for name, cmd in gates:
         print(f"\n▶ {name} ...", flush=True)
         rc, out, cost = run(cmd, timeout=args.timeout)
-        status = "✅ PASS" if rc == 0 else "❌ FAIL"
+        # 仅显式可选的门禁允许整项 SKIP；smoke 的可选链路跳过仍算通过。
+        skipped = rc == 0 and name in {"备份/PITR 演练", "企业套件真实 PG (pg IT)"} \
+                and "SKIP:" in out
+        if skipped:
+            status = "⏭️  SKIP"
+        else:
+            status = "✅ PASS" if rc == 0 else "❌ FAIL"
         print(f"  {status} ({cost:.1f}s, exit={rc})")
         if rc != 0:
             print("  ---- 输出尾部 ----")
             print("\n".join(("  " + line) for line in out.strip().splitlines()[-8:]))
-        results.append((name, rc, cost, out))
+        results.append((name, rc, cost, out, skipped))
 
-    nums = collect_numbers({name: out for name, rc, cost, out in results})
+    nums = collect_numbers({name: out for name, rc, cost, out, _s in results})
     if nums:
         write_numbers(nums)
 
@@ -180,18 +189,27 @@ def main() -> int:
         if rc != 0:
             print("  ---- 输出尾部 ----")
             print("\n".join(("  " + line) for line in out.strip().splitlines()[-8:]))
-        results.append(("文档数字校验", rc, cost, out))
+        results.append(("文档数字校验", rc, cost, out, False))
 
     print("\n" + "=" * 72)
     print("汇总")
     print("=" * 72)
-    for name, rc, cost, _ in results:
-        print(f"  {'✅' if rc == 0 else '❌'} {name}: exit={rc} ({cost:.1f}s)")
-    failed = [n for n, rc, _, _ in results if rc != 0]
+    skipped_names = []
+    for name, rc, cost, _out, skipped in results:
+        if skipped:
+            skipped_names.append(name)
+            print(f"  ⏭️  {name}: SKIP ({cost:.1f}s)")
+        else:
+            print(f"  {'✅' if rc == 0 else '❌'} {name}: exit={rc} ({cost:.1f}s)")
+    failed = [n for n, rc, _, _out, skipped in results if rc != 0 and not skipped]
     if failed:
         print(f"\n❌ {len(failed)} 项未通过：{', '.join(failed)}")
         return 1
-    print(f"\n✅ 全部 {len(results)} 项门禁通过")
+    passed = len(results) - len(skipped_names)
+    if skipped_names:
+        print(f"\n✅ {passed} 项通过；⏭️  {len(skipped_names)} 项 SKIP（不计 PASS）：{', '.join(skipped_names)}")
+    else:
+        print(f"\n✅ 全部 {len(results)} 项门禁通过")
     return 0
 
 

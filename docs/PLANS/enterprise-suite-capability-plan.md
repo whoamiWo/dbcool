@@ -319,6 +319,17 @@
 - 真实 PG：`scripts/verify-enterprise-suite.py` → **11/11 PASS**（迁移 4 + DEPT 3 + 索引检索 1 + 结构 2）。
 - `scripts/monthly-gate.py` → **13/13 全部 PASS**。
 
+### Round 2 收口状态（本机，2026-11-06）
+
+- R0：动态记录写 `created_by/updated_by/deleted_by`，查询投影回传系统列；公开表单/自动化归属接线；历史归属仅提供 dry-run 默认的 `scripts/backfill-created-by.py`。
+- R1：新增通用记录详情路由 `/records/:collection/:recordId`；单记录、导出、聚合、批量、版本、回收站、BI、审批详情补齐范围/可见性判定；搜索统一 deeplink。
+- R2/R7：V81 纠正流程通知类型并加 `last_event_at`；失败通知统一；通知聚合不再重置已读/创建时间。
+- R3/R4：索引重建改 keyset 全量分页；搜索 ACL 改为 request-scoped context + 批量读取；同步修复全文检索实体映射与索引 upsert。
+- R5/R6/R8：新增 `EnterpriseSuitePgIT`（4/4 PG tests）、新表租户隔离断言（22/22）、冒烟链路（14 项：13 PASS + 1 可选 MinIO SKIP）、CUSTOM 写入拒绝/存量告警与管理端清单；移除重复 DEPT SQL 实现。
+- 门禁：`mvn -o verify` → **2747 tests, 0 failures/errors，BUILD SUCCESS**；前端 **974 passed / 120 files**，TypeScript 0 errors；Playwright 移动端仍未跑。
+- 真实栈：smoke（新后端 8081）**13 PASS + 1 SKIP**；tenant isolation **22/22 PASS**；`verify-enterprise-suite.py` **12 项 PASS**；API contract **0 漂移**；版本一致。
+- 说明：`monthly-gate.py` 已增加真实 PG 与 schema smoke 两项（14 项总数）；本次未在旧默认 8080 镜像上执行整套 monthly gate。
+
 ### 未完成项（不得视为已完成）
 
 1. **钉钉审批去程联调**：代码路径存在但默认关闭（`approval.dingtalk.push.enabled=false`），未对真实钉钉应用验证。

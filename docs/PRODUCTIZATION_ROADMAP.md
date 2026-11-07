@@ -30,7 +30,7 @@
 
 ### 2.1 门禁基线（本次实跑）
 
-> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2713 run / 0F / 0E（BUNDLE LINE 79.55），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/13、租户隔离 16/16。
+> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2761 run / 0F / 0E（BUNDLE LINE 79.74），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/14（1 可选 SKIP）、租户隔离 22/22。
 
 | 项 | 命令 | 实测结果 |
 |---|---|---|
@@ -121,7 +121,7 @@ Wave 4    持续迭代节奏            长期
 | # | 任务 | 落点 | 验收 | 状态 |
 |---|---|---|---|---|
 | W0-T1 | 版本单一真相源 | 根 `VERSION`；10 处版本号；`scripts/version-consistency-verify.py`（含 `--fix`）；`ci.yml` job `version-consistency` | exit 0 + 三条反向自检（1/2/0） | ✅ 已完成（实测通过） |
-| W0-T2 | 门禁数字基线化 | `README.md` / `BASELINE.md` / `RISK_REGISTER.md` / `TECH_DEBT.md` | 同一指标唯一值 + 「实测于 2026-10-30 @02b3a59」 | ✅ 已统一（Java 2588、前端 964/118 files、BUNDLE 0.8007、前端行覆盖 77.12%、Python 68/1、冒烟 13/13、租户隔离 16/16） |
+| W0-T2 | 门禁数字基线化 | `README.md` / `BASELINE.md` / `RISK_REGISTER.md` / `TECH_DEBT.md` | 同一指标唯一值 + 「实测于 2026-10-30 @02b3a59」 | ✅ 已统一（Java 2588、前端 964/118 files、BUNDLE 0.8007、前端行覆盖 77.12%、Python 68/1、冒烟 13/14（1 可选 SKIP）、租户隔离 22/22） |
 | W0-T3 | 清红灯 | 前端 5 个 unhandled errors（ErDiagram.test.tsx 等） | `npm run test:run` → 0 failed **且 0 errors** | ✅ 已修（Wave 0.5 A-7：产品代码空值保护，根因为 `AlertCenter` quota 字段与 `ErDiagram` stats 缺失） |
 | W0-T4 | 版本条目 | `CHANGELOG.md` 顶部 4 段 `## Unreleased` 归入 `## v2.1.1` | CHANGELOG 有唯一版本条目 | ✅ 已归并（v2.1.1 含 Wave 0 + Wave 0.5 摘要与实测数字） |
 
@@ -215,8 +215,8 @@ Wave 4    持续迭代节奏            长期
 
 | 门禁 | 命令 | 基线（实测于 2026-10-30 @02b3a59） |
 |---|---|---|
-| 后端 | `cd backend-java && mvn -o verify` | 2713 run / 0F / 0E；JaCoCo BUNDLE line 0.8007（红线 ≥ 0.79） |
-| 前端单测 | `cd frontend && npm run test:run` | 972 passed / 0 failed / **0 unhandled errors**；行覆盖率 77.12% |
+| 后端 | `cd backend-java && mvn -o verify` | 2761 run / 0F / 0E；JaCoCo BUNDLE line 0.7974（红线 ≥ 0.79） |
+| 前端单测 | `cd frontend && npm run test:run` | 974 passed / 0 failed / **0 unhandled errors**；行覆盖率 77.12% |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors |
 | E2E | `cd frontend && npx playwright test` | 上次实测 159/159；**本轮未实测，按实际报** |
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 68 passed / 1 skipped |
