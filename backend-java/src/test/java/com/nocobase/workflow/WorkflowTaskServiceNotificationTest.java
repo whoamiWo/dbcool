@@ -168,4 +168,19 @@ class WorkflowTaskServiceNotificationTest {
         verify(notifyDispatcher, never()).notifyOne(any(), any(), any());
         assertThat(true).isTrue();
     }
+
+    @Test
+    @DisplayName("A0-3 afterAdvance FAILED → 实例创建者收到 1 条 WORKFLOW_FAILED")
+    void afterAdvance_failed_notifiesOwner() {
+        WorkflowFailureNotifier notifier = mock(WorkflowFailureNotifier.class);
+        ReflectionTestUtils.setField(service, "failureNotifier", notifier);
+        WorkflowInstanceEntity failed = instance(WorkflowInstanceEntity.Status.FAILED);
+        failed.setWorkflowId(UUID.randomUUID());
+
+        ReflectionTestUtils.invokeMethod(service, "afterAdvance",
+                failed, WorkflowEngine.NodeResult.FAILED);
+
+        verify(notifier).notifyIfFailed(eq(failed), eq(failed.getWorkflowId()),
+                any(), any(), eq(TENANT));
+    }
 }

@@ -36,6 +36,8 @@ public class WorkflowScheduler {
     private final WorkflowEngine engine;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StringRedisTemplate redisTemplate;
+    private final WorkflowInstanceRepository instanceRepository;
+    private final WorkflowFailureNotifier failureNotifier;
 
     /** Redis 锁前缀 */
     private static final String LOCK_PREFIX = "workflow:schedule:lock:";
@@ -45,9 +47,19 @@ public class WorkflowScheduler {
 
     public WorkflowScheduler(WorkflowRepository workflowRepository, WorkflowEngine engine,
                              StringRedisTemplate redisTemplate) {
+        this(workflowRepository, engine, redisTemplate, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public WorkflowScheduler(WorkflowRepository workflowRepository, WorkflowEngine engine,
+                             StringRedisTemplate redisTemplate,
+                             WorkflowInstanceRepository instanceRepository,
+                             WorkflowFailureNotifier failureNotifier) {
         this.workflowRepository = workflowRepository;
         this.engine = engine;
         this.redisTemplate = redisTemplate;
+        this.instanceRepository = instanceRepository;
+        this.failureNotifier = failureNotifier;
     }
 
     /** 每 60 秒检查一次;首次延迟 30 秒，避开启动期 bean 初始化。 */
@@ -221,8 +233,23 @@ public class WorkflowScheduler {
                 result = engine.executeFrom(instance, nodes, 0, w.getCreatedBy());
             }
             log.info("工作流 {} 触发完成，结果 {}", w.getName(), result);
+            if (failureNotifier != null) {
+                failureNotifier.notifyIfFailed(instance, w.getId(), w.getCreatedBy(),
+                        w.getName(), w.getTenantId());
+            }
         } catch (Exception e) {
             log.error("工作流 {} 执行失败：{}", w.getName(), e.getMessage(), e);
+            // A0-3：异常路径先持久化 FAILED，再发通知（否则重启后实例仍是 RUNNING）。
+            instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+            instance.setErrorMessage(e.getMessage());
+            instance.setFinishedAt(Instant.now());
+            if (instanceRepository != null) {
+                instanceRepository.save(instance);
+            }
+            if (failureNotifier != null) {
+                failureNotifier.notifyFailure(instance, w.getId(), w.getCreatedBy(),
+                        w.getName(), w.getTenantId());
+            }
         }
     }
 }

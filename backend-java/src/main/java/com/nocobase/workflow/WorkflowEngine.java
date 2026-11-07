@@ -354,10 +354,11 @@ public class WorkflowEngine {
         MessageEntity msg = new MessageEntity();
         msg.setId(UUID.randomUUID());
         msg.setRecipient(recipient);
-        msg.setType("workflow");
+        msg.setType(com.nocobase.notification.NotifyDispatcher.WORKFLOW_NOTICE);
         msg.setTitle(title);
         msg.setBody(body);
         msg.setRelatedId(instance.getId().toString());
+        msg.setDeeplink("/designer/instances/" + instance.getId());
         msg.setCreatedAt(java.time.Instant.now());
         msg.setTenantId(instance.getTenantId());
         messageRepository.save(msg);

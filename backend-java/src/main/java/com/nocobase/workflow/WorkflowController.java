@@ -51,6 +51,10 @@ public class WorkflowController {
     /** Week 42 D4b.2 — R08 死循环防护:静态图校验器。 */
     private final WorkflowGraphValidator graphValidator;
 
+    /** R2：统一失败通知（实例终态为准）。测试构造时可缺省。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private WorkflowFailureNotifier failureNotifier;
+
     public WorkflowController(
             WorkflowRepository workflowRepository,
             WorkflowInstanceRepository instanceRepository,
@@ -331,13 +335,31 @@ public class WorkflowController {
 
         // 3. 优先图遍历(若 edges 非空);否则回退数组顺序
         WorkflowEngine.NodeResult result;
-        if (!edges.isEmpty() && !nodes.isEmpty()) {
-            String startId = (String) nodes.get(0).get("id");
-            result = engine.executeGraphFrom(instance, nodes, edges, startId, w.getCreatedBy());
-        } else {
-            result = engine.executeFrom(instance, nodes, 0, w.getCreatedBy());
+        try {
+            if (!edges.isEmpty() && !nodes.isEmpty()) {
+                String startId = (String) nodes.get(0).get("id");
+                result = engine.executeGraphFrom(instance, nodes, edges, startId, w.getCreatedBy());
+            } else {
+                result = engine.executeFrom(instance, nodes, 0, w.getCreatedBy());
+            }
+        } catch (Exception e) {
+            // A0-3：异常先落 FAILED，再通知；随后按原契约返回 500。
+            instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+            instance.setErrorMessage(e.getMessage());
+            instance.setFinishedAt(Instant.now());
+            instanceRepository.save(instance);
+            if (failureNotifier != null) {
+                failureNotifier.notifyFailure(instance, w.getId(), w.getCreatedBy(),
+                        w.getName(), w.getTenantId());
+            }
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR, "workflow failed: " + e.getMessage(), e);
         }
 
+        if (failureNotifier != null) {
+            failureNotifier.notifyIfFailed(instance, w.getId(), w.getCreatedBy(),
+                    w.getName(), w.getTenantId());
+        }
         if (result == WorkflowEngine.NodeResult.NEEDS_APPROVAL) {
             auditService.log(auditTenant, auditUser, auditUsername,
                     "TRIGGER", "workflow", w.getId().toString(),

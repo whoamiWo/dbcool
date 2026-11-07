@@ -37,19 +37,26 @@ public class WorkflowTriggerListener {
     private final TriggerRateLimiter rateLimiter;
     /** E3：工作流执行失败通知（WORKFLOW_FAILED）。 */
     private final com.nocobase.notification.NotifyDispatcher notifyDispatcher;
+    private final WorkflowInstanceRepository instanceRepository;
+
+    /** R2：统一失败通知（实例终态为准）。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private WorkflowFailureNotifier failureNotifier;
 
     public WorkflowTriggerListener(
             WorkflowTriggerMatcher matcher,
             WorkflowEngine engine,
             WorkflowRepository workflowRepository,
             TriggerRateLimiter rateLimiter,
-            com.nocobase.notification.NotifyDispatcher notifyDispatcher
+            com.nocobase.notification.NotifyDispatcher notifyDispatcher,
+            WorkflowInstanceRepository instanceRepository
     ) {
         this.matcher = matcher;
         this.engine = engine;
         this.workflowRepository = workflowRepository;
         this.rateLimiter = rateLimiter;
         this.notifyDispatcher = notifyDispatcher;
+        this.instanceRepository = instanceRepository;
     }
 
     /**
@@ -108,6 +115,9 @@ public class WorkflowTriggerListener {
         instance.setRecordId(event.getRecordId());
         instance.setTenantId(event.getTenantId());
         instance.setCurrentNodeIndex(0);
+        instance.setStartedAt(java.time.Instant.now());
+        // A0-3：先落库，异常路径才能把失败终态持久化。
+        instanceRepository.save(instance);
 
         try {
             // 直接调引擎(简化版 trigger),跳过 controller 复杂参数解析
@@ -129,23 +139,20 @@ public class WorkflowTriggerListener {
 
             log.info("D4a: 工作流 {} 触发 {} 状态 {}",
                     w.getName(), event.getChangeType(), result);
+            if (failureNotifier != null) {
+                failureNotifier.notifyIfFailed(instance, w.getId(), w.getCreatedBy(),
+                        w.getName(), w.getTenantId());
+            }
         } catch (Exception e) {
             log.error("D4a: 工作流 {} 执行失败: {}", w.getName(), e.getMessage(), e);
-            // E3：执行失败必须通知到创建人，避免"静默失败"
-            try {
-                if (w.getCreatedBy() != null) {
-                    notifyDispatcher.notifyOne(
-                            com.nocobase.notification.NotifyDispatcher.WORKFLOW_FAILED,
-                            w.getCreatedBy(),
-                            new com.nocobase.notification.NotifyDispatcher.Payload(
-                                    w.getTenantId(), "工作流执行失败",
-                                    "工作流「" + w.getName() + "」执行失败：" + e.getMessage(),
-                                    w.getId().toString(),
-                                    "/designer/instances/" + instance.getId(),
-                                    "HIGH", "workflow-failed:" + instance.getId()));
-                }
-            } catch (Exception notifyError) {
-                log.warn("[workflow] 失败通知发送失败: {}", notifyError.getMessage());
+            instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+            instance.setErrorMessage(e.getMessage());
+            instance.setFinishedAt(java.time.Instant.now());
+            instanceRepository.save(instance);
+            // E3/R2：执行失败必须通知到创建人，避免"静默失败"（统一 notifier）
+            if (failureNotifier != null) {
+                failureNotifier.notifyFailure(instance, w.getId(), w.getCreatedBy(),
+                        w.getName(), w.getTenantId());
             }
         }
     }

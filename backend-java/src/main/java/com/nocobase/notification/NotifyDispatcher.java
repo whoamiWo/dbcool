@@ -50,8 +50,15 @@ public class NotifyDispatcher {
     public static final String COMMENT = "COMMENT";
     public static final String DUE_SOON = "DUE_SOON";
     public static final String WORKFLOW_FAILED = "WORKFLOW_FAILED";
+    /** D13b：普通流程通知（与真实失败 WORKFLOW_FAILED 区分，可单独筛选/静音）。 */
+    public static final String WORKFLOW_NOTICE = "WORKFLOW_NOTICE";
     public static final String QUOTA = "QUOTA";
     public static final String SYSTEM = "SYSTEM";
+
+    /** 已知通知类型白名单：未知值落 SYSTEM 并告警，避免写入前端无法筛选的孤儿类型。 */
+    private static final java.util.Set<String> KNOWN_TYPES = java.util.Set.of(
+            APPROVAL_TODO, APPROVAL_RESULT, MENTION, COMMENT, DUE_SOON,
+            WORKFLOW_FAILED, WORKFLOW_NOTICE, QUOTA, SYSTEM);
 
     private final MessageRepository messageRepository;
     private final NotificationService notificationService;
@@ -99,6 +106,13 @@ public class NotifyDispatcher {
     public MessageEntity notifyOne(String type, UUID recipient, Payload payload) {
         String tenantId = payload.tenantId();
         String digestKey = payload.digestKey();
+        String safeType = type;
+        if (safeType == null || !KNOWN_TYPES.contains(safeType)) {
+            log.warn("[notify] 未登记的通知类型 type={}，回落为 SYSTEM（recipient={}）",
+                    type, recipient);
+            safeType = SYSTEM;
+        }
+        type = safeType;
         MessageEntity msg = null;
 
         if (digestKey != null && !digestKey.isBlank()) {
@@ -112,9 +126,8 @@ public class NotifyDispatcher {
                 msg.setTitle(payload.title());
                 msg.setBody(payload.body());
                 msg.setDeeplink(payload.deeplink());
-                msg.setCreatedAt(Instant.now());
-                msg.setRead(false);
-                msg.setReadAt(null);
+                // R7：聚合不得把已读重新置为未读，也不得覆盖 createdAt 造成列表跳动
+                msg.setLastEventAt(Instant.now());
             }
         }
 
@@ -133,6 +146,7 @@ public class NotifyDispatcher {
             msg.setDigestKey(digestKey);
             msg.setDigestCount(1);
             msg.setCreatedAt(Instant.now());
+            msg.setLastEventAt(Instant.now());
             msg.setRead(false);
             created = true;
         }

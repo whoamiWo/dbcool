@@ -46,6 +46,10 @@ public class WorkflowTaskService {
     private final com.nocobase.approval.ApprovalCcRepository approvalCcRepository;
     private final com.nocobase.notification.NotifyDispatcher notifyDispatcher;
 
+    /** R2：统一失败通知（实例终态为准）。测试构造时可缺省。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private WorkflowFailureNotifier failureNotifier;
+
     public WorkflowTaskService(WorkflowTaskRepository taskRepository,
                                WorkflowInstanceRepository instanceRepository,
                                WorkflowRepository workflowRepository,
@@ -219,6 +223,11 @@ public class WorkflowTaskService {
                 "REJECT", "workflow_task", task.getId().toString(),
                 Map.of("workflow", wf != null ? wf.getId().toString() : "", "comment", task.getComment() == null ? "" : task.getComment()));
 
+        // R2：驳回把实例置为 FAILED，同样纳入统一失败通知（按实例去重）
+        if (failureNotifier != null) {
+            failureNotifier.notifyIfFailed(instance, instance.getWorkflowId(),
+                    actor, wf != null ? wf.getName() : null, instance.getTenantId());
+        }
         return instance;
     }
 
@@ -292,6 +301,10 @@ public class WorkflowTaskService {
             notifyResult(instance, true);
         } else if (result == WorkflowEngine.NodeResult.FAILED) {
             notifyResult(instance, false);
+            if (failureNotifier != null) {
+                failureNotifier.notifyIfFailed(instance, instance.getWorkflowId(),
+                        null, null, instance.getTenantId());
+            }
         }
     }
 

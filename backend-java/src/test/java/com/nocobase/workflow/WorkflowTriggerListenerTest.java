@@ -31,6 +31,7 @@ class WorkflowTriggerListenerTest {
     private WorkflowEngine engine;
     private WorkflowRepository repository;
     private TriggerRateLimiter rateLimiter;
+    private WorkflowInstanceRepository instanceRepository;
     private WorkflowTriggerListener listener;
 
     @BeforeEach
@@ -39,11 +40,13 @@ class WorkflowTriggerListenerTest {
         engine = mock(WorkflowEngine.class);
         repository = mock(WorkflowRepository.class);
         rateLimiter = mock(TriggerRateLimiter.class);
+        instanceRepository = mock(WorkflowInstanceRepository.class);
         // 默认允许触发,死循环测试单独 mock
         org.mockito.Mockito.when(rateLimiter.allowTrigger(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(true);
         listener = new WorkflowTriggerListener(matcher, engine, repository, rateLimiter,
-                mock(com.nocobase.notification.NotifyDispatcher.class));
+                mock(com.nocobase.notification.NotifyDispatcher.class),
+                instanceRepository);
     }
 
     private WorkflowEntity workflow() {
@@ -93,6 +96,21 @@ class WorkflowTriggerListenerTest {
     }
 
     @Test
+    void onRecordChange_notifierGetsInstanceTerminalState() {
+        WorkflowEntity w = workflow();
+        when(matcher.findMatching(any())).thenReturn(List.of(w));
+        when(engine.executeFrom(any(), anyList(), anyInt(), any()))
+                .thenReturn(WorkflowEngine.NodeResult.CONTINUE);
+        WorkflowFailureNotifier notifier = mock(WorkflowFailureNotifier.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(listener, "failureNotifier", notifier);
+
+        listener.onRecordChange(event());
+
+        verify(notifier).notifyIfFailed(any(), eq(w.getId()), eq(w.getCreatedBy()),
+                eq(w.getName()), eq(w.getTenantId()));
+    }
+
+    @Test
     void onRecordChange_matcherThrows_doesNotPropagate() {
         // 监听器异常不应导致 CollectionController 响应失败
         when(matcher.findMatching(any())).thenThrow(new RuntimeException("boom"));
@@ -104,12 +122,21 @@ class WorkflowTriggerListenerTest {
 
     @Test
     void onRecordChange_engineThrows_doesNotPropagate() {
-        when(matcher.findMatching(any())).thenReturn(List.of(workflow()));
+        WorkflowEntity w = workflow();
+        when(matcher.findMatching(any())).thenReturn(List.of(w));
         org.mockito.Mockito.doThrow(new RuntimeException("engine boom"))
                 .when(engine).executeFrom(any(), anyList(), anyInt(), any());
+        WorkflowFailureNotifier notifier = mock(WorkflowFailureNotifier.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(listener, "failureNotifier", notifier);
 
         // 不应抛
         listener.onRecordChange(event());
+
+        verify(instanceRepository, org.mockito.Mockito.atLeastOnce()).save(
+                org.mockito.ArgumentMatchers.argThat((WorkflowInstanceEntity i) ->
+                        i.getStatus() == WorkflowInstanceEntity.Status.FAILED));
+        verify(notifier).notifyFailure(any(), eq(w.getId()), eq(w.getCreatedBy()),
+                eq(w.getName()), eq(w.getTenantId()));
     }
 
     @Test

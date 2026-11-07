@@ -517,4 +517,24 @@ class WorkflowControllerTest {
                 () -> controller.reject(t.getId(), null));
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
+
+    @Test
+    void trigger_engineThrows_persistsFailedAndNotifies() {
+        WorkflowEntity w = makeWorkflow();
+        when(workflowRepository.findByIdAndTenantId(w.getId(), "tenant_default"))
+                .thenReturn(Optional.of(w));
+        when(engine.executeFrom(any(), any(), anyInt(), any()))
+                .thenThrow(new RuntimeException("boom"));
+        WorkflowFailureNotifier notifier = mock(WorkflowFailureNotifier.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "failureNotifier", notifier);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> controller.trigger(w.getId(), Map.of(), testUser));
+
+        verify(instanceRepository, org.mockito.Mockito.atLeastOnce()).save(
+                org.mockito.ArgumentMatchers.argThat((WorkflowInstanceEntity i) ->
+                        i.getStatus() == WorkflowInstanceEntity.Status.FAILED));
+        verify(notifier).notifyFailure(any(), eq(w.getId()), eq(w.getCreatedBy()),
+                eq(w.getName()), eq(w.getTenantId()));
+    }
 }

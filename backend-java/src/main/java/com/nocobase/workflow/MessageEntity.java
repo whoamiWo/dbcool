@@ -70,6 +70,10 @@ public class MessageEntity {
     @Column(name = "digest_count", nullable = false)
     private int digestCount = 1;
 
+    /** V81/R7：最近一次事件时间（聚合合并时更新；列表排序仍用 created_at）。 */
+    @Column(name = "last_event_at")
+    private Instant lastEventAt;
+
     public MessageEntity() {}
 
     public UUID getId() { return id; }
@@ -105,4 +109,6 @@ public class MessageEntity {
     public void setChannelSentJson(String channelSentJson) { this.channelSentJson = channelSentJson; }
     public int getDigestCount() { return digestCount; }
     public void setDigestCount(int digestCount) { this.digestCount = digestCount; }
+    public Instant getLastEventAt() { return lastEventAt; }
+    public void setLastEventAt(Instant lastEventAt) { this.lastEventAt = lastEventAt; }
 }
