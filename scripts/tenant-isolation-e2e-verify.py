@@ -257,7 +257,15 @@ def main():
     page_slug = f"page-a-{_uuid_mod.uuid4().hex[:6]}"
     user_suffix = _uuid_mod.uuid4().hex[:4]
     huddle_name = f"huddle-a-{user_suffix}"
-    report_collection = "users"
+    # R1d：BI 报表保存现在校验 collection READ；用真实动态集合（创建者自动获得策略）
+    report_collection = f"rpt_{user_suffix}"
+    _, b = raw_post("/api/collections", {
+        "name": report_collection,
+        "fields": [{"name": "title", "type": "text"}]
+    }, admin_token)
+    if b.get("code") != 0:
+        log(f"FATAL: report collection creation failed: {b}")
+        sys.exit(1)
 
     _, b = raw_post("/api/wiki/kb", {"name": "kb-a", "slug": kb_slug, "description": "test"}, admin_token)
     kb_id_a = b.get("data", {}).get("id")
@@ -494,6 +502,65 @@ def main():
                 return False
         return True
     check("14-users B≠A", "GET", "/api/admin/users", 200, 200, check_users)
+
+    # R6：4 张新表的跨租户断言（org_unit / approval_template / approval_request / approval_cc）
+    log("\n--- R6: enterprise tables cross-tenant ---")
+    org_unit_id = str(_uuid_mod.uuid4())
+    org_unit_name = "R6部门-" + _uuid_mod.uuid4().hex[:6]
+    db_sql(
+        "INSERT INTO org_unit (id, tenant_id, parent_id, name, path, sort, source, deleted, created_at, updated_at) "
+        f"VALUES ('{org_unit_id}', 'tenant_default', NULL, '{org_unit_name}', '/{org_unit_id}/', 0, 'LOCAL', FALSE, NOW(), NOW()) "
+        "ON CONFLICT DO NOTHING"
+    )
+
+    def check_tree_excludes_a(body):
+        if not body or body.get("code") != 0:
+            return False
+        return org_unit_name not in json.dumps(body, ensure_ascii=False)
+
+    check("17-orgUnit B≠A", "GET", "/api/org/tree", 200, 200, check_tree_excludes_a)
+    check("18-orgMember B→A", "GET", f"/api/org/members/{user_id_a}", 200, 404)
+
+    tmpl_id = str(_uuid_mod.uuid4())
+    req_id = str(_uuid_mod.uuid4())
+    db_sql(
+        "INSERT INTO approval_template (id, tenant_id, name, workflow_id, approver_type, enabled, created_at) "
+        f"VALUES ('{tmpl_id}', 'tenant_default', 'R6审批', '{_uuid_mod.uuid4()}', 'USER', TRUE, NOW()) "
+        "ON CONFLICT DO NOTHING"
+    )
+    db_sql(
+        "INSERT INTO approval_request (id, tenant_id, template_id, applicant_id, form_data, status, submitted_at) "
+        f"VALUES ('{req_id}', 'tenant_default', '{tmpl_id}', '{user_id_a}', '{{}}'::jsonb, 'PENDING', NOW()) "
+        "ON CONFLICT DO NOTHING"
+    )
+    db_sql(
+        "INSERT INTO approval_cc (request_id, user_id, created_at) "
+        f"VALUES ('{req_id}', '{user_id_a}', NOW()) ON CONFLICT DO NOTHING"
+    )
+
+    def check_templates_excludes_a(body):
+        if not body or body.get("code") != 0:
+            return False
+        return tmpl_id not in json.dumps(body, ensure_ascii=False)
+
+    check("19-approvalTemplate B≠A", "GET", "/api/approvals/templates", 200, 200,
+          check_templates_excludes_a)
+    # A 管理员可见（R1e ADMIN 分支），B 一律 404；A 非申请人 cancel → 403，B → 404
+    check("20-approvalRequest B→A read", "GET", f"/api/approvals/{req_id}", 200, 404)
+    check("21-approvalRequest B→A write", "POST", f"/api/approvals/{req_id}/cancel", 403, 404)
+
+    def check_cc_excludes_a(body):
+        if not body or body.get("code") != 0:
+            return False
+        return req_id not in json.dumps(body, ensure_ascii=False)
+
+    check("22-approvalCc B≠A", "GET", "/api/approvals/cc", 200, 200, check_cc_excludes_a)
+
+    # 清理 R6 数据
+    db_sql(f"DELETE FROM approval_cc WHERE request_id='{req_id}';")
+    db_sql(f"DELETE FROM approval_request WHERE id='{req_id}';")
+    db_sql(f"DELETE FROM approval_template WHERE id='{tmpl_id}';")
+    db_sql(f"DELETE FROM org_unit WHERE id='{org_unit_id}';")
 
     # R5-7: Control assertion - random ID should not give same result as A's real resource
     log("\n--- R5-7: Control assertion for random IDs ---")

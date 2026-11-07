@@ -397,6 +397,96 @@ def step13_export(token, collection_name):
     return collection_name
 
 
+def step14_enterprise_chain(token):
+    """E1–E4 链路：建部门 → 建用户 → 发起审批 → 审批通过 → 通知存在 → 搜索命中。"""
+    suffix = uuid.uuid4().hex[:8]
+    unit_name = "smoke部门-" + suffix
+    username = "smoke_user_" + suffix
+    password = "Smoke!Pass123"
+
+    # 当前管理员 id（审批人）
+    status, me = req("GET", "/api/auth/me", token=token)
+    assert status == 200, f"/auth/me 返 {status}: {me}"
+    admin_id = (me.get("data") or {}).get("id")
+    assert admin_id, f"/auth/me 缺 id: {me}"
+
+    # 1) 建部门
+    status, body = req("POST", "/api/org/units", {"name": unit_name}, token=token)
+    assert status == 200 and body.get("code") == 0, f"建部门失败 {status}: {body}"
+    unit_id = body.get("data")
+    assert unit_id, f"部门 id 缺失: {body}"
+
+    # 2) 建用户并挂到部门
+    status, body = req("POST", "/api/admin/users", {
+        "username": username, "password": password, "displayName": "冒烟员工"
+    }, token=token)
+    assert status in (200, 201), f"建用户失败 {status}: {body}"
+    user_id = body.get("data", {}).get("id")
+    assert user_id, f"用户 id 缺失: {body}"
+    status, body = req("PUT", f"/api/org/members/{user_id}/unit",
+                       {"unitId": unit_id}, token=token)
+    assert status == 200, f"调整部门失败 {status}: {body}"
+
+    # 3) 建审批模板（USER 审批 → 管理员）
+    status, body = req("POST", "/api/approvals/templates/from-preset", {
+        "name": "冒烟请假", "category": "HR", "levels": 1,
+        "approverType": "USER", "assignee": admin_id,
+    }, token=token)
+    assert status == 200 and body.get("code") == 0, f"建模板失败 {status}: {body}"
+    template_id = body.get("data", {}).get("id")
+    assert template_id, f"模板 id 缺失: {body}"
+
+    # 4) 新员工登录并发起审批
+    status, body = req("POST", "/api/auth/login",
+                       {"username": username, "password": password})
+    assert status == 200, f"新用户登录失败 {status}: {body}"
+    user_token = body.get("data", {}).get("access_token")
+    assert user_token, f"新用户 token 缺失: {body}"
+
+    status, body = req("POST", "/api/approvals", {
+        "templateId": template_id, "formData": {"days": 1, "reason": "冒烟"}, "ccUserIds": []
+    }, token=user_token)
+    assert status == 200 and body.get("code") == 0, f"发起审批失败 {status}: {body}"
+    request_id = body.get("data", {}).get("id")
+    assert request_id, f"审批单据 id 缺失: {body}"
+
+    # 5) 管理员审批通过
+    status, body = req("GET", "/api/workflows/tasks/my", token=token)
+    assert status == 200, f"待办失败 {status}: {body}"
+    tasks = body.get("data") or []
+    # 按单据实例匹配（单据 detail 里有 currentTaskId）
+    status, detail = req("GET", f"/api/approvals/{request_id}", token=token)
+    assert status == 200, f"审批详情失败 {status}: {detail}"
+    task_id = (detail.get("data") or {}).get("currentTaskId")
+    if not task_id:
+        task_id = next((t.get("id") for t in tasks), None)
+    assert task_id, f"待办任务缺失: {detail} / {tasks}"
+
+    status, body = req("POST", f"/api/workflows/tasks/{task_id}/approve", {}, token=token)
+    assert status == 200, f"审批通过失败 {status}: {body}"
+
+    # 6) 申请人收到通知
+    status, body = req("GET", "/api/messages?limit=50", token=user_token)
+    assert status == 200, f"通知列表失败 {status}: {body}"
+    messages = (body.get("data") or {}).get("messages") or []
+    assert any(m.get("type") == "APPROVAL_RESULT" for m in messages), \
+        f"未收到审批结果通知: {[m.get('type') for m in messages]}"
+
+    # 7) 搜索命中并可打开
+    status, body = req("GET", "/api/search?keyword="
+                       + urllib.parse.quote("冒烟请假") + "&types=approval&limit=10",
+                       token=user_token)
+    assert status == 200, f"搜索失败 {status}: {body}"
+    hits = (body.get("data") or {}).get("results") or []
+    assert any(str(h.get("id")) == request_id for h in hits), f"搜索未命中审批: {hits}"
+
+    # 详情可打开（R1e 可见性：申请人本人）
+    status, _ = req("GET", f"/api/approvals/{request_id}", token=user_token)
+    assert status == 200, f"审批详情不可打开 {status}"
+
+    return True
+
+
 def main():
     print("=" * 70)
     print(f"PHASE89 跨模块端到端冒烟（真调后端，禁止 mock）")
@@ -440,6 +530,9 @@ def main():
              lambda: step12_public_form(token))
     run_step(13, "导出 GET /api/collections/{name}/export-file?format=xlsx",
              lambda: step13_export(token, collection_name))
+
+    # E1–E4 端到端链路
+    run_step(14, "组织→审批→通知→搜索链路", lambda: step14_enterprise_chain(token))
 
     finish()
 

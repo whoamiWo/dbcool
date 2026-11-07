@@ -7,22 +7,29 @@
 
 ## 1. 门禁总览
 
+> **SKIP 不等于 PASS**：`monthly-gate.py` 会把 SKIP 项单列（例如无 Docker 时的 pg IT、
+> 可选对象存储未启用时的附件链路）。最终结论同时打印「通过项」与「SKIP 项」。
+
 | 门禁 | 命令 | 阈值 | 失败怎么办 |
 |---|---|---|---|
-| Java 测试 | `cd backend-java && mvn -o test` | > 1411，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
+| Java 测试 | `cd backend-java && mvn -o test` | 2761，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
 | Java 覆盖率 | `cd backend-java && mvn -o verify` | JaCoCo BUNDLE ≥ 82% | 见 §3 覆盖率缺口与补测计划 |
-| 前端单测 | `cd frontend && npm run test:run` | ≥ 800（2026-10-24 实测 877 passed / 109 files，覆盖率 80.06%） | 看 vitest 输出中失败的 spec |
+| 前端单测 | `cd frontend && npm run test:run` | 974 passed / 120 files |
+| Playwright（含 375px） | `cd frontend && npx playwright test` | 240 passed（chromium/firefox/mobile-390/mobile-375） | 看 vitest 输出中失败的 spec |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors | 按报错文件与行号修 |
 | E2E | `cd frontend && npx playwright test` | ≥ 135 | collab-crdt 偶发 429 见 §4 |
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 48 passed / 1 skipped | 看 pytest 输出 |
 | 备份演练 | `python3 scripts/backup-e2e-verify.py` | 30 / 30 | 见 `docs/backup-restore-runbook.md` |
 | 管理员鉴权 | `python3 scripts/admin-authz-e2e-verify.py` | 18 / 18 | 检查 admin/user 登录状态码 |
-| 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 全 PASS | 检查跨租户断言 |
+| 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 22 / 22 PASS | 检查跨租户断言 |
 | 契约比对 | `python3 scripts/api-contract-verify.py` | 0 漂移 | 重跑 `scripts/export-backend-mappings.py` |
 | SaaS 就绪 | `python3 scripts/saas-readiness-verify.py` | 11 / 11 | 检查 T1/T2/T3 三项 |
-| 冒烟 | `python3 scripts/smoke.py` | 11 / 11 | 检查服务是否全部 healthy |
+| 冒烟 | `python3 scripts/smoke.py` | 14 项：13 PASS + 1 SKIP（可选 MinIO） | 检查服务是否全部 healthy |
 | 生产检查 | `python3 scripts/startup-checklist.py` | 全 PASS | 按清单逐项修 |
-| 依赖漏洞扫描（离线替代） | `python3 scripts/java-dependency-audit.py` | 0 高危 | 补 `config/known-vulnerabilities.json` 或升级依赖 |
+| 企业套件真实 PG（Testcontainers） | `python3 scripts/pg-it-gate.py` | 8/8；无 Docker → SKIP | 看 `EnterpriseSuitePgIT` / `UnifiedSearchIndexRepositoryPgIT` 输出 |
+| 归属写入静态门禁 | `python3 scripts/actor-writer-verify.py` | PASS | 禁止控制器回退旧 UUID-less 重载 |
+| 企业套件 schema smoke | `python3 scripts/verify-enterprise-suite.py` | 12/12 | 检查 V77–V81 迁移是否已应用 |
+| 依赖漏洞扫描（离线替代） | `python3 scripts/java-dependency-audit.py --backend offline`（离线环境） | 0 高危 | 补 `config/known-vulnerabilities.json` 或升级依赖 |
 | 密钥轮换验证 | `python3 scripts/key-rotation-verify.py` | 3/3 断言 | 见 `docs/key-rotation-runbook.md` |
 | 配额端到端 | `python3 scripts/quota-e2e-verify.py` | 5/5 | 检查存储/席位配额链路 |
 | 证书生命周期 | `./scripts/cert-lifecycle.sh check` | exit 0 | 见 `PHASE100_DEPLOY_GUIDE.md` §4.1 |
@@ -52,7 +59,21 @@ Rule violated for package com.nocobase.notification: lines covered ratio is 0.63
 ```
 证明红线确实生效（不是恒真断言）。
 
-### 2.2 移除 `|| true`
+### 2.2 `@Tag("pg")` 测试在 `mvn verify` 中的语义
+
+`pom.xml` 的 surefire 配置**没有**排除 `pg` 标签，因此 `mvn -o verify` 会执行
+Testcontainers 测试（`EnterpriseSuitePgIT` 等）：
+
+- Docker 可用：真实启动 PostgreSQL 容器并执行断言；容器/镜像不可拉取时构建会失败。
+- Docker 不可用：测试类上的 `@Testcontainers(disabledWithoutDocker = true)` 自动 **SKIP**，
+  构建继续通过（surefire 输出 `Tests run: ..., Skipped: ...`）。
+
+这不是「跳过门禁」：`python3 scripts/pg-it-gate.py` 是独立的真实 PG 门禁，会解析
+surefire 报告并对「SKIP」单独判定（`monthly-gate.py` 也把 `SKIP:` 前缀视为 SKIP 而非 PASS）。
+若希望本地 `verify` 完全不触碰 Docker，可显式加 `-DexcludedGroups=pg`，但 CI 的
+`mvn verify` 保持默认（有 Docker 时真实执行）。
+
+### 2.3 移除 `|| true`
 
 - `Makefile:108` `mvn checkstyle:check -q || true` → 移除（lint 失败必须退出）
 - `Makefile:115` `mvn spotless:apply || true` → 移除
