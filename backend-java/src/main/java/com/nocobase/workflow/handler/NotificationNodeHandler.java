@@ -83,10 +83,11 @@ public class NotificationNodeHandler implements WorkflowNodeHandler {
         MessageEntity msg = new MessageEntity();
         msg.setId(UUID.randomUUID());
         msg.setRecipient(recipient);
-        msg.setType("workflow");
+        msg.setType(com.nocobase.notification.NotifyDispatcher.WORKFLOW_NOTICE);
         msg.setTitle(title);
         msg.setBody(body);
         msg.setRelatedId(ctx.instance().getId().toString());
+        msg.setDeeplink("/designer/instances/" + ctx.instance().getId());
         msg.setCreatedAt(Instant.now());
         msg.setTenantId(ctx.instance().getTenantId());
         messageRepository.save(msg);

@@ -391,4 +391,23 @@ class PlaybookServiceTest {
         when(runRepo.findById(run.getId())).thenReturn(Optional.of(run));
         return run;
     }
+
+    @Test
+    void runOnce_engineThrows_persistsFailedAndNotifies() {
+        PlaybookEntity pb = playbook("[{\"id\":\"n1\"}]");
+        when(workflowEngine.executeFrom(any(WorkflowInstanceEntity.class), any(), anyInt(), eq(USER)))
+                .thenThrow(new RuntimeException("engine down"));
+        com.nocobase.workflow.WorkflowFailureNotifier notifier =
+                mock(com.nocobase.workflow.WorkflowFailureNotifier.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "failureNotifier", notifier);
+
+        service.runOnce(pb.getId(), USER, null);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(WorkflowInstanceEntity.class);
+        verify(instanceRepo, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
+        assertThat(captor.getAllValues()).anySatisfy(i ->
+                assertThat(i.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.FAILED));
+        verify(notifier).notifyIfFailed(any(WorkflowInstanceEntity.class), any(),
+                eq(USER), eq(pb.getName()), eq(TENANT));
+    }
 }

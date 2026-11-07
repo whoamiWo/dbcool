@@ -54,7 +54,8 @@ class WorkflowSchedulerTest {
                 .thenReturn(WorkflowEngine.NodeResult.CONTINUE);
         when(engine.executeGraphFrom(any(), any(), any(), any(), any()))
                 .thenReturn(WorkflowEngine.NodeResult.CONTINUE);
-        scheduler = new WorkflowScheduler(workflowRepository, engine, redisTemplate);
+        scheduler = new WorkflowScheduler(workflowRepository, engine, redisTemplate,
+                mock(WorkflowInstanceRepository.class), mock(WorkflowFailureNotifier.class));
     }
 
     @Test
@@ -260,6 +261,25 @@ class WorkflowSchedulerTest {
 
         scheduler.pollScheduledWorkflows();
         verify(engine, never()).executeFrom(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void poll_engineThrows_marksFailedAndNotifies() {
+        UUID wfId = UUID.randomUUID();
+        WorkflowEntity w = workflow(true, "{\"type\":\"cron\",\"expression\":\"* * * * * *\"}", null);
+        w.setId(wfId);
+        when(workflowRepository.findAll()).thenReturn(List.of(w));
+        when(valueOps.setIfAbsent(eq("workflow:schedule:lock:" + wfId), eq("1"), anyLong(), any()))
+                .thenReturn(true);
+        when(workflowRepository.findById(wfId)).thenReturn(Optional.of(w));
+        when(engine.executeFrom(any(), any(), anyInt(), any()))
+                .thenThrow(new RuntimeException("boom"));
+        WorkflowFailureNotifier notifier = (WorkflowFailureNotifier) org.springframework.test.util
+                .ReflectionTestUtils.getField(scheduler, "failureNotifier");
+
+        scheduler.pollScheduledWorkflows();
+
+        verify(notifier).notifyFailure(any(), any(), any(), any(), any());
     }
 
     private WorkflowEntity workflow(boolean enabled, String triggerJson, Instant lastTriggeredAt) {

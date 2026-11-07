@@ -76,14 +76,37 @@ class NotifyDispatcherTest {
         existing.setTenantId(TENANT);
         existing.setType(NotifyDispatcher.APPROVAL_TODO);
         existing.setDigestCount(2);
-        existing.setCreatedAt(Instant.now().minusSeconds(60));
+        Instant originalCreatedAt = Instant.now().minusSeconds(60);
+        Instant originalReadAt = Instant.now().minusSeconds(30);
+        existing.setCreatedAt(originalCreatedAt);
+        existing.setRead(true);
+        existing.setReadAt(originalReadAt);
         when(messageRepository.findByTenantIdAndRecipientAndDigestKeyAndCreatedAtAfterOrderByCreatedAtDesc(
                 any(), any(), any(), any(), any())).thenReturn(List.of(existing));
 
         dispatcher.notifyOne(NotifyDispatcher.APPROVAL_TODO, recipient, payload("approval-todo:t1"));
 
         assertThat(existing.getDigestCount()).isEqualTo(3);
+        // R7：聚合不得把已读顶回未读，也不得覆盖 createdAt
+        assertThat(existing.isRead()).isTrue();
+        assertThat(existing.getReadAt()).isEqualTo(originalReadAt);
+        assertThat(existing.getCreatedAt()).isEqualTo(originalCreatedAt);
+        assertThat(existing.getLastEventAt()).isNotNull();
         verify(notificationService, never()).fire(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("R2：未知 type 回落 SYSTEM 且保留告警（不写入孤儿类型）")
+    void unknownType_fallsBackToSystem() {
+        MessageEntity msg = dispatcher.notifyOne("workflow", recipient, payload(null));
+        assertThat(msg.getType()).isEqualTo(NotifyDispatcher.SYSTEM);
+    }
+
+    @Test
+    @DisplayName("新建通知写入 last_event_at")
+    void createdNotification_setsLastEventAt() {
+        MessageEntity msg = dispatcher.notifyOne(NotifyDispatcher.APPROVAL_TODO, recipient, payload(null));
+        assertThat(msg.getLastEventAt()).isNotNull();
     }
 
     @Test

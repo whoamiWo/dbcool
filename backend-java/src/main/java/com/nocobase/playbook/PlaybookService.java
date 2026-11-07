@@ -35,6 +35,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class PlaybookService {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(PlaybookService.class);
+
     private static final int DEFAULT_SLA_HOURS = 24;
 
     private final PlaybookRepository playbookRepo;
@@ -46,6 +49,10 @@ public class PlaybookService {
     private final WikiPageService wikiPageService;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ObjectMapper objectMapper;
+
+    /** R2：统一失败通知（剧本无 workflow 实体时回退到触发人）。测试构造时可缺省。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nocobase.workflow.WorkflowFailureNotifier failureNotifier;
 
     public PlaybookService(PlaybookRepository playbookRepo,
                            PlaybookRunRepository runRepo,
@@ -177,12 +184,26 @@ public class PlaybookService {
         run.setChecklistJson(toJson(def.initialChecklist()));
         run.setStartedAt(Instant.now());
         run = runRepo.save(run);
-        // 执行(edges 为空走顺序模式)
-        if (!def.edges().isEmpty() && !def.nodes().isEmpty()) {
-            String startId = String.valueOf(def.nodes().get(0).get("id"));
-            workflowEngine.executeGraphFrom(inst, def.nodes(), def.edges(), startId, triggerUserId);
-        } else {
-            workflowEngine.executeFrom(inst, def.nodes(), 0, triggerUserId);
+        // A0-3：异常也要持久化 FAILED，再发失败通知；通知异常不回滚剧本运行。
+        try {
+            if (!def.edges().isEmpty() && !def.nodes().isEmpty()) {
+                String startId = String.valueOf(def.nodes().get(0).get("id"));
+                workflowEngine.executeGraphFrom(inst, def.nodes(), def.edges(), startId, triggerUserId);
+            } else {
+                workflowEngine.executeFrom(inst, def.nodes(), 0, triggerUserId);
+            }
+        } catch (Exception e) {
+            log.error("[playbook] 执行失败 playbook={} instance={}: {}",
+                    pb.getId(), inst.getId(), e.getMessage(), e);
+            inst.setStatus(WorkflowInstanceEntity.Status.FAILED);
+            inst.setErrorMessage(e.getMessage());
+            inst.setFinishedAt(java.time.Instant.now());
+            instanceRepo.save(inst);
+        }
+        // R2：剧本实例进入 FAILED 时通知（无 workflow 实体 → 回退触发人）
+        if (failureNotifier != null) {
+            failureNotifier.notifyIfFailed(inst, inst.getWorkflowId(), triggerUserId,
+                    pb.getName(), pb.getTenantId());
         }
         appendEvent(run, "started", "由用户 " + triggerUserId + " 启动");
         syncProgress(pb, "剧本已启动: " + pb.getName(), triggerUserId);
