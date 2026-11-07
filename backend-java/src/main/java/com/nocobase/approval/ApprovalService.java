@@ -55,6 +55,10 @@ public class ApprovalService {
     private final com.nocobase.integration.dingtalk.DingTalkApprovalService dingTalkApprovalService;
     private final com.nocobase.notification.NotifyDispatcher notifyDispatcher;
     private final com.nocobase.search.UnifiedSearchService searchService;
+    private final ApprovalVisibilityService visibilityService;
+    /** R2：统一失败通知（A-7 审批人解析失败即实例 FAILED 的主路径）。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nocobase.workflow.WorkflowFailureNotifier failureNotifier;
     private final boolean dingTalkPushEnabled;
 
     public ApprovalService(ApprovalTemplateRepository templateRepository,
@@ -68,6 +72,7 @@ public class ApprovalService {
                            com.nocobase.integration.dingtalk.DingTalkApprovalService dingTalkApprovalService,
                            com.nocobase.notification.NotifyDispatcher notifyDispatcher,
                            com.nocobase.search.UnifiedSearchService searchService,
+                           ApprovalVisibilityService visibilityService,
                            @org.springframework.beans.factory.annotation.Value(
                                    "${approval.dingtalk.push.enabled:false}") boolean dingTalkPushEnabled) {
         this.templateRepository = templateRepository;
@@ -81,6 +86,7 @@ public class ApprovalService {
         this.dingTalkApprovalService = dingTalkApprovalService;
         this.notifyDispatcher = notifyDispatcher;
         this.searchService = searchService;
+        this.visibilityService = visibilityService;
         this.dingTalkPushEnabled = dingTalkPushEnabled;
     }
 
@@ -259,6 +265,11 @@ public class ApprovalService {
                         request.getId(), e.getMessage());
             }
         }
+        // R2：审批触发的工作流若进入 FAILED（如审批人解析失败），创建者必须收到通知
+        if (failureNotifier != null) {
+            failureNotifier.notifyIfFailed(instance, workflow.getId(), applicantId,
+                    workflow.getName(), tenantId);
+        }
         request = syncStatus(request, instance);
         // E3：第一级审批待办通知（后续级别的待办由 WorkflowTaskService 在推进后发出）
         notifyPendingTasks(instance, request.getId(), template.getName());
@@ -353,10 +364,14 @@ public class ApprovalService {
         return out;
     }
 
+    /**
+     * R1e：审批详情（带可见性判定）。非申请人/审批人/抄送人/ADMIN → 404。
+     */
     @Transactional
-    public Map<String, Object> detail(String tenantId, UUID requestId) {
+    public Map<String, Object> detail(String tenantId, UUID requestId, UUID userId) {
         ApprovalRequestEntity r = requestRepository.findByIdAndTenantId(requestId, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "审批单据不存在"));
+        visibilityService.assertCanView(tenantId, r, userId);
         return detailOf(syncStatus(r, null));
     }
 

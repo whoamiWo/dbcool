@@ -60,6 +60,8 @@ public class UnifiedSearchService {
     private final com.nocobase.approval.ApprovalRequestRepository approvalRequestRepository;
     private final com.nocobase.approval.ApprovalCcRepository approvalCcRepository;
     private final com.nocobase.workflow.WorkflowTaskRepository taskRepository;
+    /** R1e：与审批详情共用同一可见性谓词。 */
+    private final com.nocobase.approval.ApprovalVisibilityService approvalVisibilityService;
 
     public UnifiedSearchService(
             MessageService messageService,
@@ -76,7 +78,8 @@ public class UnifiedSearchService {
             com.nocobase.wiki.WikiPermissionService wikiPermissionService,
             com.nocobase.approval.ApprovalRequestRepository approvalRequestRepository,
             com.nocobase.approval.ApprovalCcRepository approvalCcRepository,
-            com.nocobase.workflow.WorkflowTaskRepository taskRepository
+            com.nocobase.workflow.WorkflowTaskRepository taskRepository,
+            com.nocobase.approval.ApprovalVisibilityService approvalVisibilityService
     ) {
         this.messageService = messageService;
         this.wikiPageService = wikiPageService;
@@ -93,6 +96,7 @@ public class UnifiedSearchService {
         this.approvalRequestRepository = approvalRequestRepository;
         this.approvalCcRepository = approvalCcRepository;
         this.taskRepository = taskRepository;
+        this.approvalVisibilityService = approvalVisibilityService;
     }
 
     /**
@@ -110,6 +114,8 @@ public class UnifiedSearchService {
                                       List<String> types, int limit) {
         Map<String, Object> result = new HashMap<>();
         List<Map<String, Object>> allResults = new ArrayList<>();
+        // R4：request 级 ACL 上下文（只在本次 search 内有效，禁止跨请求缓存）
+        SearchAclContext aclContext = new SearchAclContext(userId, tenantId);
 
         int safeLimit = Math.max(1, Math.min(limit, 100));
         int perTypeLimit = Math.max(1, safeLimit / 5);
@@ -119,10 +125,11 @@ public class UnifiedSearchService {
 
         // 全部类型：走索引统一检索（IM 需按用户已加入频道过滤）
         if (types == null || types.isEmpty()) {
-            allResults.addAll(searchIndex(tenantId, keyword, fetchLimit, userId));
+            allResults.addAll(searchIndex(tenantId, keyword, fetchLimit, userId, aclContext));
         } else {
             for (String type : types) {
-                allResults.addAll(searchByType(tenantId, keyword, type, perTypeFetchLimit, userId));
+                allResults.addAll(searchByType(tenantId, keyword, type, perTypeFetchLimit, userId,
+                        aclContext));
             }
         }
 
@@ -160,7 +167,8 @@ public class UnifiedSearchService {
     /**
      * 统一索引检索（无类型过滤）。
      */
-    private List<Map<String, Object>> searchIndex(String tenantId, String keyword, int limit, UUID userId) {
+    private List<Map<String, Object>> searchIndex(String tenantId, String keyword, int limit, UUID userId,
+                                                  SearchAclContext aclContext) {
         try {
             List<UnifiedSearchIndexEntity> hits = searchIndexRepository.searchAllTypes(keyword, tenantId, limit);
             List<Map<String, Object>> results = toResultMaps(hits);
@@ -169,7 +177,7 @@ public class UnifiedSearchService {
                 filterImByChannelMembership(results, userId);
             }
             // A-3：记录/文档必须做 ACL 过滤（修复前搜索返回无权记录 = 数据泄露）
-            filterRecordsByAcl(results, tenantId, userId);
+            filterRecordsByAcl(results, tenantId, userId, aclContext);
             filterWikiByAcl(results, tenantId, userId);
             return results;
         } catch (Exception e) {
@@ -181,15 +189,16 @@ public class UnifiedSearchService {
     /**
      * 按类型检索（走索引 + ts_headline 高亮）。
      */
-    private List<Map<String, Object>> searchByType(String tenantId, String keyword, String type, int limit, UUID userId) {
+    private List<Map<String, Object>> searchByType(String tenantId, String keyword, String type, int limit, UUID userId,
+                                                    SearchAclContext aclContext) {
         // E4：支持 record:<collection> 按集合过滤
         if (type != null && type.startsWith("record:")) {
-            return searchRecord(tenantId, keyword, limit, userId, type.substring("record:".length()));
+            return searchRecord(tenantId, keyword, limit, userId, type.substring("record:".length()), aclContext);
         }
         return switch (type) {
             case "wiki" -> searchWiki(tenantId, keyword, limit, userId);
             case "im" -> searchIm(tenantId, keyword, limit, userId);
-            case "record" -> searchRecord(tenantId, keyword, limit, userId);
+            case "record" -> searchRecord(tenantId, keyword, limit, userId, aclContext);
             case "automation" -> searchAutomation(tenantId, keyword, limit);
             case "project" -> searchProject(tenantId, keyword, limit);
             case "approval" -> searchApproval(tenantId, keyword, limit, userId);
@@ -269,19 +278,21 @@ public class UnifiedSearchService {
     }
 
     /** Collection 记录：走索引检索 + ACL 过滤（A-3）。 */
-    private List<Map<String, Object>> searchRecord(String tenantId, String keyword, int limit, UUID userId) {
-        return searchRecord(tenantId, keyword, limit, userId, null);
+    private List<Map<String, Object>> searchRecord(String tenantId, String keyword, int limit,
+                                                   UUID userId, SearchAclContext aclContext) {
+        return searchRecord(tenantId, keyword, limit, userId, null, aclContext);
     }
 
     private List<Map<String, Object>> searchRecord(String tenantId, String keyword, int limit,
-                                                   UUID userId, String collection) {
+                                                   UUID userId, String collection,
+                                                   SearchAclContext aclContext) {
         try {
             List<UnifiedSearchIndexEntity> hits = searchIndexRepository.searchByKeywordAndType("record", keyword, tenantId, limit);
             List<Map<String, Object>> results = toResultMaps(hits);
             if (collection != null && !collection.isBlank()) {
                 results.removeIf(r -> !collection.equals(String.valueOf(r.get("collection"))));
             }
-            filterRecordsByAcl(results, tenantId, userId);
+            filterRecordsByAcl(results, tenantId, userId, aclContext);
             return results;
         } catch (Exception e) {
             log.warn("[SEARCH] record 索引检索失败 tenantId={} keyword={} error={}", tenantId, keyword, e.getMessage(), e);
@@ -375,34 +386,103 @@ public class UnifiedSearchService {
      *
      * <p>无法判定时一律丢弃（fail-closed），不允许"索引里有就返回"。
      */
-    private void filterRecordsByAcl(List<Map<String, Object>> results, String tenantId, UUID userId) {
+    private void filterRecordsByAcl(List<Map<String, Object>> results, String tenantId, UUID userId,
+                                    SearchAclContext aclContext) {
+        if (userId == null) {
+            results.removeIf(r -> "record".equals(r.get("type")));
+            return;
+        }
+        // 1) 按 collection 分组批量取记录（替换逐条 getRecord）
+        Map<String, List<String>> idsByCollection = new HashMap<>();
+        for (Map<String, Object> r : results) {
+            if (!"record".equals(r.get("type"))) continue;
+            Object c = r.get("collection");
+            if (c == null || String.valueOf(c).isBlank()) continue;
+            idsByCollection.computeIfAbsent(String.valueOf(c), k -> new ArrayList<>())
+                    .add(String.valueOf(r.get("id")));
+        }
+        Map<String, Map<String, Map<String, Object>>> recordsByCollection = new HashMap<>();
+        for (Map.Entry<String, List<String>> e : idsByCollection.entrySet()) {
+            String collection = e.getKey();
+            if (!aclContext.allowed(collection)) continue;
+            try {
+                List<Map<String, Object>> loaded =
+                        collectionService.getRecordsByIds(collection, e.getValue(), tenantId);
+                Map<String, Map<String, Object>> byId = new HashMap<>();
+                for (Map<String, Object> rec : loaded) {
+                    Object id = rec.get("id");
+                    if (id != null) byId.put(String.valueOf(id), rec);
+                }
+                recordsByCollection.put(collection, byId);
+            } catch (Exception ex) {
+                log.debug("[SEARCH] 批量读取记录失败 collection={}: {}", collection, ex.getMessage());
+            }
+        }
+
+        // 2) 逐条做 ROW ACL + 数据范围（角色/部门/集合权限均已在上下文中只查一次）
         results.removeIf(r -> {
             if (!"record".equals(r.get("type"))) return false;
             try {
-                if (userId == null) return true;
                 String collection = r.get("collection") == null ? null : r.get("collection").toString();
                 if (collection == null || collection.isBlank()) return true; // 元数据缺失 → 无法判权
-                if (!aclEnforcer.isAllowed(userId, tenantId, collection,
-                        com.nocobase.auth.AclPolicyEntity.Action.READ)) {
-                    return true;
-                }
-                String id = String.valueOf(r.get("id"));
-                Map<String, Object> record = collectionService.getRecord(collection, id, tenantId);
+                if (!aclContext.allowed(collection)) return true;
+                Map<String, Object> record = recordsByCollection
+                        .getOrDefault(collection, Map.of())
+                        .get(String.valueOf(r.get("id")));
                 if (record == null) return true;
-                List<String> roles = roleRepository.findRoleNamesByUserId(userId, tenantId);
                 var principal = new com.nocobase.acl.RowAclService.Principal(
-                        userId.toString(), roles);
+                        userId.toString(), aclContext.roles());
                 if (!rowAclService.evaluateRead(tenantId, collection, record, principal)) {
                     return true;
                 }
-                // 部门数据范围（A-1 修复后的真实子树判定）
-                return aclEnforcer.filterRecordsByDataScope(userId, tenantId, collection,
-                        List.of(record)).isEmpty();
+                return aclEnforcer.filterInScope(aclContext.scope(), List.of(record)).isEmpty();
             } catch (Exception e) {
                 log.debug("[SEARCH] 记录判权失败，保守丢弃 id={}: {}", r.get("id"), e.getMessage());
                 return true;
             }
         });
+    }
+
+    /**
+     * R4：request 级 ACL 上下文 —— 只在单次 {@code search()} 内创建，禁止注入单例。
+     */
+    private final class SearchAclContext {
+        private final UUID userId;
+        private final String tenantId;
+        private List<String> roles;
+        private com.nocobase.auth.AclEnforcer.ScopePlan scopePlan;
+        private final Map<String, Boolean> allowedByCollection = new HashMap<>();
+
+        SearchAclContext(UUID userId, String tenantId) {
+            this.userId = userId;
+            this.tenantId = tenantId;
+        }
+
+        List<String> roles() {
+            if (roles == null) {
+                roles = userId == null ? List.of()
+                        : roleRepository.findRoleNamesByUserId(userId, tenantId);
+            }
+            return roles;
+        }
+
+        com.nocobase.auth.AclEnforcer.ScopePlan scope() {
+            if (scopePlan == null) {
+                scopePlan = aclEnforcer.resolveScopePlan(userId, tenantId);
+            }
+            return scopePlan;
+        }
+
+        boolean allowed(String collection) {
+            return allowedByCollection.computeIfAbsent(collection, c -> {
+                try {
+                    return aclEnforcer.isAllowed(userId, tenantId, c,
+                            com.nocobase.auth.AclPolicyEntity.Action.READ);
+                } catch (Exception e) {
+                    return false;
+                }
+            });
+        }
     }
 
     /** A-3：文档 ACL —— 仅返回 PUBLISHED 且用户有读权限的页面。 */
@@ -437,8 +517,11 @@ public class UnifiedSearchService {
                                                      int limit, UUID userId) {
         if (userId == null) return List.of();
         try {
+            // 先多取候选再按可见性过滤：可见性在 Java 侧（申请人/抄送/审批人/ADMIN），
+            // 若先 LIMIT 10 再过滤，普通用户自己的单据可能根本不在候选集里。
+            int candidateLimit = Math.min(Math.max(limit * 20, 100), 1000);
             List<UnifiedSearchIndexEntity> hits = searchIndexRepository
-                    .searchByKeywordAndType("approval", keyword, tenantId, limit);
+                    .searchByKeywordAndType("approval", keyword, tenantId, candidateLimit);
             List<Map<String, Object>> results = new ArrayList<>();
             for (UnifiedSearchIndexEntity idx : hits) {
                 UUID requestId;
@@ -450,13 +533,8 @@ public class UnifiedSearchService {
                 var request = approvalRequestRepository.findByIdAndTenantId(requestId, tenantId)
                         .orElse(null);
                 if (request == null) continue;
-                boolean allowed = request.getApplicantId().equals(userId)
-                        || approvalCcRepository.findByRequestId(requestId).stream()
-                                .anyMatch(cc -> cc.getUserId().equals(userId))
-                        || (request.getInstanceId() != null
-                                && taskRepository.existsByInstanceIdAndAssignee(
-                                        request.getInstanceId(), userId));
-                if (!allowed) continue;
+                // R1e：与审批详情共用同一谓词，消除两处规则漂移
+                if (!approvalVisibilityService.canView(tenantId, request, userId)) continue;
                 Map<String, Object> map = new HashMap<>();
                 map.put("type", "approval");
                 map.put("id", requestId);
@@ -466,6 +544,7 @@ public class UnifiedSearchService {
                 map.put("deeplink", "/approvals/" + requestId);
                 map.put("createdAt", idx.getUpdatedAt());
                 results.add(map);
+                if (results.size() >= limit) break;
             }
             return results;
         } catch (Exception e) {
@@ -507,9 +586,14 @@ public class UnifiedSearchService {
     @Transactional
     public void indexEntity(String entityType, String entityId, String tenantId,
                             String title, String content, Map<String, Object> metadata) {
-        searchIndexRepository.deleteByEntityTypeAndEntityIdAndTenantId(entityType, entityId, tenantId);
-        UnifiedSearchIndexEntity index = new UnifiedSearchIndexEntity();
-        index.setId(UUID.randomUUID());
+        // 先查后写（upsert 语义）：delete+insert 在 Hibernate 中可能先 flush INSERT，
+        // 触发 (entity_type, entity_id, tenant_id) 唯一键冲突（审批详情同步即会踩到）。
+        List<UnifiedSearchIndexEntity> existing = searchIndexRepository
+                .findByEntityTypeAndEntityIdAndTenantId(entityType, entityId, tenantId);
+        UnifiedSearchIndexEntity index = existing.isEmpty()
+                ? new UnifiedSearchIndexEntity()
+                : existing.get(0);
+        index.setId(existing.isEmpty() ? UUID.randomUUID() : existing.get(0).getId());
         index.setEntityType(entityType);
         index.setEntityId(entityId);
         index.setTenantId(tenantId);
@@ -520,7 +604,7 @@ public class UnifiedSearchService {
         } catch (Exception e) {
             index.setMetadataJson("{}");
         }
-        index.setCreatedAt(Instant.now());
+        if (index.getCreatedAt() == null) index.setCreatedAt(Instant.now());
         index.setUpdatedAt(Instant.now());
         searchIndexRepository.save(index);
     }
