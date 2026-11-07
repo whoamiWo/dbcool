@@ -38,6 +38,10 @@ public class BiReportService {
     private final StringRedisTemplate redis;
     private final ReportExcelExporter excelExporter;
     private final ReportPdfExporter pdfExporter;
+    /** R1d：BI 必须与列表接口同源判权（可选依赖，兼容既有单测）。 */
+    private final com.nocobase.auth.AclEnforcer aclEnforcer;
+    private final com.nocobase.acl.RowAclService rowAclService;
+    private final com.nocobase.auth.RoleRepository roleRepository;
 
     public BiReportService(CollectionService collectionService,
                            BiReportRepository reportRepository,
@@ -45,12 +49,96 @@ public class BiReportService {
                            StringRedisTemplate redis,
                            ReportExcelExporter excelExporter,
                            ReportPdfExporter pdfExporter) {
+        this(collectionService, reportRepository, objectMapper, redis,
+                excelExporter, pdfExporter, null, null, null);
+    }
+
+    public BiReportService(CollectionService collectionService,
+                           BiReportRepository reportRepository,
+                           ObjectMapper objectMapper,
+                           StringRedisTemplate redis,
+                           ReportExcelExporter excelExporter,
+                           ReportPdfExporter pdfExporter,
+                           com.nocobase.auth.AclEnforcer aclEnforcer) {
+        this(collectionService, reportRepository, objectMapper, redis,
+                excelExporter, pdfExporter, aclEnforcer, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public BiReportService(CollectionService collectionService,
+                           BiReportRepository reportRepository,
+                           ObjectMapper objectMapper,
+                           StringRedisTemplate redis,
+                           ReportExcelExporter excelExporter,
+                           ReportPdfExporter pdfExporter,
+                           com.nocobase.auth.AclEnforcer aclEnforcer,
+                           com.nocobase.acl.RowAclService rowAclService,
+                           com.nocobase.auth.RoleRepository roleRepository) {
         this.collectionService = collectionService;
         this.reportRepository = reportRepository;
         this.objectMapper = objectMapper;
         this.redis = redis;
         this.excelExporter = excelExporter;
         this.pdfExporter = pdfExporter;
+        this.aclEnforcer = aclEnforcer;
+        this.rowAclService = rowAclService;
+        this.roleRepository = roleRepository;
+    }
+
+    // ============================================================
+    //  R1d：权限闭环辅助
+    // ============================================================
+
+    private void assertReadable(UUID userId, String tenantId, String collectionName) {
+        if (userId == null || aclEnforcer == null) return;
+        aclEnforcer.assertCan(userId, tenantId, collectionName,
+                com.nocobase.auth.AclPolicyEntity.Action.READ);
+    }
+
+    /** 聚合请求显式 403：不做静默替换，避免结果含义漂移。 */
+    private void assertReadableFields(UUID userId, String tenantId, String collectionName,
+                                      Collection<String> fields) {
+        if (userId == null || aclEnforcer == null) return;
+        Set<String> hidden = aclEnforcer.filterReadableFields(userId, tenantId, collectionName);
+        if (hidden == null || hidden.isEmpty()) return;
+        List<String> bad = fields.stream()
+                .filter(f -> f != null && hidden.contains(f))
+                .distinct().toList();
+        if (!bad.isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "BI 拒绝：字段不可读 " + bad);
+        }
+    }
+
+    private com.nocobase.auth.AclEnforcer.ScopePlan scope(UUID userId, String tenantId) {
+        if (userId == null || aclEnforcer == null) {
+            return new com.nocobase.auth.AclEnforcer.ScopePlan(
+                    com.nocobase.auth.AclEnforcer.ScopeKind.ALL, null, null, false);
+        }
+        return aclEnforcer.resolveScopePlan(userId, tenantId);
+    }
+
+    /**
+     * SQL 聚合不能安全地应用表达式型 ROW ACL 或 CUSTOM 数据范围。
+     * 失败关闭，不从未裁剪的全集产生统计值。
+     */
+    private void assertAggregationSupported(UUID userId, String tenantId, String collectionName) {
+        if (userId == null || aclEnforcer == null) return; // 仅保留旧测试/系统兼容调用
+        com.nocobase.auth.AclEnforcer.ScopePlan plan = scope(userId, tenantId);
+        boolean rowRead = rowAclService != null
+                && rowAclService.hasPolicies(tenantId, collectionName, "read");
+        if (plan.customFallback() || rowRead) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "当前策略不支持聚合下推（ROW/CUSTOM），请使用受行级过滤的明细导出");
+        }
+    }
+
+    private com.nocobase.acl.RowAclService.Principal rowAclPrincipal(UUID userId, String tenantId) {
+        if (userId == null || roleRepository == null) return null;
+        List<String> roles = roleRepository.findRoleNamesByUserId(userId, tenantId);
+        return new com.nocobase.acl.RowAclService.Principal(userId.toString(), roles);
     }
 
     // ============================================================
@@ -83,6 +171,10 @@ public class BiReportService {
             e.setCreatedAt(java.time.Instant.now());
         }
         e.setCollectionName((String) body.get("collectionName"));
+        // R1d：报表定义指向的集合必须可读（无权集合连保存都不允许）
+        if (e.getCollectionName() != null) {
+            assertReadable(userId, tenantId, e.getCollectionName());
+        }
         e.setName((String) body.getOrDefault("name", "未命名报表"));
         e.setTitle((String) body.get("title"));
         String type = (String) body.getOrDefault("type", "PIVOT");
@@ -148,8 +240,30 @@ public class BiReportService {
     /** 列出扁平记录 (用于导出明细)。 */
     public List<Map<String, Object>> listFlatRecords(String collectionName, String tenantId,
                                                      List<CollectionService.FilterRule> filters) {
-        // 默认限制 1000 条，不排序
-        return collectionService.listRecords(collectionName, tenantId, 1000, null, filters);
+        return listFlatRecords(collectionName, tenantId, filters, null);
+    }
+
+    /** R1d：明细列表必须带集合读权限 + 数据范围 + 字段级裁剪。 */
+    public List<Map<String, Object>> listFlatRecords(String collectionName, String tenantId,
+                                                     List<CollectionService.FilterRule> filters,
+                                                     UUID userId) {
+        assertReadable(userId, tenantId, collectionName);
+        com.nocobase.auth.AclEnforcer.ScopePlan plan = scope(userId, tenantId);
+        List<Map<String, Object>> records = plan.predicate() == null
+                ? collectionService.listRecords(collectionName, tenantId, 1000, null, filters)
+                : collectionService.listRecords(collectionName, tenantId, 1000, null, filters,
+                        plan.predicate().sql(), plan.predicate().params());
+        if (userId != null && aclEnforcer != null) {
+            records = aclEnforcer.filterInScope(plan, records);
+            if (rowAclService != null) {
+                records = rowAclService.filterReadable(tenantId, collectionName, records,
+                        rowAclPrincipal(userId, tenantId));
+            }
+            records = records.stream()
+                    .map(r -> aclEnforcer.filterRecord(userId, tenantId, collectionName, r))
+                    .toList();
+        }
+        return records;
     }
 
     // ============================================================
@@ -164,7 +278,12 @@ public class BiReportService {
      * @return xlsx 文件字节数组
      */
     public byte[] exportToExcel(UUID reportId, String tenantId) {
-        ExportContext ctx = buildExportContext(reportId, tenantId);
+        return exportToExcel(reportId, tenantId, null);
+    }
+
+    /** R1d：保存报表导出同样受限；字段不可读时剔除并告警（R-8，不整页失败）。 */
+    public byte[] exportToExcel(UUID reportId, String tenantId, UUID userId) {
+        ExportContext ctx = buildExportContext(reportId, tenantId, userId);
         if (ctx.flat()) {
             return excelExporter.exportFlat(ctx.records(), ctx.title());
         }
@@ -179,7 +298,12 @@ public class BiReportService {
      * @return pdf 文件字节数组
      */
     public byte[] exportToPdf(UUID reportId, String tenantId) {
-        ExportContext ctx = buildExportContext(reportId, tenantId);
+        return exportToPdf(reportId, tenantId, null);
+    }
+
+    /** R1d：按报表 ID 导出 PDF（带用户权限）。 */
+    public byte[] exportToPdf(UUID reportId, String tenantId, UUID userId) {
+        ExportContext ctx = buildExportContext(reportId, tenantId, userId);
         if (ctx.flat()) {
             return pdfExporter.exportFlat(ctx.records(), ctx.title());
         }
@@ -190,11 +314,14 @@ public class BiReportService {
     private record ExportContext(boolean flat, List<Map<String, Object>> records,
                                  Map<String, Object> pivotResult, String title) {}
 
-    private ExportContext buildExportContext(UUID reportId, String tenantId) {
+    private ExportContext buildExportContext(UUID reportId, String tenantId, UUID userId) {
         BiReportEntity e = reportRepository.findByIdAndTenantId(reportId, tenantId)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND,
                         "报表不存在或不属于当前租户: " + reportId));
+        String collection = e.getCollectionName();
+        // R1d：保存报表的集合必须可读
+        assertReadable(userId, tenantId, collection);
         String title = e.getTitle() != null && !e.getTitle().isBlank() ? e.getTitle() : e.getName();
         Map<String, Object> cfg = asMap(parseJson(e.getConfigJson()));
 
@@ -202,16 +329,34 @@ public class BiReportService {
         List<CollectionService.FilterRule> filters = parseCfgFilters(cfg.get("filters"));
 
         if (Boolean.TRUE.equals(cfg.get("flat")) || "flat".equalsIgnoreCase((String) cfg.get("mode"))) {
-            List<Map<String, Object>> records =
-                    collectionService.listRecords(e.getCollectionName(), tenantId, 1000, null, filters);
+            List<Map<String, Object>> records = listFlatRecords(collection, tenantId, filters, userId);
             return new ExportContext(true, records, null, title);
         }
 
-        List<String> rows = castStrList(cfg.get("rows"));
-        List<String> columns = castStrList(cfg.get("columns"));
-        List<Map<String, String>> values = castMeasureList(cfg.get("values"));
-        Map<String, Object> pivotResult = executePivot(
-                e.getCollectionName(), tenantId, rows, columns, values, filters);
+        List<String> rows = new ArrayList<>(castStrList(cfg.get("rows")));
+        List<String> columns = new ArrayList<>(castStrList(cfg.get("columns")));
+        List<Map<String, String>> values = new ArrayList<>(castMeasureList(cfg.get("values")));
+        // R-8：保存报表导出 → 剔除不可读字段并降级，不整页失败
+        if (userId != null && aclEnforcer != null) {
+            Set<String> hidden = aclEnforcer.filterReadableFields(userId, tenantId, collection);
+            if (hidden != null && !hidden.isEmpty()) {
+                boolean changed = rows.removeIf(hidden::contains);
+                changed |= columns.removeIf(hidden::contains);
+                changed |= values.removeIf(v -> v == null || hidden.contains(v.get("field")));
+                if (changed) {
+                    log.warn("[BI] 保存报表导出剔除不可读字段 report={} collection={} hidden={}",
+                            reportId, collection, hidden);
+                }
+            }
+        }
+        Map<String, Object> pivotResult;
+        if (values.isEmpty()) {
+            // 所有度量都不可读 → 退化为明细导出（仍受数据范围约束）
+            List<Map<String, Object>> records = listFlatRecords(collection, tenantId, filters, userId);
+            return new ExportContext(true, records, null, title);
+        }
+        pivotResult = executePivotInternal(collection, tenantId, rows, columns, values, filters,
+                userId, false);
         return new ExportContext(false, null, pivotResult, configTitle(cfg, title));
     }
 
@@ -261,11 +406,40 @@ public class BiReportService {
                                             List<String> columns,
                                             List<Map<String, String>> values,
                                             List<CollectionService.FilterRule> filters) {
+        return executePivot(collectionName, tenantId, rows, columns, values, filters, null);
+    }
+
+    /** R1d：带权限校验的透视（userId 为 null 时保持旧行为，仅供单测）。 */
+    public Map<String, Object> executePivot(String collectionName, String tenantId,
+                                            List<String> rows,
+                                            List<String> columns,
+                                            List<Map<String, String>> values,
+                                            List<CollectionService.FilterRule> filters,
+                                            UUID userId) {
+        return executePivotInternal(collectionName, tenantId, rows, columns, values, filters,
+                userId, true);
+    }
+
+    private Map<String, Object> executePivotInternal(String collectionName, String tenantId,
+                                                     List<String> rows,
+                                                     List<String> columns,
+                                                     List<Map<String, String>> values,
+                                                     List<CollectionService.FilterRule> filters,
+                                                     UUID userId,
+                                                     boolean enforceFields) {
         log.info("[BI] pivot: collection={}, rows={}, columns={}", collectionName, rows, columns);
+        assertReadable(userId, tenantId, collectionName);
+        assertAggregationSupported(userId, tenantId, collectionName);
 
         List<String> safeRows = orEmpty(rows);
         List<String> safeCols = orEmpty(columns);
         List<Map<String, String>> measures = values == null ? List.of() : values;
+        if (enforceFields) {
+            List<String> requested = new ArrayList<>(safeRows);
+            requested.addAll(safeCols);
+            measures.forEach(m -> { if (m != null) requested.add(m.get("field")); });
+            assertReadableFields(userId, tenantId, collectionName, requested);
+        }
 
         // 行维度 + 列维度 共同构成 GROUP BY
         List<String> groupBy = new ArrayList<>(safeRows);
@@ -280,7 +454,7 @@ public class BiReportService {
                 .toList();
 
         List<Map<String, Object>> aggRows = runAggregate(
-                collectionName, tenantId, groupBy, aggSpecs, filters, "pivot");
+                collectionName, tenantId, groupBy, aggSpecs, filters, "pivot", userId);
 
         // 组装透视矩阵(SQL 已按 groupBy 聚合,每个 (row,col) 组合至多一行)
         Set<String> rowKeys = new LinkedHashSet<>();
@@ -341,8 +515,26 @@ public class BiReportService {
                                             String xField, String yField, String seriesField,
                                             String agg,
                                             List<CollectionService.FilterRule> filters) {
+        return executeChart(collectionName, tenantId, chartType, xField, yField, seriesField,
+                agg, filters, null);
+    }
+
+    /** R1d：带权限校验的图表查询。 */
+    public Map<String, Object> executeChart(String collectionName, String tenantId,
+                                            String chartType,
+                                            String xField, String yField, String seriesField,
+                                            String agg,
+                                            List<CollectionService.FilterRule> filters,
+                                            UUID userId) {
         log.info("[BI] chart: collection={}, type={}, x={}, y={}",
                 collectionName, chartType, xField, yField);
+        assertReadable(userId, tenantId, collectionName);
+        assertAggregationSupported(userId, tenantId, collectionName);
+        List<String> requested = new ArrayList<>();
+        if (xField != null) requested.add(xField);
+        if (yField != null) requested.add(yField);
+        if (seriesField != null) requested.add(seriesField);
+        assertReadableFields(userId, tenantId, collectionName, requested);
 
         if (xField == null || yField == null) {
             return Map.of("chartType", chartType == null ? "bar" : chartType,
@@ -357,7 +549,7 @@ public class BiReportService {
                 new DynamicTableManager.AggSpec(yField, agg == null ? "SUM" : agg, yField));
 
         List<Map<String, Object>> aggRows = runAggregate(
-                collectionName, tenantId, groupBy, aggSpecs, filters, "chart");
+                collectionName, tenantId, groupBy, aggSpecs, filters, "chart", userId);
 
         // x 值保序 + 系列名去重
         Set<String> categories = new LinkedHashSet<>();
@@ -405,9 +597,12 @@ public class BiReportService {
                                                    List<String> groupBy,
                                                    List<DynamicTableManager.AggSpec> aggSpecs,
                                                    List<CollectionService.FilterRule> filters,
-                                                   String kind) {
+                                                   String kind, UUID userId) {
         if (aggSpecs.isEmpty()) return List.of();
-        String key = CACHE_PREFIX + tenantId + ":" + collectionName + ":" + kind + ":"
+        assertAggregationSupported(userId, tenantId, collectionName);
+        // 缓存键必须包含用户：数据范围因用户而异，否则会把 A 的聚合结果返回给 B
+        String key = CACHE_PREFIX + tenantId + ":" + collectionName + ":" + kind + ":u="
+                + (userId == null ? "all" : userId) + ":"
                 + (groupBy == null ? "" : String.join(",", groupBy)) + ":"
                 + aggSpecs.stream().map(a -> a.agg() + "(" + a.field() + ")")
                           .collect(Collectors.joining(",")) + ":"
@@ -423,8 +618,11 @@ public class BiReportService {
             log.debug("[BI] cache read skipped: {}", e.getMessage());
         }
 
-        List<Map<String, Object>> result =
-                collectionService.aggregate(collectionName, tenantId, groupBy, aggSpecs, filters);
+        com.nocobase.auth.AclEnforcer.ScopePlan plan = scope(userId, tenantId);
+        List<Map<String, Object>> result = plan.predicate() == null
+                ? collectionService.aggregate(collectionName, tenantId, groupBy, aggSpecs, filters)
+                : collectionService.aggregate(collectionName, tenantId, groupBy, aggSpecs, filters,
+                        plan.predicate().sql(), plan.predicate().params());
 
         // 写缓存
         try {
