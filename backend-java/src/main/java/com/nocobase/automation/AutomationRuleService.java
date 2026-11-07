@@ -346,8 +346,13 @@ public class AutomationRuleService {
         Map<String, Object> updates = (Map<String, Object>) action.get("updates");
         if (recordId != null && updates != null) {
             try {
-                collectionService.updateRecord(rule.getCollectionName(), recordId, updates,
-                        tenantId);
+                if (rule.getCreatedBy() == null) {
+                    collectionService.updateRecord(rule.getCollectionName(), recordId, updates,
+                            tenantId);
+                } else {
+                    collectionService.updateRecord(rule.getCollectionName(), recordId, updates,
+                            tenantId, rule.getCreatedBy());
+                }
                 log.info("[AUTOMATION UPDATE_RECORD] recordId={}", recordId);
             } catch (Exception e) {
                 log.warn("[AUTOMATION UPDATE_RECORD] failed: {}", e.getMessage());
@@ -360,8 +365,11 @@ public class AutomationRuleService {
         Map<String, Object> fields = (Map<String, Object>) action.get("fields");
         if (collectionName != null && fields != null) {
             try {
-                UUID newId = collectionService.insertRecord(collectionName, fields,
-                        tenantId);
+                // D20：自动化创建的记录归属到规则创建者（无创建者时保持旧签名）
+                UUID newId = rule.getCreatedBy() == null
+                        ? collectionService.insertRecord(collectionName, fields, tenantId)
+                        : collectionService.insertRecord(collectionName, fields, tenantId,
+                                rule.getCreatedBy());
                 log.info("[AUTOMATION CREATE_RECORD] collection={}, newId={}", collectionName, newId);
             } catch (Exception e) {
                 log.warn("[AUTOMATION CREATE_RECORD] failed: {}", e.getMessage());

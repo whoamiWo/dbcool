@@ -129,14 +129,54 @@ public class DynamicTableManager {
     }
 
     /**
-     * 插入一条记录.
+     * R0：读取记录投影。
+     *
+     * <p>系统列（归属/时间）不在 {@code extra} 内，必须在此注入返回 JSON，否则
+     * SELF/DEPT 数据范围、行级策略、评论通知读到的 {@code created_by} 恒为 null。
+     * <b>DB 列覆盖 extra 同名键</b>（右侧 jsonb_build_object 优先），防止客户端在
+     * extra 里伪造归属。
+     */
+    private static final String RECORD_PROJECTION =
+            "COALESCE(extra::jsonb, '{}'::jsonb) || jsonb_build_object("
+            + "'id', id::text, "
+            + "'created_by', created_by::text, "
+            + "'created_at', created_at, "
+            + "'updated_at', updated_at, "
+            + "'updated_by', updated_by::text)";
+
+    /** 含删除信息的投影（回收站/版本回滚）。 */
+    private static final String RECORD_PROJECTION_DELETED =
+            RECORD_PROJECTION + " || jsonb_build_object("
+            + "'deleted_by', deleted_by::text, "
+            + "'deleted_at', deleted_at)";
+
+    /**
+     * 插入一条记录（兼容旧签名 — 不写 created_by）。
      */
     public void insertRecord(String collectionName, String id, String jsonData) {
+        insertRecord(collectionName, id, jsonData, null);
+    }
+
+    /**
+     * 插入一条记录并写入归属人（R0 / D20）。
+     *
+     * @param createdBy 当前操作者；null 时不写该列（历史兼容）
+     */
+    public void insertRecord(String collectionName, String id, String jsonData,
+                             java.util.UUID createdBy) {
         validateIdentifier(collectionName); // PHASE116 加固
+        if (createdBy == null) {
+            jdbc.update(
+                    "INSERT INTO " + physicalTableName(collectionName) +
+                    " (id, extra) VALUES (?::uuid, ?::jsonb)",
+                    id, jsonData
+            );
+            return;
+        }
         jdbc.update(
                 "INSERT INTO " + physicalTableName(collectionName) +
-                " (id, extra) VALUES (?::uuid, ?::jsonb)",
-                id, jsonData
+                " (id, created_by, extra) VALUES (?::uuid, ?::uuid, ?::jsonb)",
+                id, createdBy.toString(), jsonData
         );
     }
 
@@ -180,8 +220,7 @@ public class DynamicTableManager {
         // 否则前端拿不到 id(无法编辑/删除/建立关联),rollup 也无法定位关联记录。
         // 注意路径只能是 '{id}' —— PostgreSQL 的 jsonb_set 只能创建**最后一级**缺失键,
         // 用 '{data,id}' 不会创建中间的 data 对象(实测返回原值不变)。
-        StringBuilder sql = new StringBuilder(
-                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM ")
+        StringBuilder sql = new StringBuilder("SELECT (" + RECORD_PROJECTION + ")::text FROM ")
                 .append(physicalTableName(collectionName))
                 // PHASE125:列表默认排除已软删记录(回收站记录由 listDeleted 单独查询)
                 .append(" WHERE deleted_at IS NULL");
@@ -199,6 +238,64 @@ public class DynamicTableManager {
         if (dataScopeParams != null) args.addAll(dataScopeParams);
         args.add(Math.min(limit, 500));
         return jdbc.queryForList(sql.toString(), String.class, args.toArray());
+    }
+
+    /**
+     * R3：keyset 分页遍历（搜索索引全量重建）。
+     *
+     * <p>{@code id} 为 UUID 主键，{@code id > ?} 的排序在单次重建期间稳定；
+     * 该顺序仅用于遍历，不改变任何展示顺序。必须带 {@code deleted_at IS NULL}，
+     * 否则回收站记录也会进入索引。
+     *
+     * @param afterId 上一页最后一条 id；null/空表示第一页
+     */
+    public List<String> listRecordsAfter(String collectionName, String afterId, int limit) {
+        validateIdentifier(collectionName); // PHASE116 加固
+        StringBuilder sql = new StringBuilder("SELECT (" + RECORD_PROJECTION + ")::text FROM ")
+                .append(physicalTableName(collectionName))
+                .append(" WHERE deleted_at IS NULL");
+        List<Object> args = new ArrayList<>();
+        if (afterId != null && !afterId.isBlank()) {
+            sql.append(" AND id > ?::uuid");
+            args.add(afterId);
+        }
+        sql.append(" ORDER BY id ASC LIMIT ?");
+        args.add(Math.max(1, Math.min(limit, 500)));
+        return jdbc.queryForList(sql.toString(), String.class, args.toArray());
+    }
+
+    /**
+     * R4：批量按 id 取记录（搜索 ACL 判定用，避免逐条回表）。
+     *
+     * <p>索引里可能混入非 UUID 的脏 {@code entity_id}（历史数据/外部写入）。
+     * 若直接拼 {@code ?::uuid}，PostgreSQL 会拒绝整条语句，导致该 collection 的
+     * 搜索结果全部被吞。因此先在 Java 侧过滤非法 id，只把合法 UUID 送进查询。
+     */
+    public List<String> getRecordsByIds(String collectionName, java.util.Collection<String> ids) {
+        validateIdentifier(collectionName); // PHASE116 加固
+        if (ids == null || ids.isEmpty()) return List.of();
+        List<String> valid = ids.stream()
+                .filter(DynamicTableManager::isUuid)
+                .distinct()
+                .toList();
+        if (valid.isEmpty()) return List.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(valid.size(), "?::uuid"));
+        return jdbc.queryForList(
+                "SELECT (" + RECORD_PROJECTION + ")::text FROM " + physicalTableName(collectionName)
+                        + " WHERE deleted_at IS NULL AND id IN (" + placeholders + ")",
+                String.class,
+                valid.toArray());
+    }
+
+    /** 非法 UUID 返回 false（不抛异常），用于批量查询前过滤。 */
+    private static boolean isUuid(String id) {
+        if (id == null || id.isBlank()) return false;
+        try {
+            java.util.UUID.fromString(id);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /**
@@ -314,6 +411,23 @@ public class DynamicTableManager {
                                                 List<String> groupByFields,
                                                 List<AggSpec> aggSpecs,
                                                 List<CollectionService.FilterRule> filters) {
+        return aggregate(collectionName, groupByFields, aggSpecs, filters, null, null);
+    }
+
+    /**
+     * R1c：带数据范围谓词下推的聚合。
+     *
+     * <p>聚合无法在内存后过滤（结果已是分组值），必须把 SELF/DEPT 谓词直接
+     * 拼进 SQL。拼装顺序固定：
+     * {@code WHERE deleted_at IS NULL AND (<filters>) AND (<scope>)} ——
+     * 因此参数列表顺序也必须是 filters 参数在前、scope 参数在后。
+     */
+    public List<Map<String, Object>> aggregate(String collectionName,
+                                                List<String> groupByFields,
+                                                List<AggSpec> aggSpecs,
+                                                List<CollectionService.FilterRule> filters,
+                                                String dataScopeWhere,
+                                                java.util.List<Object> dataScopeParams) {
         validateIdentifier(collectionName); // PHASE116 加固
         List<String> groups = safeFields(groupByFields);
         List<AggSpec> aggs = aggSpecs == null ? List.of() : aggSpecs.stream()
@@ -347,10 +461,15 @@ public class DynamicTableManager {
         // PHASE125:BI 聚合必须排除已软删记录,否则报表会把回收站数据算进去
         List<Object> args = new ArrayList<>();
         String where = buildWhere(filters, args);
+        boolean hasScope = dataScopeWhere != null && !dataScopeWhere.isBlank();
         if (where != null) {
             sql.append(" WHERE deleted_at IS NULL AND (").append(where).append(")");
         } else {
             sql.append(" WHERE deleted_at IS NULL");
+        }
+        if (hasScope) {
+            sql.append(" AND (").append(dataScopeWhere).append(")");
+            if (dataScopeParams != null) args.addAll(dataScopeParams);
         }
 
         if (!groupCols.isEmpty()) {
@@ -421,9 +540,8 @@ public class DynamicTableManager {
      */
     public java.util.Optional<String> getRecord(String collectionName, String id) {
         validateIdentifier(collectionName); // PHASE116 加固
-        // PHASE71: 同 listRecords —— 注入 id 到返回 JSON（路径只能是 '{id}'，见 listRecords 注释）
         var list = jdbc.queryForList(
-                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
+                "SELECT (" + RECORD_PROJECTION + ")::text FROM "
                         + physicalTableName(collectionName) +
                         " WHERE id = ?::uuid AND deleted_at IS NULL",
                 String.class,
@@ -436,11 +554,28 @@ public class DynamicTableManager {
      * 更新记录 extra JSON(整段覆盖).
      */
     public int updateRecord(String collectionName, String id, String jsonData) {
+        return updateRecord(collectionName, id, jsonData, null);
+    }
+
+    /**
+     * 更新记录并写入更新人（R0 / D20）。
+     *
+     * @param updatedBy 当前操作者；null 时保留原 updated_by（旧调用方兼容）
+     */
+    public int updateRecord(String collectionName, String id, String jsonData,
+                            java.util.UUID updatedBy) {
         validateIdentifier(collectionName); // PHASE116 加固
+        if (updatedBy == null) {
+            return jdbc.update(
+                    "UPDATE " + physicalTableName(collectionName) +
+                    " SET extra = ?::jsonb, updated_at = NOW() WHERE id = ?::uuid",
+                    jsonData, id
+            );
+        }
         return jdbc.update(
                 "UPDATE " + physicalTableName(collectionName) +
-                " SET extra = ?::jsonb, updated_at = NOW() WHERE id = ?::uuid",
-                jsonData, id
+                " SET extra = ?::jsonb, updated_at = NOW(), updated_by = ?::uuid WHERE id = ?::uuid",
+                jsonData, updatedBy.toString(), id
         );
     }
 
@@ -518,7 +653,7 @@ public class DynamicTableManager {
     public java.util.Optional<String> getRecordIncludeDeleted(String collectionName, String id) {
         validateIdentifier(collectionName); // PHASE116 加固
         var list = jdbc.queryForList(
-                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
+                "SELECT (" + RECORD_PROJECTION_DELETED + ")::text FROM "
                         + physicalTableName(collectionName) +
                         " WHERE id = ?::uuid",
                 String.class,
@@ -536,7 +671,7 @@ public class DynamicTableManager {
     public List<String> listDeleted(String collectionName, int limit) {
         validateIdentifier(collectionName); // PHASE116 加固
         return jdbc.queryForList(
-                "SELECT jsonb_set(COALESCE(extra::jsonb, '{}'::jsonb), '{id}', to_jsonb(id::text), true)::text FROM "
+                "SELECT (" + RECORD_PROJECTION_DELETED + ")::text FROM "
                         + physicalTableName(collectionName) +
                         " WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT ?",
                 String.class,

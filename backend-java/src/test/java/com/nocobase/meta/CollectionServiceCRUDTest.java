@@ -238,4 +238,65 @@ public class CollectionServiceCRUDTest {
         assertThrows(Exception.class, () ->
                 service.aggregate(COLLECTION, List.of("group"), null, null, "other_tenant"));
     }
+
+    @Test
+    void insertRecord_stripsSystemKeysFromClientPayload() throws Exception {
+        service.insertRecord(COLLECTION, Map.of(
+                "amount", 100,
+                "id", UUID.randomUUID().toString(),
+                "created_by", UUID.randomUUID().toString(),
+                "createdBy", UUID.randomUUID().toString(),
+                "created_at", "2020-01-01T00:00:00Z",
+                "updated_by", UUID.randomUUID().toString(),
+                "deleted_by", UUID.randomUUID().toString()), TENANT_ID);
+
+        org.mockito.ArgumentCaptor<String> json = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(tableManager).insertRecord(
+                org.mockito.ArgumentMatchers.eq(COLLECTION),
+                org.mockito.ArgumentMatchers.anyString(), json.capture());
+        Map<String, Object> stored = new ObjectMapper().readValue(json.getValue(), Map.class);
+        assertEquals(100, ((Number) stored.get("amount")).intValue());
+        assertFalse(stored.containsKey("id"));
+        assertFalse(stored.containsKey("created_by"));
+        assertFalse(stored.containsKey("createdBy"));
+        assertFalse(stored.containsKey("created_at"));
+        assertFalse(stored.containsKey("updated_by"));
+        assertFalse(stored.containsKey("deleted_by"));
+    }
+
+    @Test
+    void updateRecord_doesNotWriteProjectionSystemColumnsBackIntoExtra() throws Exception {
+        // 模拟 RECORD_PROJECTION：extra 内容 + 系统列全部平铺在顶层
+        String systemId = UUID.randomUUID().toString();
+        String createdAt = "2024-01-01T00:00:00Z";
+        when(tableManager.getRecord(COLLECTION, systemId))
+                .thenReturn(Optional.of("{\"data\":{\"id\":\"" + systemId + "\","
+                        + "\"amount\":100,\"created_by\":\"creator-1\","
+                        + "\"created_at\":\"" + createdAt + "\","
+                        + "\"updated_at\":\"" + createdAt + "\","
+                        + "\"updated_by\":\"updater-1\","
+                        + "\"deleted_at\":null,\"deleted_by\":null}}"));
+
+        UUID attacker = UUID.randomUUID();
+        service.updateRecord(COLLECTION, systemId, Map.of(
+                "amount", 200,
+                "updated_by", attacker.toString(),
+                "created_by", attacker.toString(),
+                "created_at", "1999-01-01T00:00:00Z",
+                "id", UUID.randomUUID().toString()), TENANT_ID);
+
+        org.mockito.ArgumentCaptor<String> json = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(tableManager).updateRecord(
+                org.mockito.ArgumentMatchers.eq(COLLECTION),
+                org.mockito.ArgumentMatchers.eq(systemId), json.capture());
+        Map<String, Object> stored = new ObjectMapper().readValue(json.getValue(), Map.class);
+        assertEquals(200, ((Number) stored.get("amount")).intValue());
+        assertFalse(stored.containsKey("id"));
+        assertFalse(stored.containsKey("created_by"));
+        assertFalse(stored.containsKey("created_at"));
+        assertFalse(stored.containsKey("updated_at"));
+        assertFalse(stored.containsKey("updated_by"));
+        assertFalse(stored.containsKey("deleted_at"));
+        assertFalse(stored.containsKey("deleted_by"));
+    }
 }

@@ -51,15 +51,21 @@ public class DeptScopeResolver {
      * @return 成员 id 集合（至少含用户自己）；DB 异常时返回「仅本人」—— 保守收敛
      */
     public Set<UUID> resolveVisibleCreatorIds(UUID userId, String tenantId) {
+        if (userId == null) return new HashSet<>();
+        return resolveVisibleCreatorIdsForPath(userId, tenantId,
+                resolveUserDeptPath(userId, tenantId));
+    }
+
+    /**
+     * 使用调用方已经解析的部门路径查询可见创建者，避免同一请求重复查路径。
+     * 路径为 null 时按 D6/fail-safe 收敛 SELF。
+     */
+    public Set<UUID> resolveVisibleCreatorIdsForPath(UUID userId, String tenantId, String path) {
         Set<UUID> result = new HashSet<>();
         if (userId == null) return result;
         result.add(userId);
+        if (path == null || path.isBlank()) return result;
         try {
-            String path = resolveUserDeptPath(userId, tenantId);
-            if (path == null) {
-                // 无部门 → SELF 兜底（决策 D6）
-                return result;
-            }
             // 子树 = path 前缀匹配的所有部门下的所有成员
             List<UUID> ids = jdbc.query(
                     "SELECT u.id FROM users u JOIN org_unit o ON u.department_id = o.id "
@@ -94,24 +100,6 @@ public class DeptScopeResolver {
                     userId, tenantId, e.getMessage());
             return null;
         }
-    }
-
-    /**
-     * 生成 DEPT 范围的下推 SQL 谓词（供报表/审计等确实需要 SQL 文本的场合）。
-     *
-     * <p><b>与修复前的差异</b>：表名是真实存在的 {@code users} / {@code org_unit}，
-     * 子树用 {@code path LIKE :deptPath || '%'} 表达。
-     *
-     * @param creatorField 业务表中归属人列名（白名单校验由调用方负责）
-     * @return 谓词 SQL；用户无部门时返回 null（调用方应按 SELF 处理）
-     */
-    public String buildDeptScopeSql(UUID userId, String tenantId, String creatorField) {
-        String path = resolveUserDeptPath(userId, tenantId);
-        if (path == null) return null;
-        String field = (creatorField == null || creatorField.isBlank()) ? "created_by" : creatorField;
-        return field + " IN (SELECT u.id FROM users u JOIN org_unit o ON u.department_id = o.id "
-                + "WHERE o.tenant_id = '" + tenantId.replace("'", "''")
-                + "' AND o.deleted = FALSE AND o.path LIKE '" + path.replace("'", "''") + "%')";
     }
 
     /**

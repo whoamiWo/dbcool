@@ -88,6 +88,12 @@ class CollectionControllerTest {
         doNothing().when(aclEnforcer).assertCanWriteFields(any(), anyString(), anyString(), any(), any());
         when(aclEnforcer.filterRecord(any(), anyString(), anyString(), any()))
                 .thenAnswer(inv -> inv.getArgument(3));
+        when(aclEnforcer.resolveDataScopePlan(any(), anyString(), anyString()))
+                .thenReturn(new com.nocobase.auth.AclEnforcer.DataScopePlan(null, false));
+        when(aclEnforcer.resolveScopePlan(any(), anyString()))
+                .thenReturn(new com.nocobase.auth.AclEnforcer.ScopePlan(
+                        com.nocobase.auth.AclEnforcer.ScopeKind.ALL, null, null, false));
+        when(aclEnforcer.filterInScope(any(), any())).thenAnswer(inv -> inv.getArgument(1));
         when(aclEnforcer.filterRecordsByDataScope(any(), anyString(), anyString(), any()))
                 .thenAnswer(inv -> inv.getArgument(3));
         // T1.3：默认无数据范围下推（走既有内存路径），具体用例可覆盖
@@ -332,7 +338,7 @@ class CollectionControllerTest {
     @Test
     void createRecord_returns201AndAudit() {
         UUID id = UUID.randomUUID();
-        when(service.insertRecord(eq("posts"), any(), eq("tenant_default"))).thenReturn(id);
+        when(service.insertRecord(eq("posts"), any(), eq("tenant_default"), any())).thenReturn(id);
 
         ResponseEntity<Map<String, Object>> resp = controller.createRecord("posts",
                 Map.of("title", "Hi"), testUser);
@@ -345,7 +351,7 @@ class CollectionControllerTest {
     @Test
     void listRecords_withFilter_returnsServiceResult() {
         when(service.listRecords(eq("posts"), eq("tenant_default"), eq(50),
-                any(), any(), any(), any())).thenReturn(List.of(Map.of("title", "A")));
+                any(), any())).thenReturn(List.of(Map.of("title", "A")));
 
         Map<String, Object> resp = controller.listRecords("posts", 50, null, null, testUser);
 
@@ -356,7 +362,7 @@ class CollectionControllerTest {
     @Test
     void listRecords_withComplexFilter_parsesCorrectly() {
         when(service.listRecords(eq("posts"), eq("tenant_default"), eq(50),
-                any(), any(), any(), any())).thenReturn(List.of());
+                any(), any())).thenReturn(List.of());
 
         // filter=name:contains:Al,age:gt:20,email:empty
         controller.listRecords("posts", 50, null,
@@ -365,7 +371,7 @@ class CollectionControllerTest {
         ArgumentCaptor<List<CollectionService.FilterRule>> cap =
                 ArgumentCaptor.forClass(List.class);
         verify(service).listRecords(eq("posts"), eq("tenant_default"), eq(50),
-                any(), cap.capture(), any(), any());
+                any(), cap.capture());
         List<CollectionService.FilterRule> rules = cap.getValue();
         assertEquals(3, rules.size());
         assertEquals("contains", rules.get(0).op());
@@ -376,7 +382,7 @@ class CollectionControllerTest {
     @Test
     void listRecords_invalidFilterSkipped_parsesValid() {
         when(service.listRecords(eq("posts"), eq("tenant_default"), anyInt(),
-                any(), any(), any(), any())).thenReturn(List.of());
+                any(), any())).thenReturn(List.of());
 
         // 非法 op:invalid + 合法 eq:Alice
         controller.listRecords("posts", 50, null, "op:invalid:x,name:eq:Alice", testUser);
@@ -384,7 +390,7 @@ class CollectionControllerTest {
         ArgumentCaptor<List<CollectionService.FilterRule>> cap =
                 ArgumentCaptor.forClass(List.class);
         verify(service).listRecords(eq("posts"), eq("tenant_default"), anyInt(),
-                any(), cap.capture(), any(), any());
+                any(), cap.capture());
         // 只有 eq:Alice 通过
         assertEquals(1, cap.getValue().size());
         assertEquals("name", cap.getValue().get(0).field());
@@ -415,7 +421,7 @@ class CollectionControllerTest {
     void updateRecord_succeedsAndAudits() {
         Map<String, Object> existing = Map.of("id", "rec-1", "title", "Old");
         when(service.getRecord("posts", "rec-1", "tenant_default")).thenReturn(existing);
-        when(service.updateRecord(eq("posts"), eq("rec-1"), any(), eq("tenant_default")))
+        when(service.updateRecord(eq("posts"), eq("rec-1"), any(), eq("tenant_default"), any()))
                 .thenReturn(true);
 
         Map<String, Object> resp = controller.updateRecord("posts", "rec-1",
@@ -430,7 +436,7 @@ class CollectionControllerTest {
     void updateRecord_notFound_returns404() {
         Map<String, Object> existing = Map.of("id", "rec-1");
         when(service.getRecord("posts", "rec-1", "tenant_default")).thenReturn(existing);
-        when(service.updateRecord(anyString(), anyString(), any(), anyString()))
+        when(service.updateRecord(anyString(), anyString(), any(), anyString(), any()))
                 .thenReturn(false);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
@@ -440,7 +446,7 @@ class CollectionControllerTest {
     }
 
     @Test
-    void updateRecord_rowAclDeny_returns403() {
+    void updateRecord_rowAclDeny_returns404() {
         Map<String, Object> existing = Map.of("id", "rec-1");
         when(service.getRecord("posts", "rec-1", "tenant_default")).thenReturn(existing);
         when(rowAclService.evaluateUpdate(anyString(), anyString(), any(), any()))
@@ -449,7 +455,7 @@ class CollectionControllerTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> controller.updateRecord("posts", "rec-1",
                         Map.of("title", "New"), testUser));
-        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
     @Test
@@ -512,7 +518,7 @@ class CollectionControllerTest {
         String csv = "title,body\nHello,World\nFoo,Bar\n";
         MockMultipartFile file = new MockMultipartFile("file", "data.csv",
                 "text/csv", csv.getBytes(StandardCharsets.UTF_8));
-        when(service.insertRecord(eq("posts"), any(), eq("tenant_default")))
+        when(service.insertRecord(eq("posts"), any(), eq("tenant_default"), any()))
                 .thenReturn(UUID.randomUUID());
 
         Map<String, Object> resp = controller.importCsv("posts", file, testUser);
@@ -551,7 +557,7 @@ class CollectionControllerTest {
         MockMultipartFile file = new MockMultipartFile("file", "data.csv",
                 "text/csv", csv.getBytes(StandardCharsets.UTF_8));
         // 第一次调用成功,第二次失败
-        when(service.insertRecord(eq("posts"), any(), eq("tenant_default")))
+        when(service.insertRecord(eq("posts"), any(), eq("tenant_default"), any()))
                 .thenReturn(UUID.randomUUID())
                 .thenThrow(new RuntimeException("validation failed"));
 
@@ -576,7 +582,7 @@ class CollectionControllerTest {
         List<Map<String, Object>> records = List.of(
                 Map.of("title", "A"), Map.of("title", "B")
         );
-        when(service.batchInsert(eq("posts"), eq(records), eq("tenant_default")))
+        when(service.batchInsert(eq("posts"), eq(records), eq("tenant_default"), any()))
                 .thenReturn(2);
 
         Map<String, Object> resp = controller.batchCreateRecords("posts", records, testUser);
@@ -604,7 +610,7 @@ class CollectionControllerTest {
                 new CollectionService.BatchUpdateItem("u1", Map.of("views", 10)),
                 new CollectionService.BatchUpdateItem("u2", Map.of("views", 20))
         );
-        when(service.batchUpdate(eq("posts"), eq(items), eq("tenant_default")))
+        when(service.batchUpdate(eq("posts"), eq(items), eq("tenant_default"), any()))
                 .thenReturn(List.of("u1", "u2"));
 
         Map<String, Object> resp = controller.batchUpdateRecords("posts", items, testUser);
@@ -627,7 +633,7 @@ class CollectionControllerTest {
     @Test
     void batchDelete_ids_deletedAndAudited() {
         List<String> ids = List.of("u1", "u2", "u3");
-        when(service.batchDelete(eq("posts"), eq(ids), eq("tenant_default"))).thenReturn(3);
+        when(service.batchDelete(eq("posts"), eq(ids), eq("tenant_default"), any())).thenReturn(3);
 
         Map<String, Object> resp = controller.batchDeleteRecords("posts", ids, testUser);
 

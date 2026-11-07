@@ -476,6 +476,17 @@ public class CollectionService {
     // ============================================================
 
     public UUID insertRecord(String collectionName, Map<String, Object> data, String tenantId) {
+        return insertRecord(collectionName, data, tenantId, null);
+    }
+
+    /**
+     * R0：插入记录并写入归属人（created_by）。
+     *
+     * <p>客户端提交的 {@code created_by/createdBy} 一律剥离 —— 归属只能由服务端
+     * 根据当前操作者写入，防止伪造。
+     */
+    public UUID insertRecord(String collectionName, Map<String, Object> data, String tenantId,
+                             UUID actorId) {
         if (tenantId == null || tenantId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
         }
@@ -483,17 +494,59 @@ public class CollectionService {
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
+        Map<String, Object> safeData = stripSystemKeys(data);
         // US-003:字段约束(默认值填充 + 必填/唯一/主键校验)
-        Map<String, Object> effective = applyFieldConstraints(meta, data, null, true);
+        Map<String, Object> effective = applyFieldConstraints(meta, safeData, null, true);
         UUID id = UUID.randomUUID();
         try {
             String json = objectMapper.writeValueAsString(effective);
-            tableManager.insertRecord(collectionName, id.toString(), json);
+            if (actorId == null) {
+                tableManager.insertRecord(collectionName, id.toString(), json);
+            } else {
+                tableManager.insertRecord(collectionName, id.toString(), json, actorId);
+            }
             return id;
         } catch (Exception e) {
             throw new RuntimeException("record 序列化失败", e);
         }
     }
+
+    /**
+     * Round 3：剥离系统保留键（snake_case 与 camelCase 两种写法）。
+     *
+     * <p>系统列由数据库维护，绝不能来自客户端：
+     * <ul>
+     *   <li>{@code id} —— 主键，由服务端生成</li>
+     *   <li>{@code created_by/created_at} —— 归属与创建时间</li>
+     *   <li>{@code updated_by/updated_at} —— 最后修改人与时间</li>
+     *   <li>{@code deleted_by/deleted_at} —— 软删除信息</li>
+     * </ul>
+     *
+     * <p>插入/更新都会经过这里。读取投影（{@code RECORD_PROJECTION}）会把系统列合并进
+     * 返回 JSON，更新时的读-改-写流程若不剥离，会把系统列回写进 {@code extra} 并允许
+     * 客户端伪造 {@code updated_by}。collection 若声明同名字段，以系统列为准。
+     */
+    private static Map<String, Object> stripSystemKeys(Map<String, Object> data) {
+        if (data == null || data.isEmpty()) return data;
+        boolean hasSystemKey = false;
+        for (String key : data.keySet()) {
+            if (SYSTEM_KEYS.contains(key)) {
+                hasSystemKey = true;
+                break;
+            }
+        }
+        if (!hasSystemKey) return data;
+        Map<String, Object> copy = new java.util.HashMap<>(data);
+        copy.keySet().removeAll(SYSTEM_KEYS);
+        return copy;
+    }
+
+    /** 系统保留键；与 {@code DynamicTableManager} 的系统列一一对应。 */
+    private static final java.util.Set<String> SYSTEM_KEYS = java.util.Set.of(
+            "id",
+            "created_by", "createdBy", "created_at", "createdAt",
+            "updated_by", "updatedBy", "updated_at", "updatedAt",
+            "deleted_by", "deletedBy", "deleted_at", "deletedAt");
 
     /**
      * US-003:应用字段约束 —— 默认值填充、必填校验、唯一校验、主键(=必填+唯一)。
@@ -722,6 +775,48 @@ public class CollectionService {
         return records;
     }
 
+    /**
+     * R3：keyset 分页遍历（搜索索引全量重建用）。
+     *
+     * @param afterId 上一页最后一条 id；null 表示第一页
+     * @return 记录（含 id/created_by 等系统列），按 id 升序
+     */
+    public List<Map<String, Object>> listRecordsAfter(String collectionName, String tenantId,
+                                                       String afterId, int limit) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        return tableManager.listRecordsAfter(collectionName, afterId, limit).stream()
+                .map(this::unwrapRecord)
+                .toList();
+    }
+
+    /** R4：批量按 id 取记录（搜索 ACL 判定，避免逐条回表）。 */
+    public List<Map<String, Object>> getRecordsByIds(String collectionName,
+                                                      java.util.Collection<String> ids,
+                                                      String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        return tableManager.getRecordsByIds(collectionName, ids).stream()
+                .map(this::unwrapRecord)
+                .toList();
+    }
+
+    /** 回收站/版本操作：取单条（含已软删记录，带 created_by/deleted_by）。 */
+    public Map<String, Object> getRecordIncludingDeleted(String collectionName, String id,
+                                                          String tenantId) {
+        CollectionMetaEntity meta = get(collectionName);
+        if (!meta.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
+        }
+        String json = tableManager.getRecordIncludeDeleted(collectionName, id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "记录不存在"));
+        return unwrapRecord(json);
+    }
+
     /** Week 17: 与前端 FilterRule op 完全镜像 */
     boolean matchFilter(Object value, FilterRule rule) {
         if (rule == null || rule.op == null) return true;
@@ -759,11 +854,22 @@ public class CollectionService {
                                                List<String> groupByFields,
                                                List<DynamicTableManager.AggSpec> aggSpecs,
                                                List<FilterRule> filters) {
+        return aggregate(collectionName, tenantId, groupByFields, aggSpecs, filters, null, null);
+    }
+
+    /** R1c：带数据范围谓词下推的聚合（参数顺序：filters 在前、scope 在后）。 */
+    public List<Map<String, Object>> aggregate(String collectionName, String tenantId,
+                                               List<String> groupByFields,
+                                               List<DynamicTableManager.AggSpec> aggSpecs,
+                                               List<FilterRule> filters,
+                                               String dataScopeWhere,
+                                               java.util.List<Object> dataScopeParams) {
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
-        return tableManager.aggregate(collectionName, groupByFields, aggSpecs, filters);
+        return tableManager.aggregate(collectionName, groupByFields, aggSpecs, filters,
+                dataScopeWhere, dataScopeParams);
     }
 
     /**
@@ -959,6 +1065,14 @@ public class CollectionService {
 
 public boolean updateRecord(String collectionName, String id,
                                   Map<String, Object> data, String tenantId) {
+        return updateRecord(collectionName, id, data, tenantId, null);
+    }
+
+    /**
+     * R0：更新记录并写入 updated_by（同时剥离客户端伪造的归属键）。
+     */
+    public boolean updateRecord(String collectionName, String id,
+                                  Map<String, Object> data, String tenantId, UUID actorId) {
         if (tenantId == null || tenantId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "租户上下文缺失，拒绝访问");
         }
@@ -967,17 +1081,22 @@ public boolean updateRecord(String collectionName, String id,
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
         try {
-            // merge:把新 fields 合并到现有 record,避免破坏 created_by 等
-            Map<String, Object> existing = getRecord(collectionName, id, tenantId);
+            Map<String, Object> safeData = stripSystemKeys(data);
+            // merge:把新 fields 合并到现有 record,避免破坏 created_by 等。
+            // 现有记录来自 RECORD_PROJECTION（含系统列），合并前同样剥离，
+            // 否则每次更新都会把 id/created_at/... 回写进 extra。
+            Map<String, Object> existing = stripSystemKeys(getRecord(collectionName, id, tenantId));
             Map<String, Object> merged = new java.util.HashMap<>(existing);
-            merged.putAll(data);
+            if (safeData != null) merged.putAll(safeData);
             // US-003:字段约束(排除自身 id,避免与自身唯一值冲突)
             // PHASE71: 传入用户实际提交的 keySet —— 否则自动字段的旧值(由 merged 带过来)
             // 会被误判为"手工写入"而 400，导致含 createdTime/createdBy 的记录无法更新。
             Map<String, Object> effective = applyFieldConstraints(
-                    meta, merged, id, false, data == null ? java.util.Set.of() : data.keySet());
+                    meta, merged, id, false, safeData == null ? java.util.Set.of() : safeData.keySet());
             String json = objectMapper.writeValueAsString(effective);
-            return tableManager.updateRecord(collectionName, id, json) > 0;
+            return (actorId == null
+                    ? tableManager.updateRecord(collectionName, id, json)
+                    : tableManager.updateRecord(collectionName, id, json, actorId)) > 0;
         } catch (org.springframework.web.server.ResponseStatusException rse) {
             throw rse;
         } catch (Exception e) {
@@ -1229,6 +1348,13 @@ public boolean updateRecord(String collectionName, String id,
      */
     @Transactional
     public int batchInsert(String collectionName, List<Map<String, Object>> dataList, String tenantId) {
+        return batchInsert(collectionName, dataList, tenantId, null);
+    }
+
+    /** R0：批量插入，所有记录 created_by = 当前操作者。 */
+    @Transactional
+    public int batchInsert(String collectionName, List<Map<String, Object>> dataList,
+                           String tenantId, UUID actorId) {
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
@@ -1237,8 +1363,12 @@ public boolean updateRecord(String collectionName, String id,
         int count = 0;
         for (Map<String, Object> data : dataList) {
             UUID id = UUID.randomUUID();
-            String json = serializeRecord(data, fields);
-            tableManager.insertRecord(collectionName, id.toString(), json);
+            String json = serializeRecord(stripSystemKeys(data), fields);
+            if (actorId == null) {
+                tableManager.insertRecord(collectionName, id.toString(), json);
+            } else {
+                tableManager.insertRecord(collectionName, id.toString(), json, actorId);
+            }
             count++;
         }
         return count;
@@ -1251,6 +1381,13 @@ public boolean updateRecord(String collectionName, String id,
      */
     @Transactional
     public List<String> batchUpdate(String collectionName, List<BatchUpdateItem> items, String tenantId) {
+        return batchUpdate(collectionName, items, tenantId, null);
+    }
+
+    /** R0：批量更新，所有记录 updated_by = 当前操作者。 */
+    @Transactional
+    public List<String> batchUpdate(String collectionName, List<BatchUpdateItem> items,
+                                    String tenantId, UUID actorId) {
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
@@ -1258,7 +1395,7 @@ public boolean updateRecord(String collectionName, String id,
         List<FieldDef> fields = parseFields(meta);
         List<String> updatedIds = new ArrayList<>();
         for (BatchUpdateItem item : items) {
-            if (updateRecordInternal(collectionName, item.id(), item.data(), fields)) {
+            if (updateRecordInternal(collectionName, item.id(), item.data(), fields, actorId)) {
                 updatedIds.add(item.id());
             }
         }
@@ -1272,15 +1409,22 @@ public boolean updateRecord(String collectionName, String id,
      */
     @Transactional
     public int batchDelete(String collectionName, List<String> ids, String tenantId) {
+        return batchDelete(collectionName, ids, tenantId, null);
+    }
+
+    /** R0：批量软删，所有记录 deleted_by = 当前操作者。 */
+    @Transactional
+    public int batchDelete(String collectionName, List<String> ids, String tenantId, UUID actorId) {
         CollectionMetaEntity meta = get(collectionName);
         if (!meta.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该 collection");
         }
         int count = 0;
         for (String id : ids) {
-            if (tableManager.deleteRecord(collectionName, id) > 0) {
-                count++;
-            }
+            int n = actorId == null
+                    ? tableManager.deleteRecord(collectionName, id)
+                    : tableManager.deleteRecord(collectionName, id, actorId);
+            if (n > 0) count++;
         }
         return count;
     }
@@ -1302,9 +1446,12 @@ public boolean updateRecord(String collectionName, String id,
         return tableManager.aggregate(collectionName, groupByFields, aggSpecs, filters);
     }
 
-    private boolean updateRecordInternal(String collectionName, String id, Map<String, Object> data, List<FieldDef> fields) {
-        String json = serializeRecord(data, fields);
-        return tableManager.updateRecord(collectionName, id, json) > 0;
+    private boolean updateRecordInternal(String collectionName, String id, Map<String, Object> data,
+                                         List<FieldDef> fields, UUID actorId) {
+        String json = serializeRecord(stripSystemKeys(data), fields);
+        return (actorId == null
+                ? tableManager.updateRecord(collectionName, id, json)
+                : tableManager.updateRecord(collectionName, id, json, actorId)) > 0;
     }
 
     private String serializeRecord(Map<String, Object> data, List<FieldDef> fields) {
