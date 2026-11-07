@@ -499,7 +499,22 @@ button {
     flex-wrap: nowrap;
     gap: 8px;
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     padding-bottom: 4px;
+  }
+
+  /* 375px：右侧操作区（搜索/通知/用户/语言/退出）必须换行，否则撑破视口 */
+  .app-header > div:last-child {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .app-header > div:last-child > span {
+    display: none; /* 用户名/角色在窄屏隐藏，避免固定宽度文本溢出 */
   }
 
   .app-header a {
@@ -687,5 +702,20 @@ button {
   /* 防止内联 flex 行（如页头操作区）在窄屏溢出视口 */
   .app-main {
     overflow-x: hidden;
+  }
+
+  /* E1/E2 页面：桌面为「主内容 + 固定宽度侧栏」，移动端改为纵向单列。
+     这些页面使用内联 flex/width，因此需要 !important 覆盖。 */
+  .split-layout {
+    flex-direction: column !important;
+  }
+
+  .split-sidebar,
+  .split-main {
+    width: 100% !important;
+    max-width: none !important;
+    flex: none !important;
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
   }
 }

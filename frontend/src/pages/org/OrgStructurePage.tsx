@@ -121,8 +121,8 @@ export function OrgStructurePage() {
   );
 
   return (
-    <div style={{ display: 'flex', gap: 24, padding: 20 }}>
-      <section style={{ flex: 1, maxWidth: 520 }}>
+    <div className="split-layout" style={{ display: 'flex', gap: 24, padding: 20 }}>
+      <section className="split-main" style={{ flex: 1, maxWidth: 520 }}>
         <h2 style={{ fontSize: 16 }}>组织结构</h2>
         <div style={{ border: '1px solid var(--color-border-light)', borderRadius: 8, padding: 8 }}>
           {tree.map(n => renderNode(n, 0))}
@@ -130,7 +130,7 @@ export function OrgStructurePage() {
         </div>
       </section>
 
-      <section style={{ width: 380 }}>
+      <section className="split-sidebar" style={{ width: 380 }}>
         <h3 style={{ fontSize: 14 }}>{selected ? `编辑：${selected.name}` : '新建部门'}</h3>
         {selected && (
           <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>

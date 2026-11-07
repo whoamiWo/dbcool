@@ -31,6 +31,16 @@ export default defineConfig({
     // 用例全部以 "browserType.launch: Executable doesn't exist" 失败
     // （看起来像适配没做，实际是浏览器没装）。
     { name: 'mobile-chromium', use: { ...devices['iPhone 13'], browserName: 'chromium' } },
+    // N0/A0-7：发布验收要求 375px 窄屏（iPhone 13 为 390px）
+    {
+      name: 'mobile-375',
+      use: {
+        ...devices['iPhone 13'],
+        browserName: 'chromium',
+        viewport: { width: 375, height: 812 },
+        screen: { width: 375, height: 812 },
+      },
+    },
   ],
   webServer: {
     command: 'VITE_E2E=true npm run build && VITE_E2E=true npm run preview -- --port 4173',

@@ -126,12 +126,20 @@ export function GlobalSearchPanel() {
 
   const handleResultClick = (result: SearchResult) => {
     handleClose();
+    // D16：统一走后端 deeplink（保证与权限判定同源，后端路径变更时不再二次断链）
+    if (result.deeplink) {
+      navigate(result.deeplink);
+      return;
+    }
     switch (result.type) {
       case 'wiki':
         navigate(`/wiki/${result.slug || result.id}`);
         break;
       case 'record':
-        navigate(result.collection ? `/records/${result.collection}/${result.id}` : '/');
+        navigate(result.collection ? `/records/${result.collection}/${result.id}` : '/search');
+        break;
+      case 'approval':
+        navigate(`/approvals/${result.id}`);
         break;
       case 'im':
         navigate(`/im`);
@@ -143,7 +151,7 @@ export function GlobalSearchPanel() {
         navigate(`/designer/workflows`);
         break;
       default:
-        navigate('/');
+        navigate('/search');
     }
   };
 

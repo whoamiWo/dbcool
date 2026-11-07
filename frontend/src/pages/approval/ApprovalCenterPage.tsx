@@ -154,8 +154,8 @@ export function ApprovalCenterPage() {
 
       {error && <div style={{ color: 'var(--color-error)', marginBottom: 12 }}>{error}</div>}
 
-      <div style={{ display: 'flex', gap: 20 }}>
-        <section style={{ flex: 1 }}>
+      <div className="split-layout" style={{ display: 'flex', gap: 20 }}>
+        <section className="split-main" style={{ flex: 1 }}>
           {items.length === 0 && <div style={{ opacity: 0.6 }}>暂无记录</div>}
           {items.map(it => (
             <Link
@@ -181,7 +181,7 @@ export function ApprovalCenterPage() {
           ))}
         </section>
 
-        <aside style={{ width: 340 }}>
+        <aside className="split-sidebar" style={{ width: 340 }}>
           <h3 style={{ fontSize: 14 }}>发起审批</h3>
           <select
             value={form.templateId}

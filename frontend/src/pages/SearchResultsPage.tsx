@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { searchApi, SEARCH_FACET_LABELS, type SearchResult } from '@/api/search';
 
-const TYPES = ['', 'wiki', 'record', 'im', 'project', 'automation'];
+const TYPES = ['', 'wiki', 'record', 'im', 'project', 'automation', 'approval'];
 
 /**
  * 全局搜索结果页（E4）。
@@ -45,6 +45,8 @@ export function SearchResultsPage() {
       return;
     }
     if (r.type === 'wiki') navigate(`/wiki/${r.slug ?? r.id}`);
+    else if (r.type === 'record' && r.collection) navigate(`/records/${r.collection}/${r.id}`);
+    else if (r.type === 'approval') navigate(`/approvals/${r.id}`);
     else if (r.type === 'im') navigate('/im');
     else if (r.type === 'project') navigate('/projects');
     else if (r.type === 'automation') navigate('/designer/workflows');
