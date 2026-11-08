@@ -27,8 +27,8 @@ export function OrgStructurePage() {
 
   const load = () => {
     apiClient
-      .get<OrgNode[]>('/org/tree')
-      .then(r => setTree(r ?? []))
+      .get<{ data: OrgNode[] }>('/org/tree')
+      .then(r => setTree(r?.data ?? []))
       .catch(e => setError(e?.message ?? '加载失败'));
   };
 

@@ -220,6 +220,36 @@ class UnifiedSearchServiceTest {
     }
 
     @Test
+    void search_records_noRowPolicy_isVisibleLikeListPath() {
+        String r1 = UUID.randomUUID().toString();
+        givenIndexHits(List.of(idx("record", r1, "订单 A", "content")));
+        // 无 ROW 策略：evaluateRead 本身是 fail-closed，但列表路径的语义是「无策略=放行」，
+        // 搜索必须与列表同源，否则未配置行级权限的集合在搜索里整体消失。
+        when(rowAclService.hasPolicies(tenantId, "orders", "read")).thenReturn(false);
+        when(rowAclService.evaluateRead(any(), any(), any(), any())).thenReturn(false);
+
+        Map<String, Object> result = service.search("content", tenantId, USER,
+                List.of("record"), 20);
+
+        assertThat(result.get("total")).isEqualTo(1);
+        verify(rowAclService, org.mockito.Mockito.never())
+                .evaluateRead(any(), any(), any(), any());
+    }
+
+    @Test
+    void search_records_rowPolicyDeny_filtersOut() {
+        String r1 = UUID.randomUUID().toString();
+        givenIndexHits(List.of(idx("record", r1, "订单 A", "content")));
+        when(rowAclService.hasPolicies(tenantId, "orders", "read")).thenReturn(true);
+        when(rowAclService.evaluateRead(any(), any(), any(), any())).thenReturn(false);
+
+        Map<String, Object> result = service.search("content", tenantId, USER,
+                List.of("record"), 20);
+
+        assertThat(result.get("total")).isEqualTo(0);
+    }
+
+    @Test
     void search_automation_filtersByKeyword() {
         AutomationRuleEntity rule = new AutomationRuleEntity();
         rule.setId(ruleId);

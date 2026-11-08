@@ -55,7 +55,7 @@ test.describe('Mobile Responsive Tests', () => {
   }
 
   async function mockApprovals(page: import('@playwright/test').Page) {
-    await page.route('**/api/approvals*', async (route) => {
+    await page.route('**/api/approvals**', async (route) => {
       const url = route.request().url();
       if (url.includes('/templates')) {
         await route.fulfill({
@@ -67,7 +67,7 @@ test.describe('Mobile Responsive Tests', () => {
         });
         return;
       }
-      if (url.match(/\/approvals\/[^/?]+$/)) {
+      if (url.match(/\/approvals\/(?!todo$|mine$|cc$)[^/?]+$/)) {
         await route.fulfill({
           status: 200, contentType: 'application/json',
           body: JSON.stringify({
@@ -157,7 +157,7 @@ test.describe('Mobile Responsive Tests', () => {
         }),
       });
     });
-    await page.route('**/api/collections/orders*', async (route) => {
+    await page.route('**/api/collections/orders**', async (route) => {
       const url = route.request().url();
       if (url.includes('/records/r1')) {
         await route.fulfill({
