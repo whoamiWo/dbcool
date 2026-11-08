@@ -301,13 +301,13 @@
 | **T1.3 DEPT（A-1）** | ✅ 完成（含 SQL 下推） | `DeptScopeResolver` 真实子树；`AclEnforcer.resolveDataScopePlan` 产出可参数化谓词；SELF/DEPT **下推到 SQL**（`CollectionService.listRecords` 7 参重载 → `DynamicTableManager` `AND (...)` + `LIMIT ×5`），CUSTOM/ROW ACL 保留内存过滤并 `log.warn`；`AclDataScopeTest` 10 项（行为断言）+ `CollectionControllerTest` 37 项；真实 PG 脚本 3 项断言 PASS |
 | **T1.4 组织同步（A-4）** | ✅ 完成 | 逐部门 BFS + cursor 分页（110+10 人两页）、已存在用户更新、未出现→RESIGNED+enabled=false、租户遍历、`usersFailed>0 → code!=0`；`DingTalkOrgSyncServiceMultiDeptTest` 4 项 |
 | **T1.5 会话失效（A-5）** | ✅ 完成 | `JwtAuthFilter` + `UserStatusService`（Redis 60s + fail-closed）；`RefreshTokenService.revokeAll`；禁用/删除/离职主动失效；`JwtAuthFilterTest` 含失效 token 用例 |
-| **T2.1 组织后端** | ✅ 完成（钉钉/企微）；⚠️ 飞书仅登录建号，无部门同步接口（原服务即无此能力） | `OrgUnitServiceTest` 10 项；`OrgUnitController` 树/成员/CRUD/调动 |
+| **T2.1 组织后端** | ✅ 完成（钉钉/企微/飞书） | `OrgUnitServiceTest` 10 项；`OrgUnitController` 树/成员/CRUD/调动；飞书部门树同步 `FeishuOrgSyncService`（代码 + mock 测试完成，真实租户需 `contact:department:readonly` / `contact:user.base:readonly`） |
 | **T2.2 通讯录前端** | ✅ 完成 | `/directory`、`/admin/org`；手机号按 ADMIN/HR 后端字段级下发（D7） |
 | **T3.1 审批后端** | ✅ 完成 | V78；`ApprovalServiceTest` 8 项（提交前 manager 校验、状态投影、撤回、模板向导） |
 | **T3.2 审批前端 + 钉钉** | ⚠️ 部分（前端完成，钉钉未联调） | `/approvals`、`/approvals/:id` 可用；模板创建 UI 已接入 `from-preset`；`/tasks/my` 已重定向到 `/approvals`（旧组件保留供单测）；单据页 `window.print()` + `@media print` 样式；钉钉去程推送已实现且默认关闭，未对真实钉钉租户联调 |
 | **T4 通知中心** | ✅ 完成（7/7 接入点） | APPROVAL_TODO / APPROVAL_RESULT / MENTION / COMMENT / WORKFLOW_FAILED / DUE_SOON / **QUOTA**（`TenantQuotaFilter` 429 分支 → 租户 ADMIN，按天 digest）；偏好读写 API `/api/users/me/preferences`（真实 H2 往返测试 3 项）+ 前端偏好抽屉（免打扰/渠道开关）；`NotifyDispatcherTest` 6、`NotificationSchedulerTest` 4、`CommentNotificationListenerTest` 5、`UserPreferenceControllerTest` 3 |
 | **T5.1 索引写入（A-6）** | ✅ 完成（含存量重建） | `SearchIndexSyncListenerTest` 5 项（字段推断、元数据白名单、DELETE、元数据缺失兜底）；存量重建 `SearchReindexRunner`（`--reindex-search`，逐租户逐集合，复用同一推断逻辑，`SearchReindexRunnerTest` 3 项） |
-| **T5.2 搜索 ACL（A-3）** | ✅ 完成 | 集合 READ + 行级 + 部门三重判权；取数窗口放大 ×5 后再过滤截断；新增 `approval` 类型与可见性判权（申请人/抄送/任务处理人）；`UnifiedSearchServiceTest` 8 项；fail-closed |
+| **T5.2 搜索 ACL（A-3）** | ✅ 完成 | 集合 READ + 行级 + 部门三重判权；取数窗口放大 ×5 后再过滤截断；新增 `approval` 类型与可见性判权（申请人/抄送/任务处理人）；无 ROW 策略时与列表路径一致放行（`hasPolicies`），有策略时 fail-closed；`UnifiedSearchServiceTest` 10 项 |
 | **T5.3 搜索前端** | ✅ 完成 | 全局搜索优先 deeplink；`/search` 结果页；类型筛选（含 approval）；`Ctrl/Cmd+K` 打开（移动端不启用）+ ↑↓ 键盘导航 + Enter 跳转 + 选中高亮 |
 | **额外发现并修复** | ✅ | `V50` 丢弃搜索触发器未重建 → `V80__restore_search_vector_trigger.sql`；真实 PG 复现并回填 |
 
@@ -330,12 +330,24 @@
 - 真实栈：smoke（新后端 8081）**13 PASS + 1 SKIP**；tenant isolation **22/22 PASS**；`verify-enterprise-suite.py` **12 项 PASS**；API contract **0 漂移**；版本一致。
 - 说明：`monthly-gate.py` 已增加真实 PG 与 schema smoke 两项（14 项总数）；本次未在旧默认 8080 镜像上执行整套 monthly gate。
 
+### Round 3 收口状态（本机，2026-11-07）
+
+- **系统列剥离**：`CollectionService.stripSystemKeys` 覆盖 `id/created_by/created_at/updated_at/updated_by/deleted_at/deleted_by`（含 camelCase），插入、更新（合并前）、批量路径统一剥离；`CollectionServiceCRUDTest` 断言 `extra` 不含系统键且客户端伪造 `updated_by` 无效。
+- **批量取记录**：`DynamicTableManager.getRecordsByIds` 先 `UUID.fromString` 过滤，非法 id 不再让整条 `?::uuid` 查询失败；`DynamicTableManagerOwnerColumnsTest` 覆盖混合 id。
+- **索引重建**：`SearchReindexRunner` 记录本页最后有效 id，游标不前进/整页无 id 即 `break` + warn；`SearchReindexRunnerTest` 6 项。
+- **搜索 ACL 与列表同源**：无 ROW 策略时放行（`hasPolicies`），有策略时 `evaluateRead` fail-closed；避免「未配置行级权限的集合在搜索里整体消失」。
+- **门禁实测**：`mvn -o verify` → **2776 tests, 0 failures/errors**，JaCoCo **79.88%**（阈值 79%）；前端 **974 passed / 120 files**；`tsc`/`eslint src` 0 错误；契约 **460 × 137 → 0 漂移**；Python **68 passed / 1 skipped**。
+- **真实栈（新构建 8081）**：smoke **13 PASS + 1 SKIP（MinIO）**；tenant isolation **24/24 PASS**（新增第 23/24 项搜索跨租户）；`pg-it-gate` **8/8**；`verify-enterprise-suite.py` **12/12**；`actor-writer-verify` PASS；月度门禁 **15/15**。
+- **移动端 375px**：`npx playwright test --project=mobile-375` → **65 passed**（新增 `/directory`、`/admin/org`、`/approvals`、`/approvals/:id`、`/search`+记录详情，及 `/tasks/my` 重定向断言）。
+- **飞书/OIDC**：`FeishuOrgSyncServiceMultiDeptTest` 5 项（两层部门、110/10 分页、改名、离职、429、开关关闭零请求）；`OidcLoginSuccessHandlerTest` 4 项（成功/403/非法主体/带 query redirect）。
+- **外部依赖**：钉钉真实审批联调、真实 IdP/飞书租户仍需凭证，验收步骤见 `docs/PLANS/external-integration-acceptance.md`。
+
 ### 未完成项（不得视为已完成）
 
 1. **钉钉审批去程联调**：代码路径存在但默认关闭（`approval.dingtalk.push.enabled=false`），未对真实钉钉应用验证。
-2. **行级 ACL（ROW/CUSTOM policy）仍为内存过滤**：SELF/DEPT 数据范围已下推 SQL，ROW 表达式策略与 CUSTOM 范围仍是内存过滤（P2-7 状态：部分修复）；行级策略下推需引入表达式 DSL 编译器，本轮未做。
-3. **飞书部门树同步**：原 `FeishuAppService` 无部门列表能力，未新增。
+2. **行级 ACL（ROW/CUSTOM policy）明确不下推**：SELF/DEPT 数据范围已下推 SQL；ROW 表达式策略与 CUSTOM 范围保留内存过滤（P2-7 定稿：**不支持 SQL 下推**，CUSTOM 写入拒绝 + 存量告警 + fail-closed）。行级策略下推需引入表达式 DSL 编译器，属独立工程。
+3. ~~**飞书部门树同步**~~：Round 3 已完成代码与 mock 测试；真实租户验证需外部凭证（见验收清单）。
 4. **OIDC 首次登录端到端 200**：OIDC 建号路径已用真实 DB 覆盖（`UserProvisioningRealDbTest`），但"真实 IdP 首次登录 200"需要外部 IdP，未在本机执行。
-5. **移动端 375px Playwright 验收**（T2.3/T3.4）与 **HTTP+SQL 双证**：需要部署新构建后的运行环境，本轮只做了响应式实现与接口层单测，未跑 Playwright。
-6. **搜索负向用例进 `tenant-isolation-e2e-verify.py`**：该脚本跑在**线上旧镜像**上（当前容器仍是改动前的 jar），新端点尚未部署，直接加会立即红灯；已在后端单测层覆盖等价断言（ACL 跨租户/跨 collection 0 结果），待镜像重建后再补脚本用例。
+5. ~~**移动端 375px Playwright 验收**~~：Round 3 已在新构建上执行，`mobile-375` 65 passed。
+6. ~~**搜索负向用例进 `tenant-isolation-e2e-verify.py`**~~：Round 3 已新增第 23/24 项，真实栈 **24/24 PASS**。
 7. **IM @提及候选仍取「频道成员」而非 `/api/org/members`**：刻意保留 —— 频道成员是通讯录的子集且有会话权限，改为全组织会造成"能 @ 不可见成员"的越权。

@@ -12,7 +12,7 @@
 
 | 门禁 | 命令 | 阈值 | 失败怎么办 |
 |---|---|---|---|
-| Java 测试 | `cd backend-java && mvn -o test` | 2761，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
+| Java 测试 | `cd backend-java && mvn -o verify` | 2776，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
 | Java 覆盖率 | `cd backend-java && mvn -o verify` | JaCoCo BUNDLE ≥ 82% | 见 §3 覆盖率缺口与补测计划 |
 | 前端单测 | `cd frontend && npm run test:run` | 974 passed / 120 files |
 | Playwright（含 375px） | `cd frontend && npx playwright test` | 240 passed（chromium/firefox/mobile-390/mobile-375） | 看 vitest 输出中失败的 spec |
@@ -21,7 +21,7 @@
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 48 passed / 1 skipped | 看 pytest 输出 |
 | 备份演练 | `python3 scripts/backup-e2e-verify.py` | 30 / 30 | 见 `docs/backup-restore-runbook.md` |
 | 管理员鉴权 | `python3 scripts/admin-authz-e2e-verify.py` | 18 / 18 | 检查 admin/user 登录状态码 |
-| 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 22 / 22 PASS | 检查跨租户断言 |
+| 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 24 / 24 PASS | 检查跨租户断言 |
 | 契约比对 | `python3 scripts/api-contract-verify.py` | 0 漂移 | 重跑 `scripts/export-backend-mappings.py` |
 | SaaS 就绪 | `python3 scripts/saas-readiness-verify.py` | 11 / 11 | 检查 T1/T2/T3 三项 |
 | 冒烟 | `python3 scripts/smoke.py` | 14 项：13 PASS + 1 SKIP（可选 MinIO） | 检查服务是否全部 healthy |
