@@ -46,8 +46,8 @@ export function DirectoryPage() {
 
   useEffect(() => {
     apiClient
-      .get<OrgNode[]>('/org/tree')
-      .then(r => setTree(r ?? []))
+      .get<{ data: OrgNode[] }>('/org/tree')
+      .then(r => setTree(r?.data ?? []))
       .catch(e => setError(e?.message ?? '加载组织架构失败'));
   }, []);
 
@@ -57,8 +57,8 @@ export function DirectoryPage() {
     if (keyword) p.set('keyword', keyword);
     p.set('includeDescendants', 'true');
     apiClient
-      .get<Member[]>(`/org/members?${p.toString()}`)
-      .then(r => setMembers(r ?? []))
+      .get<{ data: Member[] }>(`/org/members?${p.toString()}`)
+      .then(r => setMembers(r?.data ?? []))
       .catch(e => setError(e?.message ?? '加载成员失败'));
   }, [selected, keyword]);
 

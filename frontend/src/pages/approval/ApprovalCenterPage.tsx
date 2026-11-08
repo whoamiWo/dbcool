@@ -51,16 +51,16 @@ export function ApprovalCenterPage() {
 
   const loadTemplates = () => {
     apiClient
-      .get<Template[]>('/approvals/templates')
-      .then(r => setTemplates(r ?? []))
+      .get<{ data: Template[] }>('/approvals/templates')
+      .then(r => setTemplates(r?.data ?? []))
       .catch(() => setTemplates([]));
   };
 
   const loadItems = (which: Tab) => {
     setError(null);
     apiClient
-      .get<ApprovalItem[]>(`/approvals/${which}`)
-      .then(r => setItems(r ?? []))
+      .get<{ data: ApprovalItem[] }>(`/approvals/${which}`)
+      .then(r => setItems(r?.data ?? []))
       .catch(e => setError(e?.response?.data?.message ?? e?.message ?? '加载失败'));
   };
 
@@ -70,10 +70,10 @@ export function ApprovalCenterPage() {
     // 状态更新放在请求回调 / catch 中。
     let cancelled = false;
     apiClient
-      .get<ApprovalItem[]>(`/approvals/${tab}`)
+      .get<{ data: ApprovalItem[] }>(`/approvals/${tab}`)
       .then(r => {
         if (!cancelled) {
-          setItems(r ?? []);
+          setItems(r?.data ?? []);
           setError(null);
         }
       })

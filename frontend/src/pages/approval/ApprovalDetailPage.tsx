@@ -41,8 +41,8 @@ export function ApprovalDetailPage() {
   const load = () => {
     if (!id) return;
     apiClient
-      .get<Detail>(`/approvals/${id}`)
-      .then(r => setDetail(r))
+      .get<{ data: Detail }>(`/approvals/${id}`)
+      .then(r => setDetail(r?.data ?? null))
       .catch(e => setError(e?.response?.data?.message ?? e?.message ?? '加载失败'));
   };
 

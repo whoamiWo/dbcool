@@ -432,7 +432,10 @@ public class UnifiedSearchService {
                 if (record == null) return true;
                 var principal = new com.nocobase.acl.RowAclService.Principal(
                         userId.toString(), aclContext.roles());
-                if (!rowAclService.evaluateRead(tenantId, collection, record, principal)) {
+                // 与列表路径同源：没有 ROW 策略时放行（evaluateRead 对无策略是 fail-closed，
+                // 直接调用会让「没有配置行级权限」的集合在搜索里整体消失）。
+                if (rowAclService.hasPolicies(tenantId, collection, "read")
+                        && !rowAclService.evaluateRead(tenantId, collection, record, principal)) {
                     return true;
                 }
                 return aclEnforcer.filterInScope(aclContext.scope(), List.of(record)).isEmpty();
