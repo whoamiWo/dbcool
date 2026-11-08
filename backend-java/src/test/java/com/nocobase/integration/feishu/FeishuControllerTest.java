@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 class FeishuControllerTest {
 
     private FeishuAppService feishuAppService;
+    private FeishuOrgSyncService orgSyncService;
     private AuditService auditService;
     private FeishuController controller;
 
@@ -35,8 +36,9 @@ class FeishuControllerTest {
     @BeforeEach
     void setUp() {
         feishuAppService = mock(FeishuAppService.class);
+        orgSyncService = mock(FeishuOrgSyncService.class);
         auditService = mock(AuditService.class);
-        controller = new FeishuController(feishuAppService, auditService);
+        controller = new FeishuController(feishuAppService, orgSyncService, auditService);
     }
 
     @Test

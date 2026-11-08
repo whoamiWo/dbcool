@@ -137,7 +137,7 @@
   {
     "path": "/collections/{}/records/batch",
     "file": "frontend/src/pages/TableView.tsx",
-    "line": 49
+    "line": 50
   },
   {
     "path": "/collections/{}/records/{}",
@@ -162,7 +162,7 @@
   {
     "path": "/collections/{}/records?{}",
     "file": "frontend/src/pages/TableView.tsx",
-    "line": 108
+    "line": 109
   },
   {
     "path": "/collections/{}/recycle",
@@ -387,7 +387,7 @@
   {
     "path": "/messages/read-all",
     "file": "frontend/src/pages/MessagesInbox.tsx",
-    "line": 117
+    "line": 118
   },
   {
     "path": "/messages/unread-count",
@@ -397,12 +397,12 @@
   {
     "path": "/messages/{}/read",
     "file": "frontend/src/pages/MessagesInbox.tsx",
-    "line": 112
+    "line": 113
   },
   {
     "path": "/messages?",
     "file": "frontend/src/pages/MessagesInbox.tsx",
-    "line": 105
+    "line": 106
   },
   {
     "path": "/org/units",
