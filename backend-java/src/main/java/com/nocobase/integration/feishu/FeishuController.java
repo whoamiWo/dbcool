@@ -30,11 +30,15 @@ import org.springframework.security.access.prepost.PreAuthorize;
 public class FeishuController {
 
     private final FeishuAppService feishuAppService;
+    private final FeishuOrgSyncService orgSyncService;
     private final AuditService auditService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public FeishuController(FeishuAppService feishuAppService, AuditService auditService) {
+    public FeishuController(FeishuAppService feishuAppService,
+                            FeishuOrgSyncService orgSyncService,
+                            AuditService auditService) {
         this.feishuAppService = feishuAppService;
+        this.orgSyncService = orgSyncService;
         this.auditService = auditService;
     }
 
@@ -111,6 +115,51 @@ public class FeishuController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("{\"error\":\"processing failed\"}");
         }
+    }
+
+    /**
+     * 同步飞书组织架构到本地（管理员）。
+     *
+     * <p>租户一律取自 JWT，拒绝 body 中的 tenantId 跨租户触发同步。
+     */
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
+    @PostMapping("/sync-org")
+    public Map<String, Object> syncOrg(@AuthenticationPrincipal AuthenticatedUser user) {
+        Map<String, Object> result = orgSyncService.syncOrganization(user.tenantId());
+        auditService.log(user.tenantId(), user.userId().toString(), user.username(),
+                "feishu.sync.org", "feishu_org_sync", user.tenantId(),
+                Map.of("code", String.valueOf(result.get("code"))));
+        return result;
+    }
+
+    /** 最近一次飞书组织同步状态（管理员，仅限本租户）。 */
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
+    @GetMapping("/sync-status")
+    public ResponseEntity<Map<String, Object>> syncStatus(
+            @RequestParam(required = false) String tenantId,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        if (tenantId != null && !tenantId.isBlank() && !tenantId.equals(user.tenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "code", 403, "message", "不得查询其他租户的同步状态", "data", Map.of()));
+        }
+        boolean enabled = orgSyncService.isSyncEnabled();
+        boolean configured = feishuAppService.isConfigured(user.tenantId());
+        Map<String, Object> last = orgSyncService.getLastSyncResult(user.tenantId());
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("syncEnabled", enabled);
+        data.put("configured", configured);
+        data.put("lastSyncTime", last == null ? null : last.get("timestamp"));
+        data.put("departmentsSynced", last == null ? 0 : last.getOrDefault("departmentsSynced", 0));
+        data.put("usersSynced", last == null ? 0 : last.getOrDefault("usersSynced", 0));
+        data.put("usersFailed", last == null ? 0 : last.getOrDefault("usersFailed", 0));
+        data.put("usersResigned", last == null ? 0 : last.getOrDefault("usersResigned", 0));
+        data.put("errors", last == null ? java.util.List.of() : last.getOrDefault("errors", java.util.List.of()));
+        data.put("notes", enabled
+                ? "手动触发: POST /api/feishu/sync-org"
+                : "feishu.sync.enabled=false，同步接口不会发起外部请求");
+        int failed = (int) data.get("usersFailed");
+        return ResponseEntity.ok(Map.of("code", failed > 0 ? 1 : 0,
+                "message", "success", "data", data));
     }
 
     /** 发送消息到飞书用户/群聊 */

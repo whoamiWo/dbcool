@@ -42,6 +42,18 @@ public class FeishuAppService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 租户级 tenant_access_token 缓存。
+     *
+     * <p>key = tenantId（null 用空串）。缓存按租户隔离，禁止跨租户复用 token：
+     * 不同租户的 app_id/app_secret 不同，复用会串号。
+     */
+    private final Map<String, CachedToken> tokenCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final long TOKEN_REFRESH_SKEW_MS = 5 * 60 * 1000L;
+
+    private record CachedToken(String token, long expiresAt) {}
+
     private static final String BASE_URL = "https://open.feishu.cn/open-apis";
 
     public FeishuAppService(TenantCredentialService credentialService) {
@@ -145,8 +157,13 @@ public class FeishuAppService {
     }
 
     public boolean isConfigured() {
-        return resolveForKey("app-id", null).isPresent()
-                && resolveForKey("app-secret", null).isPresent();
+        return isConfigured(null);
+    }
+
+    /** 租户级配置判定：租户凭证优先，缺失时回退全局 @Value。 */
+    public boolean isConfigured(String tenantId) {
+        return resolveForKey("app-id", tenantId).isPresent()
+                && resolveForKey("app-secret", tenantId).isPresent();
     }
 
     /**
@@ -257,9 +274,33 @@ public class FeishuAppService {
     }
 
     private String getTenantAccessToken() throws Exception {
+        return getTenantAccessToken(null);
+    }
+
+    /**
+     * 获取租户级 {@code tenant_access_token}（企业内部应用）。
+     *
+     * <p>飞书返回的 {@code expire} 为秒；缓存提前 5 分钟过期，避免临界点请求失败。
+     * 缓存 key 含 tenantId —— 每个租户用自己的 app_id/app_secret 换取 token，
+     * 绝不能回退到全局凭证跨租户使用。
+     */
+    public String getTenantAccessToken(String tenantId) throws Exception {
+        String cacheKey = tenantId == null ? "" : tenantId;
+        long now = System.currentTimeMillis();
+        CachedToken cached = tokenCache.get(cacheKey);
+        if (cached != null && cached.expiresAt() > now) {
+            return cached.token();
+        }
+
+        String key = resolveForKey("app-id", tenantId).orElse("");
+        String secret = resolveForKey("app-secret", tenantId).orElse("");
+        if (key.isBlank() || secret.isBlank()) {
+            throw new IllegalStateException("飞书应用未配置 (feishu.app-id / app-secret)");
+        }
+
         Map<String, Object> payload = new HashMap<>();
-        payload.put("app_id", appId);
-        payload.put("app_secret", appSecret);
+        payload.put("app_id", key);
+        payload.put("app_secret", secret);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -272,10 +313,125 @@ public class FeishuAppService {
         );
 
         JsonNode body = resp.getBody();
-        if (body == null || body.path("tenant_access_token").isMissingNode()) {
-            throw new RuntimeException("获取 tenant_access_token 失败：" + (body != null ? body.toString() : "无响应"));
+        int code = body == null ? -1 : body.path("code").asInt(0);
+        if (body == null || code != 0 || body.path("tenant_access_token").asText("").isBlank()) {
+            throw new RuntimeException("获取 tenant_access_token 失败："
+                    + (body != null ? body.toString() : "无响应"));
         }
 
-        return body.path("tenant_access_token").asText();
+        String token = body.path("tenant_access_token").asText();
+        int expire = body.path("expire").asInt(body.path("expire_in").asInt(7200));
+        long ttl = Math.max(60_000L, expire * 1000L - TOKEN_REFRESH_SKEW_MS);
+        tokenCache.put(cacheKey, new CachedToken(token, now + ttl));
+        return token;
+    }
+
+    /**
+     * 递归收集全部部门（BFS，父在子前）。
+     *
+     * <p>飞书 {@code GET /contact/v3/departments/{id}/children} 只返回直接子部门，
+     * 因此从根 {@code 0} 开始逐层展开，并对每层做 page_token 分页。
+     */
+    public List<Map<String, Object>> listDepartments(String tenantId) throws Exception {
+        String token = getTenantAccessToken(tenantId);
+        List<Map<String, Object>> all = new ArrayList<>();
+        java.util.Set<String> visited = new java.util.LinkedHashSet<>();
+        java.util.Deque<String> queue = new java.util.ArrayDeque<>();
+        queue.add("0");
+        int maxNodes = 2000;
+
+        while (!queue.isEmpty() && all.size() < maxNodes) {
+            String parentDeptId = queue.poll();
+            String pageToken = "";
+            int pages = 0;
+            while (pages++ < 500) {
+                String url = BASE_URL + "/contact/v3/departments/"
+                        + parentDeptId + "/children?page_size=50"
+                        + "&department_id_type=open_department_id"
+                        + (pageToken.isBlank() ? "" : "&page_token=" + encode(pageToken));
+                JsonNode data = contactGet(token, url, "部门列表");
+                JsonNode items = data.path("items");
+                if (items.isArray()) {
+                    for (JsonNode dept : items) {
+                        String id = dept.path("open_department_id").asText(
+                                dept.path("department_id").asText(""));
+                        if (id.isBlank() || !visited.add(id)) continue;
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("id", id);
+                        m.put("name", dept.path("name").asText(""));
+                        String parent = dept.path("parent_department_id").asText("");
+                        m.put("parentId", parent.isBlank() ? null : parent);
+                        m.put("order", dept.path("order").asInt(0));
+                        all.add(m);
+                        queue.add(id);
+                    }
+                }
+                String next = data.path("page_token").asText("");
+                boolean hasMore = data.path("has_more").asBoolean(false);
+                if (!hasMore || next.isBlank() || next.equals(pageToken)) break;
+                pageToken = next;
+            }
+        }
+        return all;
+    }
+
+    /** 拉取某部门的直接成员（page_token 分页全量）。 */
+    public List<Map<String, Object>> listDepartmentUsers(String tenantId, String deptId) throws Exception {
+        String token = getTenantAccessToken(tenantId);
+        List<Map<String, Object>> users = new ArrayList<>();
+        String pageToken = "";
+        int pages = 0;
+        while (pages++ < 500) {
+            String url = BASE_URL + "/contact/v3/users?department_id=" + encode(deptId)
+                    + "&page_size=50&user_id_type=open_id"
+                    + "&department_id_type=open_department_id"
+                    + (pageToken.isBlank() ? "" : "&page_token=" + encode(pageToken));
+            JsonNode data = contactGet(token, url, "部门成员");
+            JsonNode items = data.path("items");
+            if (items.isArray()) {
+                for (JsonNode user : items) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("openId", user.path("open_id").asText(""));
+                    m.put("name", user.path("name").asText(""));
+                    m.put("email", user.path("email").asText(""));
+                    m.put("mobile", user.path("mobile").asText(""));
+                    m.put("jobTitle", user.path("job_title").asText(""));
+                    m.put("leaderUserId", user.path("leader_user_id").asText(""));
+                    List<String> deptIds = new ArrayList<>();
+                    JsonNode depts = user.path("department_ids");
+                    if (depts.isArray()) {
+                        for (JsonNode d : depts) deptIds.add(d.asText(""));
+                    }
+                    m.put("departmentIds", deptIds);
+                    users.add(m);
+                }
+            }
+            String next = data.path("page_token").asText("");
+            boolean hasMore = data.path("has_more").asBoolean(false);
+            if (!hasMore || next.isBlank() || next.equals(pageToken)) break;
+            pageToken = next;
+        }
+        return users;
+    }
+
+    private JsonNode contactGet(String token, String url, String what) throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + token);
+        ResponseEntity<JsonNode> resp = restTemplate.exchange(
+                url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+        JsonNode body = resp.getBody();
+        if (body == null) {
+            throw new IllegalStateException(what + "失败：无响应");
+        }
+        int code = body.path("code").asInt(0);
+        if (code != 0) {
+            throw new IllegalStateException(what + "失败：code=" + code
+                    + " msg=" + body.path("msg").asText("unknown"));
+        }
+        return body.path("data");
+    }
+
+    private static String encode(String value) {
+        return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }
