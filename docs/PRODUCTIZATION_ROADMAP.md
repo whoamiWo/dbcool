@@ -30,7 +30,7 @@
 
 ### 2.1 门禁基线（本次实跑）
 
-> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2761 run / 0F / 0E（BUNDLE LINE 79.74），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/14（1 可选 SKIP）、租户隔离 22/22。
+> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2776 run / 0F / 0E（BUNDLE LINE 79.88），前端 118 files / 964 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 13/14（1 可选 SKIP）、租户隔离 22/22。
 
 | 项 | 命令 | 实测结果 |
 |---|---|---|
@@ -93,6 +93,9 @@ issue 模板/SECURITY 披露流程，`NOTICE` 表述与新方向冲突）。
 - 白名单**不含**：日程/会议、移动工作台、xlsx 导入迁移、后台治理页补齐、RocketChat 互通、会签/或签/加签/转办、
   真实支付网关。这些仍按 §3 主表禁止，重新启用条件见计划 §8。
 - 判定口径不放松：**①存在文件 ≠ ②已接线 ≠ ③端到端可用**，E1–E4 每项都必须带实测输出。
+- **飞书部门树**：Round 3 代码完成（`FeishuOrgSyncService` + `FeishuAppService` Contact v3 拉取 + mock 测试）；
+  真实租户验证需 `contact:department:readonly`、`contact:user.base:readonly`，步骤见
+  [`docs/PLANS/external-integration-acceptance.md`](./PLANS/external-integration-acceptance.md) §C。
 
 ---
 
@@ -215,7 +218,7 @@ Wave 4    持续迭代节奏            长期
 
 | 门禁 | 命令 | 基线（实测于 2026-10-30 @02b3a59） |
 |---|---|---|
-| 后端 | `cd backend-java && mvn -o verify` | 2761 run / 0F / 0E；JaCoCo BUNDLE line 0.7974（红线 ≥ 0.79） |
+| 后端 | `cd backend-java && mvn -o verify` | 2776 run / 0F / 0E；JaCoCo BUNDLE line 0.7974（红线 ≥ 0.79） |
 | 前端单测 | `cd frontend && npm run test:run` | 974 passed / 0 failed / **0 unhandled errors**；行覆盖率 77.12% |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors |
 | E2E | `cd frontend && npx playwright test` | 上次实测 159/159；**本轮未实测，按实际报** |

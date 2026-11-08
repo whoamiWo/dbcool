@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid as _uuid_mod
 
@@ -142,6 +143,9 @@ def seed_tenant_b():
     role_uuid = str(_uuid_mod.uuid4())
 
     db_sql(f"INSERT INTO tenant (id, name, slug, status, schema_name, created_at) VALUES ('{TENANT_B_ID}', '租户B', 'tenantb', 'ACTIVE', 'tenant_b', NOW()) ON CONFLICT DO NOTHING")
+    # 动态表按租户 schema 定位（TenantContext.currentSchema），搜索隔离用例需要在
+    # tenant_b schema 中真实建表，因此先确保 schema 存在。
+    db_sql("CREATE SCHEMA IF NOT EXISTS tenant_b")
     db_sql(f"INSERT INTO roles (id, name, description, tenant_id, created_at) VALUES ('{role_uuid}', 'admin', '租户B管理员', '{TENANT_B_ID}', NOW()) ON CONFLICT DO NOTHING")
     db_sql(f"INSERT INTO users (id, username, password_hash, tenant_id, display_name, created_at) VALUES ('{user_uuid}', '{TENANT_B_USER}', '{admin_hash}', '{TENANT_B_ID}', 'AdminB', NOW()) ON CONFLICT DO NOTHING")
     db_sql(f"INSERT INTO user_roles (user_id, role_id) VALUES ('{user_uuid}', '{role_uuid}') ON CONFLICT DO NOTHING")
@@ -258,7 +262,8 @@ def main():
     user_suffix = _uuid_mod.uuid4().hex[:4]
     huddle_name = f"huddle-a-{user_suffix}"
     # R1d：BI 报表保存现在校验 collection READ；用真实动态集合（创建者自动获得策略）
-    report_collection = f"rpt_{user_suffix}"
+    # 使用更长后缀：4 位 hex 在多次运行后会与遗留集合碰撞，导致建表 409/失败
+    report_collection = f"rpt_{_uuid_mod.uuid4().hex[:8]}"
     _, b = raw_post("/api/collections", {
         "name": report_collection,
         "fields": [{"name": "title", "type": "text"}]
@@ -556,6 +561,88 @@ def main():
 
     check("22-approvalCc B≠A", "GET", "/api/approvals/cc", 200, 200, check_cc_excludes_a)
 
+    # R6-4：搜索索引的跨租户可见性。
+    # 直接写索引行（不依赖异步索引监听器），并在各自租户写入真实记录 ——
+    # 否则 getRecordsByIds 返回空会让「total == 0」在没有证据的情况下也通过。
+    log("\n--- R6: search index cross-tenant visibility ---")
+
+    def search_total(keyword, token):
+        body = fetch_json(
+            f"/api/search?keyword={urllib.parse.quote(keyword)}&types=record&limit=20",
+            token)
+        if body.get("code") != 0:
+            return -1
+        return body.get("data", {}).get("total", -1)
+
+    def make_search_fixture(token, tenant_id, prefix):
+        needle = _uuid_mod.uuid4().hex
+        collection = f"{prefix}_{_uuid_mod.uuid4().hex[:8]}"
+        status, body = raw_post("/api/collections", {
+            "name": collection,
+            "title": "R6 搜索隔离",
+            "fields": [{"name": "title", "type": "text"}],
+        }, token)
+        if status not in (200, 201) or body.get("code") != 0:
+            return None, None, None, needle, f"collection create {status}: {body}"
+        status, body = raw_post(f"/api/collections/{collection}/records",
+                                {"title": needle}, token)
+        if status not in (200, 201) or body.get("code") != 0:
+            return collection, None, None, needle, f"record create {status}: {body}"
+        record_id = body.get("data", {}).get("id")
+        index_id = str(_uuid_mod.uuid4())
+        meta = json.dumps({"collection": collection, "recordId": record_id})
+        db_sql(
+            "INSERT INTO unified_search_index "
+            "(id, entity_type, entity_id, tenant_id, title, content, metadata, created_at, updated_at) "
+            f"VALUES ('{index_id}', 'record', '{record_id}', '{tenant_id}', "
+            f"'{needle}', 'R6 搜索隔离 {needle}', '{meta}'::jsonb, NOW(), NOW()) "
+            "ON CONFLICT DO NOTHING"
+        )
+        return collection, record_id, index_id, needle, None
+
+    # 23. A 的记录索引，B 搜索不到
+    col_a, rec_a, idx_a, needle_a, err_a = make_search_fixture(
+        admin_token, "tenant_default", "r6_iso")
+    total += 1
+    if err_a:
+        log(f"  ❌ 23-search A record not visible to B: fixture failed — {err_a}")
+        results.append(("23-search A record not visible to B", False))
+    else:
+        a_total = search_total(needle_a, admin_token)
+        b_total = search_total(needle_a, b_token)
+        ok = a_total >= 1 and b_total == 0
+        if ok:
+            passed += 1
+        log(f"  {'✅' if ok else '❌'} 23-search A record not visible to B: "
+            f"A={a_total} B={b_total} (want A>=1 B=0)")
+        results.append(("23-search A record not visible to B", ok))
+
+    # 24. B 的记录索引，A 搜索不到（对称）
+    col_b, rec_b, idx_b, needle_b, err_b = make_search_fixture(
+        b_token, TENANT_B_ID, "r6_isob")
+    total += 1
+    if err_b:
+        log(f"  ❌ 24-search B record not visible to A: fixture failed — {err_b}")
+        results.append(("24-search B record not visible to A", False))
+    else:
+        a_total = search_total(needle_b, admin_token)
+        b_total = search_total(needle_b, b_token)
+        ok = b_total >= 1 and a_total == 0
+        if ok:
+            passed += 1
+        log(f"  {'✅' if ok else '❌'} 24-search B record not visible to A: "
+            f"A={a_total} B={b_total} (want B>=1 A=0)")
+        results.append(("24-search B record not visible to A", ok))
+
+    # 清理搜索隔离用例（索引行 + collection 元数据/物理表）
+    for idx in (idx_a, idx_b):
+        if idx:
+            db_sql(f"DELETE FROM unified_search_index WHERE id='{idx}';")
+    if col_a:
+        http("DELETE", f"/api/collections/{col_a}", admin_token)
+    if col_b:
+        http("DELETE", f"/api/collections/{col_b}", b_token)
+
     # 清理 R6 数据
     db_sql(f"DELETE FROM approval_cc WHERE request_id='{req_id}';")
     db_sql(f"DELETE FROM approval_request WHERE id='{req_id}';")
@@ -586,6 +673,7 @@ def main():
         sys.exit(1)
 
     # Clean up resources created in tenant_default during this test run
+    http("DELETE", f"/api/collections/{report_collection}", admin_token)
     cleanup_tenant_default_resources()
 
     sys.exit(0)
