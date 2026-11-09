@@ -974,6 +974,7 @@ jobs:
           JWT_SECRET=ci_jwt_secret_at_least_32_characters_long \
           INTEGRATION_CREDENTIAL_MASTER_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE= \
           INTERNAL_SERVICE_TOKEN=ci_internal_token_at_least_32_chars \
+          RATELIMIT_LOGIN_LIMIT=100 \
           nohup java -jar target/*.jar > /tmp/java.log 2>&1 &
           echo $! > /tmp/java.pid
 
