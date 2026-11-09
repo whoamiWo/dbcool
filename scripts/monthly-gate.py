@@ -138,6 +138,15 @@ def collect_numbers(outputs: dict) -> dict:
 def write_numbers(nums: dict) -> None:
     out = ROOT / "target" / "gate-numbers.json"
     out.parent.mkdir(parents=True, exist_ok=True)
+    # 保留本次未执行门禁（如 Playwright --list）已实测的键，避免每次覆盖后文档数字回落。
+    if out.exists():
+        try:
+            previous = json.loads(out.read_text(encoding="utf-8"))
+            if isinstance(previous, dict):
+                previous.update(nums)
+                nums = previous
+        except Exception as e:  # noqa: BLE001
+            print(f"⚠️ 读取既有 gate-numbers.json 失败（将重建）: {e}")
     out.write_text(json.dumps(nums, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"\n📊 实测数字已写入 {out.relative_to(ROOT)}")
 

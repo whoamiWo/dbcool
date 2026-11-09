@@ -81,6 +81,27 @@ public class UserEntity {
     @Column(name = "joined_at")
     private Instant joinedAt;
 
+    // ---------- Round 3 F2/F4（V82）：外部身份与禁用原因 ----------
+
+    /** 外部身份来源（FEISHU/DINGTALK/WECOM/WECHAT/LDAP/OIDC/IM）；本地账号为 null。 */
+    @Column(name = "external_source")
+    private String externalSource;
+
+    /** 外部平台用户 id（open_id / userid / uid / sub）。 */
+    @Column(name = "external_id")
+    private String externalId;
+
+    /**
+     * 禁用原因：{@link #DISABLE_REASON_MANUAL} = 管理员手工禁用，
+     * {@link #DISABLE_REASON_RESIGNED} = 外部同步判定离职，null = 正常。
+     * 同步只允许自动启用非 MANUAL 的账号。
+     */
+    @Column(name = "disable_reason")
+    private String disableReason;
+
+    public static final String DISABLE_REASON_MANUAL = "MANUAL";
+    public static final String DISABLE_REASON_RESIGNED = "RESIGNED";
+
     public UserEntity() {}
 
     public UserEntity(UUID id, String username, String passwordHash, String tenantId,
@@ -143,6 +164,20 @@ public class UserEntity {
 
     public Instant getJoinedAt() { return joinedAt; }
     public void setJoinedAt(Instant joinedAt) { this.joinedAt = joinedAt; }
+
+    public String getExternalSource() { return externalSource; }
+    public void setExternalSource(String externalSource) { this.externalSource = externalSource; }
+
+    public String getExternalId() { return externalId; }
+    public void setExternalId(String externalId) { this.externalId = externalId; }
+
+    public String getDisableReason() { return disableReason; }
+    public void setDisableReason(String disableReason) { this.disableReason = disableReason; }
+
+    /** 管理员是否手工禁用（外部同步不得覆盖）。 */
+    public boolean isManuallyDisabled() {
+        return DISABLE_REASON_MANUAL.equals(disableReason);
+    }
 
     /** 可登录/可被检索的人员（ACTIVE 且 enabled）。 */
     public boolean isActiveEmployee() {

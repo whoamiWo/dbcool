@@ -1,6 +1,7 @@
 package com.nocobase.integration.dingtalk;
 
 import com.nocobase.audit.AuditService;
+import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.auth.JwtService;
 import com.nocobase.auth.RefreshTokenService;
 import com.nocobase.auth.UserEntity;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 /**
  * 钉钉嵌入 REST API — 授权地址、免密登录、组织架构同步、审批回调。
@@ -291,15 +293,34 @@ public class DingTalkController {
 
     /**
      * 同步钉钉组织架构到本地。
+     *
+     * <p>G2：租户优先取自 JWT，避免管理员用 body 指定其它租户；租户未配置凭证时
+     * 服务层直接拒绝，且不发起任何外部请求。
+     *
+     * @param dryRun 只返回待离职名单，不写库
+     * @param force  跳过离职比例熔断（仅 ADMIN，审计留痕）
      */
     @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping("/sync-org")
-    public Map<String, Object> syncOrg(@RequestBody(required = false) Map<String, Object> body) {
-        String tenantId = body == null ? "tenant_default"
-                : String.valueOf(body.getOrDefault("tenantId", "tenant_default"));
+    public Map<String, Object> syncOrg(
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestParam(required = false, defaultValue = "false") boolean dryRun,
+            @RequestParam(required = false, defaultValue = "false") boolean force,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        String tenantId = user != null && user.tenantId() != null && !user.tenantId().isBlank()
+                ? user.tenantId()
+                : (body == null ? "tenant_default"
+                        : String.valueOf(body.getOrDefault("tenantId", "tenant_default")));
         // A-4：此前经 adapter 落到 DingTalkAppService.syncOrganization 的占位实现，
         // 直接返回 code=0 且什么都没同步（又一处假成功）。现走真实组织同步。
-        return orgSyncService.syncOrganization(tenantId);
+        Map<String, Object> result = orgSyncService.syncOrganization(tenantId, dryRun, force);
+        auditService.log(tenantId,
+                user == null ? "system" : user.userId().toString(),
+                user == null ? "system" : user.username(),
+                "dingtalk.sync.org", "dingtalk_org_sync", tenantId,
+                Map.of("code", String.valueOf(result.get("code")),
+                        "dryRun", dryRun, "force", force));
+        return result;
     }
 
     /**

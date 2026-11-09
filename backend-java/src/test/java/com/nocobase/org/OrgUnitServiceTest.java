@@ -124,6 +124,21 @@ class OrgUnitServiceTest {
     }
 
     @Test
+    @DisplayName("F3：父部门外部 ID 查不到 → 严格失败，不降级为根部门")
+    void upsertExternal_missingParent_rejected() {
+        when(repository.findByTenantIdAndSourceAndExternalIdAndDeletedFalse(
+                TENANT, "FEISHU", "missing-parent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.upsertExternal(
+                TENANT, "FEISHU", "child", "子部门", "missing-parent", 0))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("上级部门不存在")
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+        verify(repository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
     @DisplayName("move：不能移动到自己的子树下")
     void move_intoOwnSubtree_rejected() {
         OrgUnitEntity root = unit(rootId, null, "总部", "/" + rootId + "/", "LOCAL");

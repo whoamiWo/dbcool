@@ -102,7 +102,7 @@ class FeishuOrgSyncServiceMultiDeptTest {
                     return u;
                 });
 
-        when(provisioning.createExternal(anyString(), anyString(), anyString(), any(), anyString()))
+        when(provisioning.createExternal(anyString(), anyString(), anyString(), any(), anyString(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -111,11 +111,28 @@ class FeishuOrgSyncServiceMultiDeptTest {
                     u.setPasswordSet(false);
                     u.setTenantId(inv.getArgument(0));
                     u.setDisplayName(inv.getArgument(2));
+                    u.setExternalSource(inv.getArgument(4));
+                    u.setExternalId(inv.getArgument(5));
                     return u;
                 });
 
-        when(userRepository.findByUsername(anyString()))
-                .thenAnswer(inv -> Optional.ofNullable(users.get(inv.getArgument(0))));
+        when(userRepository.findByTenantIdAndExternalSourceAndExternalId(anyString(), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    String tenant = inv.getArgument(0);
+                    String source = inv.getArgument(1);
+                    String externalId = inv.getArgument(2);
+                    return users.values().stream()
+                            .filter(u -> tenant.equals(u.getTenantId()))
+                            .filter(u -> source.equals(u.getExternalSource()))
+                            .filter(u -> externalId.equals(u.getExternalId()))
+                            .findFirst();
+                });
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    String tenant = inv.getArgument(0);
+                    UserEntity u = users.get(inv.getArgument(1));
+                    return Optional.ofNullable(u).filter(x -> tenant.equals(x.getTenantId()));
+                });
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
             UserEntity u = inv.getArgument(0);
             users.put(u.getUsername(), u);
@@ -287,6 +304,166 @@ class FeishuOrgSyncServiceMultiDeptTest {
         Map<String, Object> data = (Map<String, Object>) result.get("data");
         assertThat((Integer) data.get("usersFailed")).isGreaterThan(0);
         assertThat((List<?>) data.get("errors")).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("F1：单部门 429 → 不执行离职，原用户状态与会话不变")
+    void departmentUsersRateLimited_doesNotResignAnyone() {
+        UserEntity ghost = new UserEntity();
+        ghost.setId(UUID.randomUUID());
+        ghost.setUsername("fs_ghost");
+        ghost.setTenantId(TENANT);
+        ghost.setStatus(UserStatus.ACTIVE);
+        ghost.setEnabled(true);
+        users.put("fs_ghost", ghost);
+        failDepartmentUsers = true;
+
+        Map<String, Object> result = service.syncOrganization(TENANT);
+
+        assertThat(result.get("code")).isNotEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) result.get("data");
+        assertThat(data.get("usersResigned")).isEqualTo(0);
+        assertThat(data.get("resignSkipped")).isEqualTo(true);
+        assertThat(ghost.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(ghost.isEnabled()).isTrue();
+        verify(userStatusService, never()).invalidate(any());
+    }
+
+    @Test
+    @DisplayName("F2：带租户后缀的飞书账号按 external_id 判在离职，不被误判")
+    void suffixedFeishuUsername_matchedByExternalId() {
+        UserEntity suffixed = new UserEntity();
+        suffixed.setId(UUID.randomUUID());
+        suffixed.setUsername("fs_u0_tenantb"); // 跨租户冲突后的稳定后缀
+        suffixed.setTenantId(TENANT);
+        suffixed.setExternalSource("FEISHU");
+        suffixed.setExternalId("u0"); // 本轮飞书返回的就是 u0
+        suffixed.setStatus(UserStatus.ACTIVE);
+        suffixed.setEnabled(true);
+        users.put(suffixed.getUsername(), suffixed);
+
+        service.syncOrganization(TENANT);
+
+        assertThat(suffixed.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(suffixed.isEnabled()).isTrue();
+        assertThat(suffixed.getDisplayName()).isEqualTo("研发0");
+        assertThat(users).doesNotContainKey("fs_u0"); // 未重复建号
+    }
+
+    @Test
+    @DisplayName("F1：dryRun → 返回待离职名单但不写库、不吊销会话")
+    void dryRun_returnsPendingWithoutWriting() {
+        UserEntity ghost = new UserEntity();
+        ghost.setId(UUID.randomUUID());
+        ghost.setUsername("fs_ghost");
+        ghost.setTenantId(TENANT);
+        ghost.setStatus(UserStatus.ACTIVE);
+        ghost.setEnabled(true);
+        users.put("fs_ghost", ghost);
+
+        Map<String, Object> result = service.syncOrganization(TENANT, true);
+
+        assertThat(result.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) result.get("data");
+        assertThat(data.get("usersResigned")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        List<String> pending = (List<String>) data.get("pendingResignations");
+        assertThat(pending).contains("fs_ghost");
+        assertThat(ghost.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(ghost.isEnabled()).isTrue();
+        verify(userStatusService, never()).invalidate(any());
+    }
+
+    @Test
+    @DisplayName("F1：离职人数超过阈值 → 熔断 code=409 且零写入")
+    void resignRatioBreaker_rejectsBulkResign() {
+        for (int i = 0; i < 11; i++) {
+            UserEntity ghost = new UserEntity();
+            ghost.setId(UUID.randomUUID());
+            ghost.setUsername("fs_ghost" + i);
+            ghost.setTenantId(TENANT);
+            ghost.setStatus(UserStatus.ACTIVE);
+            ghost.setEnabled(true);
+            users.put("fs_ghost" + i, ghost);
+        }
+
+        Map<String, Object> result = service.syncOrganization(TENANT);
+
+        assertThat(result.get("code")).isEqualTo(409);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) result.get("data");
+        assertThat(data.get("usersResigned")).isEqualTo(0);
+        assertThat(data.get("resignBreakerTripped")).isEqualTo(true);
+        assertThat((List<?>) data.get("pendingResignations")).hasSize(11);
+        assertThat(users.get("fs_ghost0").getStatus()).isEqualTo(UserStatus.ACTIVE);
+        verify(userStatusService, never()).invalidate(any());
+    }
+
+    @Test
+    @DisplayName("G3：force=true → 跳过熔断并执行离职（计划内大裁员）")
+    void force_releasesBreakerAndResigns() {
+        for (int i = 0; i < 11; i++) {
+            UserEntity ghost = new UserEntity();
+            ghost.setId(UUID.randomUUID());
+            ghost.setUsername("fs_ghost" + i);
+            ghost.setTenantId(TENANT);
+            ghost.setStatus(UserStatus.ACTIVE);
+            ghost.setEnabled(true);
+            users.put("fs_ghost" + i, ghost);
+        }
+
+        Map<String, Object> result = service.syncOrganization(TENANT, false, true);
+
+        assertThat(result.get("code")).isEqualTo(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) result.get("data");
+        assertThat(data.get("usersResigned")).isEqualTo(11);
+        assertThat(data.get("resignBreakerTripped")).isEqualTo(false);
+        assertThat(data.get("resignForced")).isEqualTo(true);
+        assertThat(users.get("fs_ghost0").getStatus()).isEqualTo(UserStatus.RESIGNED);
+        assertThat(users.get("fs_ghost10").isEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("F4：管理员手工禁用 → 同步不自动启用、不判离职")
+    void manuallyDisabledUser_isNotReenabledOrResigned() {
+        UserEntity disabled = new UserEntity();
+        disabled.setId(UUID.randomUUID());
+        disabled.setUsername("fs_u0"); // 本轮仍出现在飞书
+        disabled.setTenantId(TENANT);
+        disabled.setStatus(UserStatus.DISABLED);
+        disabled.setEnabled(false);
+        disabled.setDisableReason(UserEntity.DISABLE_REASON_MANUAL);
+        users.put("fs_u0", disabled);
+
+        service.syncOrganization(TENANT);
+
+        assertThat(disabled.getStatus()).isEqualTo(UserStatus.DISABLED);
+        assertThat(disabled.isEnabled()).isFalse();
+        assertThat(disabled.getDisableReason()).isEqualTo(UserEntity.DISABLE_REASON_MANUAL);
+    }
+
+    @Test
+    @DisplayName("F2：同名用户属于其他租户 → 本租户同步不改写对方")
+    void otherTenantSameUsername_isNotTouched() {
+        UserEntity tenantA = new UserEntity();
+        tenantA.setId(UUID.randomUUID());
+        tenantA.setUsername("fs_u0");
+        tenantA.setTenantId("tenantA");
+        tenantA.setDisplayName("A 公司员工");
+        tenantA.setStatus(UserStatus.ACTIVE);
+        tenantA.setEnabled(true);
+        when(userRepository.findByUsername("fs_u0")).thenReturn(Optional.of(tenantA));
+        // 注意：不在 users（本租户）里放任何 fs_u0
+
+        service.syncOrganization(TENANT);
+
+        assertThat(tenantA.getTenantId()).isEqualTo("tenantA");
+        assertThat(tenantA.getDisplayName()).isEqualTo("A 公司员工");
+        assertThat(users.get("fs_u0").getTenantId()).isEqualTo(TENANT);
+        verify(userRepository, never()).findByUsername(anyString());
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.nocobase.auth.UserProvisioningService;
 import com.nocobase.auth.UserRepository;
 import com.nocobase.auth.UserStatus;
 import com.nocobase.auth.UserStatusService;
+import com.nocobase.integration.common.OrgSyncSafety;
 import com.nocobase.integration.credential.TenantIntegrationCredentialRepository;
 import com.nocobase.integration.market.TenantIntegrationInstallRepository;
 import com.nocobase.org.OrgUnitEntity;
@@ -69,6 +70,15 @@ public class DingTalkOrgSyncService {
     @Value("${dingtalk.app-secret:}")
     private String appSecret;
 
+    /**
+     * G2：单租户存量部署的显式开关，默认关闭。
+     *
+     * <p>为 true 时才允许「租户未配置凭证 → 回退全局 app-key/secret」；多租户环境必须保持
+     * false，否则未配置租户会拉取全局组织并写入自己的用户表。
+     */
+    @Value("${dingtalk.single-tenant-legacy:false}")
+    private boolean singleTenantLegacy;
+
     /** 最近一次同步结果（进程内，供 /sync-status 读取；多副本部署时各副本各自一份）。 */
     private final Map<String, Map<String, Object>> lastResults = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -90,8 +100,8 @@ public class DingTalkOrgSyncService {
         this.credentialRepository = credentialRepository;
     }
 
-    /** 是否已配置钉钉应用凭证（全局；租户级由 {@link DingTalkAppService#isConfigured} 判定）。 */
-    private boolean isConfigured() {
+    /** 全局 {@code @Value} 凭证是否完整（仅 legacy 单租户路径使用）。 */
+    private boolean isGlobalConfigured() {
         return appKey != null && !appKey.isBlank()
                 && appSecret != null && !appSecret.isBlank();
     }
@@ -103,23 +113,50 @@ public class DingTalkOrgSyncService {
      * @return 同步结果统计；{@code usersFailed > 0} 时 {@code code != 0}
      */
     public Map<String, Object> syncOrganization(String tenantId) {
-        if (!isConfigured() && !appService.isConfigured(tenantId)) {
+        return syncOrganization(tenantId, false, false);
+    }
+
+    /** 手动触发组织架构同步（dryRun：只返回待离职名单，不写库）。 */
+    public Map<String, Object> syncOrganization(String tenantId, boolean dryRun) {
+        return syncOrganization(tenantId, dryRun, false);
+    }
+
+    /**
+     * 手动触发组织架构同步（G1/G2/G3）。
+     *
+     * <p>准入只认<b>租户级</b>凭证：未配置时直接拒绝且<b>不发生任何外部 HTTP</b>。
+     * 单租户存量部署需显式开启 {@code dingtalk.single-tenant-legacy=true} 才允许全局回退。
+     *
+     * @param dryRun 只返回待离职名单，不修改用户状态、不吊销会话
+     * @param force  跳过离职比例熔断（计划内大裁员；调用方必须校验 ADMIN 并写审计）
+     */
+    public Map<String, Object> syncOrganization(String tenantId, boolean dryRun, boolean force) {
+        boolean tenantConfigured = appService.isTenantConfigured(tenantId);
+        if (!tenantConfigured && !(singleTenantLegacy && isGlobalConfigured())) {
             return Map.of("code", 500,
-                    "message", "钉钉应用未配置 (dingtalk.app-key / app-secret)",
-                    "data", Map.of("departmentsSynced", 0, "usersSynced", 0,
-                            "usersFailed", 0, "usersResigned", 0, "errors", List.of()));
+                    "message", "该租户未配置钉钉应用凭证；已拒绝回退全局 token"
+                            + "（单租户部署需显式开启 dingtalk.single-tenant-legacy=true）",
+                    "data", emptyStats());
         }
         SyncStats stats = new SyncStats();
+        stats.dryRun = dryRun;
+        stats.force = force;
         try {
-            log.info("[DingTalk] 开始同步组织架构，tenantId={}", tenantId);
+            log.info("[DingTalk] 开始同步组织架构，tenantId={} dryRun={} force={}",
+                    tenantId, dryRun, force);
             String accessToken = appService.getAppAccessToken(tenantId);
-            if (accessToken == null || accessToken.isBlank()) {
+            if ((accessToken == null || accessToken.isBlank()) && singleTenantLegacy && isGlobalConfigured()) {
                 accessToken = getAccessToken();
+            }
+            if (accessToken == null || accessToken.isBlank()) {
+                return Map.of("code", 500,
+                        "message", "无法获取钉钉访问令牌（租户凭证无效或已过期）",
+                        "data", emptyStats());
             }
 
             // 1) 部门树（BFS 已保证父在子前）
             List<Map<String, Object>> departments = collectAllDepartments(accessToken);
-            stats.departmentsSynced = departments.size();
+            stats.departmentsTotal = departments.size();
             Map<Long, UUID> localDeptIds = upsertDepartments(tenantId, departments, stats);
 
             // 2) 逐部门拉成员（含根部门 1 的直属成员）
@@ -131,19 +168,40 @@ public class DingTalkOrgSyncService {
                 syncDepartmentUsers(accessToken, tenantId, deptId, localDeptIds, seenDingTalkUserIds, stats);
             }
 
-            // 3) 离职：本轮未出现的钉钉来源用户
-            markResigned(tenantId, seenDingTalkUserIds, stats);
+            // 3) 离职：G1 只有全量部门/用户都成功时才允许判定，否则失败部门的成员会被误判。
+            boolean complete = OrgSyncSafety.isComplete(stats.usersFailed, stats.errors.size(),
+                    stats.departmentsSynced, stats.departmentsTotal);
+            if (complete) {
+                markResigned(tenantId, seenDingTalkUserIds, stats, force);
+            } else {
+                stats.resignSkipped = true;
+                stats.resignSkipReason = "部分部门/用户同步失败，已跳过离职判定";
+                log.warn("[DingTalk] 同步不完整（depts {}/{} failed={}），跳过离职判定 tenant={}",
+                        stats.departmentsSynced, stats.departmentsTotal, stats.usersFailed, tenantId);
+            }
 
-            log.info("[DingTalk] 组织架构同步完成 tenant={} depts={} users={} failed={} resigned={}",
-                    tenantId, stats.departmentsSynced, stats.usersSynced,
-                    stats.usersFailed, stats.usersResigned);
+            log.info("[DingTalk] 组织架构同步完成 tenant={} depts={}/{} users={} failed={} resigned={} dryRun={}",
+                    tenantId, stats.departmentsSynced, stats.departmentsTotal, stats.usersSynced,
+                    stats.usersFailed, stats.usersResigned, dryRun);
 
             Map<String, Object> data = stats.toMap();
             lastResults.put(tenantId, data);
-            boolean ok = stats.usersFailed == 0 && stats.errors.isEmpty();
-            return Map.of("code", ok ? 0 : 502,
-                    "message", ok ? "success" : "部分数据同步失败，详见 data.errors",
-                    "data", data);
+            int code;
+            String message;
+            if (stats.resignBreakerTripped) {
+                code = 409;
+                message = "离职人数异常，已拒绝写入；请先以 dryRun=true 核对名单";
+            } else if (!complete) {
+                code = 502;
+                message = "部分数据同步失败，详见 data.errors（已跳过离职判定）";
+            } else if (stats.resignForced) {
+                code = 0;
+                message = "success(force)";
+            } else {
+                code = 0;
+                message = dryRun ? "success(dryRun)" : "success";
+            }
+            return Map.of("code", code, "message", message, "data", data);
 
         } catch (Exception e) {
             log.error("[DingTalk] 组织架构同步失败 tenant={}: {}", tenantId, e.getMessage(), e);
@@ -275,6 +333,8 @@ public class DingTalkOrgSyncService {
                         String.valueOf(dept.get("name")), parentExt,
                         dept.get("order") instanceof Number n ? n.intValue() : 0);
                 mapping.put(externalId, unit.getId());
+                // G6：只统计成功 upsert 的部门，失败也显示全量会掩盖同步不完整。
+                stats.departmentsSynced++;
             } catch (Exception e) {
                 stats.errors.add("department " + externalId + ": " + e.getMessage());
                 stats.usersFailed += 1;
@@ -337,11 +397,12 @@ public class DingTalkOrgSyncService {
         String name = user.path("name").asText("");
         try {
             String username = USERNAME_PREFIX + dingtalkUserId;
-            UserEntity entity = userRepository.findByUsername(username).orElse(null);
+            UserEntity entity = findExistingUser(tenantId, username, dingtalkUserId).orElse(null);
             boolean created = false;
             if (entity == null) {
                 entity = provisioningService.createExternal(
-                        tenantId, username, name, nullIfBlank(user.path("email").asText("")), SOURCE);
+                        tenantId, username, name, nullIfBlank(user.path("email").asText("")), SOURCE,
+                        dingtalkUserId);
                 created = true;
             }
             // A-4：已存在用户逐字段更新（修复前直接原样返回）
@@ -357,14 +418,19 @@ public class DingTalkOrgSyncService {
             String managerDtId = user.path("manager_userid").asText("");
             if (!managerDtId.isBlank()) {
                 UserEntity target = entity;
-                userRepository.findByUsername(USERNAME_PREFIX + managerDtId)
+                findExistingUser(tenantId, USERNAME_PREFIX + managerDtId, managerDtId)
                         .ifPresent(m -> target.setManagerId(m.getId()));
             }
             java.util.UUID deptLocal = resolveDept(user, deptId, localDeptIds);
             if (deptLocal != null) entity.setDepartmentId(deptLocal);
-            // 重新出现即视为在职（纠偏历史 RESIGNED）
-            entity.setStatus(UserStatus.ACTIVE);
-            entity.setEnabled(true);
+            // 重新出现即视为在职（纠偏历史 RESIGNED）；F4：不覆盖管理员手工禁用。
+            if (created || !entity.isManuallyDisabled()) {
+                entity.setStatus(UserStatus.ACTIVE);
+                entity.setEnabled(true);
+                entity.setDisableReason(null);
+            }
+            entity.setExternalSource(SOURCE);
+            entity.setExternalId(dingtalkUserId);
             if (created) entity.setCreatedAt(Instant.now());
             userRepository.save(entity);
             userMappingService.mapUser(dingtalkUserId, entity.getId().toString(), tenantId);
@@ -375,6 +441,16 @@ public class DingTalkOrgSyncService {
             stats.errors.add("user " + dingtalkUserId + ": " + e.getMessage());
             stats.usersFailed++;
         }
+    }
+
+    /** F2：租户 + 外部身份查找；仅在存量账号没有 external_id 时回退到租户内用户名。 */
+    private java.util.Optional<UserEntity> findExistingUser(String tenantId, String username, String dingtalkUserId) {
+        if (dingtalkUserId != null && !dingtalkUserId.isBlank()) {
+            java.util.Optional<UserEntity> byExternal = userRepository
+                    .findByTenantIdAndExternalSourceAndExternalId(tenantId, SOURCE, dingtalkUserId);
+            if (byExternal.isPresent()) return byExternal;
+        }
+        return userRepository.findByTenantIdAndUsername(tenantId, username);
     }
 
     /** 优先使用 user.dept_id_list 中能映射到本地部门的第一项，否则用当前遍历部门。 */
@@ -391,18 +467,64 @@ public class DingTalkOrgSyncService {
     }
 
     /**
-     * 离职处理：本轮未出现的钉钉来源用户 → {@code RESIGNED + enabled=false}，并吊销会话。
-     * 不删除用户（保留历史引用），符合 A-4 要求。
+     * 离职处理（G1/G3）：仅在调用方确认「全量同步成功」后进入。
+     *
+     * <p>与飞书共用 {@link OrgSyncSafety}：dryRun 只返回名单；待离职超过比例阈值
+     * 或 10 人时熔断（{@code code=409}）；计划内大裁员需显式 {@code force}。
+     * 不删除用户（保留历史引用）。
      */
-    private void markResigned(String tenantId, Set<String> seenDingTalkUserIds, SyncStats stats) {
+    private void markResigned(String tenantId, Set<String> seenDingTalkUserIds,
+                              SyncStats stats, boolean force) {
         List<UserEntity> users = userRepository.findByTenantIdOrderByCreatedAtDesc(tenantId);
+        List<UserEntity> candidates = new ArrayList<>();
         for (UserEntity u : users) {
             if (u.getUsername() == null || !u.getUsername().startsWith(USERNAME_PREFIX)) continue;
-            String dtId = u.getUsername().substring(USERNAME_PREFIX.length());
+            // 跨租户同名账号的用户名可能带租户后缀，真实 userid 以 external_id 为准。
+            String dtId = SOURCE.equals(u.getExternalSource()) && u.getExternalId() != null
+                    ? u.getExternalId()
+                    : u.getUsername().substring(USERNAME_PREFIX.length());
             if (seenDingTalkUserIds.contains(dtId)) continue;
+            if (u.isManuallyDisabled()) continue; // F4：不覆盖管理员手工禁用
             if (UserStatus.RESIGNED.equals(u.getStatus()) && !u.isEnabled()) continue;
+            candidates.add(u);
+        }
+        if (candidates.isEmpty()) return;
+
+        stats.pendingResignations = candidates.stream().map(UserEntity::getUsername).toList();
+        int seen = seenDingTalkUserIds.size();
+        OrgSyncSafety.Decision decision = OrgSyncSafety.evaluate(
+                candidates.size(), seen, stats.dryRun, force);
+        switch (decision) {
+            case NONE -> {
+                return;
+            }
+            case DRY_RUN -> {
+                stats.resignSkipped = true;
+                stats.resignSkipReason = "dryRun：仅返回名单，未写入";
+                return;
+            }
+            case TRIPPED -> {
+                stats.resignBreakerTripped = true;
+                stats.resignSkipped = true;
+                stats.resignSkipReason = OrgSyncSafety.breakerReason(candidates.size(), seen);
+                log.error("[DingTalk] 离职比例熔断 tenant={} 待离职={} 已见={}", tenantId,
+                        candidates.size(), seen);
+                return;
+            }
+            case FORCED -> {
+                stats.resignForced = true;
+                log.warn("[DingTalk] 管理员强制放行离职 tenant={} 待离职={} 已见={}", tenantId,
+                        candidates.size(), seen);
+            }
+            case ALLOW -> {
+                // 阈值内，正常写入
+            }
+        }
+
+        for (UserEntity u : candidates) {
             u.setStatus(UserStatus.RESIGNED);
             u.setEnabled(false);
+            u.setDisableReason(UserEntity.DISABLE_REASON_RESIGNED);
             userRepository.save(u);
             userStatusService.invalidate(u.getId());
             stats.usersResigned++;
@@ -419,10 +541,10 @@ public class DingTalkOrgSyncService {
             throw new IllegalArgumentException("dingtalkUserId 不能为空");
         }
         String username = USERNAME_PREFIX + dingtalkUserId;
-        UserEntity user = userRepository.findByUsername(username).orElse(null);
+        UserEntity user = findExistingUser(tenantId, username, dingtalkUserId).orElse(null);
         if (user == null) {
             user = provisioningService.createExternal(
-                    tenantId, username, name, null, SOURCE);
+                    tenantId, username, name, null, SOURCE, dingtalkUserId);
         } else if (name != null && !name.isBlank()) {
             user.setDisplayName(name);
             userRepository.save(user);
@@ -436,31 +558,66 @@ public class DingTalkOrgSyncService {
     }
 
     /**
-     * 获取钉钉访问令牌（全局凭证回退路径）。
+     * 获取钉钉访问令牌（仅 {@code dingtalk.single-tenant-legacy=true} 的全局回退路径）。
+     *
+     * <p>使用可注入的 {@link #restTemplate}，便于测试断言「未配置租户零外部请求」。
      */
     private String getAccessToken() throws Exception {
         String url = "https://oapi.dingtalk.com/gettoken?"
                 + "appkey=" + appKey
                 + "&appsecret=" + appSecret;
-        String response = new RestTemplate().getForObject(url, String.class);
+        String response = restTemplate.getForObject(url, String.class);
         JsonNode json = objectMapper.readTree(response == null ? "{}" : response);
         return json.path("access_token").asText("");
     }
 
-    /** 同步统计（返回结构契约见任务书 T1.4）。 */
+    private static Map<String, Object> emptyStats() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("departmentsSynced", 0);
+        m.put("departmentsTotal", 0);
+        m.put("usersSynced", 0);
+        m.put("usersFailed", 0);
+        m.put("usersResigned", 0);
+        m.put("dryRun", false);
+        m.put("resignSkipped", true);
+        m.put("resignSkipReason", "not started");
+        m.put("resignBreakerTripped", false);
+        m.put("resignForced", false);
+        m.put("pendingResignations", List.of());
+        m.put("errors", List.of());
+        return m;
+    }
+
+    /** 同步统计（字段名与飞书 SyncStats 对齐，便于前端复用）。 */
     static final class SyncStats {
         int departmentsSynced;
+        int departmentsTotal;
         int usersSynced;
         int usersFailed;
         int usersResigned;
+        boolean dryRun;
+        boolean force;
+        boolean resignSkipped;
+        String resignSkipReason;
+        boolean resignBreakerTripped;
+        boolean resignForced;
+        List<String> pendingResignations = List.of();
         final List<String> errors = new ArrayList<>();
 
         Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("departmentsSynced", departmentsSynced);
+            m.put("departmentsTotal", departmentsTotal);
             m.put("usersSynced", usersSynced);
             m.put("usersFailed", usersFailed);
             m.put("usersResigned", usersResigned);
+            m.put("dryRun", dryRun);
+            m.put("force", force);
+            m.put("resignSkipped", resignSkipped);
+            m.put("resignSkipReason", resignSkipReason);
+            m.put("resignBreakerTripped", resignBreakerTripped);
+            m.put("resignForced", resignForced);
+            m.put("pendingResignations", List.copyOf(pendingResignations));
             m.put("errors", List.copyOf(errors));
             m.put("timestamp", System.currentTimeMillis());
             return m;

@@ -68,16 +68,25 @@ public class OidcUserService {
             username = subject;
         }
 
-        // 1. 按 email 匹配
+        String tenantId = TenantContext.currentTenantId();
+        // 1. 按外部身份（sub）匹配 —— 改名/改邮箱后仍能稳定命中
+        if (subject != null && !subject.isBlank()) {
+            Optional<UserEntity> byExternal = userRepository
+                    .findByTenantIdAndExternalSourceAndExternalId(tenantId, "OIDC", subject);
+            if (byExternal.isPresent()) {
+                return assertEnabled(byExternal.get());
+            }
+        }
+        // 2. 按 email 匹配（仅本租户）
         if (email != null && !email.isBlank()) {
-            Optional<UserEntity> byEmail = userRepository.findByEmail(email);
+            Optional<UserEntity> byEmail = userRepository.findByTenantIdAndEmail(tenantId, email);
             if (byEmail.isPresent()) {
                 return assertEnabled(byEmail.get());
             }
         }
-        // 2. 按 username 匹配
+        // 3. 按 username 匹配（仅本租户）
         if (username != null && !username.isBlank()) {
-            Optional<UserEntity> byName = userRepository.findByUsername(username);
+            Optional<UserEntity> byName = userRepository.findByTenantIdAndUsername(tenantId, username);
             if (byName.isPresent()) {
                 return assertEnabled(byName.get());
             }
@@ -100,19 +109,20 @@ public class OidcUserService {
         String finalUsername = username;
         if (finalUsername == null || finalUsername.isBlank()) {
             finalUsername = "oidc_" + UUID.randomUUID().toString().substring(0, 8);
-        } else if (userRepository.findByUsername(finalUsername).isPresent()) {
+        } else if (userRepository.findByTenantIdAndUsername(tenantId, finalUsername).isPresent()) {
             finalUsername = finalUsername + "_" + UUID.randomUUID().toString().substring(0, 6);
         }
 
         // A-2：统一走 UserProvisioningService —— passwordHash=null 且 passwordSet=false。
         // 修复前此处手工 new + setPasswordHash(null)，而当时 password_hash 是 NOT NULL，
         // OIDC 首次登录必然 500（且被上层吞成「登录失败」）。
+        // F2：sub 作为稳定外部身份，后续改名/换邮箱仍能命中同一账号。
         UserEntity saved = provisioningService.createExternal(
                 tenantId, finalUsername,
                 oidcUser.getFullName() != null ? oidcUser.getFullName() : finalUsername,
-                email, "OIDC");
+                email, "OIDC", oidcUser.getSubject());
         log.info("[OIDC] JIT 建号成功 userId={} username={} tenant={}",
-                saved.getId(), finalUsername, tenantId);
+                saved.getId(), saved.getUsername(), tenantId);
         return saved;
     }
 

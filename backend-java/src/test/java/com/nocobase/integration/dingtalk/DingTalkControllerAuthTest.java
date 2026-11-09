@@ -166,13 +166,29 @@ class DingTalkControllerAuthTest {
     void syncOrg_delegatesToOrgSyncService() {
         // A-4：/sync-org 曾落到 DingTalkAppService 的占位实现（直接 code=0 什么都没做），
         // 现必须走真实组织同步服务。
-        when(orgSyncService.syncOrganization("tenant1"))
+        when(orgSyncService.syncOrganization("tenant1", false, false))
                 .thenReturn(Map.of("code", 0, "synced", 42));
 
-        Map<String, Object> r = controller.syncOrg(Map.of("tenantId", "tenant1"));
+        Map<String, Object> r = controller.syncOrg(Map.of("tenantId", "tenant1"),
+                false, false, null);
 
         assertEquals(0, r.get("code"));
-        verify(orgSyncService).syncOrganization("tenant1");
+        verify(orgSyncService).syncOrganization("tenant1", false, false);
+    }
+
+    @Test
+    void syncOrg_usesJwtTenantOverBody() {
+        com.nocobase.auth.JwtAuthFilter.AuthenticatedUser user =
+                new com.nocobase.auth.JwtAuthFilter.AuthenticatedUser(
+                        java.util.UUID.randomUUID(), "admin", "tenant-from-jwt");
+        when(orgSyncService.syncOrganization("tenant-from-jwt", true, true))
+                .thenReturn(Map.of("code", 0));
+
+        controller.syncOrg(Map.of("tenantId", "tenant-attacker"), true, true, user);
+
+        verify(orgSyncService).syncOrganization("tenant-from-jwt", true, true);
+        verify(orgSyncService, org.mockito.Mockito.never())
+                .syncOrganization("tenant-attacker", true, true);
     }
 
     @Test

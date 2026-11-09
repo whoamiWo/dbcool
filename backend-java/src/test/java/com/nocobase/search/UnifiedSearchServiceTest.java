@@ -75,6 +75,8 @@ class UnifiedSearchServiceTest {
         // A-3：默认放行（无策略 = 放行），越权拒绝在专门用例中断言
         when(aclEnforcer.isAllowed(any(), any(), any(), any())).thenReturn(true);
         when(rowAclService.evaluateRead(any(), any(), any(), any())).thenReturn(true);
+        when(rowAclService.policyPresence(any(), any(), any()))
+                .thenReturn(com.nocobase.acl.RowAclService.PolicyPresence.ABSENT);
         when(roleRepository.findRoleNamesByUserId(any(), any())).thenReturn(java.util.List.of("USER"));
         when(aclEnforcer.filterRecordsByDataScope(any(), any(), any(), any()))
                 .thenAnswer(inv -> inv.getArgument(3));
@@ -217,6 +219,9 @@ class UnifiedSearchServiceTest {
         // 集合权限按 collection 记忆化：2 条命中只判 1 次
         verify(aclEnforcer, org.mockito.Mockito.times(1))
                 .isAllowed(eq(USER), eq(tenantId), eq("orders"), any());
+        // F5：ROW 策略存在性同样按集合只查 1 次
+        verify(rowAclService, org.mockito.Mockito.times(1))
+                .policyPresence(tenantId, "orders", "read");
     }
 
     @Test
@@ -225,7 +230,8 @@ class UnifiedSearchServiceTest {
         givenIndexHits(List.of(idx("record", r1, "订单 A", "content")));
         // 无 ROW 策略：evaluateRead 本身是 fail-closed，但列表路径的语义是「无策略=放行」，
         // 搜索必须与列表同源，否则未配置行级权限的集合在搜索里整体消失。
-        when(rowAclService.hasPolicies(tenantId, "orders", "read")).thenReturn(false);
+        when(rowAclService.policyPresence(tenantId, "orders", "read"))
+                .thenReturn(com.nocobase.acl.RowAclService.PolicyPresence.ABSENT);
         when(rowAclService.evaluateRead(any(), any(), any(), any())).thenReturn(false);
 
         Map<String, Object> result = service.search("content", tenantId, USER,
@@ -240,13 +246,31 @@ class UnifiedSearchServiceTest {
     void search_records_rowPolicyDeny_filtersOut() {
         String r1 = UUID.randomUUID().toString();
         givenIndexHits(List.of(idx("record", r1, "订单 A", "content")));
-        when(rowAclService.hasPolicies(tenantId, "orders", "read")).thenReturn(true);
+        when(rowAclService.policyPresence(tenantId, "orders", "read"))
+                .thenReturn(com.nocobase.acl.RowAclService.PolicyPresence.PRESENT);
         when(rowAclService.evaluateRead(any(), any(), any(), any())).thenReturn(false);
 
         Map<String, Object> result = service.search("content", tenantId, USER,
                 List.of("record"), 20);
 
         assertThat(result.get("total")).isEqualTo(0);
+    }
+
+    @Test
+    void search_records_rowPolicyPresenceQueriedOncePerCollection() {
+        String r1 = UUID.randomUUID().toString();
+        String r2 = UUID.randomUUID().toString();
+        UnifiedSearchIndexEntity ordersHit = idx("record", r1, "订单 A", "content");
+        UnifiedSearchIndexEntity usersHit = idx("record", r2, "用户 B", "content");
+        usersHit.setMetadataJson("{\"collection\":\"users\",\"recordId\":\"" + r2 + "\"}");
+        givenIndexHits(List.of(ordersHit, usersHit));
+
+        service.search("content", tenantId, USER, List.of("record"), 20);
+
+        verify(rowAclService, org.mockito.Mockito.times(1))
+                .policyPresence(tenantId, "orders", "read");
+        verify(rowAclService, org.mockito.Mockito.times(1))
+                .policyPresence(tenantId, "users", "read");
     }
 
     @Test

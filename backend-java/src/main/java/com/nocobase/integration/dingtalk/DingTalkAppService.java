@@ -77,6 +77,20 @@ public class DingTalkAppService {
     }
 
     /**
+     * 仅检查<b>租户级</b>凭证，不回退全局 {@code @Value}（G2）。
+     *
+     * <p>组织同步必须用租户自己的 app-key/secret 调用 {@code /topapi/*}；
+     * 若沿用 {@link #isConfigured(String)} 的全局回退，未配置租户会拉取全局组织
+     * 并写入该租户的用户表。单租户存量部署需显式开启
+     * {@code dingtalk.single-tenant-legacy=true}，不得进入租户同步路径。
+     */
+    public boolean isTenantConfigured(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) return false;
+        return credentialService.get(tenantId, "dingtalk", "app-key").isPresent()
+                && credentialService.get(tenantId, "dingtalk", "app-secret").isPresent();
+    }
+
+    /**
      * 按 key 解析凭证：租户级优先，回退全局 @Value。
      *
      * @param tenantId 租户 ID；传 null 时只取全局（用于无租户上下文的场景）
@@ -228,15 +242,16 @@ public class DingTalkAppService {
     @Transactional
     public UserEntity syncUserFromDingTalk(String unionid, String nickname, String tenantId) {
         String username = "dt_" + safeTail(unionid, 12);
-        return userRepository.findByUsername(username)
+        return userRepository.findByTenantIdAndExternalSourceAndExternalId(tenantId, "DINGTALK", unionid)
+                .or(() -> userRepository.findByTenantIdAndUsername(tenantId, username))
                 .map(existing -> {
-                    log.debug("[DingTalk] 复用既有账号: {}", username);
+                    log.debug("[DingTalk] 复用既有账号: {}", existing.getUsername());
                     return existing;
                 })
                 .orElseGet(() -> {
                     // A-2：统一建号路径 —— 外部托管账号无本地密码（此前写 bcrypt(随机)）
                     UserEntity saved = provisioningService.createExternal(
-                            tenantId, username, nickname, null, "DINGTALK");
+                            tenantId, username, nickname, null, "DINGTALK", unionid);
                     log.info("[DingTalk] 新建钉钉账号: {} (tenant={}, display={})",
                             username, tenantId, saved.getDisplayName());
                     return saved;

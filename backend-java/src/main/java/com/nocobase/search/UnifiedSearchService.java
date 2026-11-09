@@ -434,7 +434,8 @@ public class UnifiedSearchService {
                         userId.toString(), aclContext.roles());
                 // 与列表路径同源：没有 ROW 策略时放行（evaluateRead 对无策略是 fail-closed，
                 // 直接调用会让「没有配置行级权限」的集合在搜索里整体消失）。
-                if (rowAclService.hasPolicies(tenantId, collection, "read")
+                // F5：策略存在性按集合缓存，避免每条命中都查一次库。
+                if (aclContext.hasPolicies(collection)
                         && !rowAclService.evaluateRead(tenantId, collection, record, principal)) {
                     return true;
                 }
@@ -455,6 +456,8 @@ public class UnifiedSearchService {
         private List<String> roles;
         private com.nocobase.auth.AclEnforcer.ScopePlan scopePlan;
         private final Map<String, Boolean> allowedByCollection = new HashMap<>();
+        /** F5：集合 -> 是否有 read 行级策略；只缓存确定的 PRESENT/ABSENT，UNKNOWN 不缓存。 */
+        private final Map<String, Boolean> policiesByCollection = new HashMap<>();
 
         SearchAclContext(UUID userId, String tenantId) {
             this.userId = userId;
@@ -485,6 +488,19 @@ public class UnifiedSearchService {
                     return false;
                 }
             });
+        }
+
+        boolean hasPolicies(String collection) {
+            Boolean cached = policiesByCollection.get(collection);
+            if (cached != null) return cached;
+            var presence = rowAclService.policyPresence(tenantId, collection, "read");
+            if (presence == com.nocobase.acl.RowAclService.PolicyPresence.UNKNOWN) {
+                // 查询失败：当前请求按"有策略"保守判权，但不缓存异常态。
+                return true;
+            }
+            boolean present = presence == com.nocobase.acl.RowAclService.PolicyPresence.PRESENT;
+            policiesByCollection.put(collection, present);
+            return present;
         }
     }
 
