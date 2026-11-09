@@ -201,20 +201,15 @@ public class WeComAppService {
         // 按 unionId 哈希后的用户名查找本地用户
         String username = "wecom_" + safeTail(unionId, 12);
         final String tenantId = "system";
-        UserEntity existing = userRepository.findByUsername(username).orElse(null);
+        UserEntity existing = findExistingUser(tenantId, username, userId).orElse(null);
         if (existing != null) {
-            // 归属校验：企业微信账号固定归属 system 租户；命中其他租户同名账号
-            // 说明用户名哈希碰撞或数据被篡改，必须拒绝而不是跨租户复用。
-            if (!existing.getTenantId().equals(tenantId)) {
-                throw new IllegalStateException("企业微信账号存在跨租户冲突: " + username);
-            }
-            log.info("[WeCom] 用户已存在: username={}", username);
+            log.info("[WeCom] 用户已存在: username={} tenant={}", existing.getUsername(), tenantId);
             return existing;
         }
 
         // A-2：统一建号路径 —— 企业微信托管账号无本地密码（此前写 bcrypt(random)）
         UserEntity user = provisioningService.createExternal(
-                tenantId, username, name, email, "WECOM");
+                tenantId, username, name, email, "WECOM", userId);
         log.info("[WeCom] 新建用户: username={}, unionId={}", username, unionId);
         return user;
     }
@@ -287,11 +282,11 @@ public class WeComAppService {
                     String uemail = u.path("email").asText("");
                     if (uid.isBlank()) continue;
                     String uusername = "wecom_" + safeTail(uid, 12);
-                    if (userRepository.findByUsername(uusername).isEmpty() &&
-                            userRepository.findByEmail(uemail).isEmpty()) {
+                    if (findExistingUser("system", uusername, uid).isEmpty() &&
+                            userRepository.findByTenantIdAndEmail("system", uemail).isEmpty()) {
                         // A-2：统一建号路径
                         var created = provisioningService.createExternal(
-                                "system", uusername, uname, uemail, "WECOM");
+                                "system", uusername, uname, uemail, "WECOM", uid);
                         // E1：写入部门归属（simplelist 的 department 数组首个 id）
                         JsonNode deptArr = u.path("department");
                         if (created != null && deptArr.isArray() && !deptArr.isEmpty()) {
@@ -310,6 +305,16 @@ public class WeComAppService {
         log.info("[WeCom] 通讯录同步完成: departments={} users={}", deptCount, userCount);
         return Map.of("code", 0, "message", "sync completed",
                 "departments", deptCount, "users", userCount);
+    }
+
+    /** F2：租户内按外部身份优先、用户名兜底查找，禁止全局 findByUsername。 */
+    private java.util.Optional<UserEntity> findExistingUser(String tenantId, String username, String userId) {
+        if (userId != null && !userId.isBlank()) {
+            java.util.Optional<UserEntity> byExternal = userRepository
+                    .findByTenantIdAndExternalSourceAndExternalId(tenantId, "WECOM", userId);
+            if (byExternal.isPresent()) return byExternal;
+        }
+        return userRepository.findByTenantIdAndUsername(tenantId, username);
     }
 
     /** 取标识尾部并只保留字母数字，避免生成非法用户名。 */

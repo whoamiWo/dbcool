@@ -1,9 +1,14 @@
 package com.nocobase.auth;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.HexFormat;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -58,7 +63,7 @@ public class UserProvisioningService {
         if (tenantId == null || tenantId.isBlank()) {
             throw new IllegalArgumentException("tenantId 不能为空");
         }
-        UserEntity existing = userRepository.findByUsername(username).orElse(null);
+        UserEntity existing = userRepository.findByTenantIdAndUsername(tenantId, username).orElse(null);
         if (existing != null) {
             return existing;
         }
@@ -73,22 +78,88 @@ public class UserProvisioningService {
      */
     public UserEntity createExternal(String tenantId, String username, String displayName,
                                      String email, String source) {
+        return createExternal(tenantId, username, displayName, email, source, null);
+    }
+
+    /**
+     * 新建外部托管账号，并写入显式外部身份（F2）。
+     *
+     * <p>{@code users.username} 在 V1 中是<b>全局唯一</b>。两个租户接同一个外部应用时，
+     * 同一 {@code open_id} 会生成同一个用户名；此处对跨租户冲突追加稳定的租户后缀，
+     * 既保证双方都能建号，也<b>绝不改写另一个租户的账号</b>。
+     * 租户内仍由 {@code (tenant_id, external_source, external_id)} 唯一索引进一重保护。
+     */
+    public UserEntity createExternal(String tenantId, String username, String displayName,
+                                     String email, String source, String externalId) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("username 不能为空");
+        }
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalArgumentException("tenantId 不能为空");
+        }
+        String finalUsername = username;
+        Optional<UserEntity> global = userRepository.findByUsername(username);
+        if (global.isPresent()) {
+            UserEntity other = global.get();
+            if (tenantId.equals(other.getTenantId())) {
+                throw new IllegalStateException("账号已存在，不能重复创建: " + username);
+            }
+            finalUsername = username + "_" + tenantSuffix(tenantId);
+            Optional<UserEntity> suffixed = userRepository.findByUsername(finalUsername);
+            if (suffixed.isPresent() && tenantId.equals(suffixed.get().getTenantId())) {
+                // 同一租户的重试（例如 external_id 尚未回填）：返回已建账号，避免重复建号。
+                UserEntity existing = suffixed.get();
+                if (existing.getExternalId() == null) {
+                    existing.setExternalSource(source);
+                    existing.setExternalId(externalId);
+                    existing = userRepository.save(existing);
+                }
+                log.info("[provision] 复用租户后缀账号 source={} tenant={} username={}",
+                        source, tenantId, finalUsername);
+                return existing;
+            }
+            if (suffixed.isPresent()) {
+                finalUsername = finalUsername + "_" + UUID.randomUUID().toString().substring(0, 4);
+            }
+            log.warn("[provision] 用户名跨租户冲突，使用租户后缀 source={} tenant={} username={} -> {}",
+                    source, tenantId, username, finalUsername);
+        }
+
         UserEntity user = new UserEntity();
         user.setId(UUID.randomUUID());
-        user.setUsername(username);
+        user.setUsername(finalUsername);
         // A-2 的核心：外部托管账号没有本地密码
         user.setPasswordHash(null);
         user.setPasswordSet(false);
         user.setTenantId(tenantId);
-        user.setDisplayName(displayName == null || displayName.isBlank() ? username : displayName);
+        user.setDisplayName(displayName == null || displayName.isBlank() ? finalUsername : displayName);
         user.setEmail(email);
         user.setEnabled(true);
         user.setStatus(UserStatus.ACTIVE);
+        user.setExternalSource(source);
+        user.setExternalId(externalId == null || externalId.isBlank() ? null : externalId);
         user.setCreatedAt(Instant.now());
-        UserEntity saved = userRepository.save(user);
-        log.info("[provision] 新建外部托管账号 source={} username={} tenant={}",
-                source, username, tenantId);
-        return saved;
+        try {
+            UserEntity saved = userRepository.save(user);
+            log.info("[provision] 新建外部托管账号 source={} username={} tenant={}",
+                    source, finalUsername, tenantId);
+            return saved;
+        } catch (DataIntegrityViolationException e) {
+            // 并发建号或仍存在的唯一键冲突：给调用方明确错误，绝不回退成"复用他人账号"。
+            throw new IllegalStateException(
+                    "外部账号建号冲突（username 已被占用）: " + finalUsername, e);
+        }
+    }
+
+    /** 稳定、可读的租户后缀（SHA-256 前 6 位十六进制）。 */
+    private static String tenantSuffix(String tenantId) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(tenantId.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 6);
+        } catch (Exception e) {
+            return Integer.toHexString(Math.abs(tenantId.hashCode()));
+        }
     }
 
     /**

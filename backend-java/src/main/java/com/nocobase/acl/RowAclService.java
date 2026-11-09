@@ -42,14 +42,29 @@ public class RowAclService {
      *
      * @return true 允许 / false 拒绝
      */
-    /** 是否存在该集合上的行级策略（用于决定是否放大取数窗口）。 */
-    public boolean hasPolicies(String tenantId, String collection, String action) {
+    /** 策略存在性三态：UNKNOWN 不得被调用方永久缓存。 */
+    public enum PolicyPresence { PRESENT, ABSENT, UNKNOWN }
+
+    /**
+     * 查询集合上是否有行级策略，并区分「查询失败」。
+     *
+     * <p>搜索侧按集合缓存时必须使用该三态：异常态只能对当前请求保守放行，
+     * 不能被缓存成 PRESENT，否则一次数据库抖动会让该集合后续请求都不再判权。
+     */
+    public PolicyPresence policyPresence(String tenantId, String collection, String action) {
         try {
-            return !repository.findApplicable(tenantId, collection, action).isEmpty();
+            return repository.findApplicable(tenantId, collection, action).isEmpty()
+                    ? PolicyPresence.ABSENT : PolicyPresence.PRESENT;
         } catch (Exception e) {
             log.warn("[row-acl] 策略查询失败 collection={}: {}", collection, e.getMessage());
-            return true; // 查询失败按"有策略"处理 → 放大取数，避免少返回
+            return PolicyPresence.UNKNOWN;
         }
+    }
+
+    /** 是否存在该集合上的行级策略（用于决定是否放大取数窗口）。 */
+    public boolean hasPolicies(String tenantId, String collection, String action) {
+        // 查询失败按"有策略"处理 → 放大取数 / 逐条判权，避免少返回造成越权。
+        return policyPresence(tenantId, collection, action) != PolicyPresence.ABSENT;
     }
 
     public boolean evaluateRead(String tenantId,

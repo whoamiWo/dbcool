@@ -92,8 +92,9 @@ public class SlashCommandInitializer implements CommandLineRunner {
                         targetUuid = UUID.fromString(targetInput);
                         targetDisplay = targetInput;
                     } catch (IllegalArgumentException e1) {
-                        // 尝试按用户名查找
-                        Optional<UserEntity> userOpt = userRepository.findByUsername(targetInput);
+                        // 尝试按用户名查找（限当前租户，避免跨租户邀请同名用户）
+                        Optional<UserEntity> userOpt = userRepository.findByTenantIdAndUsername(
+                                String.valueOf(ctx.get("tenantId")), targetInput);
                         if (userOpt.isEmpty()) {
                             ctx.put("error", "未找到用户：" + targetInput);
                             return;

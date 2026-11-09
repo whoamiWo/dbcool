@@ -51,11 +51,33 @@
 | C2 | 配置租户级 `feishu.app-id` / `app-secret`，设置 `feishu.sync.enabled=true` | `GET /api/feishu/sync-status` 显示 configured=true | 响应 JSON（无 secret） | 未验证 |
 | C3 | `POST /api/feishu/sync-org` | 部门树写入 `org_unit(source=FEISHU, external_id=open_department_id)` | `departmentsSynced` + `org_unit` 抽样 | 未验证 |
 | C4 | 检查用户 | `username=fs_<open_id>`，部门/岗位/上级/邮箱/手机写入 | `users` 抽样（手机号仅管理端可见） | 未验证 |
-| C5 | 在飞书移出组织后重同步 | 对应本地用户 `status=RESIGNED`、`enabled=false`、会话失效 | `users.status` + `users.enabled` | 未验证 |
+| C5 | 在飞书移出组织后重同步（确保 `errors=[]` 且 `departmentsSynced==departmentsTotal`） | 对应本地用户 `status=RESIGNED`、`enabled=false`、`disable_reason=RESIGNED`、会话失效 | `users.status` + `users.enabled` + `disable_reason` | 未验证 |
+| C5b | 对单部门注入 429/超时后重同步 | **不执行离职**：`usersResigned=0`、`resignSkipped=true`、原用户状态不变 | 响应 JSON + `users` 前后值 | 未验证 |
+| C5c | `POST /api/feishu/sync-org?dryRun=true` | 返回 `pendingResignations` 名单，**零写入、零会话吊销** | 响应 JSON + `users` 前后值 | 未验证 |
 | C6 | 关闭 `feishu.sync.enabled` 后调用同步 | `code=500` 明确提示未启用，**零外部 HTTP 请求** | 应用日志无 outbound 飞书请求 | 未验证 |
 
 自动化覆盖：`FeishuOrgSyncServiceMultiDeptTest`（两层部门、110/10 分页、改名、离职、
-429 失败计数、开关关闭零请求）。真实租户结果另附记录，不阻断发布。
+429 失败计数、部分失败不离职、比例熔断、dryRun、force 放行、管理员手工禁用保护、跨租户同名隔离、开关关闭零请求）。
+真实租户结果另附记录，不阻断发布。
+
+---
+
+## C2. 钉钉组织架构同步（可选，需外部环境）
+
+| # | 步骤 | 预期 | 证据 | 状态 |
+|---|---|---|---|---|
+| D1 | 租户未配置 `dingtalk.app-key/secret` 时调用 `POST /api/dingtalk/sync-org` | `code=500` 且明确「拒绝回退全局 token」；**零外部 HTTP** | 响应 JSON + 应用日志无 outbound 钉钉请求 | 未验证 |
+| D2 | 仅配置全局凭证、未开启 `dingtalk.single-tenant-legacy` | 同上拒绝；多租户环境必须保持该开关为 false | 响应 JSON | 未验证 |
+| D3 | 配置租户级凭证后同步 | 部门/用户按租户写入；`departmentsSynced==departmentsTotal` | 响应 JSON + `org_unit`/`users` 抽样 | 未验证 |
+| D4 | 单部门注入 429/超时后重同步 | **不执行离职**：`usersResigned=0`、`resignSkipped=true` | 响应 JSON + `users` 前后值 | 未验证 |
+| D5 | `POST /api/dingtalk/sync-org?dryRun=true` | 返回 `pendingResignations`，零写入、零会话吊销 | 响应 JSON + `users` 前后值 | 未验证 |
+| D6 | 计划内大裁员 | 默认熔断 409；ADMIN 加 `force=true` 才执行，且审计含 `force=true` | 响应 JSON + `audit_log` | 未验证 |
+| D7 | 管理员手工禁用（`disable_reason=MANUAL`）后重同步 | 保持禁用，不被自动启用，也不判离职 | `users` 前后值 | 未验证 |
+
+自动化覆盖：`DingTalkOrgSyncServiceMultiDeptTest`（两层部门/分页/改名/离职、单部门失败不离职、
+dryRun、force、未配置租户零外部请求）、`OrgSyncSafetyTest`（完整性/阈值下限/熔断/force）、
+`DingTalkControllerAuthTest`（JWT 租户优先于 body）、`UserAdminServiceTest`（G5 资料编辑不改写禁用原因）。
+真实租户结果另附记录，不阻断发布。
 
 ---
 

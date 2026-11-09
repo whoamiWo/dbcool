@@ -63,7 +63,7 @@ class WeChatAppServiceTest {
         com.nocobase.auth.UserProvisioningService provisioning =
                 mock(com.nocobase.auth.UserProvisioningService.class);
         // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -138,7 +138,7 @@ class WeChatAppServiceTest {
         mockOAuthResponse();
         when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(
                 anyString(), eq(OPENID), anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByUsername("wechat_" + TAIL12))
+        when(userRepository.findByTenantIdAndUsername("system", "wechat_" + TAIL12))
                 .thenAnswer(inv -> Optional.of(buildExisting()));
         when(passwordEncoder.encode(anyString())).thenReturn("encoded");
 
@@ -157,7 +157,7 @@ class WeChatAppServiceTest {
         mockOAuthResponse();
         when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(
                 anyString(), eq(OPENID), anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -195,7 +195,7 @@ class WeChatAppServiceTest {
                 .thenReturn("{\"openid\":\"" + OPENID + "\",\"session_key\":\"SK\",\"unionid\":\"\"}");
         when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(
                 anyString(), eq(OPENID), anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 

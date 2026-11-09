@@ -146,6 +146,94 @@ class UserAdminServiceTest {
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
+    @Test
+    void update_disabling_setsManualDisableReason() {
+        UserEntity u = makeUser();
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+
+        UserEntity updated = service.update(u.getId(), null, false, "tenant_default");
+
+        assertFalse(updated.isEnabled());
+        assertEquals(UserEntity.DISABLE_REASON_MANUAL, updated.getDisableReason());
+        assertTrue(updated.isManuallyDisabled());
+    }
+
+    @Test
+    void update_enabling_clearsDisableReason() {
+        UserEntity u = makeUser();
+        u.setEnabled(false);
+        u.setDisableReason(UserEntity.DISABLE_REASON_MANUAL);
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+
+        UserEntity updated = service.update(u.getId(), null, true, "tenant_default");
+
+        assertTrue(updated.isEnabled());
+        assertEquals(null, updated.getDisableReason());
+    }
+
+    @Test
+    void updateProfile_disabledStatus_forcesManualReason() {
+        UserEntity u = makeUser();
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+
+        UserEntity updated = service.updateProfile(u.getId(), "tenant_default",
+                new UserAdminService.UserProfilePatch(null, null, null, null,
+                        null, null, null, null, UserStatus.DISABLED, null));
+
+        assertFalse(updated.isEnabled());
+        assertEquals(UserEntity.DISABLE_REASON_MANUAL, updated.getDisableReason());
+    }
+
+    @Test
+    void updateProfile_profileOnlyEdit_preservesResignedReason() {
+        // G5：纯资料编辑不得把同步写入的 RESIGNED 改成 MANUAL，
+        // 否则该用户重新出现在外部组织时无法自动恢复。
+        UserEntity u = makeUser();
+        u.setStatus(UserStatus.RESIGNED);
+        u.setEnabled(false);
+        u.setDisableReason(UserEntity.DISABLE_REASON_RESIGNED);
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+
+        UserEntity updated = service.updateProfile(u.getId(), "tenant_default",
+                new UserAdminService.UserProfilePatch("新名字", null, null, null,
+                        null, null, null, null, null, null));
+
+        assertEquals("新名字", updated.getDisplayName());
+        assertFalse(updated.isEnabled());
+        assertEquals(UserEntity.DISABLE_REASON_RESIGNED, updated.getDisableReason());
+        assertFalse(updated.isManuallyDisabled());
+    }
+
+    @Test
+    void updateProfile_profileOnlyEdit_preservesManualReason() {
+        UserEntity u = makeUser();
+        u.setStatus(UserStatus.DISABLED);
+        u.setEnabled(false);
+        u.setDisableReason(UserEntity.DISABLE_REASON_MANUAL);
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+
+        UserEntity updated = service.updateProfile(u.getId(), "tenant_default",
+                new UserAdminService.UserProfilePatch(null, "new@example.com", null, null,
+                        null, null, null, null, null, null));
+
+        assertEquals("new@example.com", updated.getEmail());
+        assertFalse(updated.isEnabled());
+        assertEquals(UserEntity.DISABLE_REASON_MANUAL, updated.getDisableReason());
+    }
+
+    @Test
+    void updateProfile_explicitDisable_stillSetsManualReason() {
+        UserEntity u = makeUser();
+        when(userRepository.findByIdAndTenantId(u.getId(), "tenant_default")).thenReturn(Optional.of(u));
+
+        UserEntity updated = service.updateProfile(u.getId(), "tenant_default",
+                new UserAdminService.UserProfilePatch(null, null, null, null,
+                        null, null, null, null, null, false));
+
+        assertFalse(updated.isEnabled());
+        assertEquals(UserEntity.DISABLE_REASON_MANUAL, updated.getDisableReason());
+    }
+
     // ============ resetPassword with tenantId ============
 
     @Test

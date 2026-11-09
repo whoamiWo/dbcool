@@ -31,7 +31,7 @@ class DingTalkAppServiceTest {
         com.nocobase.auth.UserProvisioningService provisioning =
                 mock(com.nocobase.auth.UserProvisioningService.class);
         // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
                     u.setId(java.util.UUID.randomUUID());
@@ -153,7 +153,7 @@ class DingTalkAppServiceTest {
         existing.setId(java.util.UUID.randomUUID());
         existing.setUsername("dt_abc123");
         existing.setTenantId("t1");
-        when(userRepository.findByUsername("dt_abc123")).thenReturn(java.util.Optional.of(existing));
+        when(userRepository.findByTenantIdAndUsername("t1", "dt_abc123")).thenReturn(java.util.Optional.of(existing));
 
         var user = service.syncUserFromDingTalk("abc123", "Nick", "t1");
         assertThat(user).isEqualTo(existing);
@@ -161,7 +161,7 @@ class DingTalkAppServiceTest {
 
     @Test
     void syncUserFromDingTalk_newUser_createsExternalManagedAccount() throws Exception {
-        when(userRepository.findByUsername("dt_xyz789")).thenReturn(java.util.Optional.empty());
+        when(userRepository.findByTenantIdAndUsername("t1", "dt_xyz789")).thenReturn(java.util.Optional.empty());
 
         var user = service.syncUserFromDingTalk("xyz789", "Display", "t1");
         assertThat(user.getUsername()).isEqualTo("dt_xyz789");

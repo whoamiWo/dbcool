@@ -136,7 +136,7 @@ class SlashCommandInitializerTest {
         UserEntity user = new UserEntity();
         user.setId(targetId);
         user.setUsername(username);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findByTenantIdAndUsername("t1", username)).thenReturn(Optional.of(user));
 
         handler.accept(username, ctx);
 
@@ -163,7 +163,7 @@ class SlashCommandInitializerTest {
                 "user", "alice",
                 "userId", userId.toString()));
 
-        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername("t1", "unknown")).thenReturn(Optional.empty());
 
         handler.accept("unknown", ctx);
 

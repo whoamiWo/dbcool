@@ -4,11 +4,11 @@
 任务书要求：涉及 DB 约束、索引写入、权限过滤的用例必须落在真实 PG 上。
 本脚本不 mock 任何东西，直接在运行中的 Postgres 上：
 
-  1. 应用 V77/V78/V79 迁移（全部 IF NOT EXISTS，可重复执行）；
+  1. 应用 V77–V82 迁移（全部 IF NOT EXISTS，可重复执行）；
   2. schema smoke：建两棵部门树 + 三个用户，验证 org_unit/users 数据与子树查询可用
      （**不验证 Java 实现**；Java 路径由 EnterpriseSuitePgIT 走真实代码覆盖）；
   3. 向 unified_search_index 写入一行业务记录，断言全文检索能命中（A-6 语义）；
-  4. 校验 V78/V79/V81 的表/列真实存在。
+  4. 校验 V78/V79/V81/V82 的表/列真实存在。
 
 用法：
   python3 scripts/verify-enterprise-suite.py [--container nocobase-postgres]
@@ -32,6 +32,7 @@ MIGRATIONS = [
     ROOT / "backend-java/src/main/resources/db/migration/V79__notification_center.sql",
     ROOT / "backend-java/src/main/resources/db/migration/V80__restore_search_vector_trigger.sql",
     ROOT / "backend-java/src/main/resources/db/migration/V81__notification_type_backfill_and_last_event.sql",
+    ROOT / "backend-java/src/main/resources/db/migration/V82__user_external_identity_and_disable_reason.sql",
 ]
 
 TENANT = "verify_es_" + uuid.uuid4().hex[:8]
@@ -75,7 +76,7 @@ def main():
     ap.add_argument("--db", default="nocobase")
     args = ap.parse_args()
 
-    print(f"[1/4] 应用迁移 V77–V81（tenant={TENANT}）")
+    print(f"[1/4] 应用迁移 V77–V82（tenant={TENANT}）")
     for mig in MIGRATIONS:
         sql = mig.read_text(encoding="utf-8")
         ok, out, err = run_sql(args.container, args.user, args.db, sql)
@@ -155,6 +156,15 @@ WHERE table_schema = 'public' AND table_name = 'messages'
 """
     ok, out, err = run_sql(args.container, args.user, args.db, sql)
     check("messages notification columns exist (7, incl V81 last_event_at)", ok and out.strip() == "7",
+          f"out={out!r} err={err[:200]}")
+
+    sql = """
+SELECT COUNT(*) FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'users'
+  AND column_name IN ('external_source','external_id','disable_reason');
+"""
+    ok, out, err = run_sql(args.container, args.user, args.db, sql)
+    check("users external identity/disable columns exist (3, V82)", ok and out.strip() == "3",
           f"out={out!r} err={err[:200]}")
 
     sql = f"""

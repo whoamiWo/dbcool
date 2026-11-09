@@ -83,15 +83,19 @@ def main():
     print(f"Base: {BASE}")
     print("=" * 70)
 
-    # 清理自己产生的限流 key，避免与其他脚本互扰（PHASE109）
+    # 清理登录限流 key，避免与其他脚本互扰（PHASE109）。
+    # CI 可能通过 IPv6 localhost（0:0:0:0:0:0:0:1）访问，不能只删两个 IPv4 key，
+    # 否则前序脚本耗尽 5 次额度后，本脚本创建的新用户会登录 429。
     import subprocess as _sp
     try:
-        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
-                 "ratelimit:ip:127.0.0.1:/api/auth/login"],
-                check=False, capture_output=True)
-        _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL",
-                 "ratelimit:ip:172.18.0.1:/api/auth/login"],
-                check=False, capture_output=True)
+        scan = _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli",
+                        "--scan", "--pattern", "ratelimit:ip:*:/api/auth/login"],
+                       check=False, capture_output=True, text=True)
+        for key in scan.stdout.splitlines():
+            key = key.strip()
+            if key:
+                _sp.run(["docker", "compose", "exec", "-T", "redis", "redis-cli", "DEL", key],
+                        check=False, capture_output=True)
     except Exception:
         pass
 

@@ -258,10 +258,9 @@ public class InboundMessageService {
         // A-2：统一建号路径 —— 第三方同步用户无本地密码（此前写 bcrypt(随机 UUID)，
         // 语义上仍是「有密码的账号」，与「第三方用户不得本地登录」的注释自相矛盾）
         final com.nocobase.auth.UserEntity user =
-                userRepository.findByUsername(username)
-                        .filter(u -> tenantId.equals(u.getTenantId()))
+                userRepository.findByTenantIdAndUsername(tenantId, username)
                         .orElseGet(() -> provisioningService.createExternal(
-                                tenantId, username, username, null, source));
+                                tenantId, username, username, null, source, externalUserId));
 
         ExternalUserMappingEntity mapping = new ExternalUserMappingEntity();
         mapping.setId(UUID.randomUUID());
