@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -44,7 +45,7 @@ class OidcUserServiceTest {
     void setUp() {
         userRepository = mock(UserRepository.class);
         provisioningMock = mock(com.nocobase.auth.UserProvisioningService.class);
-        when(provisioningMock.createExternal(any(), any(), any(), any(), any()))
+        when(provisioningMock.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
                     u.setId(java.util.UUID.randomUUID());
@@ -89,8 +90,8 @@ class OidcUserServiceTest {
     @Test
     void mapOrCreate_matchesByEmail() {
         UserEntity existing = existingUser("zhangsan", "z@corp.com", true);
-        when(userRepository.findByEmail("z@corp.com")).thenReturn(Optional.of(existing));
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndEmail(anyString(), eq("z@corp.com"))).thenReturn(Optional.of(existing));
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
 
         UserEntity result = service.mapOrCreate(oidcUser("sub-1", "z@corp.com", "other", "张三"));
 
@@ -100,8 +101,8 @@ class OidcUserServiceTest {
     @Test
     void mapOrCreate_matchesByUsername() {
         UserEntity existing = existingUser("lisi", "l@corp.com", true);
-        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByUsername("lisi")).thenReturn(Optional.of(existing));
+        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), eq("lisi"))).thenReturn(Optional.of(existing));
 
         UserEntity result = service.mapOrCreate(oidcUser("sub-2", "unknown@corp.com", "lisi", "李四"));
 
@@ -111,8 +112,8 @@ class OidcUserServiceTest {
     /** JIT 建号 —— 托管账号无本地密码，只能走 OIDC 登录。 */
     @Test
     void mapOrCreate_createsUser_whenNoMatch() {
-        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
 
         UserEntity created = service.mapOrCreate(
                 oidcUser("sub-new", "new@corp.com", "newuser", "新用户"));
@@ -128,7 +129,7 @@ class OidcUserServiceTest {
     @Test
     void mapOrCreate_rejectsDisabledUser() {
         UserEntity disabled = existingUser("disabled", "d@corp.com", false);
-        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(disabled));
+        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.of(disabled));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> service.mapOrCreate(oidcUser("sub-3", "d@corp.com", "disabled", "禁用")));
@@ -138,8 +139,8 @@ class OidcUserServiceTest {
 
     @Test
     void mapOrCreate_fallsBackToSubject_whenUsernameBlank() {
-        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
 
         // email 与 username 均为空 → 用 sub 兜底
         OidcIdToken idToken = new OidcIdToken("tv", null, null,

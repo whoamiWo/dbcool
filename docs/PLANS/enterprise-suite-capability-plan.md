@@ -351,3 +351,26 @@
 5. ~~**移动端 375px Playwright 验收**~~：Round 3 已在新构建上执行，`mobile-375` 65 passed。
 6. ~~**搜索负向用例进 `tenant-isolation-e2e-verify.py`**~~：Round 3 已新增第 23/24 项，真实栈 **24/24 PASS**。
 7. **IM @提及候选仍取「频道成员」而非 `/api/org/members`**：刻意保留 —— 频道成员是通讯录的子集且有会话权限，改为全组织会造成"能 @ 不可见成员"的越权。
+
+### N1 收口状态（本机，2026-11-09）
+
+- **F1 飞书离职安全**：离职判定仅在 `usersFailed==0 && errors.isEmpty() && departmentsSynced==departmentsTotal` 时执行；待离职 >10 人或 >已见用户 20%（或本轮未见到任何用户）时 `code=409` 熔断且零写入；`POST /api/feishu/sync-org?dryRun=true` 返回 `pendingResignations` 且不写库、不吊销会话。
+- **F2 外部身份隔离**：V82 增加 `users.external_source/external_id/disable_reason` 与 `(tenant_id, external_source, external_id)` 唯一索引；飞书/钉钉/企微/微信/LDAP/OIDC/入站同步改为租户内 + 外部身份查询；跨租户同名外部账号使用稳定租户后缀，不改写对方账号。
+- **F4 人工禁用**：`disable_reason=MANUAL` 的账号不会被同步自动启用，也不参与自动离职；重新启用时清空。
+- **F3 父部门严格化**：外部父部门查不到时抛 400，不再静默降级为根部门；该错误会阻止本轮离职判定。
+- **F5 搜索策略缓存**：`SearchAclContext.policyPresence` 按集合缓存 PRESENT/ABSENT；UNKNOWN（查询失败）不缓存，仍 fail-closed。
+- **F8 事件审计租户**：飞书事件审计使用 `tenant_key`，缺失记 `unknown`。
+- **门禁实测**：`mvn -o test` → **2797 tests, 0 failures/errors**；JaCoCo LINE **80.11%**；`verify-enterprise-suite.py` 新增 V82 检查（14 项，实测 14/14）；`doc-numbers-verify.py` 24 个锚点一致；Playwright `--list` **260 tests / 13 files**。
+- **F7 流程**：本轮改动保留在工作树，未提交/未推送；提交时按 `fix/feishu-org-sync-safety` 分支 + PR。`main` 分支保护（required checks、禁止直接 push）需仓库管理员在 GitHub 设置中开启，代码侧无法自动化。
+- **仍需外部环境**：钉钉审批真实联调、真实 OIDC IdP、真实飞书租户（含 dryRun 与 429 注入演练）见 `docs/PLANS/external-integration-acceptance.md` C5b/C5c。
+
+### N1b 收口状态（本机，2026-11-09）
+
+- **G1 钉钉离职安全**：抽出共享 `OrgSyncSafety`（完整性/dryRun/比例熔断/force），飞书与钉钉共用；钉钉单部门 429/超时 → `usersResigned=0`、`resignSkipped=true`，原用户状态与会话不变。
+- **G2 钉钉租户凭证**：同步准入只认 `appService.isTenantConfigured(tenantId)`；未配置租户直接拒绝且零外部 HTTP；全局凭证仅在显式 `dingtalk.single-tenant-legacy=true` 生效；`/sync-org` 租户优先取自 JWT。
+- **G3 熔断下限与 force**：比例阈值 `max(1, round(seen*20%))`；待离职 >10 人仍默认 409；ADMIN `force=true` 跳过熔断并写审计（飞书/钉钉端点均支持）。
+- **G5 资料编辑**：纯资料编辑不再把 `RESIGNED` 改写为 `MANUAL`；只有显式启停/状态变更才写 `MANUAL`。
+- **G6 部门计数**：钉钉 `departmentsSynced` 按成功 upsert 累加，`departmentsTotal` 参与完整性判定。
+- **G4 V82 说明**：`wecom_/wechat_` 回填的 `external_id` 是 12 位摘要（近似值），首次同步用完整 id 覆盖；LDAP/OIDC 不回填。
+- **门禁实测（新 jar 副本 8081）**：`mvn -o verify` → **2816 tests / 0F / 0E**，JaCoCo LINE **80.16%**；前端 974/120，tsc/eslint 0；契约 460×137 0 漂移；Python 68/1；冒烟 **14/14**；租户隔离 **24/24**；PG IT **8/8**；schema **14/14**；上线终验 **8/8**；`monthly-gate` **15 PASS + 1 SKIP**（备份无 `pg_dump`）；`doc-numbers-verify` 通过。
+- **流程**：改动仍未提交；建议按 `fix/org-sync-safety` 分支 + PR 提交，`main` 分支保护需仓库管理员开启。

@@ -77,7 +77,11 @@ public class UserAdminService {
         UserEntity u = get(id, tenantId);
         if (displayName != null) u.setDisplayName(displayName);
         boolean disabling = enabled != null && !enabled && u.isEnabled();
-        if (enabled != null) u.setEnabled(enabled);
+        if (enabled != null) {
+            u.setEnabled(enabled);
+            // F4：管理员手工启停与外部同步离职分离，同步不得自动覆盖手工禁用
+            u.setDisableReason(enabled ? null : UserEntity.DISABLE_REASON_MANUAL);
+        }
         UserEntity saved = userRepository.save(u);
         // A-5：禁用立即失效（缓存 + 全部 refresh token），不等 60s 窗口
         if (disabling) userStatusService.invalidate(id);
@@ -102,10 +106,25 @@ public class UserAdminService {
         if (patch.departmentId() != null) u.setDepartmentId(patch.departmentId());
         if (patch.status() != null) u.setStatus(patch.status());
         boolean disabling = patch.enabled() != null && !patch.enabled() && u.isEnabled();
-        if (patch.enabled() != null) u.setEnabled(patch.enabled());
-        if (UserStatus.RESIGNED.equals(u.getStatus()) || UserStatus.DISABLED.equals(u.getStatus())) {
+        if (patch.enabled() != null) {
+            u.setEnabled(patch.enabled());
+            if (patch.enabled()) {
+                u.setDisableReason(null);
+            } else {
+                u.setDisableReason(UserEntity.DISABLE_REASON_MANUAL);
+            }
+        } else if (patch.status() != null
+                && (UserStatus.RESIGNED.equals(patch.status())
+                    || UserStatus.DISABLED.equals(patch.status()))) {
+            // G5：只有管理员<b>显式</b>把状态改成离职/禁用时才停用账号。
+            // 纯资料编辑（displayName/email/...）不得改写 disable_reason ——
+            // 否则同步写入的 RESIGNED 会被改成 MANUAL，用户重新入职后无法自动恢复。
+            if (u.isEnabled()) disabling = true;
             u.setEnabled(false);
-            disabling = true;
+            // 保留已有原因（如 RESIGNED）；仅当原因为空时落 MANUAL，防止被同步自动启用。
+            if (u.getDisableReason() == null) {
+                u.setDisableReason(UserEntity.DISABLE_REASON_MANUAL);
+            }
         }
         UserEntity saved = userRepository.save(u);
         if (disabling) userStatusService.invalidate(id);

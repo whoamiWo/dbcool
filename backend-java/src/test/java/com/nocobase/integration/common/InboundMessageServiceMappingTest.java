@@ -61,7 +61,7 @@ class InboundMessageServiceMappingTest {
 
         provisioning = mock(com.nocobase.auth.UserProvisioningService.class);
         // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -168,9 +168,9 @@ class InboundMessageServiceMappingTest {
 
         when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(anyString(), anyString(), eq(TENANT)))
                 .thenReturn(Optional.empty());
-        // 全局能按 username 查到，但那个用户属于另一个租户 —— 不得复用
-        when(userRepository.findByUsername("slack:shared-1"))
-                .thenReturn(Optional.of(otherTenantUser));
+        // 该用户名只存在于另一个租户；本租户内查询必须查不到
+        when(userRepository.findByTenantIdAndUsername(TENANT, "slack:shared-1"))
+                .thenReturn(Optional.empty());
         when(userRepository.save(any(UserEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
         when(messageRepository.save(any(ImMessageEntity.class)))
@@ -188,7 +188,7 @@ class InboundMessageServiceMappingTest {
         // A-2：建号走统一路径，租户必须是当前租户（不得复用其它租户的同名用户）
         ArgumentCaptor<String> tenantCaptor = ArgumentCaptor.forClass(String.class);
         verify(provisioning).createExternal(tenantCaptor.capture(),
-                anyString(), anyString(), any(), anyString());
+                anyString(), anyString(), any(), anyString(), any());
         assertThat(tenantCaptor.getValue()).isEqualTo(TENANT);
     }
 
@@ -198,7 +198,7 @@ class InboundMessageServiceMappingTest {
         ReflectionTestUtils.setField(service, "autoProvisionUser", true);
         when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(anyString(), anyString(), eq(TENANT)))
                 .thenReturn(Optional.empty());
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
         when(userRepository.save(any(UserEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
         when(messageRepository.save(any(ImMessageEntity.class)))
@@ -225,7 +225,7 @@ class InboundMessageServiceMappingTest {
         ReflectionTestUtils.setField(service, "autoProvisionUser", true);
         when(mappingRepository.findByPlatformAndExternalUserIdAndTenantId(anyString(), anyString(), eq(TENANT)))
                 .thenReturn(Optional.empty());
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
         when(messageRepository.save(any(ImMessageEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
         when(memberRepository.existsByChannelIdAndUserId(any(), any())).thenReturn(true);
@@ -242,6 +242,7 @@ class InboundMessageServiceMappingTest {
                 .createExternal(org.mockito.ArgumentMatchers.any(),
                         provCaptor.capture(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.isNull(),
+                        org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any());
         assertThat(provCaptor.getValue()).isEqualTo("slack:U-pw");
     }

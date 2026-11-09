@@ -221,12 +221,15 @@ public class LdapSyncService {
             try {
                 String displayName = (String) ldapUser.getOrDefault("displayName", uid);
                 String email = (String) ldapUser.getOrDefault("email", uid + "@local");
-                UserEntity localUser = userRepository.findByUsername(uid).orElse(null);
+                UserEntity localUser = userRepository
+                        .findByTenantIdAndExternalSourceAndExternalId(tenantId, "LDAP", uid)
+                        .or(() -> userRepository.findByTenantIdAndUsername(tenantId, uid))
+                        .orElse(null);
                 if (localUser == null) {
                     // A-2：LDAP 托管账号无本地密码（此前写 bcrypt(随机 UUID) —— 语义上仍是
                     // 「有密码的账号」，且 PHASE96 之前更糟：全库统一字面量 "LDAP_SYNCED"）
                     localUser = provisioningService.createExternal(
-                            tenantId, uid, displayName, email, "LDAP");
+                            tenantId, uid, displayName, email, "LDAP", uid);
                     mapping.setLocalUserId(localUser.getId());
                 } else {
                     mapping.setLocalUserId(localUser.getId());

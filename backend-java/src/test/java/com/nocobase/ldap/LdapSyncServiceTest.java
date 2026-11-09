@@ -51,7 +51,7 @@ class LdapSyncServiceTest {
         provisioning = mock(com.nocobase.auth.UserProvisioningService.class);
         when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -82,8 +82,8 @@ class LdapSyncServiceTest {
         LdapConfigEntity cfg = config("tenant_a", "cfg-a");
         when(mappingRepository.findByLdapUidAndTenantId(eq("uid-1"), eq("tenant_a")))
                 .thenReturn(Optional.empty());
-        when(userRepository.findByUsername("uid-1")).thenReturn(Optional.empty());
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(userRepository.findByTenantIdAndUsername("tenant_a", "uid-1")).thenReturn(Optional.empty());
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -105,7 +105,7 @@ class LdapSyncServiceTest {
         org.mockito.Mockito.verify(provisioning).createExternal(
                 org.mockito.ArgumentMatchers.any(), captor.capture(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.eq("LDAP"));
+                org.mockito.ArgumentMatchers.eq("LDAP"), org.mockito.ArgumentMatchers.any());
         assertThat(captor.getValue()).isEqualTo("uid-1");
     }
 
@@ -113,8 +113,8 @@ class LdapSyncServiceTest {
     @Test
     void syncUser_twoUsers_haveDifferentPasswords() {
         when(mappingRepository.findByLdapUidAndTenantId(any(), any())).thenReturn(Optional.empty());
-        when(userRepository.findByUsername(any())).thenReturn(Optional.empty());
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(userRepository.findByTenantIdAndUsername(any(), any())).thenReturn(Optional.empty());
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -135,7 +135,7 @@ class LdapSyncServiceTest {
         org.mockito.Mockito.verify(provisioning, org.mockito.Mockito.times(2))
                 .createExternal(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.eq("LDAP"));
+                        org.mockito.ArgumentMatchers.eq("LDAP"), org.mockito.ArgumentMatchers.any());
     }
 
     /** 定时同步必须遍历所有启用配置，而不是只查 system 租户。 */
@@ -198,7 +198,7 @@ class LdapSyncServiceTest {
         UserEntity existing = new UserEntity();
         existing.setId(UUID.randomUUID());
         existing.setUsername("uid-9");
-        when(userRepository.findByUsername("uid-9")).thenReturn(Optional.of(existing));
+        when(userRepository.findByTenantIdAndUsername("t1", "uid-9")).thenReturn(Optional.of(existing));
         when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.syncUser(cfg, Map.of("uid", "uid-9", "dn", "cn=uid-9"), "t1");
@@ -226,9 +226,9 @@ class LdapSyncServiceTest {
     void syncUser_saveThrows_marksError() {
         LdapConfigEntity cfg = config("t1", "cfg");
         when(mappingRepository.findByLdapUidAndTenantId("uid-err", "t1")).thenReturn(Optional.empty());
-        when(userRepository.findByUsername("uid-err")).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername("t1", "uid-err")).thenReturn(Optional.empty());
         // A-2 后建号经由 UserProvisioningService —— 失败点随之迁移到 createExternal
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenThrow(new RuntimeException("db down"));
         when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -271,7 +271,7 @@ class LdapSyncServiceTest {
                         Map.of("uid", "u2", "dn", "cn=u2", "displayName", "U2", "email", "u2@x.com")
                 ));
         when(mappingRepository.findByLdapUidAndTenantId(any(), eq("t1"))).thenReturn(Optional.empty());
-        when(userRepository.findByUsername(any())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(any(), any())).thenReturn(Optional.empty());
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
         when(mappingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

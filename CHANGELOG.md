@@ -1,3 +1,31 @@
+## v2.1.4 (2026-11-09)
+
+### Round 3 / N1 修复：飞书组织同步安全 + 外部身份按租户隔离
+
+**安全修复**
+- **G1 钉钉同步对齐飞书安全策略**：抽出共享 `OrgSyncSafety`（完整性判定/dryRun/比例熔断/force），飞书与钉钉共用；钉钉单部门 429/超时不再批量误判离职
+- **G2 钉钉租户凭证硬隔离**：组织同步只接受租户级 `app-key/secret`，未配置租户直接拒绝且**零外部 HTTP**；全局凭证仅在显式 `dingtalk.single-tenant-legacy=true` 的单租户部署生效；`/sync-org` 租户优先取自 JWT
+- **G3 熔断下限与人工放行**：比例阈值改为 `max(1, round(seen*20%))`，小组织单人离职不再被误熔断；计划内大裁员可用 ADMIN `force=true` 跳过熔断，并写入审计
+- **G5 资料编辑不再改写禁用原因**：纯资料编辑保留 `RESIGNED/MANUAL`，只有显式启停/状态变更才写入 `MANUAL`，重新入职可被同步自动恢复
+- **G6 钉钉部门计数按成功累加**：`departmentsSynced` 不再在 upsert 前预置总数，失败不会显示为全量
+- **G4 V82 回填说明**：`wecom_/wechat_` 历史 `external_id` 是 12 位摘要（近似值），首次同步用完整 id 覆盖；LDAP/OIDC 不回填
+- **F1 飞书离职安全**：只有“部门数与用户都全量同步成功”才允许判定离职；待离职 > 10 人或 > 已见用户 20% 时熔断（`code=409`）且零写入；新增 `POST /api/feishu/sync-org?dryRun=true` 先返回名单；`usersResigned` 统计与实际写入一致
+- **F2 外部身份隔离**：`users` 增加 `external_source/external_id`（V82）；飞书/钉钉/企微/微信/LDAP/OIDC/入站同步全部改为“租户内 + 外部身份”查询，不再使用全局 `findByUsername`；跨租户同名外部账号追加稳定租户后缀，**不改写对方租户账号**
+- **F4 人工禁用保护**：`users.disable_reason`（`MANUAL`/`RESIGNED`）；外部同步只在非管理员手工禁用时自动启用，离职判定也不覆盖手工禁用
+- **F3 父部门严格化**：外部部门父 ID 查不到时抛错并跳过该子树，不再静默降级为根部门
+- **F5 搜索 ROW 策略缓存**：`SearchAclContext` 按集合缓存 `policyPresence`，查询失败（UNKNOWN）不缓存，避免一次抖动让集合整体“无策略”
+- **F8 飞书事件审计**：审计租户取自事件体 `tenant_key`，无法解析记 `unknown`，不再冒充 `tenant_default`
+
+**迁移**
+- `V82__user_external_identity_and_disable_reason.sql`：新增 3 列、回填 `fs_/dt_/wecom_/wechat_` 历史外部身份、`(tenant_id, external_source, external_id)` 唯一索引
+
+**实测**
+- Java `mvn -o verify`：**2816 run / 0F / 0E**，JaCoCo LINE **80.16%**；前端未改动（974/974）；Playwright `--list` 260 tests / 13 files
+- 门禁实测（新 jar 8081）：冒烟 14/14、租户隔离 24/24、PG IT 8/8、schema 14/14、上线终验 8/8；`monthly-gate` 15 PASS + 1 SKIP（备份无 `pg_dump`）；`doc-numbers-verify` 锚点一致
+
+**流程纠偏**
+- 上一轮提交未走 PR 直接进入 `main`；本轮修复按 `fix/feishu-org-sync-safety` 分支 + PR 提交，建议同时开启 `main` 分支保护（required checks、禁止直接 push）
+
 ## v2.1.3 (2026-10-31)
 
 ### 本批摘要：Wave 4 待办池全量收口（16/16）+ Compose 蓝绿发布

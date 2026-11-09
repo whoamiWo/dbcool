@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.nocobase.auth.UserEntity;
@@ -40,6 +43,7 @@ class DingTalkOrgSyncServiceMultiDeptTest {
     private static final String TENANT = "t1";
 
     private DingTalkOrgSyncService service;
+    private DingTalkAppService appService;
     private UserRepository userRepository;
     private UserProvisioningService provisioning;
     private OrgUnitService orgUnitService;
@@ -53,7 +57,7 @@ class DingTalkOrgSyncServiceMultiDeptTest {
 
     @BeforeEach
     void setUp() {
-        DingTalkAppService appService = mock(DingTalkAppService.class);
+        appService = mock(DingTalkAppService.class);
         userRepository = mock(UserRepository.class);
         provisioning = mock(UserProvisioningService.class);
         orgUnitService = mock(OrgUnitService.class);
@@ -75,6 +79,7 @@ class DingTalkOrgSyncServiceMultiDeptTest {
 
         when(appService.getAppAccessToken(TENANT)).thenReturn("token");
         when(appService.isConfigured(TENANT)).thenReturn(true);
+        when(appService.isTenantConfigured(TENANT)).thenReturn(true);
 
         when(orgUnitService.upsertExternal(eq(TENANT), eq("DINGTALK"), any(),
                 any(), any(), any(Integer.class)))
@@ -91,7 +96,7 @@ class DingTalkOrgSyncServiceMultiDeptTest {
                     return u;
                 });
 
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -100,11 +105,28 @@ class DingTalkOrgSyncServiceMultiDeptTest {
                     u.setPasswordSet(false);
                     u.setTenantId(inv.getArgument(0));
                     u.setDisplayName(inv.getArgument(2));
+                    u.setExternalSource(inv.getArgument(4));
+                    u.setExternalId(inv.getArgument(5));
                     return u;
                 });
 
-        when(userRepository.findByUsername(any()))
-                .thenAnswer(inv -> Optional.ofNullable(users.get(inv.getArgument(0))));
+        when(userRepository.findByTenantIdAndExternalSourceAndExternalId(any(), any(), any()))
+                .thenAnswer(inv -> {
+                    String tenant = inv.getArgument(0);
+                    String source = inv.getArgument(1);
+                    String externalId = inv.getArgument(2);
+                    return users.values().stream()
+                            .filter(u -> tenant.equals(u.getTenantId()))
+                            .filter(u -> source.equals(u.getExternalSource()))
+                            .filter(u -> externalId.equals(u.getExternalId()))
+                            .findFirst();
+                });
+        when(userRepository.findByTenantIdAndUsername(any(), any()))
+                .thenAnswer(inv -> {
+                    String tenant = inv.getArgument(0);
+                    UserEntity u = users.get(inv.getArgument(1));
+                    return Optional.ofNullable(u).filter(x -> tenant.equals(x.getTenantId()));
+                });
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
             UserEntity u = inv.getArgument(0);
             users.put(u.getUsername(), u);
@@ -270,5 +292,80 @@ class DingTalkOrgSyncServiceMultiDeptTest {
         Map<?, ?> data = (Map<?, ?>) result.get("data");
         assertThat((Integer) data.get("usersFailed")).isGreaterThan(0);
         assertThat((List<?>) data.get("errors")).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("G1：单部门 429 → 不执行离职，原用户状态与会话不变")
+    void departmentFailure_doesNotResignAnyone() {
+        UserEntity ghost = ghost("dt_ghost");
+        failDept11 = true;
+
+        Map<String, Object> result = service.syncOrganization(TENANT);
+
+        assertThat(result.get("code")).isNotEqualTo(0);
+        Map<?, ?> data = (Map<?, ?>) result.get("data");
+        assertThat(data.get("usersResigned")).isEqualTo(0);
+        assertThat(data.get("resignSkipped")).isEqualTo(true);
+        assertThat(ghost.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(ghost.isEnabled()).isTrue();
+        verify(userStatusService, never()).invalidate(any());
+    }
+
+    @Test
+    @DisplayName("G1：dryRun → 返回待离职名单但不写库、不吊销会话")
+    void dryRun_returnsPendingWithoutWriting() {
+        UserEntity ghost = ghost("dt_ghost");
+
+        Map<String, Object> result = service.syncOrganization(TENANT, true);
+
+        assertThat(result.get("code")).isEqualTo(0);
+        Map<?, ?> data = (Map<?, ?>) result.get("data");
+        assertThat(data.get("usersResigned")).isEqualTo(0);
+        assertThat((List<String>) data.get("pendingResignations")).contains("dt_ghost");
+        assertThat(ghost.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(ghost.isEnabled()).isTrue();
+        verify(userStatusService, never()).invalidate(any());
+    }
+
+    @Test
+    @DisplayName("G3：force=true → 跳过熔断并执行离职")
+    void force_releasesBreakerAndResigns() {
+        for (int i = 0; i < 11; i++) {
+            ghost("dt_ghost" + i);
+        }
+
+        Map<String, Object> result = service.syncOrganization(TENANT, false, true);
+
+        assertThat(result.get("code")).isEqualTo(0);
+        Map<?, ?> data = (Map<?, ?>) result.get("data");
+        assertThat(data.get("usersResigned")).isEqualTo(11);
+        assertThat(data.get("resignBreakerTripped")).isEqualTo(false);
+        assertThat(data.get("resignForced")).isEqualTo(true);
+        assertThat(users.get("dt_ghost0").getStatus()).isEqualTo(UserStatus.RESIGNED);
+    }
+
+    @Test
+    @DisplayName("G2：未配置租户即便有全局凭证也拒绝，且零外部 HTTP")
+    void unconfiguredTenant_rejectsWithoutAnyExternalRequest() {
+        // 全局 app-key/secret 已在 setUp 设置；租户级凭证缺失、legacy 默认关闭。
+        when(appService.isTenantConfigured("tenant-x")).thenReturn(false);
+
+        Map<String, Object> result = service.syncOrganization("tenant-x");
+
+        assertThat(result.get("code")).isEqualTo(500);
+        assertThat(String.valueOf(result.get("message"))).contains("拒绝回退全局 token");
+        verifyNoInteractions(restTemplate);
+        verify(appService, never()).getAppAccessToken("tenant-x");
+    }
+
+    private UserEntity ghost(String username) {
+        UserEntity u = new UserEntity();
+        u.setId(UUID.randomUUID());
+        u.setUsername(username);
+        u.setTenantId(TENANT);
+        u.setStatus(UserStatus.ACTIVE);
+        u.setEnabled(true);
+        users.put(username, u);
+        return u;
     }
 }

@@ -125,6 +125,56 @@ class FeishuControllerTest {
     }
 
     @Test
+    void eventsCallback_usesEventTenantForAudit() {
+        String body = "{\"header\":{\"tenant_key\":\"tenant_x\"},"
+                + "\"type\":\"im.message.receive_v1\",\"event_id\":\"e3\"}";
+        when(feishuAppService.verifySignature("ts", "nc", "sig", body)).thenReturn(true);
+
+        controller.eventsCallback(body, "ts", "nc", "sig");
+
+        verify(auditService).log(eq("tenant_x"), anyString(), anyString(),
+                eq("feishu.events.received"), anyString(), anyString(), any(Map.class));
+    }
+
+    @Test
+    void eventsCallback_unknownTenantDoesNotImpersonateDefault() {
+        String body = "{\"type\":\"url_verification\",\"challenge\":\"ch\"}";
+
+        controller.eventsCallback(body, null, null, null);
+
+        verify(auditService).log(eq("unknown"), anyString(), anyString(),
+                eq("feishu.events.challenge"), anyString(), anyString(), any(Map.class));
+    }
+
+    @Test
+    void syncOrg_passesDryRunToService() {
+        when(orgSyncService.syncOrganization("tenant_default", true, false))
+                .thenReturn(Map.of("code", 0, "message", "success", "data", Map.of()));
+
+        Map<String, Object> result = controller.syncOrg(true, false, USER);
+
+        assertThat(result.get("code")).isEqualTo(0);
+        verify(orgSyncService).syncOrganization("tenant_default", true, false);
+    }
+
+    @Test
+    void syncOrg_forceIsPassedAndAudited() {
+        when(orgSyncService.syncOrganization("tenant_default", false, true))
+                .thenReturn(Map.of("code", 0, "message", "success(force)", "data", Map.of()));
+
+        Map<String, Object> result = controller.syncOrg(false, true, USER);
+
+        assertThat(result.get("message")).isEqualTo("success(force)");
+        verify(orgSyncService).syncOrganization("tenant_default", false, true);
+        org.mockito.ArgumentCaptor<Object> payload =
+                org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(auditService).log(eq("tenant_default"), anyString(), anyString(),
+                eq("feishu.sync.org"), eq("feishu_org_sync"), eq("tenant_default"),
+                payload.capture());
+        assertThat(((Map<?, ?>) payload.getValue()).get("force")).isEqualTo(true);
+    }
+
+    @Test
     void sendMessage_missingParams_returns400() {
         ResponseEntity<Map<String, Object>> resp = controller.sendMessage(Map.of("open_id", "ou_1"), USER);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
