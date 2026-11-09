@@ -1,6 +1,6 @@
 # 升级 Runbook（Wave1 T1.6）
 
-> 适用：docker compose 单机部署。数据库迁移由后端启动时的 Flyway 自动执行（当前最新迁移 **V81**）。
+> 适用：docker compose 单机部署。数据库迁移由后端启动时的 Flyway 自动执行（当前最新迁移 **V82**）。
 
 ## 一、前置条件
 
@@ -46,7 +46,7 @@ gunzip -c backups/pre-upgrade-2.1.0-to-2.1.1-<stamp>.sql.gz \
 - 若新版本含破坏性迁移，镜像回滚后需按上节恢复备份。
 - 迁移执行证据看后端日志：`docker logs nocobase-backend-java | grep -i flyway`。
 
-### 4.1 本轮迁移（V77–V81）与数据影响
+### 4.1 本轮迁移（V77–V82）与数据影响
 
 | 迁移 | 内容 | 回滚影响 |
 |---|---|---|
@@ -55,8 +55,23 @@ gunzip -c backups/pre-upgrade-2.1.0-to-2.1.1-<stamp>.sql.gz \
 | V79 | `messages` 通知中心列 + 旧类型收敛（把 `workflow` 误标为 `WORKFLOW_FAILED`） | 已发布迁移**不可修改**；本轮由 V81 纠偏 |
 | V80 | 恢复 `content_tsv` 触发器 | 保留 |
 | V81 | `messages.last_event_at`；`workflow` → `WORKFLOW_NOTICE`；仅回填 V79 之前被误标的 `WORKFLOW_FAILED` | 旧镜像不识别 `WORKFLOW_NOTICE`，会显示在“全部”但无对应 tab；不影响功能 |
+| V82 | `users.external_source/external_id/disable_reason`；外部身份按 `(tenant_id, source, external_id)` 唯一；按用户名前缀回填历史外部身份 | 增量列可保留，旧镜像忽略；`disable_reason` 为 NULL 时行为与升级前一致 |
 
 > V81 依赖 `flyway_schema_history` 中的 V79 安装时间。手工初始化、缺少该表的库会**跳过**失败类型回填并 `RAISE NOTICE`（不改数据），此时历史通知可能仍显示“流程失败”，需人工核对。
+
+> V82 的外部身份回填只识别 `fs_ / dt_ / wecom_ / wechat_` 前缀，其它托管账号保持 NULL 并在下次同步时补齐。
+> 其中 `wecom_ / wechat_` 的历史 username 只保存了 openid/unionid 的 12 位摘要，回填出的 `external_id`
+> 是**近似值**，首次同步会以完整 id 覆盖；此前按 `external_id` 做的审计查询可能看到摘要值。LDAP/OIDC 不回填。
+> `username` 仍是全局唯一：两个租户接同一外部应用时会为后建账号追加稳定的租户后缀，**不会改写对方租户账号**。
+> `disable_reason=MANUAL` 的账号在外部同步中保持禁用；管理员重新启用时清空该字段。纯资料编辑不再把
+> `RESIGNED` 改写为 `MANUAL`，因此重新入职可被同步自动恢复。
+>
+> 同步安全开关：
+> - 飞书：`POST /api/feishu/sync-org?dryRun=true` 先核对 `pendingResignations`；计划内大裁员需 ADMIN 加
+>   `force=true`（跳过熔断并写审计）。
+> - 钉钉：组织同步**只使用租户级凭证**。未配置租户会直接拒绝且不发起外部请求；单租户存量部署若确需回退
+>   全局 `dingtalk.app-key/secret`，必须显式设置 `dingtalk.single-tenant-legacy=true`（多租户环境保持 false）。
+>   钉钉同样支持 `dryRun=true` / `force=true`。
 
 ### 4.2 DEPT / SELF 数据范围在升级后“才真正生效”
 

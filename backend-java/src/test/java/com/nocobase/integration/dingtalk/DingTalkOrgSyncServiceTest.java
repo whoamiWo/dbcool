@@ -2,6 +2,7 @@ package com.nocobase.integration.dingtalk;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * PHASE105: DingTalkOrgSyncService 测试。
@@ -78,14 +80,29 @@ class DingTalkOrgSyncServiceTest {
 
     @Test
     void syncOrganization_configuredButNetworkFails_returns502() {
-        // 已配置 → 走真实 HTTP；离线环境必然失败 → catch → 502（不抛出）
+        // 单租户 legacy 模式：租户未配置时显式允许全局凭证回退。
+        configureCredentials("key", "secret");
+        ReflectionTestUtils.setField(service, "singleTenantLegacy", true);
+        RestTemplate rest = mock(RestTemplate.class);
+        when(rest.getForObject(anyString(), eq(String.class)))
+                .thenThrow(new RuntimeException("network down"));
+        ReflectionTestUtils.setField(service, "restTemplate", rest);
+
+        Map<String, Object> result = service.syncOrganization("t1");
+
+        assertThat(result.get("code")).isEqualTo(502);
+        assertThat(result).containsKey("data");
+    }
+
+    @Test
+    void syncOrganization_globalCredentialsWithoutLegacy_areRejected() {
+        // G2：全局凭证存在但未开启 legacy → 不得进入租户同步路径（零外部请求）。
         configureCredentials("key", "secret");
 
         Map<String, Object> result = service.syncOrganization("t1");
 
-        // 离线为 502；若联网成功则为 0。断言不抛异常且结构完整
-        assertThat(result.get("code")).isIn(0, 502);
-        assertThat(result).containsKey("data");
+        assertThat(result.get("code")).isEqualTo(500);
+        assertThat(String.valueOf(result.get("message"))).contains("拒绝回退全局 token");
     }
 
     @Test
@@ -122,7 +139,7 @@ class DingTalkOrgSyncServiceTest {
                 (UserMappingService) ReflectionTestUtils.getField(service, "userMappingService");
         com.nocobase.auth.UserEntity existing = new com.nocobase.auth.UserEntity();
         existing.setId(UUID.randomUUID());
-        when(userRepo.findByUsername("dt_u1")).thenReturn(Optional.of(existing));
+        when(userRepo.findByTenantIdAndUsername("t1", "dt_u1")).thenReturn(Optional.of(existing));
 
         com.nocobase.auth.UserEntity result = service.syncSingleUser("u1", "张三", "t1");
 
@@ -139,13 +156,13 @@ class DingTalkOrgSyncServiceTest {
         com.nocobase.auth.UserProvisioningService provisioning =
                 (com.nocobase.auth.UserProvisioningService)
                         ReflectionTestUtils.getField(service, "provisioningService");
-        when(userRepo.findByUsername("dt_u1")).thenReturn(Optional.empty());
+        when(userRepo.findByTenantIdAndUsername("t1", "dt_u1")).thenReturn(Optional.empty());
         com.nocobase.auth.UserEntity created = new com.nocobase.auth.UserEntity();
         created.setId(UUID.randomUUID());
         created.setUsername("dt_u1");
         created.setPasswordHash(null);
         // A-2：建号统一走 provisioning（无本地密码）
-        when(provisioning.createExternal(any(), any(), any(), any(), any())).thenReturn(created);
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any())).thenReturn(created);
 
         com.nocobase.auth.UserEntity result = service.syncSingleUser("u1", "张三", "t1");
 

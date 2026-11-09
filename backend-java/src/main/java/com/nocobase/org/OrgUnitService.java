@@ -133,9 +133,14 @@ public class OrgUnitService {
                                         String name, String parentExternalId, int sort) {
         UUID parentId = null;
         if (parentExternalId != null && !parentExternalId.isBlank()) {
+            // F3：父外部 ID 明确给出却查不到，说明上级部门尚未同步或已被删除。
+            // 旧实现静默降级为根部门，会让整个子树挂错层级且难以察觉；这里严格失败，
+            // 由同步方记录错误并跳过该子树（并因此禁用本轮离职判定）。
             parentId = repository
                     .findByTenantIdAndSourceAndExternalIdAndDeletedFalse(tenantId, source, parentExternalId)
-                    .map(OrgUnitEntity::getId).orElse(null);
+                    .map(OrgUnitEntity::getId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "上级部门不存在: source=" + source + " externalId=" + parentExternalId));
         }
         OrgUnitEntity unit = repository
                 .findByTenantIdAndSourceAndExternalIdAndDeletedFalse(tenantId, source, externalId)

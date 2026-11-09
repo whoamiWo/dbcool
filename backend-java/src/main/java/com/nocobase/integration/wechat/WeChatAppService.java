@@ -205,7 +205,7 @@ public class WeChatAppService {
 
         // 按 openid 哈希后的用户名查找本地用户（未建映射的旧数据兜底）
         String username = "wechat_" + safeTail(openid, 12);
-        UserEntity existing = userRepository.findByUsername(username).orElse(null);
+        UserEntity existing = findExistingUser("system", username, openid).orElse(null);
         if (existing != null) {
             persistMapping("wechat", openid, "system", existing.getId(), nickname);
             log.info("[WeChat] 用户已存在并补建映射：username={}, openid={}", username, openid);
@@ -214,7 +214,7 @@ public class WeChatAppService {
 
         // A-2：统一建号路径 —— 微信托管账号无本地密码（此前写 bcrypt(random)）
         UserEntity user = provisioningService.createExternal(
-                "system", username, nickname, null, "WECHAT");
+                "system", username, nickname, null, "WECHAT", openid);
         persistMapping("wechat", openid, "system", user.getId(), nickname);
         log.info("[WeChat] 新建用户+映射：username={}, openid={}", username, openid);
         return user;
@@ -306,7 +306,7 @@ public class WeChatAppService {
 
         // 按 openid 哈希后的用户名查找本地用户（未建映射的旧数据兜底）
         String username = "wechat_" + safeTail(openid, 12);
-        UserEntity existing = userRepository.findByUsername(username).orElse(null);
+        UserEntity existing = findExistingUser("system", username, openid).orElse(null);
         if (existing != null) {
             persistMapping("wechat", openid, "system", existing.getId(), "微信用户");
             log.info("[MiniProgram] 用户已存在并补建映射：username={}, openid={}", username, openid);
@@ -315,10 +315,20 @@ public class WeChatAppService {
 
         // A-2：统一建号路径 —— 小程序托管账号无本地密码
         UserEntity user = provisioningService.createExternal(
-                "system", username, "微信用户", null, "WECHAT");
+                "system", username, "微信用户", null, "WECHAT", openid);
         persistMapping("wechat", openid, "system", user.getId(), "微信用户");
         log.info("[MiniProgram] 新建用户+映射：username={}, openid={}", username, openid);
         return user;
+    }
+
+    /** F2：租户内按外部身份优先、用户名兜底查找，禁止全局 findByUsername。 */
+    private java.util.Optional<UserEntity> findExistingUser(String tenantId, String username, String openId) {
+        if (openId != null && !openId.isBlank()) {
+            java.util.Optional<UserEntity> byExternal = userRepository
+                    .findByTenantIdAndExternalSourceAndExternalId(tenantId, "WECHAT", openId);
+            if (byExternal.isPresent()) return byExternal;
+        }
+        return userRepository.findByTenantIdAndUsername(tenantId, username);
     }
 
     /** 取标识尾部并只保留字母数字，避免生成非法用户名。 */

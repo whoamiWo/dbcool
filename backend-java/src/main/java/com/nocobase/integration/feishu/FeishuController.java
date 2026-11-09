@@ -87,25 +87,29 @@ public class FeishuController {
             JsonNode json = objectMapper.readTree(body);
             String type = json.path("type").asText();
             
+            // F8：审计租户取自事件体 tenant_key；无法解析时记 unknown，
+            // 不得冒充 tenant_default（否则跨租户事件会污染默认租户审计）。
+            String eventTenant = resolveEventTenant(json);
+
             if ("url_verification".equals(type)) {
                 String challenge = json.path("challenge").asText();
                 if (challenge.isBlank()) {
                     return ResponseEntity.badRequest().body("{\"error\":\"missing challenge\"}");
                 }
-                auditService.log("tenant_default", "system", "system",
+                auditService.log(eventTenant, "system", "system",
                         "feishu.events.challenge", "feishu_event", challenge,
                         Map.of("eventType", "url_verification", "challenge", challenge));
                 return ResponseEntity.ok(challenge);
             }
 
             if (!feishuAppService.verifySignature(timestamp, nonce, signature, body)) {
-                auditService.log("tenant_default", "unknown", "unknown",
+                auditService.log(eventTenant, "unknown", "unknown",
                         "feishu.events.rejected", "feishu_event", "unknown",
                         Map.of("timestamp", timestamp, "nonce", nonce, "reason", "signature_invalid"));
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("{\"error\":\"invalid signature\"}");
             }
 
-            auditService.log("tenant_default", "system", "system",
+            auditService.log(eventTenant, "system", "system",
                     "feishu.events.received", "feishu_event", json.path("event_id").asText("unknown"),
                     Map.of("type", type, "bodyPreview", body.length() > 100 ? body.substring(0, 100) : body));
 
@@ -124,12 +128,23 @@ public class FeishuController {
      */
     @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
     @PostMapping("/sync-org")
-    public Map<String, Object> syncOrg(@AuthenticationPrincipal AuthenticatedUser user) {
-        Map<String, Object> result = orgSyncService.syncOrganization(user.tenantId());
+    public Map<String, Object> syncOrg(
+            @RequestParam(required = false, defaultValue = "false") boolean dryRun,
+            @RequestParam(required = false, defaultValue = "false") boolean force,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        Map<String, Object> result = orgSyncService.syncOrganization(user.tenantId(), dryRun, force);
         auditService.log(user.tenantId(), user.userId().toString(), user.username(),
                 "feishu.sync.org", "feishu_org_sync", user.tenantId(),
-                Map.of("code", String.valueOf(result.get("code"))));
+                Map.of("code", String.valueOf(result.get("code")),
+                        "dryRun", dryRun, "force", force));
         return result;
+    }
+
+    /** 事件体租户：优先 header.tenant_key（v2 事件），兼容顶层 tenant_key。 */
+    static String resolveEventTenant(JsonNode json) {
+        String key = json.path("header").path("tenant_key").asText("");
+        if (key.isBlank()) key = json.path("tenant_key").asText("");
+        return key.isBlank() ? "unknown" : key;
     }
 
     /** 最近一次飞书组织同步状态（管理员，仅限本租户）。 */

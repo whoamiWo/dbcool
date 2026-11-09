@@ -39,7 +39,7 @@ class WeComAppServiceTest {
         com.nocobase.auth.UserProvisioningService provisioning =
                 mock(com.nocobase.auth.UserProvisioningService.class);
         // A-2：统一建号路径 —— mock 出真实行为（无本地密码的托管账号）
-        when(provisioning.createExternal(any(), any(), any(), any(), any()))
+        when(provisioning.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
                     UserEntity u = new UserEntity();
                     u.setId(UUID.randomUUID());
@@ -99,7 +99,7 @@ class WeComAppServiceTest {
                 .thenReturn(json("userid", "zhangsan"))
                 .thenReturn(json("name", "张三", "email", "zhang@example.com"));
 
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
         when(userRepository.save(any())).thenAnswer(inv -> {
             UserEntity u = inv.getArgument(0);
             u.setId(UUID.randomUUID());
@@ -125,7 +125,7 @@ class WeComAppServiceTest {
         // 企业微信账号固定归属 system 租户；归属校验（跨租户冲突拒绝）依赖该字段
         existing.setTenantId("system");
         existing.setDisplayName("张三（旧）");
-        when(userRepository.findByUsername("wecom_zhangsan")).thenReturn(Optional.of(existing));
+        when(userRepository.findByTenantIdAndUsername("system", "wecom_zhangsan")).thenReturn(Optional.of(existing));
 
         UserEntity user = service.loginFromWeCom("valid_code_123");
         assertThat(user).isSameAs(existing); // 幂等：不重复建号
@@ -184,8 +184,8 @@ class WeComAppServiceTest {
                 .thenReturn("{\"department\":[{\"id\":\"1\",\"name\":\"总部\"},{\"id\":\"2\",\"name\":\"研发\"}]}")
                 .thenReturn("{\"userlist\":[{\"userid\":\"lisi\",\"name\":\"李四\",\"email\":\"lisi@example.com\"}]}");
 
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.empty());
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var result = service.syncContacts();
@@ -200,8 +200,8 @@ class WeComAppServiceTest {
                 .thenReturn("{\"department\":[{\"id\":\"1\",\"name\":\"总部\"}]}")
                 .thenReturn("{\"userlist\":[{\"userid\":\"lisi\",\"name\":\"李四\",\"email\":\"lisi@example.com\"}]}");
 
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail("lisi@example.com")).thenReturn(Optional.of(new UserEntity()));
+        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
+        when(userRepository.findByTenantIdAndEmail("system", "lisi@example.com")).thenReturn(Optional.of(new UserEntity()));
 
         var result = service.syncContacts();
         assertThat(result.get("users")).isEqualTo(0); // 已存在，跳过
