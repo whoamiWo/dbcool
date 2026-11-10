@@ -58,6 +58,18 @@ public class ApprovalRequestEntity {
     @Column(name = "external_instance_id")
     private String externalInstanceId;
 
+    @Column(name = "corp_id")
+    private String corpId;
+
+    @Column(name = "external_process_code")
+    private String externalProcessCode;
+
+    @Column(name = "external_push_status", nullable = false)
+    private String externalPushStatus = "NOT_REQUIRED";
+
+    @Column(name = "external_push_error", length = 500)
+    private String externalPushError;
+
     @Column(name = "submitted_at", nullable = false)
     private Instant submittedAt;
 
@@ -82,6 +94,14 @@ public class ApprovalRequestEntity {
     public void setCurrentTaskId(UUID currentTaskId) { this.currentTaskId = currentTaskId; }
     public String getExternalInstanceId() { return externalInstanceId; }
     public void setExternalInstanceId(String externalInstanceId) { this.externalInstanceId = externalInstanceId; }
+    public String getCorpId() { return corpId; }
+    public void setCorpId(String corpId) { this.corpId = corpId; }
+    public String getExternalProcessCode() { return externalProcessCode; }
+    public void setExternalProcessCode(String externalProcessCode) { this.externalProcessCode = externalProcessCode; }
+    public String getExternalPushStatus() { return externalPushStatus; }
+    public void setExternalPushStatus(String externalPushStatus) { this.externalPushStatus = externalPushStatus; }
+    public String getExternalPushError() { return externalPushError; }
+    public void setExternalPushError(String externalPushError) { this.externalPushError = externalPushError; }
     public Instant getSubmittedAt() { return submittedAt; }
     public void setSubmittedAt(Instant submittedAt) { this.submittedAt = submittedAt; }
     public Instant getFinishedAt() { return finishedAt; }

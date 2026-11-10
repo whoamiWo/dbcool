@@ -53,6 +53,7 @@ class ApprovalServiceTest {
     private final UUID applicant = UUID.randomUUID();
     private final UUID templateId = UUID.randomUUID();
     private final UUID workflowId = UUID.randomUUID();
+    private org.springframework.beans.factory.ObjectProvider<ApprovalSubmissionService> submissions;
 
     @BeforeEach
     void setUp() {
@@ -64,13 +65,22 @@ class ApprovalServiceTest {
         taskRepository = mock(WorkflowTaskRepository.class);
         engine = mock(WorkflowEngine.class);
         userRepository = mock(UserRepository.class);
+        submissions = mock(org.springframework.beans.factory.ObjectProvider.class);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<ApprovalSubmissionService> typedSubmissions = submissions;
         service = new ApprovalService(templateRepository, requestRepository, ccRepository,
                 workflowRepository, instanceRepository, taskRepository, engine, userRepository,
-                mock(com.nocobase.integration.dingtalk.DingTalkApprovalService.class),
+                 mock(com.nocobase.integration.dingtalk.DingTalkExternalApprovalService.class),
+                submissions,
                 mock(NotifyDispatcher.class),
                 mock(com.nocobase.search.UnifiedSearchService.class),
                 mock(com.nocobase.approval.ApprovalVisibilityService.class),
                 false);
+        var submission = mock(ApprovalSubmissionService.class);
+        when(submission.submit(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> service.submitLocal(inv.getArgument(0), inv.getArgument(1),
+                        inv.getArgument(2), inv.getArgument(3), inv.getArgument(4)));
+        when(submissions.getObject()).thenReturn(submission);
 
         when(requestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(instanceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -167,7 +177,7 @@ class ApprovalServiceTest {
 
         assertThat(data.get("status")).isEqualTo("PENDING");
         verify(instanceRepository).save(any(WorkflowInstanceEntity.class));
-        verify(engine).executeFrom(any(), any(), anyInt(), any());
+        verify(engine).executeFrom(any(), any(), anyInt(), any(), any());
     }
 
     @Test
@@ -211,6 +221,7 @@ class ApprovalServiceTest {
         instance.setId(instanceId);
         instance.setStatus(WorkflowInstanceEntity.Status.RUNNING);
         when(instanceRepository.findById(instanceId)).thenReturn(Optional.of(instance));
+        when(instanceRepository.findLockedByIdAndTenantId(instanceId, TENANT)).thenReturn(Optional.of(instance));
 
         WorkflowTaskEntity task = new WorkflowTaskEntity();
         task.setId(UUID.randomUUID());
@@ -267,6 +278,38 @@ class ApprovalServiceTest {
                 "财务", 1, "ROLE", null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("roleId");
+    }
+
+    @Test
+    void disabledExternalPush_rejectsExternalTemplateInsteadOfStuckApproval() {
+        ApprovalTemplateEntity external = new ApprovalTemplateEntity();
+        external.setId(UUID.randomUUID());
+        external.setExternalProcessCode("PROC-1");
+        when(templateRepository.findByIdAndTenantId(external.getId(), TENANT))
+                .thenReturn(Optional.of(external));
+        assertThatThrownBy(() -> service.submit(TENANT, applicant, external.getId(), Map.of(), List.of()))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("外推已关闭");
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void disabledExternalPush_keepsOrdinaryLocalTemplateUsable() {
+        ApprovalTemplateEntity ordinary = template("USER");
+        ordinary.setExternalProcessCode(null);
+        when(templateRepository.findByIdAndTenantId(ordinary.getId(), TENANT))
+                .thenReturn(Optional.of(ordinary));
+        WorkflowEntity workflow = workflowWithApproval("USER");
+        workflow.setNodesJson("[{\"id\":\"a1\",\"type\":\"APPROVAL\",\"config\":{\"assignee\":\""
+                + applicant + "\"}}]");
+        when(workflowRepository.findByIdAndTenantId(workflowId, TENANT))
+                .thenReturn(Optional.of(workflow));
+        when(userRepository.findByIdAndTenantId(applicant, TENANT))
+                .thenReturn(Optional.of(user(applicant, null)));
+        when(userRepository.findById(applicant)).thenReturn(Optional.of(user(applicant, null)));
+        when(engine.executeFrom(any(), any(), anyInt(), any(), any()))
+                .thenReturn(WorkflowEngine.NodeResult.CONTINUE);
+        service.submit(TENANT, applicant, ordinary.getId(), Map.of(), List.of());
+        verify(submissions).getObject();
     }
 
     @Test

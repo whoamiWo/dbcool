@@ -1,12 +1,18 @@
 package com.nocobase.integration.dingtalk;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.approval.ApprovalCcRepository;
+import com.nocobase.approval.ApprovalRequestEntity;
+import com.nocobase.approval.ApprovalRequestRepository;
+import com.nocobase.workflow.WorkflowEngine;
 import com.nocobase.workflow.WorkflowEntity;
 import com.nocobase.workflow.WorkflowInstanceEntity;
 import com.nocobase.workflow.WorkflowInstanceRepository;
@@ -18,237 +24,180 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Wave4 待办池 #10：钉钉审批回调业务闭环（事件消费端真实推进）。
- *
- * 链路：钉钉回调事件 → WorkflowTaskService.@EventListener → 绑定反查 →
- *       approveTask/rejectTask（与平台内审批同一逻辑）→ 任务与实例状态更新。
- */
 class DingTalkApprovalCallbackClosureTest {
-
+    private static final String TENANT = "tenant_a";
     private WorkflowInstanceRepository instanceRepository;
-    private WorkflowTaskRepository taskRepository;
     private WorkflowRepository workflowRepository;
+    private ApprovalRequestRepository requestRepository;
+    private WorkflowEngine engine;
     private WorkflowTaskService taskService;
+    private ApprovalRequestEntity request;
+    private WorkflowInstanceEntity instance;
+    private WorkflowEntity workflow;
 
     @BeforeEach
     void setUp() {
         instanceRepository = mock(WorkflowInstanceRepository.class);
-        taskRepository = mock(WorkflowTaskRepository.class);
         workflowRepository = mock(WorkflowRepository.class);
-        taskService = new WorkflowTaskService(taskRepository, instanceRepository, workflowRepository,
-                mock(com.nocobase.workflow.WorkflowEngine.class),
-                mock(com.nocobase.audit.AuditService.class),
-                new com.fasterxml.jackson.databind.ObjectMapper(),
-                mock(com.nocobase.approval.ApprovalRequestRepository.class),
-                mock(com.nocobase.approval.ApprovalCcRepository.class),
-                mock(com.nocobase.notification.NotifyDispatcher.class));
-    }
-
-    private WorkflowInstanceEntity instance() {
-        WorkflowInstanceEntity i = new WorkflowInstanceEntity();
-        i.setId(UUID.randomUUID());
-        i.setTenantId("tenant_default");
-        i.setWorkflowId(UUID.randomUUID());
-        i.setStatus(WorkflowInstanceEntity.Status.PENDING);
-        i.setCurrentNodeIndex(0);
-        i.setTriggerDataJson("{\"dingtalkInstanceId\":\"dt-inst-1\"}");
-        return i;
-    }
-
-    private WorkflowTaskEntity pendingTask(UUID instanceId) {
-        WorkflowTaskEntity t = new WorkflowTaskEntity();
-        t.setId(UUID.randomUUID());
-        t.setInstanceId(instanceId);
-        t.setTenantId("tenant_default");
-        t.setStatus(WorkflowTaskEntity.Status.PENDING);
-        return t;
-    }
-
-    private WorkflowEntity workflow() {
-        WorkflowEntity w = new WorkflowEntity();
-        w.setId(UUID.randomUUID());
-        w.setName("hook-flow");
-        w.setNodesJson("[]");
-        w.setEdgesJson("[]");
-        return w;
-    }
-
-    /** 补齐推进链所需的 findById stub（Mockito 默认返回 null → 404）。 */
-    private void stubChain(WorkflowInstanceEntity instance, WorkflowTaskEntity task) {
-        when(instanceRepository.findByTriggerDataJsonContaining("dt-inst-1")).thenReturn(List.of(instance));
-        when(taskRepository.findByInstanceId(instance.getId())).thenReturn(List.of(task));
-        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
-        when(instanceRepository.findById(instance.getId())).thenReturn(Optional.of(instance));
-        WorkflowEntity wf = workflow();
-        when(workflowRepository.findById(wf.getId())).thenReturn(Optional.of(wf));
-        // 实例的 workflowId 指向该 workflow
-        instance.setWorkflowId(wf.getId());
+        requestRepository = mock(ApprovalRequestRepository.class);
+        engine = mock(WorkflowEngine.class);
+        taskService = new WorkflowTaskService(mock(WorkflowTaskRepository.class), instanceRepository,
+                workflowRepository, engine, mock(com.nocobase.audit.AuditService.class),
+                new com.fasterxml.jackson.databind.ObjectMapper(), requestRepository,
+                mock(ApprovalCcRepository.class), mock(com.nocobase.notification.NotifyDispatcher.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(taskService, "approvalService",
+                mock(com.nocobase.approval.ApprovalService.class));
+        request = new ApprovalRequestEntity();
+        request.setId(UUID.randomUUID());
+        request.setTenantId(TENANT);
+        request.setApplicantId(UUID.randomUUID());
+        request.setExternalPushStatus("PUSHED");
+        request.setStatus("PENDING");
+        instance = new WorkflowInstanceEntity();
+        instance.setId(UUID.randomUUID());
+        instance.setTenantId(TENANT);
+        instance.setWorkflowId(UUID.randomUUID());
+        instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+        request.setInstanceId(instance.getId());
+        workflow = new WorkflowEntity();
+        workflow.setId(instance.getWorkflowId());
+        workflow.setTenantId(TENANT);
+        workflow.setNodesJson("[{\"id\":\"external\",\"type\":\"DINGTALK_APPROVAL\"}]");
+        workflow.setEdgesJson("[]");
+        when(requestRepository.findByIdAndTenantId(request.getId(), TENANT)).thenReturn(Optional.of(request));
+        when(requestRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(instanceRepository.findLockedByIdAndTenantId(instance.getId(), TENANT)).thenReturn(Optional.of(instance));
+        when(instanceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(workflowRepository.findByIdAndTenantId(workflow.getId(), TENANT)).thenReturn(Optional.of(workflow));
     }
 
     @Test
-    @DisplayName("回调 agree：任务 APPROVED，无后续节点则实例 COMPLETED")
-    void callback_agree_marksTaskApprovedAndCompletesInstance() {
-        WorkflowInstanceEntity instance = instance();
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        stubChain(instance, task);
-
-        boolean handled = taskService.approveByExternalBinding("dt-inst-1", true, "agree");
-
-        assertThat(handled).isTrue();
-        assertThat(task.getStatus()).isEqualTo(WorkflowTaskEntity.Status.APPROVED);
+    void agree_completesWithoutCreatingLocalHumanTask() {
+        assertThat(taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree")).isTrue();
         assertThat(instance.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.COMPLETED);
-        verify(taskRepository).save(task);
-        verify(instanceRepository, org.mockito.Mockito.atLeastOnce()).save(instance);
+        assertThat(request.getStatus()).isEqualTo("APPROVED");
+        verify(engine, never()).executeFrom(any(), any(), any(Integer.class), any());
     }
 
     @Test
-    @DisplayName("回调 reject：任务 REJECTED，实例 FAILED 并带原因")
-    void callback_reject_marksTaskRejectedAndFailsInstance() {
-        WorkflowInstanceEntity instance = instance();
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        stubChain(instance, task);
-
-        boolean handled = taskService.approveByExternalBinding("dt-inst-1", false, "reject");
-
-        assertThat(handled).isTrue();
-        assertThat(task.getStatus()).isEqualTo(WorkflowTaskEntity.Status.REJECTED);
+    void refuse_rejectsButDoesNotTurnPushIntoFailure() {
+        assertThat(taskService.approveByExternalBinding(TENANT, request.getId(), false, "refuse")).isTrue();
         assertThat(instance.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.FAILED);
+        assertThat(request.getStatus()).isEqualTo("REJECTED");
+        assertThat(request.getExternalPushStatus()).isEqualTo("PUSHED");
     }
 
     @Test
-    @DisplayName("会签：存在其他 PENDING 任务时实例保持 PENDING（等待会签）")
-    void callback_withCoSign_pendingStaysPending() {
-        WorkflowInstanceEntity instance = instance();
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        task.setNodeId("n1");
-        WorkflowTaskEntity sibling = pendingTask(instance.getId());
-        sibling.setNodeId("n1");
-        stubChain(instance, task);
-        when(taskRepository.findByInstanceIdAndNodeIdAndStatus(any(), any(), any()))
-                .thenReturn(List.of(sibling));
-
-        taskService.approveByExternalBinding("dt-inst-1", true, "agree");
-
-        assertThat(task.getStatus()).isEqualTo(WorkflowTaskEntity.Status.APPROVED);
-        assertThat(instance.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.PENDING);
+    void localApprovalNode_cannotBeAdvancedExternally() {
+        workflow.setNodesJson("[{\"id\":\"local\",\"type\":\"APPROVAL\"}]");
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("外部审批节点");
+        verify(instanceRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("无绑定：返回 false 且不误改任何任务")
-    void callback_withoutBinding_returnsFalse() {
-        when(instanceRepository.findByTriggerDataJsonContaining(any())).thenReturn(List.of());
-
-        boolean handled = taskService.approveByExternalBinding("dt-unknown", true, "agree");
-
-        assertThat(handled).isFalse();
-        verify(taskRepository, never()).save(any());
+    void notPushedOrMissingInstanceCannotAdvance() {
+        request.setExternalPushStatus("FAILED");
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class);
+        request.setExternalPushStatus("PUSHED");
+        when(instanceRepository.findLockedByIdAndTenantId(instance.getId(), TENANT)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
-    @DisplayName("Wave4#10 收尾：图模式工作流 approve 后经引擎图遍历续跑下游节点")
-    void callback_graphMode_continuesViaEngine() {
-        WorkflowInstanceEntity instance = instance();
+    void missingBindingOrTerminalRequest_rejected() {
+        when(requestRepository.findByIdAndTenantId(request.getId(), TENANT)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class);
+        when(requestRepository.findByIdAndTenantId(request.getId(), TENANT)).thenReturn(Optional.of(request));
+        request.setStatus("APPROVED");
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("终结");
+    }
+
+    @Test
+    void linearAdvanceUsesRequestIdAndSyncsPendingProjection() {
+        workflow.setNodesJson("[{\"id\":\"external\",\"type\":\"DINGTALK_APPROVAL\"},{\"id\":\"local\",\"type\":\"APPROVAL\"}]");
+        when(engine.executeFrom(any(), any(), any(Integer.class), any(), any()))
+                .thenReturn(WorkflowEngine.NodeResult.NEEDS_APPROVAL);
+        assertThat(taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree")).isTrue();
+        verify(engine).executeFrom(eq(instance), any(), eq(1), any(), eq(request.getId()));
+        assertThat(request.getStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void invalidNodeIndexOrJsonFailsClosed() {
+        instance.setCurrentNodeIndex(-1);
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class);
         instance.setCurrentNodeIndex(0);
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        task.setNodeId("n1");
-        stubChain(instance, task);
-        // 工作流带 edges → 图模式
-        WorkflowEntity wf = workflow();
-        wf.setNodesJson("[{\"id\":\"n1\",\"type\":\"APPROVAL\"},{\"id\":\"n2\",\"type\":\"NOTIFICATION\"}]");
-        wf.setEdgesJson("[{\"source\":\"n1\",\"target\":\"n2\"}]");
-        // 重新 stub workflow（stubChain 里的 workflow() 不带 edges）—— 实例指向带 edges 的工作流
-        instance.setWorkflowId(wf.getId());
-        when(workflowRepository.findById(wf.getId())).thenReturn(java.util.Optional.of(wf));
-        var engine = (com.nocobase.workflow.WorkflowEngine)
-                org.springframework.test.util.ReflectionTestUtils.getField(taskService, "engine");
-        when(engine.executeGraphFrom(any(), any(), any(), org.mockito.ArgumentMatchers.eq("n2"), any()))
-                .thenReturn(com.nocobase.workflow.WorkflowEngine.NodeResult.CONTINUE);
-
-        boolean handled = taskService.approveByExternalBinding("dt-inst-1", true, "agree");
-
-        assertThat(handled).isTrue();
-        // 图模式：引擎图遍历被调用且起点是下一个节点 n2
-        verify(engine).executeGraphFrom(any(), any(), any(), org.mockito.ArgumentMatchers.eq("n2"), any());
+        workflow.setNodesJson("not-json");
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
-    @DisplayName("Wave4#10 收尾：数组模式（无 edges）不走引擎图遍历（行为向后兼容）")
-    void callback_arrayMode_doesNotInvokeGraphEngine() {
-        WorkflowInstanceEntity instance = instance();
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        stubChain(instance, task); // workflow() 无 edges
-        var engine = (com.nocobase.workflow.WorkflowEngine)
-                org.springframework.test.util.ReflectionTestUtils.getField(taskService, "engine");
-
-        boolean handled = taskService.approveByExternalBinding("dt-inst-1", true, "agree");
-
-        assertThat(handled).isTrue();
-        org.mockito.Mockito.verify(engine, org.mockito.Mockito.never())
-                .executeGraphFrom(any(), any(), any(), any(), any());
+    void nonPendingWorkflowCannotBeAdvancedExternally() {
+        instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
-    @DisplayName("Wave4#10 收尾：图模式当前已是最后节点 → 实例 COMPLETED（覆盖 nextIdx 越界分支）")
-    void graphMode_lastNode_completes() {
-        WorkflowInstanceEntity instance = instance();
-        instance.setCurrentNodeIndex(1); // n1(0) 已过，n2(1) 是最后一个
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        task.setNodeId("n2");
-        stubChain(instance, task);
-        WorkflowEntity wf = workflow();
-        wf.setNodesJson("[{\"id\":\"n1\",\"type\":\"APPROVAL\"},{\"id\":\"n2\",\"type\":\"NOTIFICATION\"}]");
-        wf.setEdgesJson("[{\"source\":\"n1\",\"target\":\"n2\"}]");
-        instance.setWorkflowId(wf.getId());
-        when(workflowRepository.findById(wf.getId())).thenReturn(java.util.Optional.of(wf));
-
-        boolean handled = taskService.approveByExternalBinding("dt-inst-1", true, "agree");
-
-        assertThat(handled).isTrue();
-        assertThat(instance.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.COMPLETED);
-        verify(instanceRepository, org.mockito.Mockito.atLeastOnce()).save(instance);
+    void terminatedInstanceMapsCancelledAndMissingWorkflowRejected() {
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(taskService, "syncExternalRequest",
+                request, instance);
+        instance.setStatus(WorkflowInstanceEntity.Status.TERMINATED);
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(taskService, "syncExternalRequest",
+                request, instance);
+        assertThat(request.getStatus()).isEqualTo("CANCELED");
+        when(workflowRepository.findByIdAndTenantId(workflow.getId(), TENANT)).thenReturn(Optional.empty());
+        instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+        assertThatThrownBy(() -> taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree"))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
-    @DisplayName("Wave4#10 收尾：edgesJson 非法 JSON → 降级数组模式（覆盖解析失败分支）")
-    void graphMode_badEdgesJson_fallsBackToArrayMode() {
-        WorkflowInstanceEntity instance = instance();
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        stubChain(instance, task);
-        WorkflowEntity wf = workflow();
-        wf.setNodesJson("[]");
-        wf.setEdgesJson("{invalid json");
-        instance.setWorkflowId(wf.getId());
-        when(workflowRepository.findById(wf.getId())).thenReturn(java.util.Optional.of(wf));
-        var engine = (com.nocobase.workflow.WorkflowEngine)
-                org.springframework.test.util.ReflectionTestUtils.getField(taskService, "engine");
-
-        boolean handled = taskService.approveByExternalBinding("dt-inst-1", true, "agree");
-
-        assertThat(handled).isTrue();
-        // 降级为空节点数组推进 → 无下游 → 实例 COMPLETED，且不调用引擎
-        assertThat(instance.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.COMPLETED);
-        org.mockito.Mockito.verify(engine, org.mockito.Mockito.never())
-                .executeGraphFrom(any(), any(), any(), any(), any());
+    void nullEdgesFallBackToLinearExecution() {
+        workflow.setNodesJson("[{\"id\":\"external\",\"type\":\"DINGTALK_APPROVAL\"},{\"id\":\"notice\",\"type\":\"NOTIFICATION\"}]");
+        workflow.setEdgesJson(null);
+        when(engine.executeFrom(any(), any(), any(Integer.class), any(), any()))
+                .thenReturn(WorkflowEngine.NodeResult.CONTINUE);
+        assertThat(taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree")).isTrue();
+        verify(engine).executeFrom(any(), any(), eq(1), any(), eq(request.getId()));
     }
 
     @Test
-    @DisplayName("Wave4#10 收尾：nodesJson 非法 JSON → 图模式空节点 → 实例 COMPLETED（覆盖解析失败分支）")
-    void graphMode_badNodesJson_completes() {
-        WorkflowInstanceEntity instance = instance();
-        WorkflowTaskEntity task = pendingTask(instance.getId());
-        stubChain(instance, task);
-        WorkflowEntity wf = workflow();
-        wf.setNodesJson("[broken");
-        wf.setEdgesJson("[{\"source\":\"n1\",\"target\":\"n2\"}]");
-        instance.setWorkflowId(wf.getId());
-        when(workflowRepository.findById(wf.getId())).thenReturn(java.util.Optional.of(wf));
+    void graphAdvancesFromNextNodeAndPassesRequestId() {
+        workflow.setNodesJson("[{\"id\":\"external\",\"type\":\"DINGTALK_APPROVAL\"},{\"id\":\"notice\",\"type\":\"NOTIFICATION\"}]");
+        workflow.setEdgesJson("[{\"source\":\"external\",\"target\":\"notice\"}]");
+        instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
+        when(engine.executeGraphFrom(any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
+                    return WorkflowEngine.NodeResult.CONTINUE;
+                });
+        assertThat(taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree")).isTrue();
+        verify(engine).executeGraphFrom(eq(instance), any(), any(), eq("notice"), any(), eq(request.getId()));
+        assertThat(request.getStatus()).isEqualTo("APPROVED");
+    }
 
-        boolean handled = taskService.approveByExternalBinding("dt-inst-1", true, "agree");
+    @Test
+    void downstreamFailureMapsRejectedWithoutRevivingTerminalInstance() {
+        workflow.setNodesJson("[{\"id\":\"external\",\"type\":\"DINGTALK_APPROVAL\"},{\"id\":\"notice\",\"type\":\"NOTIFICATION\"}]");
+        workflow.setEdgesJson("not-json");
+        when(engine.executeFrom(any(), any(), any(Integer.class), any(), any()))
+                .thenAnswer(inv -> {
+                    instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+                    return WorkflowEngine.NodeResult.FAILED;
+                });
+        assertThat(taskService.approveByExternalBinding(TENANT, request.getId(), true, "agree")).isTrue();
+        assertThat(request.getStatus()).isEqualTo("REJECTED");
+    }
 
-        assertThat(handled).isTrue();
-        assertThat(instance.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.COMPLETED);
-    }}
+}

@@ -2,7 +2,6 @@ package com.nocobase.integration.dingtalk;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,17 +9,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.approval.ApprovalCallbackEventService;
 import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtService;
 import com.nocobase.auth.RefreshTokenService;
-import com.nocobase.integration.common.ExternalMessageLogRepository;
 import com.nocobase.workflow.WorkflowInstanceRepository;
 import com.nocobase.workflow.WorkflowTaskRepository;
-import com.nocobase.workflow.WorkflowTaskEntity;
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +31,7 @@ class DingTalkControllerAuthTest {
 
     private DingTalkAdapter adapter;
     private DingTalkAppService appService;
-    private DingTalkApprovalService approvalService;
+    private ApprovalCallbackEventService callbackEventService;
     private DingTalkOrgSyncService orgSyncService;
     private UserMappingService userMappingService;
     private WorkflowInstanceRepository instanceRepository;
@@ -49,7 +45,7 @@ class DingTalkControllerAuthTest {
     void setUp() {
         adapter = mock(DingTalkAdapter.class);
         appService = mock(DingTalkAppService.class);
-        approvalService = mock(DingTalkApprovalService.class);
+        callbackEventService = mock(ApprovalCallbackEventService.class);
         orgSyncService = mock(DingTalkOrgSyncService.class);
         userMappingService = mock(UserMappingService.class);
         instanceRepository = mock(WorkflowInstanceRepository.class);
@@ -58,20 +54,9 @@ class DingTalkControllerAuthTest {
         refreshTokenService = mock(RefreshTokenService.class);
         auditService = mock(AuditService.class);
 
-        controller = new DingTalkController(adapter, appService, approvalService, orgSyncService,
+        controller = new DingTalkController(adapter, appService, callbackEventService, orgSyncService,
                 userMappingService, instanceRepository, taskRepository,
                 jwtService, refreshTokenService, auditService);
-    }
-
-    /** 注入 @Autowired 的 externalMessageLogRepository（用于事件幂等测试）。 */
-    private void injectMessageLogRepo(ExternalMessageLogRepository repo) {
-        try {
-            Field f = DingTalkController.class.getDeclaredField("externalMessageLogRepository");
-            f.setAccessible(true);
-            f.set(controller, repo);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Test
@@ -251,48 +236,6 @@ class DingTalkControllerAuthTest {
         assertEquals(0, r.get("code"));
         verify(auditService).log(eq("unknown"), eq("anonymous"), eq("anonymous"),
                 eq("dingtalk.logout"), eq("dingtalk_auth"), eq("anonymous"), any());
-    }
-
-    @Test
-    void getApprovalStatus_nullReturnsUnknown() {
-        when(approvalService.getApprovalStatus("inst1")).thenReturn(null);
-
-        Map<String, Object> r = controller.getApprovalStatus("inst1");
-
-        assertEquals(0, r.get("code"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) r.get("data");
-        assertEquals("unknown", data.get("status"));
-        assertEquals("inst1", data.get("instanceId"));
-    }
-
-    @Test
-    void createApproval_success_auditsAndReturns() {
-        when(approvalService.createApproval(eq("proc1"), eq("t1"), any()))
-                .thenReturn("inst_new");
-
-        Map<String, Object> r = controller.createApproval(
-                Map.of("processCode", "proc1", "title", "t1", "formValues", Map.of("k", "v")));
-
-        assertEquals(0, r.get("code"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> data = (Map<String, Object>) r.get("data");
-        assertEquals("inst_new", data.get("instanceId"));
-        verify(auditService).log(anyString(), eq("system"), eq("system"),
-                eq("dingtalk.approval.create"), any(), eq("inst_new"), any());
-    }
-
-    @Test
-    void createApproval_failed_returns502() {
-        when(approvalService.createApproval(eq("proc1"), eq("t1"), any()))
-                .thenReturn(null);
-
-        Map<String, Object> r = controller.createApproval(
-                Map.of("processCode", "proc1", "title", "t1"));
-
-        assertEquals(502, r.get("code"));
-        verify(auditService).log(anyString(), eq("system"), eq("system"),
-                eq("dingtalk.approval.failed"), any(), eq("unknown"), any());
     }
 
 }

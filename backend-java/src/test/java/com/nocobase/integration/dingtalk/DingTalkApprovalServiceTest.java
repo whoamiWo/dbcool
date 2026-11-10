@@ -1,100 +1,74 @@
 package com.nocobase.integration.dingtalk;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
-/**
- * PHASE105: DingTalkApprovalService 测试。
- *
- * <p>该 Service 在方法内部 {@code new RestTemplate()}，无法注入 mock，因此覆盖
- * 「未配置短路」「空入参短路」「已配置但网络失败降级（不抛出）」三类可离线验证的路径。
- */
 class DingTalkApprovalServiceTest {
-
-    private DingTalkApprovalService service;
-    private com.nocobase.workflow.WorkflowInstanceRepository workflowInstanceRepository;
-    private com.nocobase.workflow.WorkflowTaskRepository workflowTaskRepository;
     private DingTalkAppService appService;
+    private RestTemplate restTemplate;
+    private DingTalkApprovalService service;
 
     @BeforeEach
     void setUp() {
         appService = mock(DingTalkAppService.class);
-        when(appService.isConfigured()).thenReturn(true);
-        workflowInstanceRepository = mock(com.nocobase.workflow.WorkflowInstanceRepository.class);
-        workflowTaskRepository = mock(com.nocobase.workflow.WorkflowTaskRepository.class);
-        service = new DingTalkApprovalService(appService, workflowInstanceRepository, workflowTaskRepository,
-                mock(org.springframework.context.ApplicationEventPublisher.class));
-    }
-
-    // ── 未配置短路 ──────────────────────────────────────────
-    @Test
-    void createApproval_notConfigured_returnsNull() {
-        when(appService.isConfigured()).thenReturn(false);
-        assertThat(service.createApproval("proc1", "请假", Map.of())).isNull();
+        restTemplate = mock(RestTemplate.class);
+        service = new DingTalkApprovalService(appService, restTemplate, new ObjectMapper());
+        when(appService.isTenantConfigured("tenant_a")).thenReturn(true);
+        when(appService.getAppAccessToken("tenant_a")).thenReturn("tenant-token");
     }
 
     @Test
-    void getApprovalStatus_notConfigured_returnsNull() {
-        when(appService.isConfigured()).thenReturn(false);
-        assertThat(service.getApprovalStatus("inst123")).isNull();
+    void createApproval_usesOfficialContractAndTenantToken() {
+        when(restTemplate.postForEntity(eq("https://api.dingtalk.com/v1.0/workflow/processInstances"),
+                any(), eq(String.class))).thenReturn(ResponseEntity.ok("{\"instanceId\":\"oa-instance-1\"}"));
+        String id = service.createApproval("tenant_a", "corp-a", "PROC-1", "ding-user-1", -1L,
+                List.of(), List.of(Map.of("name", "天数", "value", "3")));
+        assertThat(id).isEqualTo("oa-instance-1");
+        @SuppressWarnings("rawtypes") ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).postForEntity(eq("https://api.dingtalk.com/v1.0/workflow/processInstances"),
+                captor.capture(), eq(String.class));
+        assertThat(captor.getValue().getHeaders().getFirst("x-acs-dingtalk-access-token"))
+                .isEqualTo("tenant-token");
+        @SuppressWarnings("unchecked") Map<String, Object> body = (Map<String, Object>) captor.getValue().getBody();
+        assertThat(body).containsEntry("processCode", "PROC-1")
+                .containsEntry("originatorUserId", "ding-user-1").containsEntry("deptId", -1L);
+        assertThat(body).doesNotContainKeys("process_code", "form_values", "title");
     }
 
     @Test
-    void cancelApproval_notConfigured_returnsEarly() {
-        when(appService.isConfigured()).thenReturn(false);
-        assertThatCode(() -> service.cancelApproval("inst123")).doesNotThrowAnyException();
-    }
-
-    // ── 空入参短路 ──────────────────────────────────────────
-    @Test
-    void getApprovalStatus_nullInstanceId_returnsNull() {
-        assertThat(service.getApprovalStatus(null)).isNull();
-    }
-
-    @Test
-    void getApprovalStatus_blankInstanceId_returnsNull() {
-        // 空串不是 null，会走 HTTP 分支；离线失败 → null
-        assertThat(service.getApprovalStatus("")).isNull();
+    void createApproval_noTenantCredentials_doesNotSendHttp() {
+        when(appService.isTenantConfigured("tenant_a")).thenReturn(false);
+        assertThatThrownBy(() -> service.createApproval("tenant_a", "corp", "proc", "user", -1L,
+                List.of(), List.of())).isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+        verifyNoInteractions(restTemplate);
     }
 
     @Test
-    void cancelApproval_nullInstanceId_returnsEarly() {
-        assertThatCode(() -> service.cancelApproval(null)).doesNotThrowAnyException();
-    }
-
-    // ── 已配置：网络失败降级（不抛出） ────────────────────────
-    @Test
-    void createApproval_configuredButNetworkFails_returnsNull() {
-        // 已配置 → 真实 HTTP；离线必失败 → catch → null
-        assertThat(service.createApproval("proc1", "请假", Map.of("days", 3))).isNull();
-    }
-
-    @Test
-    void getApprovalStatus_configuredButNetworkFails_returnsNull() {
-        assertThat(service.getApprovalStatus("inst123")).isNull();
-    }
-
-    @Test
-    void cancelApproval_configuredButNetworkFails_doesNotThrow() {
-        assertThatCode(() -> service.cancelApproval("inst123")).doesNotThrowAnyException();
-    }
-
-    // ── 回调（仅记录日志） ───────────────────────────────────
-    @Test
-    void handleApprovalCallback_agree_doesNotThrow() {
-        assertThatCode(() -> service.handleApprovalCallback("inst123", "agree"))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    void handleApprovalCallback_reject_doesNotThrow() {
-        assertThatCode(() -> service.handleApprovalCallback("inst123", "reject"))
-                .doesNotThrowAnyException();
+    void createApproval_missingInstanceId_fails() {
+        when(restTemplate.postForEntity(eq("https://api.dingtalk.com/v1.0/workflow/processInstances"),
+                any(), eq(String.class))).thenReturn(ResponseEntity.ok("{}"));
+        assertThatThrownBy(() -> service.createApproval("tenant_a", "corp", "proc", "user", -1L,
+                List.of(), List.of())).isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("审批实例 ID");
     }
 }

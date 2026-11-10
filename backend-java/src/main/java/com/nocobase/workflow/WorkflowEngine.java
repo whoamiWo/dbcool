@@ -129,8 +129,16 @@ public class WorkflowEngine {
             String startNodeId,
             UUID defaultAssignee
     ) {
-        // 公开入口 — depth = 0
-        return executeGraphFrom(instance, nodes, edges, startNodeId, defaultAssignee, 0);
+        return executeGraphFrom(instance, nodes, edges, startNodeId, defaultAssignee, null);
+    }
+
+    /** 审批中心入口：把 requestId 透传给外部审批节点。 */
+    @Transactional
+    public NodeResult executeGraphFrom(
+            WorkflowInstanceEntity instance, List<Map<String, Object>> nodes,
+            List<Map<String, Object>> edges, String startNodeId,
+            UUID defaultAssignee, UUID approvalRequestId) {
+        return executeGraphFrom(instance, nodes, edges, startNodeId, defaultAssignee, approvalRequestId, 0);
     }
 
     /** 内部重载:跟踪当前执行栈深度,R08 死循环防护运行时兜底。 */
@@ -140,6 +148,7 @@ public class WorkflowEngine {
             List<Map<String, Object>> edges,
             String startNodeId,
             UUID defaultAssignee,
+            UUID approvalRequestId,
             int depth
     ) {
         // node id → Map
@@ -187,7 +196,7 @@ public class WorkflowEngine {
             Optional<WorkflowNodeHandler> handler = handlerRegistry.find(nodeType);
             if (handler.isPresent()) {
                 NodeExecutionContext nodeCtx = new NodeExecutionContext(
-                        instance, node, defaultAssignee, null);
+                        instance, node, defaultAssignee, null, approvalRequestId);
                 NodeOutcome outcome = executeNodeWithRetry(handler.get(), nodeCtx, node, current);
                 if (outcome == NodeOutcome.NEEDS_APPROVAL) {
                     instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
@@ -261,6 +270,13 @@ public class WorkflowEngine {
             int startIdx,
             UUID defaultAssignee
     ) {
+        return executeFrom(instance, nodes, startIdx, defaultAssignee, null);
+    }
+
+    /** 审批中心入口；旧签名保留给通用工作流。 */
+    @Transactional
+    public NodeResult executeFrom(WorkflowInstanceEntity instance, List<Map<String, Object>> nodes,
+                                  int startIdx, UUID defaultAssignee, UUID approvalRequestId) {
         int i = startIdx;
         while (i < nodes.size()) {
             Map<String, Object> node = nodes.get(i);
@@ -283,7 +299,7 @@ public class WorkflowEngine {
             Optional<WorkflowNodeHandler> handler = handlerRegistry.find(nodeType);
             if (handler.isPresent()) {
                 NodeExecutionContext nodeCtx = new NodeExecutionContext(
-                        instance, node, defaultAssignee, null);
+                        instance, node, defaultAssignee, null, approvalRequestId);
                 NodeOutcome outcome = executeNodeWithRetry(handler.get(), nodeCtx, node, String.valueOf(node.get("id")));
                 if (outcome == NodeOutcome.NEEDS_APPROVAL) {
                     instance.setStatus(WorkflowInstanceEntity.Status.PENDING);
