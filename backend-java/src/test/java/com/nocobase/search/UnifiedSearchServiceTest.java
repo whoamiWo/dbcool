@@ -50,6 +50,8 @@ class UnifiedSearchServiceTest {
     private com.nocobase.auth.RoleRepository roleRepository;
     private com.nocobase.wiki.WikiPermissionService wikiPermissionService;
     private UnifiedSearchService service;
+    private com.nocobase.approval.ApprovalRequestRepository approvalRepository;
+    private com.nocobase.approval.ApprovalVisibilityService approvalVisibility;
     private static final UUID USER = UUID.randomUUID();
 
     private final String tenantId = "tenant_default";
@@ -99,15 +101,17 @@ class UnifiedSearchServiceTest {
                     }
                     return out;
                 });
+        approvalRepository = mock(com.nocobase.approval.ApprovalRequestRepository.class);
+        approvalVisibility = mock(com.nocobase.approval.ApprovalVisibilityService.class);
         service = new UnifiedSearchService(
                 messageService, wikiPageService, collectionService,
                 automationRuleService, projectService, indexRepo,
                 channelMemberRepository, objectMapper,
                 aclEnforcer, rowAclService, roleRepository, wikiPermissionService,
-                mock(com.nocobase.approval.ApprovalRequestRepository.class),
+                approvalRepository,
                 mock(com.nocobase.approval.ApprovalCcRepository.class),
                 mock(com.nocobase.workflow.WorkflowTaskRepository.class),
-                mock(com.nocobase.approval.ApprovalVisibilityService.class));
+                approvalVisibility);
     }
 
     // ---- 辅助：构造索引命中实体 ----
@@ -422,6 +426,20 @@ class UnifiedSearchServiceTest {
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).get("id")).isEqualTo(taskId);
         assertThat(rows.get(0).get("title")).isEqualTo("任务A");
+    }
+
+    @Test
+    void globalApprovalResultsUseSameVisibilityPredicate() {
+        UUID requestId = UUID.randomUUID();
+        var request = new com.nocobase.approval.ApprovalRequestEntity();
+        request.setTenantId(tenantId);
+        when(approvalRepository.findByIdAndTenantId(requestId, tenantId))
+                .thenReturn(java.util.Optional.of(request));
+        when(approvalVisibility.canView(tenantId, request, USER)).thenReturn(false);
+        when(indexRepo.searchAllTypes(anyString(), anyString(), anyInt()))
+                .thenReturn(List.of(idx("approval", requestId.toString(), "请假", "请假")));
+        assertThat(results(service.search("请假", tenantId, USER, List.of(), 10))).isEmpty();
+        verify(approvalVisibility).canView(tenantId, request, USER);
     }
 
     @Test

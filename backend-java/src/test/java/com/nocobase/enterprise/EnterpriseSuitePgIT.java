@@ -486,13 +486,28 @@ class EnterpriseSuitePgIT {
                 .thenReturn(WorkflowEngine.NodeResult.NEEDS_APPROVAL);
         when(engine.executeGraphFrom(any(), any(), any(), any(), any()))
                 .thenReturn(WorkflowEngine.NodeResult.NEEDS_APPROVAL);
-        return new ApprovalService(templateRepository, requestRepository, ccRepository,
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<com.nocobase.approval.ApprovalSubmissionService> submissions =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        var submission = mock(com.nocobase.approval.ApprovalSubmissionService.class);
+        when(submissions.getObject()).thenReturn(submission);
+        when(engine.executeFrom(any(), any(), org.mockito.ArgumentMatchers.anyInt(), any(), any()))
+                .thenReturn(WorkflowEngine.NodeResult.NEEDS_APPROVAL);
+        ApprovalService[] holder = new ApprovalService[1];
+        when(submission.submit(any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> org.springframework.test.util.ReflectionTestUtils.invokeMethod(holder[0],
+                        "submitLocal", inv.getArgument(0), inv.getArgument(1), inv.getArgument(2),
+                        inv.getArgument(3), inv.getArgument(4)));
+        ApprovalService result = new ApprovalService(templateRepository, requestRepository, ccRepository,
                 workflowRepository, instanceRepository, taskRepository, engine, userRepository,
-                mock(com.nocobase.integration.dingtalk.DingTalkApprovalService.class),
-                mock(com.nocobase.notification.NotifyDispatcher.class),
+                 mock(com.nocobase.integration.dingtalk.DingTalkExternalApprovalService.class),
+                 submissions,
+                 mock(com.nocobase.notification.NotifyDispatcher.class),
                 mock(UnifiedSearchService.class),
                 mock(ApprovalVisibilityService.class),
-                false);
+                 false);
+        holder[0] = result;
+        return result;
     }
 
     @SuppressWarnings("unchecked")

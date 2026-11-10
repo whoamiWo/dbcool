@@ -23,12 +23,16 @@ import org.springframework.web.client.RestTemplate;
 public class FeishuAppServiceTest {
 
     private FeishuAppService service;
+    private TenantCredentialService credSvc;
 
     @BeforeEach
     void setUp() {
         // 默认 mock 凭证服务返回空（走全局 @Value 回退）
-        TenantCredentialService credSvc = mock(TenantCredentialService.class);
+        credSvc = mock(TenantCredentialService.class);
         when(credSvc.get(anyString(), anyString(), anyString())).thenReturn(Optional.empty());
+        when(credSvc.lookup(anyString(), anyString(), anyString())).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.MISSING,
+                        Optional.empty()));
         service = new FeishuAppService(credSvc);
     }
 
@@ -76,6 +80,42 @@ public class FeishuAppServiceTest {
     // 按设计**跳过** credentialService 只走全局 @Value 回退（见 resolveForKey 实现）。
     // 因此"租户级凭证使 isConfigured 为 true"这条路在 null 租户下不可达，
     // 租户级读取的正确性由 TenantCredentialServiceTest 覆盖，此处不重复。
+
+    @Test
+    void resolveForKey_disabledOrInvalidTenantCredential_failsClosed() throws Exception {
+        set(service, "appId", "global-id");
+        var method = FeishuAppService.class.getDeclaredMethod("resolveForKey", String.class, String.class);
+        method.setAccessible(true);
+        when(credSvc.lookup("t1", "feishu", "app-id")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.DISABLED,
+                        Optional.empty()));
+        assertEquals(Optional.empty(), method.invoke(service, "app-id", "t1"));
+        when(credSvc.lookup("t1", "feishu", "app-id")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.INVALID,
+                        Optional.empty()));
+        assertEquals(Optional.empty(), method.invoke(service, "app-id", "t1"));
+        assertFalse(service.isConfigured("t1"));
+    }
+
+    @Test
+    void getTenantAccessToken_disabledAfterCaching_doesNotReuseOldToken() throws Exception {
+        set(service, "appId", "global-id");
+        set(service, "appSecret", "global-secret");
+        when(credSvc.lookup("t1", "feishu", "app-id")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.ACTIVE,
+                        Optional.of("tenant-id")));
+        when(credSvc.lookup("t1", "feishu", "app-secret")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.ACTIVE,
+                        Optional.of("tenant-secret")));
+        mockRest(service, "cached-test-token", new ObjectMapper().createObjectNode());
+        assertEquals("cached-test-token", service.getTenantAccessToken("t1"));
+
+        when(credSvc.lookup("t1", "feishu", "app-id")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.DISABLED,
+                        Optional.empty()));
+
+        assertThrows(IllegalStateException.class, () -> service.getTenantAccessToken("t1"));
+    }
 
     // ── getOAuthUrl ────────────────────────────────────────
     @Test

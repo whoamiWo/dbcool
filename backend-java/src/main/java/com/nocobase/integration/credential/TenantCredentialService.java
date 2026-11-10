@@ -5,6 +5,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,10 +38,29 @@ public class TenantCredentialService {
         this.cryptoService = cryptoService;
     }
 
+    /** 批量保存/更新；任一失败整体回滚，不留下部分生效的凭证。 */
+    @Transactional
+    public void saveAll(String tenantId, String provider, Map<String, String> values, String updatedBy) {
+        if (values == null || values.isEmpty()) {
+            throw new IllegalArgumentException("凭证值不能为空");
+        }
+        values.forEach((key, value) -> {
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException("凭证值不能为空: " + key);
+            }
+        });
+        values.forEach((key, value) -> saveInternal(tenantId, provider, key, value, updatedBy));
+    }
+
     /** 保存/更新凭证（加密落库） */
     @Transactional
     public String save(String tenantId, String provider, String credentialKey, String plaintextSecret,
                        String updatedBy) {
+        return saveInternal(tenantId, provider, credentialKey, plaintextSecret, updatedBy);
+    }
+
+    private String saveInternal(String tenantId, String provider, String credentialKey, String plaintextSecret,
+                                String updatedBy) {
         Optional<TenantIntegrationCredentialEntity> existing =
                 repository.findByTenantIdAndProviderAndCredentialKey(tenantId, provider, credentialKey);
 
@@ -46,7 +69,7 @@ public class TenantCredentialService {
             entity.setAppSecretEnc(cryptoService.encrypt(plaintextSecret));
             entity.setUpdatedAt(java.time.Instant.now());
             entity.setUpdatedBy(updatedBy);
-            // 状态保持不变
+            entity.setStatus("ACTIVE");
             repository.save(entity);
             log.info("[tenant-credential] 更新凭证 tenant={} provider={} key={}", tenantId, provider, credentialKey);
             return entity.getId().toString();
@@ -63,6 +86,75 @@ public class TenantCredentialService {
             log.info("[tenant-credential] 新建凭证 tenant={} provider={} key={} id={}", tenantId, provider, credentialKey, entity.getId());
             return entity.getId().toString();
         }
+    }
+
+    public enum CredentialState { ACTIVE, MISSING, DISABLED, INVALID }
+
+    /**
+     * 供租户凭证消费方区分未配置与已禁用/损坏；后两者不得回退全局配置。
+     */
+    public record Lookup(CredentialState state, Optional<String> value) {
+        static Lookup of(CredentialState state) {
+            return new Lookup(state, Optional.empty());
+        }
+    }
+
+    public Lookup lookup(String tenantId, String provider, String credentialKey) {
+        Optional<TenantIntegrationCredentialEntity> entity =
+                repository.findByTenantIdAndProviderAndCredentialKey(tenantId, provider, credentialKey);
+        if (entity.isEmpty()) {
+            return Lookup.of(CredentialState.MISSING);
+        }
+        var credential = entity.get();
+        if (!"ACTIVE".equals(credential.getStatus())) {
+            log.warn("[tenant-credential] 凭证不可用 tenant={} provider={} key={} status={}",
+                    tenantId, provider, credentialKey, credential.getStatus());
+            return Lookup.of(CredentialState.DISABLED);
+        }
+        try {
+            return new Lookup(CredentialState.ACTIVE,
+                    Optional.of(cryptoService.decrypt(credential.getAppSecretEnc())));
+        } catch (IllegalStateException e) {
+            log.error("[tenant-credential] 凭证解密失败 tenant={} provider={} key={} err={}",
+                    tenantId, provider, credentialKey, e.getMessage(), e);
+            return Lookup.of(CredentialState.INVALID);
+        }
+    }
+
+    /** 禁用该 provider 的全部租户凭证，保留密文以便管理员显式 upsert 恢复。 */
+    @Transactional
+    public void disable(String tenantId, String provider, String updatedBy) {
+        Instant now = Instant.now();
+        repository.findByTenantIdAndProvider(tenantId, provider).forEach(entity -> {
+            entity.setStatus("DISABLED");
+            entity.setUpdatedAt(now);
+            entity.setUpdatedBy(updatedBy);
+            repository.save(entity);
+        });
+        log.info("[tenant-credential] 禁用凭证 tenant={} provider={}", tenantId, provider);
+    }
+
+    /** 只返回状态和掩码，不返回明文、密文或 updatedBy。 */
+    public Map<String, Object> status(String tenantId, String provider) {
+        var rows = repository.findByTenantIdAndProvider(tenantId, provider);
+        var masked = new java.util.TreeMap<String, String>();
+        Instant updatedAt = null;
+        String status = rows.isEmpty() ? "NOT_CONFIGURED" : "ACTIVE";
+        for (var row : rows) {
+            masked.put(row.getCredentialKey(), "********");
+            if (updatedAt == null || (row.getUpdatedAt() != null && row.getUpdatedAt().isAfter(updatedAt))) {
+                updatedAt = row.getUpdatedAt();
+            }
+            if (!"ACTIVE".equals(row.getStatus())) {
+                status = "DISABLED";
+            }
+        }
+        var result = new LinkedHashMap<String, Object>();
+        result.put("configured", !rows.isEmpty());
+        result.put("status", status);
+        result.put("masked", Collections.unmodifiableMap(masked));
+        result.put("updatedAt", updatedAt);
+        return Collections.unmodifiableMap(result);
     }
 
     /** 获取凭证（解密后）；未配置返回 Optional.empty()，调用方决定是否回退全局 @Value */
@@ -93,6 +185,21 @@ public class TenantCredentialService {
     public void delete(String tenantId, String provider, String credentialKey, String updatedBy) {
         repository.deleteByTenantIdAndProviderAndCredentialKey(tenantId, provider, credentialKey);
         log.info("[tenant-credential] 删除凭证 tenant={} provider={} key={} updatedBy={}", tenantId, provider, credentialKey, updatedBy);
+    }
+
+    /** 回调解密候选只包含 corp-id 明确配置的 ACTIVE 租户；绑定最终确定业务租户。 */
+    public java.util.List<TenantIntegrationCredentialEntity> activeDingTalkCallbackCredentials() {
+        return repository.findByProvider("dingtalk").stream()
+                .filter(row -> "corp-id".equals(row.getCredentialKey()) && "ACTIVE".equals(row.getStatus()))
+                .toList();
+    }
+
+    public Optional<String> findDingTalkTenantByCorpId(String corpId) {
+        return activeDingTalkCallbackCredentials().stream()
+                .filter(row -> get(row.getTenantId(), "dingtalk", "corp-id")
+                        .map(corpId::equals).orElse(false))
+                .map(TenantIntegrationCredentialEntity::getTenantId)
+                .findFirst();
     }
 
     /** 按租户列出全部 provider（管理界面） */

@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * 审批模板（E2）。审批链由 {@code workflow_id} 指向的工作流定义驱动（决策 D9）。
@@ -49,6 +51,11 @@ public class ApprovalTemplateEntity {
     @Column(name = "external_process_code")
     private String externalProcessCode;
 
+    /** 管理员显式配置 corpId、控件映射与 OA 审批人模式，不接受任意表单直传。 */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "external_config", columnDefinition = "jsonb")
+    private String externalConfig;
+
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
@@ -73,6 +80,8 @@ public class ApprovalTemplateEntity {
     public void setApproverType(String approverType) { this.approverType = approverType; }
     public String getExternalProcessCode() { return externalProcessCode; }
     public void setExternalProcessCode(String externalProcessCode) { this.externalProcessCode = externalProcessCode; }
+    public String getExternalConfig() { return externalConfig; }
+    public void setExternalConfig(String externalConfig) { this.externalConfig = externalConfig; }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public Instant getCreatedAt() { return createdAt; }

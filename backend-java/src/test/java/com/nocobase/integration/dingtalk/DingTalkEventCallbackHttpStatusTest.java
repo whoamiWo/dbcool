@@ -55,17 +55,17 @@ class DingTalkEventCallbackHttpStatusTest {
     }
 
     @Test
-    @DisplayName("events：缺签名头 → HTTP 401（不是 200）")
+    @DisplayName("events：旧入口已停用 → HTTP 410")
     void missingHeaders_returnsHttp401() throws Exception {
         mockMvc.perform(post("/api/dingtalk/events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"eventType\":\"approval_status_changed\",\"eventId\":\"e-1\"}"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value(401));
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value(410));
     }
 
     @Test
-    @DisplayName("events：签名错误 → HTTP 401（不是 200）")
+    @DisplayName("events：旧错误签名不得回退到旧消费路径")
     void wrongSignature_returnsHttp401() throws Exception {
         String ts = String.valueOf(System.currentTimeMillis());
         mockMvc.perform(post("/api/dingtalk/events")
@@ -73,12 +73,12 @@ class DingTalkEventCallbackHttpStatusTest {
                         .header("X-DingTalk-Timestamp", ts)
                         .header("X-DingTalk-Signature", "definitely-wrong-signature")
                         .content("{\"eventType\":\"approval_status_changed\",\"eventId\":\"e-2\"}"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value(401));
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value(410));
     }
 
     @Test
-    @DisplayName("events：签名正确 → HTTP 200")
+    @DisplayName("events：旧正确签名也不得回退到旧消费路径")
     void validSignature_returnsHttp200() throws Exception {
         String ts = String.valueOf(System.currentTimeMillis());
         mockMvc.perform(post("/api/dingtalk/events")
@@ -86,7 +86,7 @@ class DingTalkEventCallbackHttpStatusTest {
                         .header("X-DingTalk-Timestamp", ts)
                         .header("X-DingTalk-Signature", sign(ts))
                         .content("{\"eventType\":\"approval_status_changed\",\"eventId\":\"e-valid-1\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0));
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value(410));
     }
 }

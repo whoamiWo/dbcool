@@ -4,30 +4,19 @@ import com.nocobase.audit.AuditService;
 import com.nocobase.auth.JwtAuthFilter.AuthenticatedUser;
 import com.nocobase.auth.JwtService;
 import com.nocobase.auth.RefreshTokenService;
-import com.nocobase.auth.UserEntity;
-import com.nocobase.integration.common.ExternalMessageLogEntity;
-import com.nocobase.integration.common.ExternalMessageLogRepository;
-import com.nocobase.tenant.TenantContext;
 import com.nocobase.workflow.WorkflowInstanceRepository;
 import com.nocobase.workflow.WorkflowTaskRepository;
-import com.nocobase.workflow.WorkflowTaskEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.Base64;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 钉钉嵌入 REST API — 授权地址、免密登录、组织架构同步、审批回调。
@@ -41,27 +30,18 @@ public class DingTalkController {
 
     private final DingTalkAdapter adapter;
     private final DingTalkAppService appService;
-    private final DingTalkApprovalService approvalService;
+    private final com.nocobase.approval.ApprovalCallbackEventService approvalCallbackEventService;
     private final DingTalkOrgSyncService orgSyncService;
     private final UserMappingService userMappingService;
-    private final WorkflowInstanceRepository instanceRepository;
-    private final WorkflowTaskRepository taskRepository;
     private static final Logger log = LoggerFactory.getLogger(DingTalkController.class);
 
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final AuditService auditService;
 
-    /**
-     * 事件幂等记录（复用入站消息那张带 UNIQUE 约束的表）。
-     * 字段注入而非构造器注入：保持构造签名稳定，不影响既有测试。
-     */
-    @Autowired
-    private ExternalMessageLogRepository externalMessageLogRepository;
-
     public DingTalkController(DingTalkAdapter adapter,
                               DingTalkAppService appService,
-                              DingTalkApprovalService approvalService,
+                               com.nocobase.approval.ApprovalCallbackEventService approvalCallbackEventService,
                               DingTalkOrgSyncService orgSyncService,
                               UserMappingService userMappingService,
                               WorkflowInstanceRepository instanceRepository,
@@ -71,11 +51,9 @@ public class DingTalkController {
                               AuditService auditService) {
         this.adapter = adapter;
         this.appService = appService;
-        this.approvalService = approvalService;
+        this.approvalCallbackEventService = approvalCallbackEventService;
         this.orgSyncService = orgSyncService;
         this.userMappingService = userMappingService;
-        this.instanceRepository = instanceRepository;
-        this.taskRepository = taskRepository;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.auditService = auditService;
@@ -203,92 +181,20 @@ public class DingTalkController {
         return Map.of("code", 0, "message", "success", "data", Map.of("loggedOut", true));
     }
 
-    /**
-     * 查询钉钉审批实例状态。
-     */
-    @PreAuthorize("isAuthenticated()")
-    @GetMapping("/approval-status")
-    public Map<String, Object> getApprovalStatus(@RequestParam String instanceId) {
-        String status = approvalService.getApprovalStatus(instanceId);
-        return Map.of("code", 0, "message", "success",
-                "data", Map.of("instanceId", instanceId, "status", status != null ? status : "unknown"));
-    }
+    /** 裸 OA 创建入口已关闭；必须由审批模板、用户映射和 V83 绑定统一发起。 */
 
-    /**
-     * 提交钉钉 OA 审批表单。
-     */
-    @PreAuthorize("isAuthenticated()")
-    @PostMapping("/approval")
-    public Map<String, Object> createApproval(@RequestBody Map<String, Object> body) {
-        String processCode = (String) body.get("processCode");
-        String title = (String) body.get("title");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> formValues = (Map<String, Object>) body.get("formValues");
-        String instanceId = approvalService.createApproval(processCode, title, formValues);
-        if (instanceId != null) {
-            auditService.log(TenantContext.currentTenantId(), "system", "system",
-                    "dingtalk.approval.create", "dingtalk_approval", instanceId,
-                    Map.of("processCode", processCode, "title", title, "instanceId", instanceId));
-            return Map.of("code", 0, "message", "success",
-                    "data", Map.of("instanceId", instanceId));
-        }
-        auditService.log(TenantContext.currentTenantId(), "system", "system",
-                "dingtalk.approval.failed", "dingtalk_approval", "unknown",
-                Map.of("processCode", processCode, "title", title, "reason", "creation_failed"));
-        return Map.of("code", 502, "message", "创建审批实例失败", "data", Map.of());
-    }
-
-    /**
-     * 钉钉审批回调 — 更新工作流节点状态。
-     * 
-     * <b>安全修复</b>：
-     * 1. 增加 HMAC-SHA256 签名校验（基于 dingtalk.app-secret + timestamp）
-     * 2. 删除 @RequestParam tenantId（租户必须由配置推导，绝不允许请求方指定）
-     */
+    /** 官方加密 HTTP 回调：验签、check_url、精确绑定与幂等由单一服务完成。 */
     @PostMapping("/approval-callback")
-    public ResponseEntity<Map<String, Object>> approvalCallback(
+    public Map<String, Object> approvalCallback(
             @RequestBody Map<String, Object> payload,
-            @RequestHeader(value = "X-DingTalk-Timestamp", required = false) String timestamp,
-            @RequestHeader(value = "X-DingTalk-Signature", required = false) String signature
-    ) {
-        // 1. 签名校验（防止伪造回调）
-        if (timestamp == null || signature == null) {
-            log.warn("[DingTalk] 审批回调缺少签名头");
-            return ResponseEntity.status(401).body(Map.of("code", 401, "message", "missing signature headers"));
+            @RequestParam(value = "msg_signature", required = false) String msgSignature,
+            @RequestParam(value = "timeStamp", required = false) String timeStamp,
+            @RequestParam(value = "nonce", required = false) String nonce) {
+        Object encrypt = payload == null ? null : payload.get("encrypt");
+        if (!(encrypt instanceof String ciphertext) || msgSignature == null || timeStamp == null || nonce == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "回调加密参数缺失");
         }
-        
-        if (!verifySignature(timestamp, signature, payload)) {
-            log.warn("[DingTalk] 审批回调签名验证失败");
-            return ResponseEntity.status(401).body(Map.of("code", 401, "message", "invalid signature"));
-        }
-        
-        // 2. 处理业务逻辑
-        Object instanceId = payload.get("instance_id");
-        Object result = payload.get("result");
-        if (instanceId != null && result != null) {
-            approvalService.handleApprovalCallback(String.valueOf(instanceId), String.valueOf(result));
-            updateWorkflowTaskStatus(String.valueOf(instanceId), String.valueOf(result));
-        }
-        return ResponseEntity.ok(Map.of("code", 0, "message", "received"));
-    }
-    
-    /**
-     * 验证钉钉回调签名。委托 {@link DingTalkSignatureUtil}(提取共用,
-     * 与 {@link DingTalkAiCardController} 卡片回调共用同一套算法)。
-     *
-     * <p>{@code sign = Base64(HmacSHA256(appSecret, timestamp))},常量时间比较,5 分钟窗口。
-     */
-    private boolean verifySignature(String timestamp, String signature, Map<String, Object> payload) {
-        String appSecret = appService.getAppSecret();
-        if (appSecret == null || appSecret.isBlank()) {
-            log.warn("[DingTalk] 审批回调：appSecret 未配置");
-            return false;
-        }
-        if (!DingTalkSignatureUtil.verify(appSecret, timestamp, signature)) {
-            log.warn("[DingTalk] 审批回调：签名校验失败 ts={}", timestamp);
-            return false;
-        }
-        return true;
+        return approvalCallbackEventService.receive(msgSignature, timeStamp, nonce, ciphertext);
     }
 
     /**
@@ -370,192 +276,13 @@ public class DingTalkController {
         return Map.of("code", failed > 0 ? 1 : 0, "message", "success", "data", data);
     }
 
-    /**
-     * 钉钉事件回调 — 处理审批状态变更、通讯录变更等事件。
-     *
-     * <b>安全要求</b>：
-     * 1. HMAC-SHA256 + Base64 签名校验（基于 appSecret + timestamp）
-     * 2. 按事件 ID 幂等（钉钉会重投）
-     */
+    /** 旧明文事件入口永久停用；审批只走 approval-callback 验签解密与持久幂等。 */
     @PostMapping("/events")
-    public ResponseEntity<Map<String, Object>> eventCallback(
-            @RequestBody Map<String, Object> payload,
-            @RequestHeader(value = "X-DingTalk-Timestamp", required = false) String timestamp,
-            @RequestHeader(value = "X-DingTalk-Signature", required = false) String signature
-    ) {
-        // 1. 签名校验
-        // 注意：验签失败必须返回 **HTTP 401**，而不是「HTTP 200 + 业务码 401」。
-        // 后者会让第三方/网关误判为成功，也不会触发钉钉的失败重投。
-        if (timestamp == null || signature == null) {
-            log.warn("[DingTalk] 事件回调缺少签名头");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("code", 401, "message", "missing signature headers"));
-        }
-
-        if (!verifyEventSignature(timestamp, signature)) {
-            log.warn("[DingTalk] 事件回调签名验证失败");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("code", 401, "message", "invalid signature"));
-        }
-
-        // 2. 解析事件
-        Object eventType = payload.get("eventType");
-        Object eventId = payload.get("eventId");
-        String tenantId = "tenant_default";
-
-        log.info("[DingTalk] 事件回调: type={}, id={}, tenant={}", eventType, eventId, tenantId);
-
-        // 3. 幂等检查（基于 eventId）
-        if (eventId != null && !String.valueOf(eventId).isBlank()) {
-            if (isDuplicateEvent(String.valueOf(eventId))) {
-                log.info("[DingTalk] 检测到重复事件，跳过: id={}", eventId);
-                return ResponseEntity.ok(Map.of("code", 0, "message", "duplicate ignored"));
-            }
-        }
-
-        // 4. 处理事件
-        // PHASE96 T7: contact_updated 原实现只打日志 + TODO，外层却返回 processed=true ——
-        // 钉钉认为事件已被消费，实际什么都没做。PHASE113 已接入真实用户同步，
-        // 现仅在「入参非法 / 同步失败」时如实返回 processed=false + 原因。
-        switch (String.valueOf(eventType)) {
-            case "approval_status_changed" -> handleApprovalStatusChanged(payload, tenantId);
-            case "contact_updated" -> {
-                Object userId = payload.get("user_id");
-                String dingUserId = userId == null ? null : String.valueOf(userId);
-                String userName = payload.get("user_name") == null
-                        ? null : String.valueOf(payload.get("user_name"));
-                if (dingUserId == null || dingUserId.isBlank()) {
-                    log.warn("[DingTalk] contact_updated 缺少 user_id，无法同步");
-                    return ResponseEntity.ok(Map.of(
-                            "code", 0, "message", "contact_updated_missing_user_id",
-                            "data", Map.of("processed", false,
-                                    "reason", "事件缺少 user_id 字段")));
-                }
-                try {
-                    UserEntity synced = orgSyncService.syncSingleUser(dingUserId, userName, tenantId);
-                    log.info("[DingTalk] contact_updated 同步成功: dingUserId={} → 平台 user={}",
-                            dingUserId, synced.getId());
-                } catch (Exception e) {
-                    log.error("[DingTalk] contact_updated 同步失败: user={}, err={}",
-                            dingUserId, e.getMessage(), e);
-                    return ResponseEntity.ok(Map.of(
-                            "code", 0, "message", "contact_updated_sync_failed",
-                            "data", Map.of("processed", false,
-                                    "reason", "用户同步失败：" + e.getMessage())));
-                }
-            }
-            default -> log.warn("[DingTalk] 未知事件类型: {}", eventType);
-        }
-
-        // 5. 记录已处理
-        if (eventId != null && !String.valueOf(eventId).isBlank()) {
-            markEventProcessed(String.valueOf(eventId), tenantId);
-        }
-
-        return ResponseEntity.ok(
-                Map.of("code", 0, "message", "success", "data", Map.of("processed", true)));
-    }
-    
-    /**
-     * 验证钉钉事件签名（与审批回调签名算法一致）。
-     */
-    private boolean verifyEventSignature(String timestamp, String signature) {
-        try {
-            String appSecret = appService.getAppSecret();
-            if (appSecret == null || appSecret.isBlank()) {
-                log.warn("[DingTalk] 事件回调：appSecret 未配置");
-                return false;
-            }
-            
-            // 检查时间戳有效性（5 分钟窗口）
-            long ts;
-            try {
-                ts = Long.parseLong(timestamp);
-            } catch (NumberFormatException e) {
-                log.warn("[DingTalk] 事件回调：timestamp 格式错误");
-                return false;
-            }
-            
-            long now = System.currentTimeMillis();
-            if (Math.abs(now - ts) > 300_000) {
-                log.warn("[DingTalk] 事件回调：timestamp 过期 {} vs {}", ts, now);
-                return false;
-            }
-            
-            // 计算签名：HmacSHA256(appSecret, timestamp)
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] digest = mac.doFinal(timestamp.getBytes(StandardCharsets.UTF_8));
-            String expectedSig = Base64.getEncoder().encodeToString(digest);
-            
-            // 常量时间比较防时序攻击
-            return MessageDigest.isEqual(
-                signature.getBytes(StandardCharsets.UTF_8),
-                expectedSig.getBytes(StandardCharsets.UTF_8)
-            );
-        } catch (Exception e) {
-            log.error("[DingTalk] 事件回调签名验证异常", e);
-            return false;
-        }
-    }
-    
-    /**
-     * 幂等检查：查已处理事件表（UNIQUE(source, external_message_id) 兜底并发）。
-     *
-     * <p>修复前这里是 {@code return false;} 的空壳（TODO 未实现），
-     * 导致钉钉重投时事件被**重复处理**（审批状态被反复更新）。
-     */
-    private boolean isDuplicateEvent(String externalMessageId) {
-        return externalMessageLogRepository
-                .findBySourceAndExternalMessageId("dingtalk", externalMessageId)
-                .isPresent();
+    public ResponseEntity<Map<String, Object>> legacyEventCallback() {
+        auditService.log("unknown", "system", "system", "dingtalk.events.legacy_rejected",
+                "dingtalk", "events", Map.of("result", "gone"));
+        return ResponseEntity.status(HttpStatus.GONE)
+                .body(Map.of("code", 410, "message", "请使用 /approval-callback 加密回调"));
     }
 
-    /**
-     * 标记事件已处理。修复前是空方法。
-     */
-    private void markEventProcessed(String externalMessageId, String tenantId) {
-        try {
-            externalMessageLogRepository.save(
-                    new ExternalMessageLogEntity("dingtalk", externalMessageId, tenantId));
-        } catch (Exception e) {
-            // 并发下 UNIQUE 约束冲突：说明已被其它实例/线程处理，忽略即可
-            log.warn("[DingTalk] 记录事件处理标记失败(可能并发重复): id={}, err={}",
-                    externalMessageId, e.getMessage());
-        }
-    }
-    
-    /**
-     * 处理审批状态变更事件。
-     */
-    private void handleApprovalStatusChanged(Map<String, Object> payload, String tenantId) {
-        Object instanceId = payload.get("instance_id");
-        Object result = payload.get("result");
-        log.info("[DingTalk] 审批状态变更: instance={}, result={}", instanceId, result);
-        
-        if (instanceId != null && result != null) {
-            approvalService.handleApprovalCallback(String.valueOf(instanceId), String.valueOf(result));
-            updateWorkflowTaskStatus(String.valueOf(instanceId), String.valueOf(result));
-        }
-    }
-    
-    /**
-     * 更新工作流任务状态（钉钉审批回调后调用）。
-     */
-    private void updateWorkflowTaskStatus(String instanceId, String result) {
-        try {
-            List<WorkflowTaskEntity> pendingTasks = taskRepository.findByInstanceIdAndStatus(
-                    UUID.fromString(instanceId), WorkflowTaskEntity.Status.PENDING);
-            for (WorkflowTaskEntity task : pendingTasks) {
-                task.setStatus("agree".equalsIgnoreCase(result)
-                        ? WorkflowTaskEntity.Status.APPROVED
-                        : WorkflowTaskEntity.Status.REJECTED);
-                task.setFinishedAt(java.time.Instant.now());
-                task.setComment("钉钉审批: " + result);
-                taskRepository.save(task);
-            }
-        } catch (Exception e) {
-            log.error("[dingtalk] 更新工作流任务状态失败 instanceId={}: {}", instanceId, e.getMessage(), e);
-        }
-    }
 }

@@ -137,7 +137,7 @@
 
 **T3.1 迁移 V78**
 - `approval_template(id, tenant_id, name, icon, category, form_id, workflow_id **NOT NULL**, approver_type, enabled, created_at)`
-- `approval_request(id, tenant_id, template_id, applicant_id, form_data JSONB, status, instance_id, current_task_id, external_instance_id, submitted_at, finished_at)`
+- `approval_request(id, tenant_id, template_id, applicant_id, form_data JSONB, status, instance_id, current_task_id, external_instance_id, corp_id, external_push_status, external_push_error, submitted_at, finished_at)`
 - `approval_cc(request_id, user_id)`
 - 状态映射（**单一事实**：`workflow_instance.status` → `approval_request.status`）
   `PENDING→PENDING`、`COMPLETED→APPROVED`、`FAILED(驳回)→REJECTED`、主动终止`→CANCELED`
@@ -152,8 +152,7 @@
   改为：按 `approverType` 解析 —— `USER`（指定人）/ `MANAGER`（发起人 `users.manager_id`）/ `ROLE`（角色成员展开）；
   **无法解析时抛业务异常，节点 FAILED、实例 FAILED，不创建任务**；`manager_id` 缺失时在**提交前**就拦住并给出明确提示
 - 抄送：进入 `APPROVED|REJECTED` 时写 `approval_cc` 并触发通知（依赖 T4）
-- 钉钉联动：`DingTalkApprovalService` 补去程创建实例（`approval.dingtalk.push.enabled=false` 默认关）；
-  回调已有 `approveByExternalBinding`，补幂等（同一 `external_instance_id` 只推进一次）
+- 钉钉联动（N2-0 修正）：`DingTalkExternalApprovalService` 在短事务外调用新版 OA，显式租户 token/外部 userid/控件映射；V83 持久化精确绑定、外推状态与事件幂等；`approval.dingtalk.push.enabled=false` 默认关，真实平台未验收。
 - **模板向导**：`POST /api/approvals/templates/from-preset` 生成三段式流程（发起 → 审批（可多级）→ 结束）+
   校验"任一审批节点必须有可解析的审批人规则"
 
@@ -228,7 +227,7 @@
 
 | 门禁 | 命令 | 本轮新增要求 |
 |---|---|---|
-| 全量 | `python3 scripts/monthly-gate.py` | 13 项全绿 |
+| 全量 | `python3 scripts/monthly-gate.py` | 15 项门禁通过（备份/PITR 另行独立执行须 30/30） |
 | 后端 | `cd backend-java && mvn -o verify` | 覆盖率红线 0.79 不下调 |
 | 前端 | `cd frontend && npm run test:run` + `npx tsc --noEmit` | 0 failed / 0 errors |
 | 契约 | `python3 scripts/api-contract-verify.py` | 新端点全部入基线，0 漂移 |
@@ -354,7 +353,7 @@
 
 ### N1 收口状态（本机，2026-11-09）
 
-- **F1 飞书离职安全**：离职判定仅在 `usersFailed==0 && errors.isEmpty() && departmentsSynced==departmentsTotal` 时执行；待离职 >10 人或 >已见用户 20%（或本轮未见到任何用户）时 `code=409` 熔断且零写入；`POST /api/feishu/sync-org?dryRun=true` 返回 `pendingResignations` 且不写库、不吊销会话。
+- **F1 飞书离职安全**：离职判定仅在 `usersFailed==0 && errors.isEmpty() && departmentsSynced==departmentsTotal` 时执行；待离职 >10 人或 >已见用户 20%（或本轮未见到任何用户）时 `code=409` 熔断且零写入；`POST /api/feishu/sync-org?dryRun=true` 返回 `pendingResignations` 且不执行离职、不吊销会话；资料 upsert 仍可能写入，dryRun 不是全库只读。
 - **F2 外部身份隔离**：V82 增加 `users.external_source/external_id/disable_reason` 与 `(tenant_id, external_source, external_id)` 唯一索引；飞书/钉钉/企微/微信/LDAP/OIDC/入站同步改为租户内 + 外部身份查询；跨租户同名外部账号使用稳定租户后缀，不改写对方账号。
 - **F4 人工禁用**：`disable_reason=MANUAL` 的账号不会被同步自动启用，也不参与自动离职；重新启用时清空。
 - **F3 父部门严格化**：外部父部门查不到时抛 400，不再静默降级为根部门；该错误会阻止本轮离职判定。
@@ -363,6 +362,15 @@
 - **门禁实测**：`mvn -o test` → **2797 tests, 0 failures/errors**；JaCoCo LINE **80.11%**；`verify-enterprise-suite.py` 新增 V82 检查（14 项，实测 14/14）；`doc-numbers-verify.py` 24 个锚点一致；Playwright `--list` **260 tests / 13 files**。
 - **F7 流程**：本轮改动保留在工作树，未提交/未推送；提交时按 `fix/feishu-org-sync-safety` 分支 + PR。`main` 分支保护（required checks、禁止直接 push）需仓库管理员在 GitHub 设置中开启，代码侧无法自动化。
 - **仍需外部环境**：钉钉审批真实联调、真实 OIDC IdP、真实飞书租户（含 dryRun 与 429 注入演练）见 `docs/PLANS/external-integration-acceptance.md` C5b/C5c。
+
+### N2-0 前置契约修正状态（工作树，2026-11-09）
+
+- **代码已落地，默认关闭**：V83 外部绑定/回调事件表；新版钉钉 OA 请求使用租户 token、真实外部 userid 和显式控件映射；外推不在事务中执行 HTTP，失败保留本地单据；SyncHTTP SHA1 + AES-CBC、`check_url`、加密 ACK、eventId 原子认领与精确绑定；旧明文/HMAC/UUID 猜测路径关闭。
+- **凭证与同步**：新增 ADMIN 加密凭证 upsert/status/disable；禁用/解密失败不回退全局；同一周期仅 `DingTalkOrgSyncService.scheduledSync` 执行，过滤非 INSTALLED。
+- **OIDC 最小闭环**：固定 `tenant_default`，禁止 email/username 静默绑定；登录成功重定向只携带 60 秒一次性随机 code，DB 仅存 SHA-256 哈希，`POST /api/auth/oidc/exchange` 用原子条件更新消费后签发含本地角色的 JWT；前端在 StrictMode 下仅交换一次，失败清理会话。不扩展 OIDC 多租户。
+- **当前证据（工作树，未部署）**：`mvn -o verify` → **2853 tests, 0 failures/errors**，JaCoCo LINE **80.33%**，Checkstyle 0；`pg-it-gate.py` → **14/14**（V83 绑定、V84 旧键升级/复合幂等键、外推占位、事件租约）；`verify-enterprise-suite.py` → **20/20**（真实 PG）；前端全量 **978/978（121 files）**、lint 0 errors、TypeScript 通过；Python **68 passed / 1 skipped**；API 契约 **460×137，0 漂移**；隔离 PG16 上 smoke **14/14**、租户隔离 **24/24**、上线终验 **8/8**、备份/恢复/PITR **30/30**；`monthly-gate.py` **15 项通过 + 1 项 SKIP**，SKIP 为备份门禁在总编排中的既有分类，独立执行已 30/30。
+- **已修复的 N2 阻断**：B1 外推失败保留 corpId/processCode/instanceId，管理员重试按可信三元组幂等补绑且不重复创建；B2 回调用 `(corpId,eventId)` 幂等，V84 从 V83 回填 corpId 并替换主键；B3/B6 开关关闭时外推模板 409、普通本地模板不受影响，dryRun 仅跳过离职/吊销、资料 upsert 仍可能写入；B4 回调租户只由绑定决定；B7 凭证批量 upsert 单事务；B8 一次性 code 持久化交换，URL 不再携带 JWT。
+- **仍未验证/发布边界**：真实钉钉 `check_url`、OA 创建、双租户回调/错签名/重放、真实 OIDC IdP、飞书租户、真实 HTTPS/四栈健康均未执行；没有部署或迁移现有生产库，没有写入真实租户凭证，相关开关保持关闭。活跃外推单据本地撤回返回 409（尚无 OA 撤回补偿）；`UNKNOWN_BINDING` 仅允许按单据已持久化的精确三元组补绑，实例已属其它单据则拒绝，无自动无限重试。总门禁验证时必须从 `target/` 外的 JAR 副本启动：同目录执行 `mvn verify` 会重打包并替换运行中 JAR，触发懒加载类缺失（本次已实证并规避）。不得宣称完整闭环或生产可用。
 
 ### N1b 收口状态（本机，2026-11-09）
 

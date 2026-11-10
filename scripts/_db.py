@@ -22,7 +22,7 @@ PG_PORT = os.environ.get("PGPORT", "5432")
 PG_PASSWORD = os.environ.get("PGPASSWORD", "test_password")
 
 # 本地 compose 的容器名；仅作为回退时的优先候选
-_COMPOSE_CONTAINER = "nocobase-postgres"
+_COMPOSE_CONTAINER = os.environ.get("PG_CONTAINER", "nocobase-postgres")
 
 
 def _psql_args():
@@ -47,6 +47,8 @@ def _docker_container() -> str | None:
     for cid, name, _img in rows:
         if name == _COMPOSE_CONTAINER:
             return cid
+    if os.environ.get("PG_CONTAINER"):
+        return None
     # 2) 按镜像特征匹配。注意 CI 的 services 镜像是 pgvector/pgvector:pg16，
     #    镜像名里并没有 "postgres" 字样，只匹配 postgres 会漏掉它。
     _IMAGE_HINTS = ("postgres", "pgvector", "postgis", "timescale")

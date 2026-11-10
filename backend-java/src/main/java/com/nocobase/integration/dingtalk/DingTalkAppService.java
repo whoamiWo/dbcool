@@ -97,12 +97,15 @@ public class DingTalkAppService {
      */
     private Optional<String> resolveForKey(String key, String tenantId) {
         if (tenantId != null && !tenantId.isBlank()) {
-            Optional<String> tenantVal = credentialService.get(tenantId, "dingtalk", key);
-            if (tenantVal.isPresent()) {
-                return tenantVal;
+            var tenantVal = credentialService.lookup(tenantId, "dingtalk", key);
+            if (tenantVal.state() == TenantCredentialService.CredentialState.ACTIVE) {
+                return tenantVal.value();
+            }
+            if (tenantVal.state() != TenantCredentialService.CredentialState.MISSING) {
+                return Optional.empty();
             }
         }
-        // 回退全局 @Value
+        // 仅该 key 没有租户记录时保留既有全局兼容回退。
         String fallback = switch (key) {
             case "app-key" -> appKey;
             case "app-secret" -> appSecret;
@@ -143,7 +146,7 @@ public class DingTalkAppService {
             }
             return json.path("access_token").asText("");
         } catch (Exception e) {
-            log.warn("[DingTalk] gettoken 异常: {}", e.getMessage());
+            log.warn("[DingTalk] gettoken 异常 category={}", e.getClass().getSimpleName());
             return "";
         }
     }

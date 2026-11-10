@@ -18,11 +18,9 @@ public interface WorkflowInstanceRepository extends JpaRepository<WorkflowInstan
     /** Week 41 B2:用于删除工作流前检查活跃实例(RUNNING/PENDING)。 */
     List<WorkflowInstanceEntity> findByWorkflowIdAndStatusIn(UUID workflowId, Collection<WorkflowInstanceEntity.Status> statuses);
 
-    /**
-     * Wave4 待办池 #10：按 trigger_data_json 内容（如钉钉审批实例 ID 绑定）反查工作流实例。
-     */
-    @Query(value = "select * from workflow_instances where trigger_data_json like concat('%', :key, '%')",
-            nativeQuery = true)
-    List<com.nocobase.workflow.WorkflowInstanceEntity> findByTriggerDataJsonContaining(
-            @Param("key") String key);
+    /** 回调只锁定精确租户与实例，禁止通过 trigger_data 子串猜测外部身份。 */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from WorkflowInstanceEntity i where i.id=:id and i.tenantId=:tenantId")
+    Optional<WorkflowInstanceEntity> findLockedByIdAndTenantId(
+            @Param("id") UUID id, @Param("tenantId") String tenantId);
 }
