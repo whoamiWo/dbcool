@@ -102,6 +102,9 @@ app:
   # 钉钉集成配置(Week 1-4 Phase 4)
   # 凭证从钉钉开发者后台获取: https://open-dev.dingtalk.com
   dingtalk:
+    # 钉钉 OA 外推默认关闭；租户凭证、模板映射与 V83 验收完成后才允许开启。
+    push:
+      enabled: ${DINGTALK_PUSH_ENABLED:false}
     app-key: ${DINGTALK_APP_KEY:}
     app-secret: ${DINGTALK_APP_SECRET:}
     agent-id: ${DINGTALK_AGENT_ID:}
@@ -147,8 +150,8 @@ app:
     allowed-origins: http://localhost:5173,http://localhost:3000
 
   # PHASE10: OIDC 通用 SSO（企业身份源：Keycloak / Azure AD / Okta / AD FS）
-  # 采用授权码流程：认证成功后由 OidcLoginSuccessHandler 签发**本地 JWT**
-  # 并重定向前端，前端零改造（继续用本地 JWT）。
+  # 采用授权码流程：认证成功后重定向一次性 code，前端交换本地 JWT。
+  # 本地 JWT 不进入重定向 URL，也不在 code 创建前签发。
   # 未配置（enabled=false 或缺 issuer-uri/client-id）时完全不注册，
   # 不影响既有账密 / 钉钉 / 飞书登录链路。
   oidc:
@@ -158,7 +161,7 @@ app:
     client-id: ${OIDC_CLIENT_ID:}
     client-secret: ${OIDC_CLIENT_SECRET:}
     scope: ${OIDC_SCOPE:openid,profile,email}
-    # 登录成功后重定向前端的地址（自动拼接 ?token=<jwt>）
+    # 登录成功后重定向前端的地址（自动拼接一次性 ?code=<code>）
     success-redirect: ${OIDC_SUCCESS_REDIRECT:http://localhost:5173/oidc/callback}
 
 # Actuator(健康检查 + 可观测性)—— PHASE 55 P0

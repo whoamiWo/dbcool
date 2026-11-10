@@ -42,8 +42,8 @@ public class OidcProperties {
     private String scope = "openid,profile,email";
 
     /**
-     * 登录成功后重定向前端的地址（会拼接 ?token=）。
-     * 前端需在该路由读取 token 并写入本地存储。
+     * 登录成功后重定向前端的地址（只拼接一次性 ?code=）。
+     * 前端需在该路由用 code 交换本地 JWT。
      */
     private String successRedirect = "http://localhost:5173/oidc/callback";
 
