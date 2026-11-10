@@ -46,6 +46,7 @@ public class DingTalkOrgSyncService {
 
     /** 外部来源标识；同时用于 org_unit.source 与 users 用户名前缀（dt_）。 */
     static final String SOURCE = "DINGTALK";
+    private static final String PROVIDER = "dingtalk";
     private static final String USERNAME_PREFIX = "dt_";
 
     private final DingTalkAppService appService;
@@ -223,20 +224,21 @@ public class DingTalkOrgSyncService {
     /**
      * 定时同步任务 - 每小时执行一次。
      *
-     * <p>A-4：不再硬编码 {@code "tenant_default"}。遍历「已安装钉钉集成」或
-     * 「已配置钉钉凭证」的租户；两者皆无时跳过并记录可操作日志。
+     * <p>A-4：不再硬编码 {@code "tenant_default"}。遍历 INSTALLED 安装或小写
+     * {@code dingtalk} 凭证来源；同一租户在同一周期只同步一次。
      */
     @Scheduled(cron = "0 0 * * * ?")
     public void scheduledSync() {
         Set<String> tenants = new LinkedHashSet<>();
         try {
-            installRepository.findByAppKey(SOURCE).stream()
+            installRepository.findByAppKey(PROVIDER).stream()
+                    .filter(i -> "INSTALLED".equals(i.getStatus()))
                     .map(i -> i.getTenantId()).forEach(tenants::add);
         } catch (Exception e) {
             log.warn("[DingTalk] 读取已安装集成失败: {}", e.getMessage());
         }
         try {
-            credentialRepository.findByProvider(SOURCE).stream()
+            credentialRepository.findByProvider(PROVIDER).stream()
                     .map(c -> c.getTenantId()).forEach(tenants::add);
         } catch (Exception e) {
             log.warn("[DingTalk] 读取钉钉凭证失败: {}", e.getMessage());

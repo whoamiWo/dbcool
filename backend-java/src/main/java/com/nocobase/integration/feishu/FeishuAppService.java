@@ -67,12 +67,15 @@ public class FeishuAppService {
      */
     private Optional<String> resolveForKey(String key, String tenantId) {
         if (tenantId != null && !tenantId.isBlank()) {
-            Optional<String> tenantVal = credentialService.get(tenantId, "feishu", key);
-            if (tenantVal.isPresent()) {
-                return tenantVal;
+            var tenantVal = credentialService.lookup(tenantId, "feishu", key);
+            if (tenantVal.state() == TenantCredentialService.CredentialState.ACTIVE) {
+                return tenantVal.value();
+            }
+            if (tenantVal.state() != TenantCredentialService.CredentialState.MISSING) {
+                return Optional.empty();
             }
         }
-        // 回退全局 @Value
+        // 仅该 key 没有租户记录时保留既有全局兼容回退。
         String fallback = switch (key) {
             case "app-id" -> appId;
             case "app-secret" -> appSecret;
@@ -285,17 +288,18 @@ public class FeishuAppService {
      * 绝不能回退到全局凭证跨租户使用。
      */
     public String getTenantAccessToken(String tenantId) throws Exception {
+        // 即使已有缓存也必须先验证当前凭证；禁用/损坏时不得继续使用旧 token。
+        String key = resolveForKey("app-id", tenantId).orElse("");
+        String secret = resolveForKey("app-secret", tenantId).orElse("");
+        if (key.isBlank() || secret.isBlank()) {
+            throw new IllegalStateException("飞书应用未配置 (feishu.app-id / app-secret)");
+        }
+
         String cacheKey = tenantId == null ? "" : tenantId;
         long now = System.currentTimeMillis();
         CachedToken cached = tokenCache.get(cacheKey);
         if (cached != null && cached.expiresAt() > now) {
             return cached.token();
-        }
-
-        String key = resolveForKey("app-id", tenantId).orElse("");
-        String secret = resolveForKey("app-secret", tenantId).orElse("");
-        if (key.isBlank() || secret.isBlank()) {
-            throw new IllegalStateException("飞书应用未配置 (feishu.app-id / app-secret)");
         }
 
         Map<String, Object> payload = new HashMap<>();
