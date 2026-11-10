@@ -1,19 +1,29 @@
 package com.nocobase.auth.oidc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.nocobase.auth.RoleRepository;
 import com.nocobase.auth.UserEntity;
+import com.nocobase.auth.UserProvisioningService;
 import com.nocobase.auth.UserRepository;
+import com.nocobase.auth.UserStatus;
+import com.nocobase.tenant.TenantContext;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -22,150 +32,167 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * PHASE10: OIDC 用户映射 / JIT 建号测试。
- *
- * <p>覆盖：
- * 1. 按 email 匹配已有用户
- * 2. 按 username 匹配已有用户
- * 3. 均未匹配 → JIT 建号（且不设密码）
- * 4. 已禁用用户 → 403 拒绝
- * 5. 用户名为空时用 sub 兜底
- * 6. null / 无标识用户 → 401
- */
 class OidcUserServiceTest {
 
-    private UserRepository userRepository;
-    private OidcUserService service;
-    private com.nocobase.auth.UserProvisioningService provisioningMock;
-
     private static final String TENANT = "tenant_default";
+
+    private UserRepository userRepository;
+    private UserProvisioningService provisioningService;
+    private RoleRepository roleRepository;
+    private OidcUserService service;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
-        provisioningMock = mock(com.nocobase.auth.UserProvisioningService.class);
-        when(provisioningMock.createExternal(any(), any(), any(), any(), any(), any()))
+        provisioningService = mock(UserProvisioningService.class);
+        roleRepository = mock(RoleRepository.class);
+        when(provisioningService.createExternal(any(), any(), any(), any(), any(), any()))
                 .thenAnswer(inv -> {
-                    com.nocobase.auth.UserEntity u = new com.nocobase.auth.UserEntity();
-                    u.setId(java.util.UUID.randomUUID());
-                    u.setUsername(inv.getArgument(1));
-                    u.setPasswordHash(null);
-                    u.setTenantId(inv.getArgument(0));
-                    u.setDisplayName(inv.getArgument(2));
-                    u.setEmail(inv.getArgument(3));
-                    return u;
+                    UserEntity user = new UserEntity();
+                    user.setId(UUID.randomUUID());
+                    user.setTenantId(inv.getArgument(0));
+                    user.setUsername(inv.getArgument(1));
+                    user.setDisplayName(inv.getArgument(2));
+                    user.setEmail(inv.getArgument(3));
+                    user.setExternalSource(inv.getArgument(4));
+                    user.setExternalId(inv.getArgument(5));
+                    user.setPasswordSet(false);
+                    return user;
                 });
-        service = new OidcUserService(userRepository, provisioningMock);
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        service = new OidcUserService(userRepository, provisioningService, roleRepository);
+    }
+
+    @AfterEach
+    void clearTenantContext() {
+        TenantContext.clear();
     }
 
     private OidcUser oidcUser(String sub, String email, String username, String fullName) {
-        // DefaultOidcUser 需要至少 authorities；idToken 构造需要 claims
-        OidcIdToken idToken = new OidcIdToken(
-                "token-value",
-                null,
-                null,
-                java.util.Map.of(
-                        "sub", sub,
-                        "email", email == null ? "" : email,
-                        "preferred_username", username == null ? "" : username,
-                        "name", fullName == null ? "" : fullName));
-        return new DefaultOidcUser(
-                java.util.List.of(new org.springframework.security.core.authority
-                        .SimpleGrantedAuthority("ROLE_USER")),
-                idToken);
+        java.util.Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("sub", sub);
+        if (email != null) claims.put("email", email);
+        if (username != null) claims.put("preferred_username", username);
+        if (fullName != null) claims.put("name", fullName);
+        OidcIdToken idToken = new OidcIdToken("token-value", null, null, claims);
+        return new DefaultOidcUser(List.of(), idToken);
     }
 
-    private UserEntity existingUser(String username, String email, boolean enabled) {
-        UserEntity u = new UserEntity();
-        u.setId(UUID.randomUUID());
-        u.setUsername(username);
-        u.setEmail(email);
-        u.setTenantId(TENANT);
-        u.setEnabled(enabled);
-        return u;
+    private UserEntity boundUser(String subject) {
+        UserEntity user = new UserEntity();
+        user.setId(UUID.randomUUID());
+        user.setUsername("oidc-user");
+        user.setEmail("oidc@corp.com");
+        user.setTenantId(TENANT);
+        user.setExternalSource("OIDC");
+        user.setExternalId(subject);
+        user.setEnabled(true);
+        user.setStatus(UserStatus.ACTIVE);
+        return user;
     }
 
     @Test
-    void mapOrCreate_matchesByEmail() {
-        UserEntity existing = existingUser("zhangsan", "z@corp.com", true);
-        when(userRepository.findByTenantIdAndEmail(anyString(), eq("z@corp.com"))).thenReturn(Optional.of(existing));
-        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
-
-        UserEntity result = service.mapOrCreate(oidcUser("sub-1", "z@corp.com", "other", "张三"));
-
-        assertEquals(existing.getId(), result.getId());
-    }
-
-    @Test
-    void mapOrCreate_matchesByUsername() {
-        UserEntity existing = existingUser("lisi", "l@corp.com", true);
-        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByTenantIdAndUsername(anyString(), eq("lisi"))).thenReturn(Optional.of(existing));
-
-        UserEntity result = service.mapOrCreate(oidcUser("sub-2", "unknown@corp.com", "lisi", "李四"));
-
-        assertEquals(existing.getId(), result.getId());
-    }
-
-    /** JIT 建号 —— 托管账号无本地密码，只能走 OIDC 登录。 */
-    @Test
-    void mapOrCreate_createsUser_whenNoMatch() {
-        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
+    void mapOrCreate_sameEmailAndUsernameWithNewSub_createsInsteadOfTakingOverLocalAccount() {
+        UserEntity local = boundUser("another-sub");
+        local.setUsername("zhangsan");
+        local.setEmail("z@corp.com");
+        local.setExternalSource(null);
+        local.setExternalId("another-sub");
+        local.setPasswordSet(true);
+        TenantContext.set("tenant_other");
+        when(userRepository.findByTenantIdAndExternalSourceAndExternalId(TENANT, "OIDC", "new-sub"))
+                .thenReturn(Optional.empty());
 
         UserEntity created = service.mapOrCreate(
-                oidcUser("sub-new", "new@corp.com", "newuser", "新用户"));
+                oidcUser("new-sub", "z@corp.com", "zhangsan", "张三"));
 
-        assertNotNull(created.getId());
-        assertEquals("newuser", created.getUsername());
-        assertEquals("new@corp.com", created.getEmail());
-        // A-2：JIT 用户不得设置密码
+        assertNotEquals(local.getId(), created.getId());
+        assertTrue(created.getUsername().startsWith("oidc_"));
+        assertNotEquals(local.getUsername(), created.getUsername());
+        assertEquals(TENANT, created.getTenantId());
+        assertEquals("OIDC", created.getExternalSource());
+        assertEquals("new-sub", created.getExternalId());
         assertNull(created.getPasswordHash());
-        assertNotNull(created.getTenantId());
+        assertEquals("zhangsan", local.getUsername());
+        assertEquals("another-sub", local.getExternalId());
+        verify(userRepository, never()).findByTenantIdAndEmail(any(), any());
+        verify(userRepository, never()).findByTenantIdAndUsername(any(), any());
+        verify(provisioningService).createExternal(
+                eq(TENANT), eq(created.getUsername()), eq("张三"), eq("z@corp.com"),
+                eq("OIDC"), eq("new-sub"));
     }
 
     @Test
-    void mapOrCreate_rejectsDisabledUser() {
-        UserEntity disabled = existingUser("disabled", "d@corp.com", false);
-        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.of(disabled));
+    void mapOrCreate_repeatedLogin_matchesSubWithoutAnotherJit() {
+        UserEntity bound = boundUser("repeat-sub");
+        TenantContext.set("tenant_other");
+        when(userRepository.findByTenantIdAndExternalSourceAndExternalId(TENANT, "OIDC", "repeat-sub"))
+                .thenReturn(Optional.of(bound));
+
+        UserEntity first = service.mapOrCreate(oidcUser("repeat-sub", "new@corp.com", "new-name", "新名"));
+        UserEntity second = service.mapOrCreate(oidcUser("repeat-sub", "new@corp.com", "new-name", "新名"));
+
+        assertEquals(bound.getId(), first.getId());
+        assertEquals(first.getId(), second.getId());
+        verify(userRepository, times(2))
+                .findByTenantIdAndExternalSourceAndExternalId(TENANT, "OIDC", "repeat-sub");
+        verify(provisioningService, never()).createExternal(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void mapOrCreate_rejectsBoundDisabledUser() {
+        UserEntity disabled = boundUser("disabled-sub");
+        disabled.setEnabled(false);
+        when(userRepository.findByTenantIdAndExternalSourceAndExternalId(TENANT, "OIDC", "disabled-sub"))
+                .thenReturn(Optional.of(disabled));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.mapOrCreate(oidcUser("sub-3", "d@corp.com", "disabled", "禁用")));
+                () -> service.mapOrCreate(oidcUser("disabled-sub", "other@corp.com", "other", null)));
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verify(provisioningService, never()).createExternal(any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    void mapOrCreate_fallsBackToSubject_whenUsernameBlank() {
-        when(userRepository.findByTenantIdAndEmail(anyString(), anyString())).thenReturn(Optional.empty());
-        when(userRepository.findByTenantIdAndUsername(anyString(), anyString())).thenReturn(Optional.empty());
+    void mapOrCreate_rejectsBoundResignedUser() {
+        UserEntity resigned = boundUser("resigned-sub");
+        resigned.setStatus(UserStatus.RESIGNED);
+        when(userRepository.findByTenantIdAndExternalSourceAndExternalId(TENANT, "OIDC", "resigned-sub"))
+                .thenReturn(Optional.of(resigned));
 
-        // email 与 username 均为空 → 用 sub 兜底
-        OidcIdToken idToken = new OidcIdToken("tv", null, null,
-                java.util.Map.of("sub", "only-sub-123"));
-        OidcUser user = new DefaultOidcUser(
-                java.util.List.of(new org.springframework.security.core.authority
-                        .SimpleGrantedAuthority("ROLE_USER")),
-                idToken);
-
-        UserEntity created = service.mapOrCreate(user);
-
-        assertEquals("only-sub-123", created.getUsername());
-    }
-
-    @Test
-    void mapOrCreate_throws401_whenUserNull() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.mapOrCreate(null));
+                () -> service.mapOrCreate(oidcUser("resigned-sub", null, null, null)));
 
-        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
+        verify(provisioningService, never()).createExternal(any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    void rolesOf_returnsEmptyList() {
-        // 当前未接入角色映射，返回空列表（调用方按需扩展）
-        assertEquals(0, service.rolesOf(UUID.randomUUID(), TENANT).size());
+    void mapOrCreate_subjectOnly_createsExternalUserWithoutPassword() {
+        UserEntity created = service.mapOrCreate(oidcUser("only-sub-123", null, null, null));
+
+        assertNotNull(created.getId());
+        assertTrue(created.getUsername().startsWith("oidc_"));
+        assertEquals(TENANT, created.getTenantId());
+        assertEquals("only-sub-123", created.getExternalId());
+        assertNull(created.getPasswordHash());
+        assertEquals(false, created.isPasswordSet());
+    }
+
+    @Test
+    void mapOrCreate_throws401_whenUserOrSubjectMissing() {
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(ResponseStatusException.class,
+                () -> service.mapOrCreate(null)).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, assertThrows(ResponseStatusException.class,
+                () -> service.mapOrCreate(oidcUser("", null, "alice", null))).getStatusCode());
+        verify(provisioningService, never()).createExternal(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void rolesOf_readsOnlyLocalRolesForDefaultTenant() {
+        UUID userId = UUID.randomUUID();
+        when(roleRepository.findRoleNamesByUserId(userId, TENANT)).thenReturn(List.of("editor"));
+
+        assertEquals(List.of("editor"), service.rolesOf(userId));
+        verify(roleRepository).findRoleNamesByUserId(userId, TENANT);
     }
 }

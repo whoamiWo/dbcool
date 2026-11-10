@@ -1,8 +1,9 @@
 package com.nocobase.auth.oidc;
 
+import com.nocobase.auth.RoleRepository;
 import com.nocobase.auth.UserEntity;
+import com.nocobase.auth.UserProvisioningService;
 import com.nocobase.auth.UserRepository;
-import com.nocobase.tenant.TenantContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,119 +16,90 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * PHASE10: OIDC 用户映射 / JIT 建号。
+ * OIDC 用户映射 / JIT 建号。
  *
- * <p>映射优先级（首次登录）：
- * <ol>
- *   <li>按 email 匹配本地已有用户（企业内 IdP 邮箱通常与本地账号一致）；</li>
- *   <li>按 username（preferred_username）匹配；</li>
- *   <li>都未匹配 → JIT 建号（Just-In-Time Provisioning），落当前租户。</li>
- * </ol>
- *
- * <p><b>安全约束</b>：
- * <ul>
- *   <li>JIT 建号的用户不设置密码（passwordHash 留空），只能走 OIDC 登录，
- *       避免凭空产生可账密登录的账号；</li>
- *   <li>已存在但被禁用（enabled=false）的用户拒绝登录；</li>
- *   <li>建号落在 {@link TenantContext} 当前租户，不硬编码。</li>
- * </ul>
+ * <p>N2 明确只支持 {@code tenant_default}。唯一登录身份是
+ * {@code (tenant_default, OIDC, sub)}，email、username 与 IdP groups 均不参与授权。
  */
 @Service
 public class OidcUserService {
 
     private static final Logger log = LoggerFactory.getLogger(OidcUserService.class);
+    private static final String TENANT_ID = "tenant_default";
+    private static final String EXTERNAL_SOURCE = "OIDC";
+    private static final int MAX_SUBJECT_BYTES = 128;
 
     private final UserRepository userRepository;
-    private final com.nocobase.auth.UserProvisioningService provisioningService;
+    private final UserProvisioningService provisioningService;
+    private final RoleRepository roleRepository;
 
     public OidcUserService(UserRepository userRepository,
-                           com.nocobase.auth.UserProvisioningService provisioningService) {
+                           UserProvisioningService provisioningService,
+                           RoleRepository roleRepository) {
         this.userRepository = userRepository;
         this.provisioningService = provisioningService;
+        this.roleRepository = roleRepository;
     }
 
     /**
-     * 把 OIDC 用户映射为本地用户（不存在则 JIT 建号）。
+     * 把 OIDC sub 映射为默认租户用户，未绑定时才 JIT 建号。
      *
-     * @param oidcUser IdP 返回的用户信息
-     * @return 本地用户实体
-     * @throws ResponseStatusException 用户被禁用或映射失败
+     * @throws ResponseStatusException sub 缺失时 401；已绑定用户禁用/离职时 403
      */
     @Transactional
     public UserEntity mapOrCreate(OidcUser oidcUser) {
         if (oidcUser == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "OIDC 用户信息缺失");
         }
-        String email = oidcUser.getEmail();
-        String username = oidcUser.getPreferredUsername();
         String subject = oidcUser.getSubject();
-
-        if ((email == null || email.isBlank())
-                && (username == null || username.isBlank())) {
-            // sub 必不为空，用它兜底，保证一定能建立映射
-            username = subject;
+        if (subject == null || subject.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "OIDC sub 缺失");
+        }
+        if (subject.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_SUBJECT_BYTES) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "OIDC sub 超出长度限制");
+        }
+        if (oidcUser.getEmail() != null && oidcUser.getEmail().length() > 255) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OIDC email 超出长度限制");
         }
 
-        String tenantId = TenantContext.currentTenantId();
-        // 1. 按外部身份（sub）匹配 —— 改名/改邮箱后仍能稳定命中
-        if (subject != null && !subject.isBlank()) {
-            Optional<UserEntity> byExternal = userRepository
-                    .findByTenantIdAndExternalSourceAndExternalId(tenantId, "OIDC", subject);
-            if (byExternal.isPresent()) {
-                return assertEnabled(byExternal.get());
-            }
+        Optional<UserEntity> bound = userRepository.findByTenantIdAndExternalSourceAndExternalId(
+                TENANT_ID, EXTERNAL_SOURCE, subject);
+        if (bound.isPresent()) {
+            return assertActive(bound.get());
         }
-        // 2. 按 email 匹配（仅本租户）
-        if (email != null && !email.isBlank()) {
-            Optional<UserEntity> byEmail = userRepository.findByTenantIdAndEmail(tenantId, email);
-            if (byEmail.isPresent()) {
-                return assertEnabled(byEmail.get());
-            }
-        }
-        // 3. 按 username 匹配（仅本租户）
-        if (username != null && !username.isBlank()) {
-            Optional<UserEntity> byName = userRepository.findByTenantIdAndUsername(tenantId, username);
-            if (byName.isPresent()) {
-                return assertEnabled(byName.get());
-            }
-        }
-        // 3. JIT 建号
-        return createUser(oidcUser, username, email);
+        return createUser(oidcUser, subject);
     }
 
-    private UserEntity assertEnabled(UserEntity user) {
-        if (!user.isEnabled()) {
-            log.warn("[OIDC] 用户已禁用，拒绝登录 userId={}", user.getId());
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "账号已被禁用");
+    private UserEntity assertActive(UserEntity user) {
+        if (!user.isActiveEmployee()) {
+            log.warn("[OIDC] 用户已禁用或离职，拒绝登录 userId={}", user.getId());
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "账号已被禁用或离职");
         }
         return user;
     }
 
-    private UserEntity createUser(OidcUser oidcUser, String username, String email) {
-        String tenantId = TenantContext.currentTenantId();
-        // 用户名冲突时加随机后缀，避免唯一键冲突
-        String finalUsername = username;
-        if (finalUsername == null || finalUsername.isBlank()) {
-            finalUsername = "oidc_" + UUID.randomUUID().toString().substring(0, 8);
-        } else if (userRepository.findByTenantIdAndUsername(tenantId, finalUsername).isPresent()) {
-            finalUsername = finalUsername + "_" + UUID.randomUUID().toString().substring(0, 6);
+    private UserEntity createUser(OidcUser oidcUser, String subject) {
+        String email = oidcUser.getEmail();
+        String preferredUsername = oidcUser.getPreferredUsername();
+        String username = "oidc_" + UUID.nameUUIDFromBytes(
+                        (EXTERNAL_SOURCE + ":" + subject).getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .toString().replace("-", "").substring(0, 16);
+        String displayName = oidcUser.getFullName();
+        if (displayName == null || displayName.isBlank()) {
+            displayName = preferredUsername == null || preferredUsername.isBlank()
+                    ? username : preferredUsername;
         }
 
-        // A-2：统一走 UserProvisioningService —— passwordHash=null 且 passwordSet=false。
-        // 修复前此处手工 new + setPasswordHash(null)，而当时 password_hash 是 NOT NULL，
-        // OIDC 首次登录必然 500（且被上层吞成「登录失败」）。
-        // F2：sub 作为稳定外部身份，后续改名/换邮箱仍能命中同一账号。
+        if (displayName.length() > 128) displayName = displayName.substring(0, 128);
         UserEntity saved = provisioningService.createExternal(
-                tenantId, finalUsername,
-                oidcUser.getFullName() != null ? oidcUser.getFullName() : finalUsername,
-                email, "OIDC", oidcUser.getSubject());
+                TENANT_ID, username, displayName, email, EXTERNAL_SOURCE, subject);
         log.info("[OIDC] JIT 建号成功 userId={} username={} tenant={}",
-                saved.getId(), saved.getUsername(), tenantId);
+                saved.getId(), saved.getUsername(), TENANT_ID);
         return saved;
     }
 
-    /** 取用户角色名列表（供 JWT claims；此处返回空列表由调用方按需扩展）。 */
-    public List<String> rolesOf(UUID userId, String tenantId) {
-        return List.of();
+    /** 本地角色是 OIDC JWT 的唯一角色来源；JIT 用户默认没有角色。 */
+    public List<String> rolesOf(UUID userId) {
+        return roleRepository.findRoleNamesByUserId(userId, TENANT_ID);
     }
 }
