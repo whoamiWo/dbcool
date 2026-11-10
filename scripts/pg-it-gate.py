@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """R5：真实 PostgreSQL 集成测试门禁（Testcontainers）。
 
-- 有 Docker：执行 `mvn -o test -Dtest=EnterpriseSuitePgIT,UnifiedSearchIndexRepositoryPgIT`（标签 pg）。
+- 有 Docker：执行 `mvn -o test -Dtest=EnterpriseSuitePgIT,UnifiedSearchIndexRepositoryPgIT,ApprovalExternalBindingRepositoryPgIT`（标签 pg）。
 - 无 Docker：显式打印 `SKIP:` 原因并退出 0 —— monthly-gate 会把 SKIP 单列，
   不计 PASS（见 scripts/monthly-gate.py）。
 
@@ -32,7 +32,7 @@ def main() -> int:
         return 0
 
     proc = subprocess.run(
-        ["mvn", "-o", "test", "-Dtest=EnterpriseSuitePgIT,UnifiedSearchIndexRepositoryPgIT"],
+        ["mvn", "-o", "test", "-Dtest=EnterpriseSuitePgIT,UnifiedSearchIndexRepositoryPgIT,ApprovalExternalBindingRepositoryPgIT"],
         cwd=ROOT / "backend-java",
         capture_output=True,
         text=True,

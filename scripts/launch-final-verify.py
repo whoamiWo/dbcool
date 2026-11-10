@@ -58,13 +58,14 @@ def clear_rate_limit() -> None:
     子脚本各自已做登录前清理，但编排串起来后累计次数仍会超限，故在此每个脚本前清一次。
     这是门禁编排的运维处理，不是放宽断言：每个脚本单独跑时同样会清理并保持自身断言强度。
     """
+    redis_container = os.environ.get("REDIS_CONTAINER", "nocobase-redis")
     try:
         scan = subprocess.run(
-            ["docker", "exec", "nocobase-redis", "redis-cli", "--scan", "--pattern", "ratelimit:*"],
+            ["docker", "exec", redis_container, "redis-cli", "--scan", "--pattern", "ratelimit:*"],
             capture_output=True, text=True, timeout=20)
         keys = [k for k in (scan.stdout or "").split() if k.strip()]
         if keys:
-            subprocess.run(["docker", "exec", "nocobase-redis", "redis-cli", "DEL"] + keys,
+            subprocess.run(["docker", "exec", redis_container, "redis-cli", "DEL"] + keys,
                            capture_output=True, text=True, timeout=20)
     except Exception:
         pass  # 清理失败不影响门禁结论，交由脚本自身的登录结果判定

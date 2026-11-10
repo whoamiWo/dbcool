@@ -4,11 +4,11 @@
 任务书要求：涉及 DB 约束、索引写入、权限过滤的用例必须落在真实 PG 上。
 本脚本不 mock 任何东西，直接在运行中的 Postgres 上：
 
-  1. 应用 V77–V82 迁移（全部 IF NOT EXISTS，可重复执行）；
+  1. 应用 V77–V84 迁移（全部 IF NOT EXISTS，可重复执行）；
   2. schema smoke：建两棵部门树 + 三个用户，验证 org_unit/users 数据与子树查询可用
      （**不验证 Java 实现**；Java 路径由 EnterpriseSuitePgIT 走真实代码覆盖）；
   3. 向 unified_search_index 写入一行业务记录，断言全文检索能命中（A-6 语义）；
-  4. 校验 V78/V79/V81/V82 的表/列真实存在。
+  4. 校验 V78/V79/V81/V82/V83/V84 的表/列真实存在。
 
 用法：
   python3 scripts/verify-enterprise-suite.py [--container nocobase-postgres]
@@ -33,6 +33,8 @@ MIGRATIONS = [
     ROOT / "backend-java/src/main/resources/db/migration/V80__restore_search_vector_trigger.sql",
     ROOT / "backend-java/src/main/resources/db/migration/V81__notification_type_backfill_and_last_event.sql",
     ROOT / "backend-java/src/main/resources/db/migration/V82__user_external_identity_and_disable_reason.sql",
+    ROOT / "backend-java/src/main/resources/db/migration/V83__dingtalk_approval_external_binding.sql",
+    ROOT / "backend-java/src/main/resources/db/migration/V84__callback_event_corp_and_oidc_login_code.sql",
 ]
 
 TENANT = "verify_es_" + uuid.uuid4().hex[:8]
@@ -71,12 +73,12 @@ def check(name, cond, detail=""):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--container", default="nocobase-postgres")
+    ap.add_argument("--container", default=__import__("os").environ.get("PG_CONTAINER", "nocobase-postgres"))
     ap.add_argument("--user", default="nocobase")
     ap.add_argument("--db", default="nocobase")
     args = ap.parse_args()
 
-    print(f"[1/4] 应用迁移 V77–V82（tenant={TENANT}）")
+    print(f"[1/4] 应用迁移 V77–V84（tenant={TENANT}）")
     for mig in MIGRATIONS:
         sql = mig.read_text(encoding="utf-8")
         ok, out, err = run_sql(args.container, args.user, args.db, sql)
@@ -140,7 +142,7 @@ COMMIT;
     last = numeric[-1] if numeric else ""
     check("written record is searchable", last == "1", f"count={out!r}")
 
-    print("[4/4] V78/V79 结构与通知列")
+    print("[4/4] V78–V84 结构、通知列与外部绑定")
     sql = f"""
 SELECT COUNT(*) FROM information_schema.tables
 WHERE table_schema = 'public'
@@ -167,13 +169,45 @@ WHERE table_schema = 'public' AND table_name = 'users'
     check("users external identity/disable columns exist (3, V82)", ok and out.strip() == "3",
           f"out={out!r} err={err[:200]}")
 
+    sql = """
+SELECT COUNT(*) FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('approval_external_binding','approval_callback_event');
+"""
+    ok, out, err = run_sql(args.container, args.user, args.db, sql)
+    check("V83 binding/event tables exist (2)", ok and out.strip() == "2", f"out={out!r}")
+    sql = """
+SELECT COUNT(*) FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'approval_request'
+  AND column_name IN ('external_push_status','external_push_error');
+"""
+    ok, out, err = run_sql(args.container, args.user, args.db, sql)
+    check("V83 external push columns exist (2)", ok and out.strip() == "2", f"out={out!r}")
+
+    sql = """
+SELECT COUNT(*) FROM information_schema.table_constraints
+WHERE table_schema='public' AND table_name='approval_callback_event'
+  AND constraint_type='PRIMARY KEY' AND constraint_name='pk_approval_callback_event';
+"""
+    ok, out, err = run_sql(args.container, args.user, args.db, sql)
+    check("V84 corp/event composite primary key exists", ok and out.strip() == "1", f"out={out!r}")
+    sql = """
+SELECT COUNT(*) FROM information_schema.tables
+WHERE table_schema='public' AND table_name='oidc_login_code';
+"""
+    ok, out, err = run_sql(args.container, args.user, args.db, sql)
+    check("V84 OIDC one-time code table exists", ok and out.strip() == "1", f"out={out!r}")
+
     sql = f"""
 BEGIN;
+DELETE FROM approval_callback_event WHERE tenant_id = '{TENANT}';
+DELETE FROM approval_external_binding WHERE tenant_id = '{TENANT}';
 DELETE FROM approval_cc WHERE request_id IN
   (SELECT id FROM approval_request WHERE tenant_id = '{TENANT}');
 DELETE FROM approval_request WHERE tenant_id = '{TENANT}';
 DELETE FROM approval_template WHERE tenant_id = '{TENANT}';
 DELETE FROM unified_search_index WHERE tenant_id = '{TENANT}';
+DELETE FROM oidc_login_code WHERE tenant_id = '{TENANT}';
 DELETE FROM users WHERE tenant_id = '{TENANT}';
 DELETE FROM org_unit WHERE tenant_id = '{TENANT}';
 COMMIT;
