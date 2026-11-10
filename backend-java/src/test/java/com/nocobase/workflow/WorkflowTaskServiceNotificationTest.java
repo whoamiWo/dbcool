@@ -34,6 +34,8 @@ class WorkflowTaskServiceNotificationTest {
     private ApprovalCcRepository approvalCcRepository;
     private NotifyDispatcher notifyDispatcher;
     private WorkflowTaskService service;
+    private WorkflowInstanceRepository instanceRepository;
+    private WorkflowRepository workflowRepository;
 
     private static final String TENANT = "t1";
     private final UUID instanceId = UUID.randomUUID();
@@ -47,10 +49,12 @@ class WorkflowTaskServiceNotificationTest {
         approvalRequestRepository = mock(ApprovalRequestRepository.class);
         approvalCcRepository = mock(ApprovalCcRepository.class);
         notifyDispatcher = mock(NotifyDispatcher.class);
+        instanceRepository = mock(WorkflowInstanceRepository.class);
+        workflowRepository = mock(WorkflowRepository.class);
         service = new WorkflowTaskService(
                 taskRepository,
-                mock(WorkflowInstanceRepository.class),
-                mock(WorkflowRepository.class),
+                instanceRepository,
+                workflowRepository,
                 mock(WorkflowEngine.class),
                 mock(com.nocobase.audit.AuditService.class),
                 new com.fasterxml.jackson.databind.ObjectMapper(),
@@ -153,6 +157,31 @@ class WorkflowTaskServiceNotificationTest {
         ReflectionTestUtils.invokeMethod(service, "afterAdvance", completed,
                 WorkflowEngine.NodeResult.CONTINUE);
         verify(notifyDispatcher).notifyOne(eq(NotifyDispatcher.APPROVAL_RESULT), eq(applicant), any());
+    }
+
+    @Test
+    void graphResumeCompletesWithInvalidOrEmptyNodes() {
+        WorkflowTaskEntity task = new WorkflowTaskEntity();
+        task.setId(UUID.randomUUID());
+        task.setInstanceId(instanceId);
+        task.setAssignee(assignee);
+        task.setStatus(WorkflowTaskEntity.Status.PENDING);
+        task.setNodeId("n1");
+        WorkflowInstanceEntity ins = instance(WorkflowInstanceEntity.Status.PENDING);
+        WorkflowEntity wf = new WorkflowEntity();
+        wf.setId(ins.getWorkflowId());
+        wf.setEdgesJson("[{\"source\":\"n1\",\"target\":\"n2\"}]");
+        wf.setNodesJson("not-json");
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(instanceRepository.findById(instanceId)).thenReturn(Optional.of(ins));
+        when(workflowRepository.findById(ins.getWorkflowId())).thenReturn(Optional.of(wf));
+        service.approveTask(task.getId(), null);
+        wf.setNodesJson("[]");
+        task.setId(UUID.randomUUID());
+        task.setStatus(WorkflowTaskEntity.Status.PENDING);
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        service.approveTask(task.getId(), null);
+        assertThat(ins.getStatus()).isEqualTo(WorkflowInstanceEntity.Status.COMPLETED);
     }
 
     @Test

@@ -14,5 +14,13 @@ public record NodeExecutionContext(
         Map<String, Object> node,
         UUID defaultAssignee,
         /** 触发此次执行的事件(可为 null — API 手动 trigger 场景)。 */
-        RecordChangeEvent triggeringEvent
-) {}
+        RecordChangeEvent triggeringEvent,
+        /** 审批单据 ID；通用工作流触发时为空。 */
+        UUID approvalRequestId
+) {
+    /** 兼容通用工作流的四参上下文。 */
+    public NodeExecutionContext(WorkflowInstanceEntity instance, Map<String, Object> node,
+                                UUID defaultAssignee, RecordChangeEvent triggeringEvent) {
+        this(instance, node, defaultAssignee, triggeringEvent, null);
+    }
+}

@@ -61,8 +61,8 @@ class DingTalkControllerSignatureTest {
     }
 
     @Test
-    @DisplayName("正确签名 → 200")
-    void correctSignature_returns200() throws Exception {
+    @DisplayName("旧 appSecret HMAC 即使正确也拒绝，必须加密回调")
+    void legacyCorrectSignature_rejected() throws Exception {
         long timestamp = System.currentTimeMillis();
         
         Mac mac = Mac.getInstance("HmacSHA256");
@@ -76,12 +76,12 @@ class DingTalkControllerSignatureTest {
                         .content("{\"instance_id\":\"test-instance\",\"result\":\"approved\"}")
                         .header("X-DingTalk-Timestamp", String.valueOf(timestamp))
                         .header("X-DingTalk-Signature", sign))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
     }
 
     @Test
-    @DisplayName("重复事件 ID → 幂等")
+    @DisplayName("旧明文 instance_id 不能伪造幂等推进")
     void duplicateEventId_idempotent() throws Exception {
         long timestamp = System.currentTimeMillis();
         String eventId = "test-event-id-001";
@@ -100,8 +100,8 @@ class DingTalkControllerSignatureTest {
                         .content(body)
                         .header("X-DingTalk-Timestamp", String.valueOf(timestamp))
                         .header("X-DingTalk-Signature", sign))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
 
         // 第二次请求（相同 instance_id）
         mockMvc.perform(post("/api/dingtalk/approval-callback")
@@ -109,7 +109,7 @@ class DingTalkControllerSignatureTest {
                         .content(body)
                         .header("X-DingTalk-Timestamp", String.valueOf(timestamp))
                         .header("X-DingTalk-Signature", sign))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0));
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
     }
 }

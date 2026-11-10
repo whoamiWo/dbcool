@@ -52,7 +52,8 @@ public class ApprovalService {
     private final WorkflowEngine engine;
     private final UserRepository userRepository;
     /** D4：钉钉推送开关默认关，本地 approval_request 为 SSOT。 */
-    private final com.nocobase.integration.dingtalk.DingTalkApprovalService dingTalkApprovalService;
+    private final com.nocobase.integration.dingtalk.DingTalkExternalApprovalService dingTalkExternalApprovalService;
+    private final org.springframework.beans.factory.ObjectProvider<ApprovalSubmissionService> submissionService;
     private final com.nocobase.notification.NotifyDispatcher notifyDispatcher;
     private final com.nocobase.search.UnifiedSearchService searchService;
     private final ApprovalVisibilityService visibilityService;
@@ -69,7 +70,8 @@ public class ApprovalService {
                            WorkflowTaskRepository taskRepository,
                            WorkflowEngine engine,
                            UserRepository userRepository,
-                           com.nocobase.integration.dingtalk.DingTalkApprovalService dingTalkApprovalService,
+                            com.nocobase.integration.dingtalk.DingTalkExternalApprovalService dingTalkExternalApprovalService,
+                            org.springframework.beans.factory.ObjectProvider<ApprovalSubmissionService> submissionService,
                            com.nocobase.notification.NotifyDispatcher notifyDispatcher,
                            com.nocobase.search.UnifiedSearchService searchService,
                            ApprovalVisibilityService visibilityService,
@@ -83,7 +85,8 @@ public class ApprovalService {
         this.taskRepository = taskRepository;
         this.engine = engine;
         this.userRepository = userRepository;
-        this.dingTalkApprovalService = dingTalkApprovalService;
+        this.dingTalkExternalApprovalService = dingTalkExternalApprovalService;
+        this.submissionService = submissionService;
         this.notifyDispatcher = notifyDispatcher;
         this.searchService = searchService;
         this.visibilityService = visibilityService;
@@ -107,9 +110,25 @@ public class ApprovalService {
      */
     @Transactional
     public ApprovalTemplateEntity createFromPreset(String tenantId, UUID creatorId, String name,
-                                                    String category, int levels,
-                                                    String approverType, String assignee) {
+                                                     String category, int levels,
+                                                     String approverType, String assignee) {
+        return createFromPreset(tenantId, creatorId, name, category, levels, approverType,
+                assignee, null, null);
+    }
+
+    @Transactional
+    public ApprovalTemplateEntity createFromPreset(String tenantId, UUID creatorId, String name,
+                                                     String category, int levels,
+                                                     String approverType, String assignee,
+                                                     String externalProcessCode, String externalConfig) {
         int safeLevels = Math.max(1, Math.min(levels, 5));
+        boolean external = externalProcessCode != null && !externalProcessCode.isBlank();
+        if (external && safeLevels != 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "外推模板仅支持单个外部审批节点");
+        }
+        if (external && (externalConfig == null || externalConfig.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "外推模板必须显式配置 externalConfig");
+        }
         String type = approverType == null || approverType.isBlank()
                 ? ApprovalTemplateEntity.APPROVER_USER : approverType.toUpperCase();
         List<Map<String, Object>> nodes = new ArrayList<>();
@@ -131,10 +150,10 @@ public class ApprovalService {
                 }
                 config.put("roleId", assignee);
             }
-            Map<String, Object> node = new HashMap<>();
+                Map<String, Object> node = new HashMap<>();
             node.put("id", nodeId);
-            node.put("type", "APPROVAL");
-            node.put("name", "第 " + i + " 级审批");
+            node.put("type", external ? "DINGTALK_APPROVAL" : "APPROVAL");
+            node.put("name", external ? "钉钉 OA 审批" : "第 " + i + " 级审批");
             node.put("config", config);
             nodes.add(node);
             if (i > 1) {
@@ -171,6 +190,8 @@ public class ApprovalService {
         t.setCategory(category);
         t.setWorkflowId(w.getId());
         t.setApproverType(type);
+        t.setExternalProcessCode(externalProcessCode);
+        t.setExternalConfig(externalConfig);
         t.setEnabled(true);
         t.setCreatedAt(Instant.now());
         return templateRepository.save(t);
@@ -180,8 +201,31 @@ public class ApprovalService {
     //  提交
     // ============================================================
 
-    @Transactional
     public Map<String, Object> submit(String tenantId, UUID applicantId,
+                                      UUID templateId, Map<String, Object> formData,
+                                      List<UUID> ccUserIds) {
+        if (dingTalkPushEnabled) {
+            ApprovalTemplateEntity external = templateRepository.findByIdAndTenantId(templateId, tenantId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "审批模板不存在"));
+            if (external.getExternalProcessCode() != null && !external.getExternalProcessCode().isBlank()) {
+                UUID requestId = dingTalkExternalApprovalService.createLocal(
+                        tenantId, applicantId, templateId, formData, ccUserIds);
+                ApprovalRequestEntity pushed = dingTalkExternalApprovalService.push(requestId);
+                log.info("[approval] 外部审批已受理 request={} pushStatus={}",
+                        requestId, pushed.getExternalPushStatus());
+                return detailOf(pushed);
+            }
+        }
+        ApprovalTemplateEntity local = templateRepository.findByIdAndTenantId(templateId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "审批模板不存在"));
+        if (local.getExternalProcessCode() != null && !local.getExternalProcessCode().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "钉钉外推已关闭，不能提交外推模板");
+        }
+        return submissionService.getObject().submit(tenantId, applicantId, templateId, formData, ccUserIds);
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    protected Map<String, Object> submitLocal(String tenantId, UUID applicantId,
                                       UUID templateId, Map<String, Object> formData,
                                       List<UUID> ccUserIds) {
         ApprovalTemplateEntity template = templateRepository.findByIdAndTenantId(templateId, tenantId)
@@ -240,30 +284,9 @@ public class ApprovalService {
         WorkflowEngine.NodeResult result;
         if (!edges.isEmpty() && !nodes.isEmpty()) {
             result = engine.executeGraphFrom(instance, nodes, edges,
-                    String.valueOf(nodes.get(0).get("id")), workflow.getCreatedBy());
+                    String.valueOf(nodes.get(0).get("id")), workflow.getCreatedBy(), request.getId());
         } else {
-            result = engine.executeFrom(instance, nodes, 0, workflow.getCreatedBy());
-        }
-        // D4：钉钉审批推送（开关默认关；失败只记日志，不阻断本地流程）
-        if (dingTalkPushEnabled && template.getExternalProcessCode() != null
-                && !template.getExternalProcessCode().isBlank()) {
-            try {
-                String externalId = dingTalkApprovalService.createApproval(
-                        template.getExternalProcessCode(),
-                        template.getName() + " - " + applicant.getDisplayName(),
-                        formData == null ? Map.of() : formData);
-                if (externalId != null && !externalId.isBlank()) {
-                    request.setExternalInstanceId(externalId);
-                    requestRepository.save(request);
-                    // 回调按 trigger_data 中的 instance id 反查（见 approveByExternalBinding）
-                    trigger.put("dingtalkInstanceId", externalId);
-                    instance.setTriggerDataJson(toJson(trigger));
-                    instanceRepository.save(instance);
-                }
-            } catch (Exception e) {
-                log.warn("[approval] 钉钉推送失败（本地流程继续）request={}: {}",
-                        request.getId(), e.getMessage());
-            }
+            result = engine.executeFrom(instance, nodes, 0, workflow.getCreatedBy(), request.getId());
         }
         // R2：审批触发的工作流若进入 FAILED（如审批人解析失败），创建者必须收到通知
         if (failureNotifier != null) {
@@ -287,6 +310,10 @@ public class ApprovalService {
         }
         boolean hasApprovalNode = false;
         for (Map<String, Object> node : nodes) {
+            if ("DINGTALK_APPROVAL".equalsIgnoreCase(String.valueOf(node.get("type")))) {
+                hasApprovalNode = true;
+                continue;
+            }
             if (!"APPROVAL".equalsIgnoreCase(String.valueOf(node.get("type")))) continue;
             hasApprovalNode = true;
             Map<String, Object> config = asMap(node.get("config"));
@@ -320,6 +347,11 @@ public class ApprovalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "审批工作流不包含审批节点");
         }
+    }
+
+    /** ADMIN 重试既有外推失败单据；不重新提交本地审批。 */
+    public Map<String, Object> retryExternalPush(String tenantId, UUID requestId) {
+        return detailOf(dingTalkExternalApprovalService.retry(tenantId, requestId));
     }
 
     // ============================================================
@@ -386,8 +418,13 @@ public class ApprovalService {
         if (!ApprovalRequestEntity.STATUS_PENDING.equals(r.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "只有审批中的单据可以撤回");
         }
+        if (!"NOT_REQUIRED".equals(r.getExternalPushStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "外推单据不能仅本地撤回；请先完成 OA 撤回补偿与对账");
+        }
         if (r.getInstanceId() != null) {
-            WorkflowInstanceEntity instance = instanceRepository.findById(r.getInstanceId()).orElse(null);
+            WorkflowInstanceEntity instance = instanceRepository.findLockedByIdAndTenantId(
+                    r.getInstanceId(), tenantId).orElse(null);
             if (instance != null) {
                 instance.setStatus(WorkflowInstanceEntity.Status.TERMINATED);
                 instance.setFinishedAt(Instant.now());
@@ -512,6 +549,9 @@ public class ApprovalService {
         m.put("templateId", r.getTemplateId().toString());
         m.put("applicantId", r.getApplicantId().toString());
         m.put("status", r.getStatus());
+        m.put("externalPushStatus", r.getExternalPushStatus());
+        m.put("externalPushError", r.getExternalPushError());
+        m.put("externalInstanceId", r.getExternalInstanceId());
         m.put("submittedAt", r.getSubmittedAt() == null ? null : r.getSubmittedAt().toString());
         m.put("finishedAt", r.getFinishedAt() == null ? null : r.getFinishedAt().toString());
         m.put("currentTaskId", r.getCurrentTaskId() == null ? null : r.getCurrentTaskId().toString());
