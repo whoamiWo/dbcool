@@ -27,10 +27,14 @@ class DingTalkOrgSyncServiceTest {
 
     private DingTalkOrgSyncService service;
     private DingTalkAppService appService;
+    private com.nocobase.integration.market.TenantIntegrationInstallRepository installRepository;
+    private com.nocobase.integration.credential.TenantIntegrationCredentialRepository credentialRepository;
 
     @BeforeEach
     void setUp() {
         appService = mock(DingTalkAppService.class);
+        installRepository = mock(com.nocobase.integration.market.TenantIntegrationInstallRepository.class);
+        credentialRepository = mock(com.nocobase.integration.credential.TenantIntegrationCredentialRepository.class);
         service = new DingTalkOrgSyncService(
                 appService,
                 mock(com.nocobase.auth.UserRepository.class),
@@ -38,8 +42,8 @@ class DingTalkOrgSyncServiceTest {
                 mock(com.nocobase.auth.UserProvisioningService.class),
                 mock(com.nocobase.org.OrgUnitService.class),
                 mock(com.nocobase.auth.UserStatusService.class),
-                mock(com.nocobase.integration.market.TenantIntegrationInstallRepository.class),
-                mock(com.nocobase.integration.credential.TenantIntegrationCredentialRepository.class));
+                installRepository,
+                credentialRepository);
     }
 
     private void configureCredentials(String appKey, String appSecret) {
@@ -117,6 +121,46 @@ class DingTalkOrgSyncServiceTest {
     void scheduledSync_configured_doesNotThrow() {
 
         service.scheduledSync();
+    }
+
+    @Test
+    void scheduledSync_onlyOncePerTenant_lowercaseProviderAndInstalledOnly() {
+        var installed = new com.nocobase.integration.market.TenantIntegrationInstallEntity(
+                "tenant_default", "dingtalk", "DingTalk", "1");
+        var disabled = new com.nocobase.integration.market.TenantIntegrationInstallEntity(
+                "disabled_tenant", "dingtalk", "DingTalk", "1");
+        disabled.setStatus("DISABLED");
+        when(installRepository.findByAppKey("dingtalk")).thenReturn(java.util.List.of(installed, disabled));
+        var credential = new com.nocobase.integration.credential.TenantIntegrationCredentialEntity();
+        credential.setTenantId("tenant_default");
+        when(credentialRepository.findByProvider("dingtalk")).thenReturn(java.util.List.of(credential));
+        when(appService.isTenantConfigured(anyString())).thenReturn(false);
+
+        service.scheduledSync();
+
+        verify(installRepository).findByAppKey("dingtalk");
+        verify(credentialRepository).findByProvider("dingtalk");
+        verify(appService).isTenantConfigured("tenant_default");
+        verify(appService, org.mockito.Mockito.never()).isTenantConfigured("disabled_tenant");
+        org.mockito.Mockito.verifyNoMoreInteractions(appService);
+    }
+
+    @Test
+    void legacyJob_remainsAvailableForManualCalls() {
+        when(appService.isTenantConfigured("tenant_default")).thenReturn(false);
+
+        new DingTalkSyncJob(service).syncOrganization();
+
+        verify(appService).isTenantConfigured("tenant_default");
+        org.mockito.Mockito.verifyNoMoreInteractions(appService);
+    }
+
+    @Test
+    void legacyJob_andScheduledSync_haveSingleScheduledEntry() throws Exception {
+        assertThat(DingTalkSyncJob.class.getDeclaredMethod("syncOrganization")
+                .getAnnotation(org.springframework.scheduling.annotation.Scheduled.class)).isNull();
+        assertThat(DingTalkOrgSyncService.class.getDeclaredMethod("scheduledSync")
+                .getAnnotation(org.springframework.scheduling.annotation.Scheduled.class)).isNotNull();
     }
 
     // ---- syncSingleUser（contact_updated 事件入口，PHASE113） ----

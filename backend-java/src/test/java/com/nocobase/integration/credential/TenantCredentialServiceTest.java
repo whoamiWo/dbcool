@@ -3,6 +3,7 @@ package com.nocobase.integration.credential;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -65,6 +66,17 @@ class TenantCredentialServiceTest {
     }
 
     @Test
+    void saveAll_validatesEveryValueBeforeWriting() {
+        var values = new java.util.LinkedHashMap<String, String>();
+        values.put("app-key", "valid-key");
+        values.put("app-secret", " ");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                service.saveAll("tenant_a", "dingtalk", values, "user-1"))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
     @DisplayName("get: 租户级配置优先于回退")
     void get_tenantLevelOverridesGlobal() {
         String tenantId = "tenant_a";
@@ -123,6 +135,75 @@ class TenantCredentialServiceTest {
 
         Optional<String> result = service.get(tenantA, provider, key);
         assertThat(result).isEmpty(); // 租户 A 读不到租户 B 的配置
+    }
+
+    @Test
+    void save_disabledCredential_reactivatesAndStatusIsMasked() {
+        var entity = new TenantIntegrationCredentialEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setTenantId("tenant_a");
+        entity.setProvider("dingtalk");
+        entity.setCredentialKey("app-secret");
+        entity.setAppSecretEnc(cryptoService.encrypt("old-test-value"));
+        entity.setStatus("DISABLED");
+        entity.setUpdatedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+        when(repository.findByTenantIdAndProviderAndCredentialKey("tenant_a", "dingtalk", "app-secret"))
+                .thenReturn(Optional.of(entity));
+        when(repository.findByTenantIdAndProvider("tenant_a", "dingtalk"))
+                .thenReturn(java.util.List.of(entity));
+
+        service.save("tenant_a", "dingtalk", "app-secret", "new-test-value", "admin");
+
+        assertThat(entity.getStatus()).isEqualTo("ACTIVE");
+        assertThat(cryptoService.decrypt(entity.getAppSecretEnc())).isEqualTo("new-test-value");
+        var status = service.status("tenant_a", "dingtalk");
+        assertThat(status).containsOnlyKeys("configured", "status", "masked", "updatedAt");
+        assertThat(status.get("configured")).isEqualTo(true);
+        assertThat(status.get("status")).isEqualTo("ACTIVE");
+        assertThat(status.get("masked")).isEqualTo(java.util.Map.of("app-secret", "********"));
+        assertThat(status.toString()).doesNotContain("new-test-value", entity.getAppSecretEnc());
+    }
+
+    @Test
+    void disable_setsEveryProviderCredentialDisabled() {
+        var entity = new TenantIntegrationCredentialEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setTenantId("tenant_a");
+        entity.setProvider("feishu");
+        entity.setCredentialKey("app-secret");
+        entity.setAppSecretEnc(cryptoService.encrypt("test-value"));
+        entity.setStatus("ACTIVE");
+        when(repository.findByTenantIdAndProvider("tenant_a", "feishu"))
+                .thenReturn(java.util.List.of(entity));
+
+        service.disable("tenant_a", "feishu", "admin");
+
+        assertThat(entity.getStatus()).isEqualTo("DISABLED");
+        assertThat(entity.getUpdatedBy()).isEqualTo("admin");
+        verify(repository).save(entity);
+        assertThat(service.get("tenant_a", "feishu", "app-secret")).isEmpty();
+    }
+
+    @Test
+    void lookup_disabledAndInvalidAreDistinctFromMissing() {
+        var disabled = new TenantIntegrationCredentialEntity();
+        disabled.setStatus("DISABLED");
+        when(repository.findByTenantIdAndProviderAndCredentialKey("t", "dingtalk", "disabled"))
+                .thenReturn(Optional.of(disabled));
+        var invalid = new TenantIntegrationCredentialEntity();
+        invalid.setStatus("ACTIVE");
+        invalid.setAppSecretEnc("not-valid-ciphertext");
+        when(repository.findByTenantIdAndProviderAndCredentialKey("t", "dingtalk", "invalid"))
+                .thenReturn(Optional.of(invalid));
+        when(repository.findByTenantIdAndProviderAndCredentialKey("t", "dingtalk", "missing"))
+                .thenReturn(Optional.empty());
+
+        assertThat(service.lookup("t", "dingtalk", "disabled").state())
+                .isEqualTo(TenantCredentialService.CredentialState.DISABLED);
+        assertThat(service.lookup("t", "dingtalk", "invalid").state())
+                .isEqualTo(TenantCredentialService.CredentialState.INVALID);
+        assertThat(service.lookup("t", "dingtalk", "missing").state())
+                .isEqualTo(TenantCredentialService.CredentialState.MISSING);
     }
 
     @Test

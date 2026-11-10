@@ -41,6 +41,9 @@ class DingTalkAppServiceTest {
                     u.setDisplayName(inv.getArgument(2));
                     return u;
                 });
+        when(credentialService.lookup(any(), any(), any())).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.MISSING,
+                        Optional.empty()));
         service = new DingTalkAppService(userRepository, passwordEncoder, credentialService,
                 provisioning);
     }
@@ -81,8 +84,12 @@ class DingTalkAppServiceTest {
 
     @Test
     void isConfigured_tenantLevelOnly_returnsTrue() {
-        when(credentialService.get("t1", "dingtalk", "app-key")).thenReturn(Optional.of("tk"));
-        when(credentialService.get("t1", "dingtalk", "app-secret")).thenReturn(Optional.of("ts"));
+        when(credentialService.lookup("t1", "dingtalk", "app-key")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.ACTIVE,
+                        Optional.of("tk")));
+        when(credentialService.lookup("t1", "dingtalk", "app-secret")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.ACTIVE,
+                        Optional.of("ts")));
 
         assertThat(service.isConfigured("t1")).isTrue();
     }
@@ -100,9 +107,31 @@ class DingTalkAppServiceTest {
     @Test
     void resolveForKey_tenantPriorityOverGlobal() throws Exception {
         setField("appKey", "global-key");
-        when(credentialService.get("t1", "dingtalk", "app-key")).thenReturn(Optional.of("tenant-key"));
+        when(credentialService.lookup("t1", "dingtalk", "app-key")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.ACTIVE,
+                        Optional.of("tenant-key")));
 
         assertThat(resolveForKey("app-key", "t1")).contains("tenant-key");
+    }
+
+    @Test
+    void resolveForKey_disabledOrInvalidTenantCredential_failsClosed() throws Exception {
+        setField("appKey", "global-key");
+        when(credentialService.lookup("t1", "dingtalk", "app-key")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.DISABLED,
+                        Optional.empty()));
+        assertThat(resolveForKey("app-key", "t1")).isEmpty();
+
+        when(credentialService.lookup("t1", "dingtalk", "app-key")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.INVALID,
+                        Optional.empty()));
+        assertThat(resolveForKey("app-key", "t1")).isEmpty();
+
+        setField("appSecret", "global-secret");
+        when(credentialService.lookup("t1", "dingtalk", "app-secret")).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.DISABLED,
+                        Optional.empty()));
+        assertThat(service.isConfigured("t1")).isFalse();
     }
 
     @Test
