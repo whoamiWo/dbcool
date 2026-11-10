@@ -77,6 +77,8 @@ public class SecurityConfig {
                         // 公开端点
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+                        // OIDC 一次性 code 本身即交换凭证；服务层校验 TTL 并原子消费。
+                        .requestMatchers(HttpMethod.POST, "/api/auth/oidc/exchange").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/health/**").permitAll()
                         // 钉钉嵌入:扫码登录与服务端回调无法携带 JWT,必须匿名放行。
@@ -174,7 +176,7 @@ public class SecurityConfig {
                     // 登录入口：/oauth2/authorization/{registrationId}
                     .loginPage("/oauth2/authorization/nocobase-oidc"));
             org.slf4j.LoggerFactory.getLogger(SecurityConfig.class)
-                    .info("[SecurityConfig] OIDC 登录已启用（授权码流程 → 签发本地 JWT）");
+                    .info("[SecurityConfig] OIDC 登录已启用（授权码流程 → 一次性 code 交换本地 JWT）");
         }
 
         return http.build();

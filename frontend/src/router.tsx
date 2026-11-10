@@ -3,6 +3,7 @@ import { Suspense, lazy } from 'react';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/Login';
 import { HomePage } from './pages/Home';
+import { OidcCallbackPage } from './pages/auth/OidcCallbackPage';
 const WeComLoginPage = lazy(() =>
   import('./pages/auth/WeComLoginPage').then(m => ({ default: m.WeComLoginPage } as { default: React.ComponentType })),
 );
@@ -205,6 +206,7 @@ const DingTalkLoginPage = lazy(() =>
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/oidc/callback', element: <OidcCallbackPage /> },
   { path: '/auth/dingtalk', element: <DingTalkLoginPage /> },
   // PHASE10: 公开表单填写 —— 免登录，独立于 AppLayout（不渲染导航栏/侧边栏）
   { path: '/forms/public/:token', element: <Lazy><FormPublicFillPage /></Lazy> },

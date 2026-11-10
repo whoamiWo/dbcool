@@ -1,6 +1,5 @@
 package com.nocobase.auth.oidc;
 
-import com.nocobase.auth.JwtService;
 import com.nocobase.auth.UserEntity;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,31 +15,21 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
-/**
- * PHASE10: OIDC 认证成功处理器 —— 签发**本地 JWT** 并重定向前端。
- *
- * <p><b>为什么签本地 JWT 而非透传 IdP token</b>：
- * 现有前端各处依赖 {@code /api/auth/login} 返回的本地 JWT（HS256，含 tid/roles）。
- * 若把 IdP 签发的 token 直接给前端，需改造所有请求的 token 来源与解析方式。
- * 这里沿用钉钉/飞书 OAuth 的既有处理模式：外部认证 → 换发本地 JWT → 前端零改造。
- *
- * <p>成功后重定向到 {@code app.oidc.success-redirect}，拼接 {@code ?token=<jwt>}；
- * 前端在该路由读取 token 写入本地存储，随后跳转业务页。
- */
+/** Maps the OIDC user, then redirects with a short-lived one-time code instead of a JWT. */
 @Component
 public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private static final Logger log = LoggerFactory.getLogger(OidcLoginSuccessHandler.class);
 
     private final OidcUserService oidcUserService;
-    private final JwtService jwtService;
+    private final OidcLoginCodeService loginCodeService;
     private final OidcProperties properties;
 
     public OidcLoginSuccessHandler(OidcUserService oidcUserService,
-                                   JwtService jwtService,
+                                   OidcLoginCodeService loginCodeService,
                                    OidcProperties properties) {
         this.oidcUserService = oidcUserService;
-        this.jwtService = jwtService;
+        this.loginCodeService = loginCodeService;
         this.properties = properties;
     }
 
@@ -51,24 +40,21 @@ public class OidcLoginSuccessHandler implements AuthenticationSuccessHandler {
             throws IOException, ServletException {
         Object principal = authentication.getPrincipal();
         if (!(principal instanceof OidcUser oidcUser)) {
-            log.error("[OIDC] 认证主体不是 OidcUser，无法签发本地 JWT：{}",
+            log.error("[OIDC] 认证主体不是 OidcUser，无法创建一次性登录 code：{}",
                     principal == null ? "null" : principal.getClass().getName());
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "OIDC 认证信息无效");
             return;
         }
 
         try {
-            // 1. 映射 / JIT 建号
             UserEntity user = oidcUserService.mapOrCreate(oidcUser);
-            // 2. 取角色并签发本地 JWT
-            List<String> roles = oidcUserService.rolesOf(user.getId(), user.getTenantId());
-            String token = jwtService.issueAccessToken(
-                    user.getId(), user.getUsername(), user.getTenantId(), roles);
-            // 3. 重定向前端并携带 token
+            List<String> roles = oidcUserService.rolesOf(user.getId());
+            String code = loginCodeService.issue(user.getId(), user.getTenantId(), roles);
             String redirect = properties.getSuccessRedirect();
             String separator = redirect.contains("?") ? "&" : "?";
-            String target = redirect + separator + "token="
-                    + URLEncoder.encode(token, StandardCharsets.UTF_8);
+            String target = redirect + separator + "code="
+                    + URLEncoder.encode(code, StandardCharsets.UTF_8);
+            // Never log the raw code, an IdP token, or a local JWT.
             log.info("[OIDC] 登录成功 userId={} username={} → 重定向前端",
                     user.getId(), user.getUsername());
             response.sendRedirect(target);
