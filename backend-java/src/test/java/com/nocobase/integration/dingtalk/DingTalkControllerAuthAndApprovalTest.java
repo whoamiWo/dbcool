@@ -1,5 +1,6 @@
 package com.nocobase.integration.dingtalk;
 
+import com.nocobase.approval.ApprovalCallbackEventService;
 import com.nocobase.auth.JwtService;
 import com.nocobase.audit.AuditService;
 import com.nocobase.workflow.WorkflowInstanceRepository;
@@ -21,7 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * PHASE105: 覆盖 DingTalkController.login / logout / createApproval
+ * PHASE105: 覆盖 DingTalkController.login / logout
  *
  * <p>getUserInfo 实际调用 RestTemplate 调外部 HTTP，难以 mock；
  * 该方法本身是 GET 请求，缺口主要在异常分支，交由集成测试覆盖。
@@ -30,7 +31,7 @@ class DingTalkControllerAuthAndApprovalTest {
 
     private DingTalkAdapter adapter;
     private DingTalkAppService appService;
-    private DingTalkApprovalService approvalService;
+    private ApprovalCallbackEventService callbackEventService;
     private DingTalkOrgSyncService syncService;
     private UserMappingService mappingService;
     private WorkflowInstanceRepository workflowInstanceRepo;
@@ -46,7 +47,7 @@ class DingTalkControllerAuthAndApprovalTest {
     void setUp() {
         adapter = mock(DingTalkAdapter.class);
         appService = mock(DingTalkAppService.class);
-        approvalService = mock(DingTalkApprovalService.class);
+        callbackEventService = mock(ApprovalCallbackEventService.class);
         syncService = mock(DingTalkOrgSyncService.class);
         mappingService = mock(UserMappingService.class);
         workflowInstanceRepo = mock(WorkflowInstanceRepository.class);
@@ -61,7 +62,7 @@ class DingTalkControllerAuthAndApprovalTest {
         when(refreshTokenService.issue(any(UUID.class))).thenReturn("refresh_token_abc");
 
         controller = new DingTalkController(
-                adapter, appService, approvalService, syncService, mappingService,
+                adapter, appService, callbackEventService, syncService, mappingService,
                 workflowInstanceRepo, workflowTaskRepo, jwtService,
                 refreshTokenService, auditService);
     }
@@ -71,7 +72,7 @@ class DingTalkControllerAuthAndApprovalTest {
     @Test
     void login_missingCode_returns401() {
         // code 为 null，adapter.ssoLogin(null, tenant) 返回非 0 结果
-        when(adapter.ssoLogin(isNull(), eq(TENANT)))
+        when(adapter.ssoLogin(org.mockito.ArgumentMatchers.isNull(), eq(TENANT)))
                 .thenReturn(Map.of("code", 401, "message", "missing code"));
 
         ResponseEntity<Map<String, Object>> resp = controller.login(Map.of());
@@ -133,67 +134,5 @@ class DingTalkControllerAuthAndApprovalTest {
 
         assertThat(resp.get("code")).isEqualTo(0);
         assertThat(resp.get("message")).isEqualTo("success");
-    }
-
-    // ==================== createApproval ====================
-
-    @Test
-    void createApproval_serviceReturnsNull_returns502() {
-        // processCode/title/formValues 齐全,但 service 返回 null → 502
-        when(approvalService.createApproval(eq("proc_x"), eq("t"), isNull()))
-                .thenReturn(null);
-
-        Map<String, Object> resp = controller.createApproval(
-                Map.of("processCode", "proc_x", "title", "t"));
-
-        assertThat(resp.get("code")).isEqualTo(502);
-        assertThat(resp.get("message")).isEqualTo("创建审批实例失败");
-    }
-
-    @Test
-    void createApproval_approvalServiceReturnsNull_returns502() {
-        when(approvalService.createApproval("proc_1", "title", Map.of("a", 1)))
-                .thenReturn(null);
-
-        Map<String, Object> resp = controller.createApproval(
-                Map.of("processCode", "proc_1", "title", "title", "formValues", Map.of("a", 1)));
-
-        assertThat(resp.get("code")).isEqualTo(502);
-    }
-
-    @Test
-    void createApproval_success_returnsInstanceId() {
-        when(approvalService.createApproval("proc_1", "title", Map.of("a", 1)))
-                .thenReturn("inst_123");
-
-        Map<String, Object> resp = controller.createApproval(
-                Map.of("processCode", "proc_1", "title", "title", "formValues", Map.of("a", 1)));
-
-        assertThat(resp.get("code")).isEqualTo(0);
-        assertThat(resp.get("message")).isEqualTo("success");
-        assertThat(((Map<?, ?>) resp.get("data")).get("instanceId")).isEqualTo("inst_123");
-    }
-
-    // ==================== approvalStatus ====================
-
-    @Test
-    void getApprovalStatus_nullStatus_returnsUnknown() {
-        when(approvalService.getApprovalStatus("inst_1"))
-                .thenReturn(null);
-
-        Map<String, Object> resp = controller.getApprovalStatus("inst_1");
-
-        assertThat(resp.get("code")).isEqualTo(0);
-        assertThat(((Map<?, ?>) resp.get("data")).get("status")).isEqualTo("unknown");
-    }
-
-    @Test
-    void getApprovalStatus_returnsStatus() {
-        when(approvalService.getApprovalStatus("inst_2"))
-                .thenReturn("APPROVED");
-
-        Map<String, Object> resp = controller.getApprovalStatus("inst_2");
-
-        assertThat(((Map<?, ?>) resp.get("data")).get("status")).isEqualTo("APPROVED");
     }
 }

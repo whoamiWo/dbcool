@@ -48,7 +48,8 @@ public class ApprovalController {
                                           @AuthenticationPrincipal AuthenticatedUser user) {
         ApprovalTemplateEntity t = approvalService.createFromPreset(
                 user.tenantId(), user.userId(), req.name(), req.category(),
-                req.levels() == null ? 1 : req.levels(), req.approverType(), req.assignee());
+                req.levels() == null ? 1 : req.levels(), req.approverType(), req.assignee(),
+                req.externalProcessCode(), req.externalConfig() == null ? null : req.externalConfig().toString());
         return Map.of("code", 0, "message", "success",
                 "data", Map.of("id", t.getId().toString(), "workflowId", t.getWorkflowId().toString()));
     }
@@ -83,6 +84,14 @@ public class ApprovalController {
                 "data", approvalService.listCc(user.tenantId(), user.userId()));
     }
 
+    @PostMapping("/{id}/external-push/retry")
+    @PreAuthorize("hasRole(T(com.nocobase.auth.RoleName).ADMIN)")
+    public Map<String, Object> retryExternalPush(@PathVariable UUID id,
+                                                  @AuthenticationPrincipal AuthenticatedUser user) {
+        return Map.of("code", 0, "message", "success",
+                "data", approvalService.retryExternalPush(user.tenantId(), id));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public Map<String, Object> detail(@PathVariable UUID id,
@@ -103,5 +112,6 @@ public class ApprovalController {
                                 List<UUID> ccUserIds) {}
 
     public record FromPresetRequest(String name, String category, Integer levels,
-                                    String approverType, String assignee) {}
+                                    String approverType, String assignee,
+                                    String externalProcessCode, Map<String, Object> externalConfig) {}
 }

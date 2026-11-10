@@ -44,6 +44,9 @@ public class WorkflowTaskService {
 
     private final com.nocobase.approval.ApprovalRequestRepository approvalRequestRepository;
     private final com.nocobase.approval.ApprovalCcRepository approvalCcRepository;
+    @org.springframework.context.annotation.Lazy
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nocobase.approval.ApprovalService approvalService;
     private final com.nocobase.notification.NotifyDispatcher notifyDispatcher;
 
     /** R2：统一失败通知（实例终态为准）。测试构造时可缺省。 */
@@ -231,62 +234,95 @@ public class WorkflowTaskService {
         return instance;
     }
 
-    /**
-     * Wave4 待办池 #10（回调专用）：按钉钉审批实例 ID 反查并推进绑定的工作流实例。
-     *
-     * <p>寻找该实例上全部 PENDING 任务：
-     * <ul>
-     *   <li>agree → {@link #approveTask}（推进下游节点，与平台内审批同一逻辑）；</li>
-     *   <li>reject → {@link #rejectTask}（实例 FAILED）。</li>
-     * </ul>
-     * 会签场景 approveTask 会因剩余 PENDING 任务返回 PENDING 实例 —— 属正常中间态。
-     *
-     * @return 是否处理了至少一个实例
-     */
-    /** Wave4 待办池 #10：钉钉审批回调事件消费（解耦，避免构造循环依赖）。 */
-    @org.springframework.context.event.EventListener
+    /** 由 V83 精确绑定得到的单一 request 推进，拒绝冲突结果与普通本地节点。 */
     @Transactional
-    public void onDingTalkApprovalCallback(DingTalkApprovalCallbackEvent event) {
-        boolean handled = approveByExternalBinding(event.dingtalkInstanceId(), event.agree(), event.comment());
-        if (!handled) {
-            log.warn("[workflow-task] 钉钉审批回调事件无绑定命中 instance={}", event.dingtalkInstanceId());
+    public boolean approveByExternalBinding(String tenantId, UUID requestId,
+                                             boolean agree, String comment) {
+        var request = approvalRequestRepository.findByIdAndTenantId(requestId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "审批绑定不存在"));
+        if (!"PUSHED".equals(request.getExternalPushStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "OA 实例尚未完成外推绑定");
         }
+        if (!ApprovalRequestEntityStatus.PENDING.equals(request.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "审批单据已终结，拒绝重放");
+        }
+        WorkflowInstanceEntity instance = instanceRepository.findLockedByIdAndTenantId(
+                request.getInstanceId(), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "工作流绑定不存在"));
+        if (instance.getStatus() != WorkflowInstanceEntity.Status.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "工作流实例不处于外部等待状态");
+        }
+        WorkflowEntity workflow = workflowRepository.findByIdAndTenantId(
+                instance.getWorkflowId(), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "工作流不存在"));
+        List<Map<String, Object>> nodes = nodes(workflow.getNodesJson());
+        if (instance.getCurrentNodeIndex() < 0 || instance.getCurrentNodeIndex() >= nodes.size()
+                || !"DINGTALK_APPROVAL".equals(nodes.get(instance.getCurrentNodeIndex()).get("type"))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "当前节点不是外部审批节点");
+        }
+        if (!agree) {
+            instance.setStatus(WorkflowInstanceEntity.Status.FAILED);
+            instance.setErrorMessage("钉钉 OA 审批驳回");
+            instance.setFinishedAt(Instant.now());
+            instanceRepository.save(instance);
+            syncExternalRequest(request, instance);
+            notifyResult(instance, false);
+            return true;
+        }
+
+        List<Map<String, Object>> edges = edges(workflow.getEdgesJson());
+        int nextIndex = instance.getCurrentNodeIndex() + 1;
+        if (nextIndex >= nodes.size()) {
+            instance.setStatus(WorkflowInstanceEntity.Status.COMPLETED);
+            instance.setFinishedAt(Instant.now());
+            instanceRepository.save(instance);
+            syncExternalRequest(request, instance);
+            notifyResult(instance, true);
+            return true;
+        }
+        instance.setStatus(WorkflowInstanceEntity.Status.RUNNING);
+        instanceRepository.save(instance);
+        WorkflowEngine.NodeResult result;
+        if (!edges.isEmpty()) {
+            result = engine.executeGraphFrom(instance, nodes, edges,
+                    String.valueOf(nodes.get(nextIndex).get("id")), workflow.getCreatedBy(), requestId);
+        } else {
+            result = engine.executeFrom(instance, nodes, nextIndex, workflow.getCreatedBy(), requestId);
+        }
+        afterAdvance(instance, result);
+        syncExternalRequest(request, instance);
+        return true;
     }
 
-    public boolean approveByExternalBinding(String bindingKey, boolean agree, String comment) {
-        List<WorkflowInstanceEntity> instances =
-                instanceRepository.findByTriggerDataJsonContaining(bindingKey);
-        if (instances.isEmpty()) {
-            log.warn("[workflow-task] 外部审批绑定未命中 key={} agree={}", bindingKey, agree);
-            return false;
+    private void syncExternalRequest(com.nocobase.approval.ApprovalRequestEntity request,
+                                     WorkflowInstanceEntity instance) {
+        String status = switch (instance.getStatus()) {
+            case COMPLETED -> "APPROVED";
+            case FAILED -> "REJECTED";
+            case TERMINATED -> "CANCELED";
+            default -> "PENDING";
+        };
+        request.setStatus(status);
+        if (!"PENDING".equals(status)) {
+            request.setFinishedAt(instance.getFinishedAt() == null ? Instant.now() : instance.getFinishedAt());
         }
-        boolean handled = false;
-        for (WorkflowInstanceEntity instance : instances) {
-            // R6：回调幂等 —— 已终结的实例不再推进（重复回调/多副本重投均安全）
-            if (instance.getStatus() == WorkflowInstanceEntity.Status.COMPLETED
-                    || instance.getStatus() == WorkflowInstanceEntity.Status.FAILED
-                    || instance.getStatus() == WorkflowInstanceEntity.Status.TERMINATED) {
-                log.info("[workflow-task] 实例 {} 已终结({}), 忽略重复回调",
-                        instance.getId(), instance.getStatus());
-                continue;
-            }
-            List<WorkflowTaskEntity> tasks = taskRepository.findByInstanceId(instance.getId());
-            WorkflowTaskEntity pending = tasks.stream()
-                    .filter(t -> t.getStatus() == WorkflowTaskEntity.Status.PENDING)
-                    .findFirst().orElse(null);
-            if (pending == null) {
-                log.warn("[workflow-task] 实例 {} 无 PENDING 任务，跳过", instance.getId());
-                continue;
-            }
-            if (agree) {
-                approveTask(pending.getId(), comment);
-            } else {
-                rejectTask(pending.getId(), comment, null);
-            }
-            handled = true;
-            log.info("[workflow-task] 外部审批已推进实例={} agree={}", instance.getId(), agree);
-        }
-        return handled;
+        approvalRequestRepository.save(request);
+        approvalService.syncStatus(request, instance);
+    }
+
+    private List<Map<String, Object>> nodes(String json) {
+        try { return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {}); }
+        catch (Exception e) { throw new ResponseStatusException(HttpStatus.CONFLICT, "工作流节点无效"); }
+    }
+
+    private List<Map<String, Object>> edges(String json) {
+        try { return objectMapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {}); }
+        catch (Exception e) { return List.of(); }
+    }
+
+    /** 防止本地类型字符串拼写漂移。 */
+    private static final class ApprovalRequestEntityStatus {
+        private static final String PENDING = com.nocobase.approval.ApprovalRequestEntity.STATUS_PENDING;
     }
 
     // ============================================================
