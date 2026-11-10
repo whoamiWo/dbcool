@@ -70,6 +70,15 @@ class FeishuOrgSyncServiceMultiDeptTest {
                 .thenReturn(Optional.of("app-id"));
         when(credSvc.get(eq(TENANT), eq("feishu"), eq("app-secret")))
                 .thenReturn(Optional.of("app-secret"));
+        when(credSvc.lookup(anyString(), anyString(), anyString())).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.MISSING,
+                        Optional.empty()));
+        when(credSvc.lookup(eq(TENANT), eq("feishu"), eq("app-id"))).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.ACTIVE,
+                        Optional.of("app-id")));
+        when(credSvc.lookup(eq(TENANT), eq("feishu"), eq("app-secret"))).thenReturn(
+                new TenantCredentialService.Lookup(TenantCredentialService.CredentialState.ACTIVE,
+                        Optional.of("app-secret")));
 
         appService = new FeishuAppService(credSvc);
         userRepository = mock(UserRepository.class);

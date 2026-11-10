@@ -179,6 +179,8 @@ public class UnifiedSearchService {
             // A-3：记录/文档必须做 ACL 过滤（修复前搜索返回无权记录 = 数据泄露）
             filterRecordsByAcl(results, tenantId, userId, aclContext);
             filterWikiByAcl(results, tenantId, userId);
+            results.removeIf(hit -> "approval".equals(hit.get("type"))
+                    && !canViewApproval(tenantId, userId, hit.get("id")));
             return results;
         } catch (Exception e) {
             log.warn("[SEARCH] 全局索引检索失败 keyword={} tenantId={} error={}", keyword, tenantId, e.getMessage(), e);
@@ -532,6 +534,17 @@ public class UnifiedSearchService {
     /**
      * 审批单据（E2/E4）：仅返回申请人、抄送人、或当前/历史任务处理人可见的单据。
      */
+    private boolean canViewApproval(String tenantId, UUID userId, Object rawId) {
+        if (userId == null || rawId == null) return false;
+        try {
+            var request = approvalRequestRepository.findByIdAndTenantId(
+                    UUID.fromString(String.valueOf(rawId)), tenantId).orElse(null);
+            return request != null && approvalVisibilityService.canView(tenantId, request, userId);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private List<Map<String, Object>> searchApproval(String tenantId, String keyword,
                                                      int limit, UUID userId) {
         if (userId == null) return List.of();

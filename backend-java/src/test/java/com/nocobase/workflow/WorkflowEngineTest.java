@@ -115,6 +115,28 @@ class WorkflowEngineTest {
     }
 
     @Test
+    void approvalEntrypointsPreserveRequestIdAndLegacyContext() {
+        WorkflowInstanceEntity ins = instance("{}");
+        stubSaveInstance();
+        var external = new com.nocobase.workflow.handler.DingTalkApprovalNodeHandler() {
+            @Override
+            public NodeOutcome execute(NodeExecutionContext ctx) {
+                assertEquals(ins.getId(), ctx.approvalRequestId());
+                return NodeOutcome.NEEDS_APPROVAL;
+            }
+        };
+        var registry = new WorkflowNodeHandlerRegistry(List.of(external));
+        WorkflowEngine externalEngine = new WorkflowEngine(instanceRepository, taskRepository, workflowRepository,
+                messageRepository, notificationService, objectMapper, registry);
+        var nodes = List.of(node("external", "DINGTALK_APPROVAL", null));
+        assertEquals(WorkflowEngine.NodeResult.NEEDS_APPROVAL,
+                externalEngine.executeFrom(ins, nodes, 0, null, ins.getId()));
+        assertEquals(WorkflowEngine.NodeResult.NEEDS_APPROVAL,
+                externalEngine.executeGraphFrom(ins, nodes, List.of(), "external", null, ins.getId()));
+        assertEquals(null, new NodeExecutionContext(ins, nodes.get(0), null, null).approvalRequestId());
+    }
+
+    @Test
     void executeFrom_unknownNodeType_skipsAndCompletes() {
         WorkflowInstanceEntity ins = instance("{}");
         stubSaveInstance();
@@ -640,7 +662,7 @@ class WorkflowEngineTest {
         List<Map<String, Object>> nodes = List.of(node("n1", "OK", Map.of()));
         List<Map<String, Object>> edges = List.of();
         WorkflowEngine.NodeResult r = engine.executeGraphFrom(
-                ins, nodes, edges, "n1", null, WorkflowEngine.MAX_EXECUTION_DEPTH);
+                ins, nodes, edges, "n1", null, null, WorkflowEngine.MAX_EXECUTION_DEPTH);
         assertEquals(WorkflowEngine.NodeResult.FAILED, r);
         assertEquals(WorkflowInstanceEntity.Status.FAILED, ins.getStatus());
         assertNotNull(ins.getErrorMessage());
@@ -656,7 +678,7 @@ class WorkflowEngineTest {
         List<Map<String, Object>> nodes = List.of(node("n1", "OK", Map.of()));
         List<Map<String, Object>> edges = List.of();
         WorkflowEngine.NodeResult r = engine.executeGraphFrom(
-                ins, nodes, edges, "n1", null, WorkflowEngine.MAX_EXECUTION_DEPTH - 1);
+                ins, nodes, edges, "n1", null, null, WorkflowEngine.MAX_EXECUTION_DEPTH - 1);
         assertEquals(WorkflowEngine.NodeResult.CONTINUE, r);
     }
 

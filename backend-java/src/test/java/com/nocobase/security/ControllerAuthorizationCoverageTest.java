@@ -75,8 +75,8 @@ class ControllerAuthorizationCoverageTest {
         "integration/feishu/FeishuController.java:68 -> eventsCallback (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)",
         "integration/wecom/WeComController.java:78 -> callback (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)",
         "integration/mattermost/MattermostController.java:42 -> incomingWebhook (reason: 第三方平台回调，SecurityConfig permitAll + HMAC 验签)",
-        "integration/dingtalk/DingTalkController.java:243 -> approvalCallback (reason: 钉钉审批回调，SecurityConfig permitAll + HMAC 验签)",
-        "integration/dingtalk/DingTalkController.java:367 -> eventCallback (reason: 钉钉事件回调，SecurityConfig permitAll + HMAC 验签)",
+        "integration/dingtalk/DingTalkController.java:221 -> approvalCallback (reason: 钉钉审批回调，SecurityConfig permitAll + SHA1/AES 验签解密)",
+        "integration/dingtalk/DingTalkController.java:288 -> legacyEventCallback (reason: 旧钉钉事件入口，SecurityConfig permitAll + 固定 410 拒绝)",
         // 钉钉 OAuth 入口：免密登录入口，必须公开（SecurityConfig permitAll）
         "integration/dingtalk/DingTalkController.java:85 -> authUrlGet (reason: 钉钉 OAuth 授权入口，必须公开)",
         "integration/dingtalk/DingTalkController.java:93 -> authUrlPost (reason: 钉钉 OAuth 授权入口，必须公开)",
