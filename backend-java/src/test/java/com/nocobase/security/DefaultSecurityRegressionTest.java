@@ -1,6 +1,7 @@
 package com.nocobase.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nocobase.integration.dingtalk.DingTalkAppService;
 import com.nocobase.integration.feishu.FeishuAppService;
@@ -89,15 +90,14 @@ class DefaultSecurityRegressionTest {
     // ==================== DingTalk ====================
 
     @Test
-    void dingtalk_verifySignature_returnsFalse_whenAppSecretMissing() throws Exception {
+    void dingtalk_callback_rejectsMissingEncryptionParameters() {
         DingTalkAppService appService = Mockito.mock(DingTalkAppService.class);
-        Mockito.when(appService.getAppSecret()).thenReturn(null);
 
         com.nocobase.integration.dingtalk.DingTalkController controller = 
                 new com.nocobase.integration.dingtalk.DingTalkController(
                         Mockito.mock(com.nocobase.integration.dingtalk.DingTalkAdapter.class),
                         appService,
-                        Mockito.mock(com.nocobase.integration.dingtalk.DingTalkApprovalService.class),
+                        Mockito.mock(com.nocobase.approval.ApprovalCallbackEventService.class),
                         Mockito.mock(com.nocobase.integration.dingtalk.DingTalkOrgSyncService.class),
                         Mockito.mock(com.nocobase.integration.dingtalk.UserMappingService.class),
                         Mockito.mock(com.nocobase.workflow.WorkflowInstanceRepository.class),
@@ -107,9 +107,10 @@ class DefaultSecurityRegressionTest {
                         auditService
                 );
 
-        // 调用 approval-callback 缺少签名头 -> 401
-        org.springframework.http.ResponseEntity<Map<String, Object>> resp = controller.approvalCallback(Map.of(), null, null);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        // 缺少加密参数必须在进入统一消费服务之前拒绝。
+        assertThatThrownBy(() -> controller.approvalCallback(Map.of(), null, null, null))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
     }
 
     // ==================== Redis 限流降级 ====================

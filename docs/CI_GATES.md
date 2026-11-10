@@ -12,7 +12,7 @@
 
 | 门禁 | 命令 | 阈值 | 失败怎么办 |
 |---|---|---|---|
-| Java 测试 | `cd backend-java && mvn -o verify` | 2816，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
+| Java 测试 | `cd backend-java && mvn -o verify` | 2853，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
 | Java 覆盖率 | `cd backend-java && mvn -o verify` | JaCoCo BUNDLE ≥ 79%（唯一阈值来源：`backend-java/pom.xml`） | 见 §3 覆盖率缺口与补测计划 |
 | 前端单测 | `cd frontend && npm run test:run` | 974 passed / 120 files |
 | Playwright（含 375px） | `cd frontend && npx playwright test` | 260 tests / 13 files（`--list` 实测；chromium/firefox/mobile-390/mobile-375） | 看 vitest 输出中失败的 spec |
@@ -26,9 +26,9 @@
 | SaaS 就绪 | `python3 scripts/saas-readiness-verify.py` | 11 / 11 | 检查 T1/T2/T3 三项 |
 | 冒烟 | `python3 scripts/smoke.py` | 14/14 PASS | 检查服务是否全部 healthy |
 | 生产检查 | `python3 scripts/startup-checklist.py` | 全 PASS | 按清单逐项修 |
-| 企业套件真实 PG（Testcontainers） | `python3 scripts/pg-it-gate.py` | 8/8；无 Docker → SKIP | 看 `EnterpriseSuitePgIT` / `UnifiedSearchIndexRepositoryPgIT` 输出 |
+| 企业套件真实 PG（Testcontainers） | `python3 scripts/pg-it-gate.py` | 12/12；无 Docker → SKIP | 看 `EnterpriseSuitePgIT` / `UnifiedSearchIndexRepositoryPgIT` / `ApprovalExternalBindingRepositoryPgIT` 输出 |
 | 归属写入静态门禁 | `python3 scripts/actor-writer-verify.py` | PASS | 禁止控制器回退旧 UUID-less 重载 |
-| 企业套件 schema smoke | `python3 scripts/verify-enterprise-suite.py` | 14/14 | 检查 V77–V82 迁移是否已应用 |
+| 企业套件 schema smoke | `python3 scripts/verify-enterprise-suite.py` | 20/20 | 检查 V77–V84 迁移是否已应用 |
 | 依赖漏洞扫描（离线替代） | `python3 scripts/java-dependency-audit.py --backend offline`（离线环境） | 0 高危 | 补 `config/known-vulnerabilities.json` 或升级依赖 |
 | 密钥轮换验证 | `python3 scripts/key-rotation-verify.py` | 3/3 断言 | 见 `docs/key-rotation-runbook.md` |
 | 配额端到端 | `python3 scripts/quota-e2e-verify.py` | 5/5 | 检查存储/席位配额链路 |
