@@ -97,7 +97,7 @@ def backend_db_env(cid: str) -> tuple[str, str]:
 
 def db_host_of(value: str) -> str:
     """从 JDBC/URL 或纯主机名中取出主机部分。"""
-    m = re.search(r"//([^:/?,;]+)", value)
+    m = re.search(r"//(?:[^/@]+@)?([^:/?,;]+)", value)
     if m:
         return m.group(1)
     return value.split(":")[0].strip()

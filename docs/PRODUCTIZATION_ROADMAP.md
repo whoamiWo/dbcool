@@ -30,7 +30,7 @@
 
 ### 2.1 门禁基线（本次实跑）
 
-> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（同日）：Java 2853 run / 0F / 0E（BUNDLE LINE 80.33），前端 121 files / 978 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 14/14、租户隔离 24/24。
+> 下表为 Wave 0.5 开工前的实测基线；**Wave 0.5 后复测**（2026-11-10）：Java 2853 run / 0F / 0E（BUNDLE LINE 80.33），前端 121 files / 978 passed / 0 failed / 0 unhandled errors，行覆盖率 77.12%；冒烟 14/14、租户隔离 24/24。
 
 | 项 | 命令 | 实测结果 |
 |---|---|---|
@@ -124,7 +124,7 @@ Wave 4    持续迭代节奏            长期
 | # | 任务 | 落点 | 验收 | 状态 |
 |---|---|---|---|---|
 | W0-T1 | 版本单一真相源 | 根 `VERSION`；10 处版本号；`scripts/version-consistency-verify.py`（含 `--fix`）；`ci.yml` job `version-consistency` | exit 0 + 三条反向自检（1/2/0） | ✅ 已完成（实测通过） |
-| W0-T2 | 门禁数字基线化 | `README.md` / `BASELINE.md` / `RISK_REGISTER.md` / `TECH_DEBT.md` | 同一指标唯一值 + 「实测于 2026-10-30 @02b3a59」 | ✅ 已统一（Java 2853、前端 978/121 files、BUNDLE 80.33、前端行覆盖 77.12%、Python 68/1、冒烟 14/14、租户隔离 24/24） |
+| W0-T2 | 门禁数字基线化 | `README.md` / `BASELINE.md` / `RISK_REGISTER.md` / `TECH_DEBT.md` | 同一指标唯一值，以 `target/gate-numbers.json` 为准 | ✅ 已统一（Java 2853、前端 978/121 files、BUNDLE 80.33、前端行覆盖 77.12%、Python 68/1、冒烟 14/14、租户隔离 24/24） |
 | W0-T3 | 清红灯 | 前端 5 个 unhandled errors（ErDiagram.test.tsx 等） | `npm run test:run` → 0 failed **且 0 errors** | ✅ 已修（Wave 0.5 A-7：产品代码空值保护，根因为 `AlertCenter` quota 字段与 `ErDiagram` stats 缺失） |
 | W0-T4 | 版本条目 | `CHANGELOG.md` 顶部 4 段 `## Unreleased` 归入 `## v2.1.1` | CHANGELOG 有唯一版本条目 | ✅ 已归并（v2.1.1 含 Wave 0 + Wave 0.5 摘要与实测数字） |
 

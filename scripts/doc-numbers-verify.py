@@ -93,7 +93,7 @@ ANCHORS = [
      r"\| Python \|[^\n]*\| (\d+) passed / (\d+) skipped",
      ["python.passed", "python.skipped"]),
     ("docs/PRODUCTIZATION_ROADMAP.md",
-     r"Wave 0\.5 后复测\*\*（同日）：Java (\d+) run / 0F / 0E（BUNDLE LINE ([\d.]+)）",
+     r"Wave 0\.5 后复测\*\*（2026-11-10）：Java (\d+) run / 0F / 0E（BUNDLE LINE ([\d.]+)）",
      ["java.tests", "java.coverage_line_pct"]),
     ("docs/PRODUCTIZATION_ROADMAP.md",
      r"BUNDLE LINE [\d.]+），前端 (\d+) files / (\d+) passed",
