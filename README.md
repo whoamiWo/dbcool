@@ -81,7 +81,7 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 
 ## 质量
 
-全部数字可当场复现（标注「实测于 2026-10-30 @02b3a59」）：
+全部数字可当场复现（最近实测于 2026-11-10 @36289e9；以 `target/gate-numbers.json` 为准）：
 
 | 门禁 | 结果 |
 |---|---|
