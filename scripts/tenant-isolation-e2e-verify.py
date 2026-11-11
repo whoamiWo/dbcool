@@ -212,6 +212,8 @@ def main():
     print("=" * 70)
     print("PHASE95 R5: Cross-tenant Isolation E2E Validation (Improved)")
     print(f"Base: {BASE}")
+    print(f"DB 目标: container={os.environ.get('PG_CONTAINER', '(auto)')} "
+          f"db={PG_DB} host={PG_HOST}:{PG_PORT} strict={os.environ.get('PG_STRICT', '0')}")
     print("=" * 70)
 
     if not wait_server():

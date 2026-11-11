@@ -28,6 +28,7 @@ def docker_available() -> bool:
 
 def main() -> int:
     if not docker_available():
+        print("GATE_SKIP: 1")
         print("SKIP: Docker 不可用，EnterpriseSuitePgIT（Testcontainers）未执行")
         return 0
 
@@ -45,6 +46,7 @@ def main() -> int:
     if m:
         total, failures, errors, skipped = map(int, m.groups())
         if total == skipped and total > 0:
+            print(f"GATE_SKIP: {skipped}")
             print(f"SKIP: {skipped} 项 pg 测试被跳过（Testcontainers 无法启动）")
             return 0
         print(f"PG IT: tests={total} failures={failures} errors={errors} skipped={skipped}")

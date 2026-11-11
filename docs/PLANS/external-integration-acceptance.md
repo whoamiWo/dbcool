@@ -44,11 +44,15 @@
 | B1 | 配置 `app.oidc.*`（issuer/client-id/secret/success-redirect） | 应用启动时注册 OIDC ClientRegistration | 启动日志无 `app.oidc` 报错 | 未验证 |
 | B2 | 新用户首次登录 | `OidcUserService.mapOrCreate` JIT 建号（`password_set=false`） | `users.username` + `password_set` | 未验证 |
 | B3 | 登录成功跳转 | 重定向 `success-redirect?code=<一次性随机码>`，URL 不含本地 JWT | 浏览器 URL（code 不记录原值） | 未验证 |
-| B4 | 非 `tenant_default` 租户或授权上下文 | 403，不签发 token；当前不支持 OIDC 多租户 | HTTP 状态 + 响应体 | 未验证 |
+| B4 | 已匹配但 `enabled=false`（或 `RESIGNED`）的本地用户登录 | 403，不签发本地 token；不泄露账号状态细节 | HTTP 状态 + 响应体 | 未验证 |
 | B5 | 新 sub 与已有本地用户同 email/username | 不接管旧账号；JIT 按 OIDC sub 建号；无本地密码 | 两账号 ID、external_source/external_id | 未验证 |
 | B6 | IdP groups 含 ADMIN，但本地无该角色 | JWT 只含本地角色 | 本地角色表 + JWT claims | 未验证 |
 | B7 | `/oidc/callback?code=...` | 地址栏 code 先清除；`POST /api/auth/oidc/exchange` 原子消费 60 秒一次性 code 后才保存 JWT；过期/重放/篡改均 401 并清理会话 | 浏览器 history + 网络请求（脱敏） | 未验证 |
 | B8 | 已匹配用户禁用/RESIGNED | 403，不签发有效会话 | HTTP 状态 + 本地用户状态 | 未验证 |
+
+> **多租户范围**：OIDC 仅验收单租户 `tenant_default`（N2 范围）。原「IdP 返回未授权租户 → 403」
+> 属**未覆盖**（租户 claim / allowlist / 显式选择契约未定义），不得因 B4 通过而推断多租户可用。
+> B4 的通过口径是「已匹配但 `enabled=false` 的本地用户 → 403、不签发本地 token」。
 
 自动化覆盖：`OidcLoginSuccessHandlerTest.java`、`OidcLoginCodeServiceTest.java`、
 `OidcLoginCodeRepositoryTest.java`、`OidcAuthControllerTest.java`、`OidcCallbackPage.test.tsx`
