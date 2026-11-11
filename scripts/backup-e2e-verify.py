@@ -40,8 +40,9 @@ POSTGRES_USER = "nocobase"
 # 源库容器：CI 为 GitHub Actions services 容器（无 nocobase-postgres 名称），
 # 本地为 docker-compose 容器 —— 由 _db.pg_container() 统一发现。
 # 硬编码容器名会让 CI 中 pg_dump / docker cp 全部失败。
-from _db import pg_container  # noqa: E402
-SRC_CONTAINER = pg_container() or "nocobase-postgres"
+from _db import pg_container, PG_STRICT  # noqa: E402
+_detected_container = pg_container()
+SRC_CONTAINER = os.environ.get("PG_CONTAINER") or _detected_container or "nocobase-postgres"
 POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD", os.environ.get("PGPASSWORD", "dev_password"))
 PG_IMAGE = "pgvector/pgvector:pg16"
 RESTORE_CONTAINER = os.environ.get("RESTORE_CONTAINER", "postgres-restore-test")
@@ -484,7 +485,14 @@ def main():
     print("=" * 60)
     print("PHASE94 备份/恢复/PITR 端到端验证")
     print("=" * 60)
+    print(f"目标：源容器={SRC_CONTAINER}（strict={os.environ.get('PG_STRICT', '0')}）"
+          f" BACKUP_DIR={BACKUP_DIR}")
     print("注意：恢复与 PITR 演练均在**独立容器**中进行，不触碰生产数据库。\n")
+
+    if PG_STRICT and not _detected_container:
+        print(f"❌ PG_STRICT=1 但找不到指定容器 PG_CONTAINER={os.environ.get('PG_CONTAINER')!r}；"
+              f"禁止回退默认栈容器，备份门禁直接失败。")
+        return 1
 
     test_t1_backup_exists()
     test_t2_restore_realtime()
@@ -493,6 +501,8 @@ def main():
 
     failed = [r for r in results if not r[1]]
     total = len(results)
+    # 机器可读 SKIP 标记：monthly-gate 只认显式标记，绝不把 SKIP 记为 PASS。
+    print(f"GATE_SKIP: {len(skipped_items)}")
     print("\n" + "=" * 60)
     print(f"总计: {total} | PASS: {total - len(failed)} | FAIL: {len(failed)}"
           f" | SKIP: {len(skipped_items)}")
