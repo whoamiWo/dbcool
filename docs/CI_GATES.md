@@ -30,7 +30,7 @@
 | Playwright（含 375px） | `cd frontend && npx playwright test` | 260 tests / 13 files（`--list` 实测；chromium/firefox/mobile-390/mobile-375） | 看 Playwright 报告（`npx playwright show-report`） |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors | 按报错文件与行号修 |
 | E2E | `cd frontend && npx playwright test` | ≥ 135 | collab-crdt 偶发 429 见 §4 |
-| Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 68 passed / 1 skipped | 看 pytest 输出 |
+| Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 81 passed / 1 skipped | 看 pytest 输出 |
 | 备份演练 | `python3 scripts/backup-e2e-verify.py` | 仅 release 实测通过后写数字；SKIP 不计 PASS | 见 `docs/backup-restore-runbook.md` |
 | 管理员鉴权 | `python3 scripts/admin-authz-e2e-verify.py` | 18 / 18 | 检查 admin/user 登录状态码 |
 | 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 24 / 24 PASS | 检查跨租户断言 |

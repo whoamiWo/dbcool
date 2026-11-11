@@ -314,7 +314,7 @@ cd frontend && npx tsc --noEmit
 
 # Python 后端
 cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q
-# 68 passed, 1 skipped（2026-10-30 实测）
+# 81 passed, 1 skipped（2026-11-11 实测）
 ```
 
 ### 十.2 集成测试

@@ -65,14 +65,18 @@ def clear_rate_limit() -> None:
 
     rotate 接口被限流保护（管理员端点），脚本单独跑或编排串行跑都可能累计触发 429。
     清理是运维处理，不是放宽断言：清理后 rotate 必须真正返回 200 并执行三条断言。
+
+    容器名支持 REDIS_CONTAINER 覆盖（默认 nocobase-redis）：验收隔离栈的 redis
+    名为 nocobase-acc-redis，硬编码默认栈会导致限流 key 未被清理、登录持续 429。
     """
+    redis_container = os.environ.get("REDIS_CONTAINER", "nocobase-redis")
     try:
         scan = subprocess.run(
-            ["docker", "exec", "nocobase-redis", "redis-cli", "--scan", "--pattern", "ratelimit:*"],
+            ["docker", "exec", redis_container, "redis-cli", "--scan", "--pattern", "ratelimit:*"],
             capture_output=True, text=True, timeout=20)
         keys = [k for k in (scan.stdout or "").split() if k.strip()]
         if keys:
-            subprocess.run(["docker", "exec", "nocobase-redis", "redis-cli", "DEL"] + keys,
+            subprocess.run(["docker", "exec", redis_container, "redis-cli", "DEL"] + keys,
                            capture_output=True, text=True, timeout=20)
             log(f"  已清理 {len(keys)} 个限流 key")
     except Exception:
