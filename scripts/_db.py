@@ -9,6 +9,10 @@ hash"、saas-readiness 报 T1.1 缺全部字段。这不是数据问题，是连
 本模块统一两条路径：
 1. 本机有 psql → 直连 PGHOST:PGPORT（CI 走这条）；
 2. 否则找 docker 容器（本地 docker-compose 走这条）。
+
+验收（ACCEPTANCE_MODE/--release）必须设置 ``PG_STRICT=1`` + 显式 ``PG_CONTAINER``：
+此时**禁止**回退 host psql，也**禁止**选择"任意 postgres 容器"；只允许 docker exec
+指定的那个容器，找不到即失败并打印目标，杜绝验收脚本打到默认栈/默认库（TY4 G2）。
 """
 
 import os
@@ -21,6 +25,9 @@ PG_HOST = os.environ.get("PGHOST", "localhost")
 PG_PORT = os.environ.get("PGPORT", "5432")
 PG_PASSWORD = os.environ.get("PGPASSWORD", "test_password")
 
+# 验收严格模式：只认显式 PG_CONTAINER，禁止 host psql / 任意容器回退。
+PG_STRICT = os.environ.get("PG_STRICT") == "1"
+
 # 本地 compose 的容器名；仅作为回退时的优先候选
 _COMPOSE_CONTAINER = os.environ.get("PG_CONTAINER", "nocobase-postgres")
 
@@ -31,7 +38,13 @@ def _psql_args():
 
 
 def _docker_container() -> str | None:
-    """返回可用于 psql 的容器 ID：优先 nocobase-postgres，其次任意 postgres 容器。"""
+    """返回可用于 psql 的容器 ID：优先 nocobase-postgres，其次任意 postgres 容器。
+
+    PG_STRICT=1 时只返回与 PG_CONTAINER 精确匹配的运行中容器；未设置或找不到
+    都返回 None（调用方必须失败，不得回退到任意 postgres）。
+    """
+    if PG_STRICT and not os.environ.get("PG_CONTAINER"):
+        return None
     if not shutil.which("docker"):
         return None
     try:
@@ -47,7 +60,7 @@ def _docker_container() -> str | None:
     for cid, name, _img in rows:
         if name == _COMPOSE_CONTAINER:
             return cid
-    if os.environ.get("PG_CONTAINER"):
+    if PG_STRICT or os.environ.get("PG_CONTAINER"):
         return None
     # 2) 按镜像特征匹配。注意 CI 的 services 镜像是 pgvector/pgvector:pg16，
     #    镜像名里并没有 "postgres" 字样，只匹配 postgres 会漏掉它。
@@ -74,6 +87,24 @@ def db_sql(sql: str, timeout: int = 120):
     两条路径都失败时，stderr 汇总两条路径的错误，便于判断是环境问题还是 SQL 问题。
     """
     errors = []
+
+    # PG_STRICT=1：禁止 host psql 路径，只走显式指定的 PG_CONTAINER。
+    if PG_STRICT:
+        cid = _docker_container()
+        if not cid:
+            return False, "", (f"PG_STRICT=1：未找到运行中的容器 "
+                               f"{os.environ.get('PG_CONTAINER')!r}（不允许回退 host psql/任意容器）")
+        try:
+            r = subprocess.run(
+                ["docker", "exec", cid, "psql", "-U", PG_USER, "-d", PG_DB,
+                 "-t", "-A", "-c", sql],
+                capture_output=True, text=True, timeout=timeout
+            )
+            if r.returncode == 0:
+                return True, (r.stdout or "").strip(), ""
+            return False, "", (r.stderr or "").strip()
+        except Exception as e:  # noqa: BLE001
+            return False, "", f"docker exec 调用异常: {e}"
 
     # 1) 本机 psql（CI 场景）
     if shutil.which("psql"):

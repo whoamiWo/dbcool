@@ -15,10 +15,10 @@
 
 ## B. 质量门禁
 
-| # | 检查项 | 命令 | 通过标准（基线 2026-10-30 @02b3a59） |
+| # | 检查项 | 命令 | 通过标准（以 `target/gate-numbers.json` 为准） |
 |---|---|---|---|
-| B1 | 后端全测 + 覆盖率 | `cd backend-java && mvn -o verify` | 0F/0E；BUNDLE 行覆盖 ≥ 0.79（实测 0.8007） |
-| B2 | 前端全测 | `cd frontend && npm run test:run` | 964 passed / 0 failed / 0 unhandled errors |
+| B1 | 后端全测 + 覆盖率 | `cd backend-java && mvn -o verify` | 0F/0E；BUNDLE 行覆盖 ≥ 0.79（最近实测 80.33） |
+| B2 | 前端全测 | `cd frontend && npm run test:run` | 978 passed / 0 failed / 0 unhandled errors |
 | B3 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors |
 | B4 | Python 测试 | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 0 failed |
 | B5 | 依赖漏洞 | `python3 scripts/java-dependency-audit.py` | 无 HIGH/CRITICAL |

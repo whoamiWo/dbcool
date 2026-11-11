@@ -109,7 +109,9 @@ def main() -> int:
     os.environ["BASE_URL"] = base_url
 
     log(f"=== 上线前全量门禁编排 ===")
-    log(f"目标后端：{BASE_URL}")
+    log(f"目标后端：{base_url}")
+    log(f"DB 目标：container={os.environ.get('PG_CONTAINER', '(auto)')} "
+        f"strict={os.environ.get('PG_STRICT', '0')}")
 
     # 依赖漏洞扫描：优先官方 security-gates.py（需 trivy 二进制，CI 环境可用）；
     # 本地无 trivy 时回落离线替代 java-dependency-audit.py（PHASE104 方案，本地可跑且非恒真）。
