@@ -23,12 +23,27 @@ Wave4 待办池 #16 — 文档门禁数字自动校准
 """
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-NUMBERS_FILE = ROOT / "target" / "gate-numbers.json"
+NUMBERS_FILE = Path(os.environ["DOC_NUMBERS_FILE"]) if os.environ.get("DOC_NUMBERS_FILE") \
+    else ROOT / "target" / "gate-numbers.json"
+
+# ============================================================
+# 键的白名单/必需语义（TY4 G6：缺失键不得静默跳过）
+# - OPTIONAL_KEYS：这些键允许缺失（锚点检查被跳过），仅限显式清单。
+# - 其它键：锚点引用了但实测缺失 → 校验失败（防"删掉 key 绕过漂移检查"）。
+# backup.* 是可选键：备份/PITR 必须在 --release 实测真实通过后才写数字；
+# 未实测时文档不得宣称 PASS（README 对应行改为"未实测"说明）。
+# ============================================================
+OPTIONAL_KEYS = {
+    "playwright.tests",       # 由 Playwright 单独运行写入，monthly-gate 不跑
+    "fe.coverage_line_pct",   # 前端覆盖率另由 vitest --coverage 采集
+    "backup.passed", "backup.total",  # 仅 release 实测真实通过时写入
+}
 
 # ============================================================
 # 锚点表：(文件, 正则, [对应 gate-numbers 键...])
@@ -129,41 +144,78 @@ def fmt(key: str, value) -> str:
 
 
 def check(numbers, fix=False):
-    """遍历锚点比对/回填。返回漂移列表（fix 回填成功后漂移列表已被清空的部分仍会包含）。"""
+    """遍历锚点比对/回填。返回漂移列表（fix 回填成功后漂移列表已被清空的部分仍会包含）。
+
+    TY4 D1/D2：
+    - optional 只表示"锚点/文件可以不存在"；一旦锚点匹配到文档里的数字，
+      而对应实测键缺失，就是**没有证据的数字**，必须失败（不得静默跳过）。
+    - 缺失键只跳过它对应的捕获组，不中断同一锚点里其它 required 键的比较。
+    """
     drift = []
     for rel, pattern, keys in ANCHORS:
+        anchor_optional = all(k in OPTIONAL_KEYS for k in keys)
         path = ROOT / rel
         if not path.exists():
+            if anchor_optional:
+                continue
             drift.append((rel, 0, pattern, "文件不存在", None))
             continue
         text = path.read_text(encoding="utf-8")
         m = re.search(pattern, text)
         if not m:
+            if anchor_optional:
+                continue  # 可选锚点（如未实测的备份数字）允许文档不含该行
             drift.append((rel, 0, pattern, "锚点未找到（文档结构可能已改）", None))
             continue
-        expected_groups = []
-        missing_key = False
+
+        line_no = text[: m.start()].count("\n") + 1
+        expected_by_index: dict[int, str] = {}
+        missing_required = []
+        missing_optional = []
         for idx, key in enumerate(keys, start=1):
             val = numbers.get(key)
             if val is None:
-                missing_key = True
-                break
-            expected_groups.append(fmt(key, val))
-        if missing_key:
-            continue  # 该指标本次未采集到（如未跑覆盖率）→ 跳过，不误报
-        actual_groups = list(m.groups())
-        if actual_groups == expected_groups:
+                if key in OPTIONAL_KEYS:
+                    missing_optional.append(key)
+                else:
+                    missing_required.append(key)
+                continue
+            expected_by_index[idx] = fmt(key, val)
+
+        if missing_required:
+            # TY4 G6：required key 缺失 → 失败，禁止"删 key 绕过漂移检查"
+            drift.append((rel, line_no, pattern,
+                          f"必需实测键缺失: {', '.join(missing_required)}", None))
             continue
-        line_no = text[: m.start()].count("\n") + 1
-        drift.append((rel, line_no, pattern, " / ".join(actual_groups), " / ".join(expected_groups)))
+        if not expected_by_index:
+            # TY4 D1：锚点已经声明了数字，但本次没有任何实测证据（可选键也不豁免）
+            drift.append((rel, line_no, pattern,
+                          "锚点声明数字但实测键缺失（无证据）: "
+                          f"{', '.join(missing_optional)}", None))
+            continue
+
+        actual_groups = list(m.groups())
+        mismatches = []
+        for idx in sorted(expected_by_index):
+            actual = actual_groups[idx - 1] if idx - 1 < len(actual_groups) else None
+            if actual != expected_by_index[idx]:
+                mismatches.append((idx, actual, expected_by_index[idx]))
+        if not mismatches:
+            continue
+        drift.append((
+            rel, line_no, pattern,
+            " / ".join(str(a) for _i, a, _e in mismatches),
+            " / ".join(str(e) for _i, _a, e in mismatches),
+        ))
 
         if fix:
-            # 回填：从后往前替换，避免偏移
+            # 回填：从后往前替换，避免偏移；只替换实测存在的捕获组
             new_text = text
-            for g_idx in range(len(actual_groups) - 1, -1, -1):
-                new_text = new_text[: m.start(g_idx + 1)] + expected_groups[g_idx] + new_text[m.end(g_idx + 1):]
+            for idx, _actual, expected in sorted(mismatches, key=lambda x: x[0], reverse=True):
+                new_text = new_text[: m.start(idx)] + expected + new_text[m.end(idx):]
             path.write_text(new_text, encoding="utf-8")
-            print(f"🔧 已回填 {rel}:{line_no}  {actual_groups} → {expected_groups}")
+            print(f"🔧 已回填 {rel}:{line_no}  "
+                  f"{[a for _i, a, _e in mismatches]} → {[e for _i, _a, e in mismatches]}")
 
     return drift
 
