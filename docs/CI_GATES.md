@@ -16,16 +16,18 @@
 > - SKIP/FAIL 门禁的旧 `gate-numbers.json` 键会被删除，禁止历史 PASS 数字残留；
 >   备份数字只在 `--release` 真实执行通过时写入。
 > - `python3 scripts/monthly-gate.py --release` 会先运行 `scripts/acceptance-preflight.py`
->   固定验收目标（`BASE_URL`/`PG_CONTAINER`/`PG_STRICT=1`/`BACKUP_DIR`/`COMPOSE_PROJECT_NAME`），
->   且任何 SKIP 一律判 FAIL；门禁真实性自测见 `python3 scripts/gate-skip-selfcheck.py`。
+>   固定验收目标（`BASE_URL`/`PG_CONTAINER`/`PG_STRICT=1`/`BACKUP_DIR`/`COMPOSE_PROJECT_NAME`，
+>   可选 `BACKEND_SERVICE`，默认 `backend-java`；预检还会校验 BASE_URL 端口落在该后端服务、
+>   且后端数据源指向 `PG_CONTAINER`），且任何 SKIP 一律判 FAIL；门禁真实性自测见
+>   `python3 scripts/gate-skip-selfcheck.py`。
 > - 分支保护：未配置；需仓库管理员开启并保存证据；未配置不得宣称 N2 收口。
 
 | 门禁 | 命令 | 阈值 | 失败怎么办 |
 |---|---|---|---|
 | Java 测试 | `cd backend-java && mvn -o verify` | 2853，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
 | Java 覆盖率 | `cd backend-java && mvn -o verify` | JaCoCo BUNDLE ≥ 79%（唯一阈值来源：`backend-java/pom.xml`） | 见 §3 覆盖率缺口与补测计划 |
-| 前端单测 | `cd frontend && npm run test:run` | 974 passed / 120 files |
-| Playwright（含 375px） | `cd frontend && npx playwright test` | 260 tests / 13 files（`--list` 实测；chromium/firefox/mobile-390/mobile-375） | 看 vitest 输出中失败的 spec |
+| 前端单测 | `cd frontend && npm run test:run` | 978 passed / 121 files | 看 vitest 输出中失败的 spec |
+| Playwright（含 375px） | `cd frontend && npx playwright test` | 260 tests / 13 files（`--list` 实测；chromium/firefox/mobile-390/mobile-375） | 看 Playwright 报告（`npx playwright show-report`） |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors | 按报错文件与行号修 |
 | E2E | `cd frontend && npx playwright test` | ≥ 135 | collab-crdt 偶发 429 见 §4 |
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 68 passed / 1 skipped | 看 pytest 输出 |

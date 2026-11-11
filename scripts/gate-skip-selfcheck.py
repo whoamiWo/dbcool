@@ -86,6 +86,8 @@ def main() -> int:
           not monthly.detect_skip("冒烟 smoke.py", 0, "⏭️  [3] 附件: SKIP — MinIO 未启用"))
     check("SKIP 输出但 rc!=0 → 不是 SKIP（是 FAIL）",
           not monthly.detect_skip("备份/PITR 演练", 1, "GATE_SKIP: 30"))
+    check("GATE_SKIP: 0 → 不判 SKIP（跳过数为 0 即真跑）",
+          not monthly.detect_skip("备份/PITR 演练", 0, "总计: 30 | PASS: 30\nGATE_SKIP: 0"))
 
     print("\n== 1. 备份 SKIP：开发模式 SKIP、release 模式 FAIL，均不写 30/30 ==")
     with tempfile.TemporaryDirectory() as td:

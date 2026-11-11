@@ -12,13 +12,20 @@
     BACKUP_DIR                   验收专用备份目录（防止选到默认栈旧备份）
     COMPOSE_PROJECT_NAME         目标 compose project（默认要求 nocobase-acceptance 类隔离 project）
 
+可选的环境变量：
+    BACKEND_SERVICE              目标后端 compose 服务名（默认 backend-java）
+
 核实项（全部通过才退出 0）：
     1. 上述变量齐备且非默认值语义（PG_CONTAINER 不得为 nocobase-postgres）；
     2. PG_CONTAINER 容器存在且其 compose project label == COMPOSE_PROJECT_NAME；
     3. 在容器内实查 current_database() / inet_server_port()；
     4. GET {BASE_URL}/api/health 返回 200；
     5. BASE_URL 端口映射到同一 compose project 内的容器（挡住 18082 → 默认栈 backend）；
-    6. 打印脱敏目标指纹：base URL / project / backend / container / 数据库 / 端口 / 当前 commit。
+       且该容器 com.docker.compose.service == BACKEND_SERVICE
+       （挡住 18082 → 本栈 frontend/minio，E5）；
+    6. 后端容器的数据源环境变量（SPRING_DATASOURCE_URL / PGHOST / POSTGRES_HOST / DB_HOST）
+       指向 PG_CONTAINER 或其 compose service 名（E5）；
+    7. 打印脱敏目标指纹：base URL / project / backend / container / 数据库 / 端口 / 当前 commit。
 
 用法：
     ACCEPTANCE_MODE=1 BASE_URL=http://127.0.0.1:18082 PG_CONTAINER=nocobase-acc-postgres \
@@ -31,6 +38,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.request
@@ -56,6 +64,98 @@ def docker(args: list[str]) -> tuple[int, str]:
     return r.returncode, (r.stdout or "").strip()
 
 
+def compose_labels(cid: str) -> dict:
+    rc, raw = docker(["inspect", "-f", "{{json .Config.Labels}}", cid])
+    try:
+        return json.loads(raw) if rc == 0 and raw else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+DB_ENV_KEYS = ("SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_JDBC_URL",
+               "JDBC_DATABASE_URL", "DATABASE_URL",
+               "PGHOST", "POSTGRES_HOST", "DB_HOST")
+
+
+def backend_db_env(cid: str) -> tuple[str, str]:
+    """返回 backend 容器内用于定位数据库的 (环境变量名, 值)；找不到返回 ("", "")。"""
+    rc, raw = docker(["inspect", "-f", "{{json .Config.Env}}", cid])
+    try:
+        env = json.loads(raw) if rc == 0 and raw else []
+    except json.JSONDecodeError:
+        env = []
+    kv = {}
+    for item in env if isinstance(env, list) else []:
+        if isinstance(item, str) and "=" in item:
+            k, v = item.split("=", 1)
+            kv[k] = v
+    for key in DB_ENV_KEYS:
+        if kv.get(key):
+            return key, kv[key]
+    return "", ""
+
+
+def db_host_of(value: str) -> str:
+    """从 JDBC/URL 或纯主机名中取出主机部分。"""
+    m = re.search(r"//([^:/?,;]+)", value)
+    if m:
+        return m.group(1)
+    return value.split(":")[0].strip()
+
+
+def check_backend_same_stack(base_url_port: int, project: str, pg_container: str,
+                             backend_service: str) -> tuple[list[str], list[str]]:
+    """BASE_URL 端口必须映射到本 project 的 backend 服务，且该 backend 连向 PG_CONTAINER。
+
+    只看端口不够：18082 也可以手工映射到默认栈容器，或映射到本栈 frontend/minio。
+    返回 (failures, backend 容器名列表)。
+    """
+    found: list[str] = []
+    errs: list[str] = []
+    pg_service = ""
+    rc, pg_cid = docker(["ps", "-q", "--filter", f"name=^{pg_container}$"])
+    if rc == 0 and pg_cid:
+        pg_service = compose_labels(pg_cid).get("com.docker.compose.service", "")
+
+    rc, cids = docker(["ps", "-q", "--filter",
+                       f"label=com.docker.compose.project={project}"])
+    candidates = cids.split() if rc == 0 and cids else []
+    for cid in candidates:
+        rc2, ports = docker(["port", cid])
+        host_ports = set()
+        for line in (ports.splitlines() if rc2 == 0 else []):
+            # 例：8080/tcp -> 0.0.0.0:18082
+            host_ports.add(line.rsplit(":", 1)[-1].strip())
+        if str(base_url_port) not in host_ports:
+            continue
+        labels = compose_labels(cid)
+        service = labels.get("com.docker.compose.service", "")
+        rc3, name = docker(["inspect", "-f", "{{.Name}}", cid])
+        cname = (name.lstrip("/") if rc3 == 0 and name else cid)
+        if service != backend_service:
+            errs.append(f"BASE_URL 端口 {base_url_port} 映射到 {cname}"
+                        f"（compose service={service or '(无)'}），不是后端服务 {backend_service!r}")
+            continue
+        found.append(cname)
+        env_key, env_val = backend_db_env(cid)
+        if not env_key:
+            errs.append(f"后端容器 {cname} 无可验证的数据源环境变量"
+                        f"（{'/'.join(DB_ENV_KEYS)}），无法确认它连向 {pg_container!r}")
+            continue
+        host = db_host_of(env_val)
+        allowed = {h for h in (pg_service, pg_container) if h}
+        if host not in allowed:
+            errs.append(f"后端容器 {cname} 的 {env_key} 指向 {host!r}，"
+                        f"与 PG_CONTAINER={pg_container!r}（service={pg_service or '(无)'}）不一致")
+
+    if not candidates:
+        errs.append(f"project {project!r} 内没有任何运行中的容器")
+    elif not found and not errs:
+        errs.append(f"BASE_URL 端口 {base_url_port} 未映射到 project {project!r} 内的任何容器；"
+                    "拒绝把隔离端口指向默认栈或其它栈的 backend")
+    return errs, found
+
+
 def main() -> int:
     print("=" * 60)
     print("验收目标固定预检（acceptance-preflight）")
@@ -68,6 +168,7 @@ def main() -> int:
     pg_user = os.environ.get("PGUSER", "nocobase")
     backup_dir = os.environ.get("BACKUP_DIR", "")
     project = os.environ.get("COMPOSE_PROJECT_NAME", "")
+    backend_service = os.environ.get("BACKEND_SERVICE", "") or "backend-java"
 
     for var in ("ACCEPTANCE_MODE", "BASE_URL", "PG_CONTAINER", "PG_STRICT",
                 "BACKUP_DIR", "COMPOSE_PROJECT_NAME"):
@@ -134,28 +235,19 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             fail(f"GET {base_url}/api/health 失败：{e}（目标栈未启动或指错地址）")
 
-    # ---- 4b) BASE_URL 必须指向同一 compose project 的容器（D6）----
-    # 仅挡端口检查不够：18082 也可以手工映射到默认栈 java 容器。
+    # ---- 4b) BASE_URL 必须指向同一 compose project 的 backend（D6/E5）----
+    # 仅挡端口检查不够：18082 也可以手工映射到默认栈 java 容器或本栈 frontend/minio。
     backend_names: list[str] = []
     is_local = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
     if not failures and is_local:
         url_port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        rc, cids = docker(["ps", "-q", "--filter",
-                           f"label=com.docker.compose.project={project}"])
-        for cid in (cids.split() if rc == 0 and cids else []):
-            rc2, ports = docker(["port", cid])
-            host_ports = set()
-            for line in (ports.splitlines() if rc2 == 0 else []):
-                # 例：8080/tcp -> 0.0.0.0:18082
-                host_ports.add(line.rsplit(":", 1)[-1].strip())
-            if str(url_port) in host_ports:
-                rc3, name = docker(["inspect", "-f", "{{.Name}}", cid])
-                backend_names.append(name.lstrip("/") if rc3 == 0 else cid)
-        if not backend_names:
-            fail(f"BASE_URL 端口 {url_port} 未映射到 project {project!r} 内的任何容器；"
-                 "拒绝把隔离端口指向默认栈或其它栈的 backend")
-        else:
-            ok(f"BASE_URL 端口 {url_port} 对应本栈容器：{', '.join(backend_names)}")
+        errs, backend_names = check_backend_same_stack(
+            url_port, project, pg_container, backend_service)
+        for msg in errs:
+            fail(msg)
+        if backend_names and not errs:
+            ok(f"BASE_URL 端口 {url_port} 对应本栈后端容器：{', '.join(backend_names)}")
+            ok(f"后端数据源指向 {pg_container}（同一 compose project）")
     elif not failures:
         ok(f"BASE_URL 非本机地址，无法本地核实 backend 同栈；需人工确认 {base_url} 属于 {project}")
 
@@ -171,6 +263,7 @@ def main() -> int:
     print(f"  BASE_URL            = {base_url or '(未设置)'}")
     print(f"  COMPOSE_PROJECT     = {project or '(未设置)'}")
     print(f"  BACKEND_CONTAINER   = {', '.join(backend_names) or '(未核实)'}")
+    print(f"  BACKEND_SERVICE     = {backend_service}")
     print(f"  PG_CONTAINER        = {pg_container or '(未设置)'}")
     print(f"  PGDATABASE / port   = {db_name or '(未实查)'} / {server_port or '(未实查)'}")
     print(f"  BACKUP_DIR          = {backup_dir or '(未设置)'}")
