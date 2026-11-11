@@ -19,10 +19,13 @@ services:
     # PHASE94 🔒-7 PITR：开启 WAL 归档，使"恢复到任意时间点"成为可能。
     # 此前这段配置只放在 docker-compose.override.yml（被 gitignore），
     # 换环境重建就没有 PITR —— 归档配置不是敏感信息，应当纳入版本控制。
+    # 验收修复（TY4 §13.1）：全新 pgdata 卷没有 pg_archive 目录，旧命令使每次
+    # 归档都失败（pg_stat_archiver.failed_count>0，PITR 不可用）。归档目录不是
+    # 持久数据，改为在 archive_command 内幂等创建，保证全新栈开箱即可归档。
     command: >
       postgres -c wal_level=replica
       -c archive_mode=on
-      -c archive_command='test -f /var/lib/postgresql/data/pg_archive/%f || cp %p /var/lib/postgresql/data/pg_archive/%f'
+      -c archive_command='mkdir -p /var/lib/postgresql/data/pg_archive && { test -f /var/lib/postgresql/data/pg_archive/%f || cp %p /var/lib/postgresql/data/pg_archive/%f; }'
       -c max_wal_senders=5
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nocobase}

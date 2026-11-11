@@ -118,10 +118,29 @@ async def get_service_or_user(
     return await get_current_user(authorization)
 
 
+def _is_admin_payload(payload: dict) -> bool:
+    """判断 JWT 是否携带管理员角色。
+
+    PHASE 验收修复：Java 后端签发的 access token 使用 `roles: ["admin"]`
+    （复数、列表），而 Python 自签 token 使用 `role: "admin"`（单数、字符串）。
+    此前只认单数字符串，导致 Java 登录的 admin 调 Python `/api/admin/backup`
+    被 403。这里同时兼容两种声明，并对大小写不敏感。
+    """
+    roles = payload.get("roles")
+    if isinstance(roles, str):
+        roles = [roles]
+    if not isinstance(roles, list):
+        roles = []
+    single = payload.get("role")
+    if isinstance(single, str) and single:
+        roles = [*roles, single]
+    return any(str(r).strip().lower() == "admin" for r in roles if r)
+
+
 async def get_current_admin_user(
     authorization: Annotated[str | None, Header()] = None,
 ) -> AuthUser:
-    """FastAPI 依赖:要求当前用户为管理员（JWT 中 role=admin）.
+    """FastAPI 依赖:要求当前用户为管理员（JWT role/roles 含 admin）.
 
     Usage:
         @app.post("/api/admin/backup")
@@ -130,7 +149,7 @@ async def get_current_admin_user(
     """
     user = await get_current_user(authorization)
     payload = _decode_token(authorization[7:]) if authorization else None
-    if payload is None or payload.get("role") != "admin":
+    if payload is None or not _is_admin_payload(payload):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="需要管理员权限",
