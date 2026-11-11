@@ -12,6 +12,13 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yml
 
+# 告警出口：规则触发后必须交给 Alertmanager，否则告警只停在 Prometheus 内部。
+# 此前缺失该段，alerts.yml 规则虽加载但永不外发（§13.3 验收实测发现）。
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
 scrape_configs:
   # Java 后端（micrometer-registry-prometheus 已暴露 /actuator/prometheus）
   - job_name: 'backend-java'
