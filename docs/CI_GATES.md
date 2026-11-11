@@ -9,6 +9,16 @@
 
 > **SKIP 不等于 PASS**：`monthly-gate.py` 会把 SKIP 项单列（例如无 Docker 时的 pg IT、
 > 可选对象存储未启用时的附件链路）。最终结论同时打印「通过项」与「SKIP 项」。
+>
+> **SKIP 语义（TY4 修订，禁止假绿）**：
+> - SKIP 只认机器标记 `GATE_SKIP: <count>`（迁移期兼容 `SKIP:`/`⏭️ SKIP`），且仅限
+>   「备份/PITR 演练」「企业套件真实 PG (pg IT)」两项白名单门禁；其它门禁一律按退出码判定。
+> - SKIP/FAIL 门禁的旧 `gate-numbers.json` 键会被删除，禁止历史 PASS 数字残留；
+>   备份数字只在 `--release` 真实执行通过时写入。
+> - `python3 scripts/monthly-gate.py --release` 会先运行 `scripts/acceptance-preflight.py`
+>   固定验收目标（`BASE_URL`/`PG_CONTAINER`/`PG_STRICT=1`/`BACKUP_DIR`/`COMPOSE_PROJECT_NAME`），
+>   且任何 SKIP 一律判 FAIL；门禁真实性自测见 `python3 scripts/gate-skip-selfcheck.py`。
+> - 分支保护：未配置；需仓库管理员开启并保存证据；未配置不得宣称 N2 收口。
 
 | 门禁 | 命令 | 阈值 | 失败怎么办 |
 |---|---|---|---|
@@ -19,7 +29,7 @@
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors | 按报错文件与行号修 |
 | E2E | `cd frontend && npx playwright test` | ≥ 135 | collab-crdt 偶发 429 见 §4 |
 | Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 68 passed / 1 skipped | 看 pytest 输出 |
-| 备份演练 | `python3 scripts/backup-e2e-verify.py` | 30 / 30 | 见 `docs/backup-restore-runbook.md` |
+| 备份演练 | `python3 scripts/backup-e2e-verify.py` | 仅 release 实测通过后写数字；SKIP 不计 PASS | 见 `docs/backup-restore-runbook.md` |
 | 管理员鉴权 | `python3 scripts/admin-authz-e2e-verify.py` | 18 / 18 | 检查 admin/user 登录状态码 |
 | 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 24 / 24 PASS | 检查跨租户断言 |
 | 契约比对 | `python3 scripts/api-contract-verify.py` | 0 漂移 | 重跑 `scripts/export-backend-mappings.py` |
@@ -69,7 +79,9 @@ Testcontainers 测试（`EnterpriseSuitePgIT` 等）：
   构建继续通过（surefire 输出 `Tests run: ..., Skipped: ...`）。
 
 这不是「跳过门禁」：`python3 scripts/pg-it-gate.py` 是独立的真实 PG 门禁，会解析
-surefire 报告并对「SKIP」单独判定（`monthly-gate.py` 也把 `SKIP:` 前缀视为 SKIP 而非 PASS）。
+surefire 报告并对「SKIP」单独判定（`monthly-gate.py` 只认白名单门禁输出的
+`GATE_SKIP: <count>` 机器标记，迁移期兼容旧 `SKIP:`/`⏭️  SKIP` 字样；其它门禁
+一律按退出码判定，见文首 TY4 语义）。
 若希望本地 `verify` 完全不触碰 Docker，可显式加 `-DexcludedGroups=pg`，但 CI 的
 `mvn verify` 保持默认（有 Docker 时真实执行）。
 
