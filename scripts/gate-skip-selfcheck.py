@@ -180,6 +180,17 @@ def main() -> int:
         finally:
             doc.ROOT, doc.ANCHORS = old_root, old_anchors
 
+    print("\n== 6. preflight db_host_of（F2：带凭据 JDBC/URL 必须取到真实主机） ==")
+    preflight = load_module("acceptance_preflight", "acceptance-preflight.py")
+    check("纯主机名 → 原样返回",
+          preflight.db_host_of("nocobase-postgres") == "nocobase-postgres")
+    check("JDBC URL → 取主机",
+          preflight.db_host_of("jdbc:postgresql://acc-postgres:5432/nocobase") == "acc-postgres")
+    check("F2：带 user:pass@ 凭据的 URL → 跳过 userinfo 取真实主机",
+          preflight.db_host_of("postgresql://nocobase:secret@acc-postgres:5432/nocobase") == "acc-postgres")
+    check("F2：带凭据 JDBC URL → 跳过 userinfo 取真实主机",
+          preflight.db_host_of("jdbc:postgresql://u:p@acc-postgres/nocobase") == "acc-postgres")
+
     print("\n" + "=" * 60)
     if failures:
         print(f"❌ 门禁自测失败 {len(failures)} 项：{', '.join(failures)}")
