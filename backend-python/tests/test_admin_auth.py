@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from jose import jwt
 
 from nocobase_py.config import get_settings
-from nocobase_py.security import get_current_admin_user, _is_admin_payload
+from nocobase_py.security import _is_admin_payload, get_current_admin_user
 
 
 def _token(payload_extra: dict) -> str:
