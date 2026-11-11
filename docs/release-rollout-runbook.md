@@ -61,6 +61,21 @@ docker compose logs backend-python 2>&1 | grep -E "FAILED|alert" | tail -10
 - 应用回滚只切镜像 tag，**PostgreSQL 数据不回滚**（数据库 schema 变更需另行评估）
 - 若回滚涉及不兼容的 schema 变更，须先执行 `docs/backup-restore-runbook.md` 的恢复流程
 
+### 2.4 V81–V84 迁移影响与回滚（N2 批次）
+
+| 迁移 | 内容 | 对数据的影响 | 回滚语义 |
+|---|---|---|---|
+| **V81** | 通知类型纠偏：`workflow` → `WORKFLOW_NOTICE`；按 V79 安装时间边界把误标的 `WORKFLOW_FAILED` 回填为流程通知；新增 `messages.last_event_at` | 历史通知类型被改写；无 Flyway history 的库**不改数据**并 `RAISE NOTICE`；`last_event_at` 对旧行为空 | 类型回填**不可逆**（原始值未保留）→ 需从备份恢复；降级应用不需降级 DB |
+| **V82** | `users.external_source/external_id/disable_reason` + `(tenant_id, source, external_id)` 唯一索引；历史 `external_id` 为**近似值**（WeCom/WeChat 为 12 位摘要，LDAP/OIDC 不回填） | 首次同步会用完整 id 覆盖近似值；同租户重复外部 id 会让迁移失败 → 先清理冲突再重跑，禁止删用户绕过 | 需备份恢复（索引与列） |
+| **V83** | 钉钉审批外部绑定/回调事件表、`approval_template.external_config`、`approval_request.external_push_status/external_push_error` | 仅新增表/列，不改写历史审批归属；历史无绑定 request 保持本地流程 | 需备份恢复；回滚应用时须同时关闭钉钉外推 |
+| **V84** | 回调事件主键改为 `(corp_id, event_id)`、回填 corpId；新增 `oidc_login_code`（仅存 code 哈希） | **孤儿事件（无法确定 corpId）会阻止升级** → 先对账清理再重跑；`oidc_login_code` 不含 JWT | 需备份恢复；回滚应用时须同时关闭 OIDC 与钉钉回调 |
+
+**发布前必读**：
+
+- V81 通知回填与 V82 前缀回填都不可逆，回滚应用 ≠ 降级 DB；必须按 `docs/backup-restore-runbook.md` 恢复。
+- 升级前确认目标容器内 `pg_dump/pg_restore` 可用且 `PG_CONTAINER` 固定；宿主缺 `pg_dump` 不构成失败依据。
+- 备份/PITR 门禁在 `--release` 下 SKIP 即 FAIL，不得以历史 30/30 作为本次证据。
+
 ---
 
 ## 3. 容量与放量上限
