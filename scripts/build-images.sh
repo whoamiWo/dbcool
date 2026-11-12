@@ -72,6 +72,23 @@ for svc in backend-java backend-python crdt-service frontend; do
     exit 2
   fi
   image="$REGISTRY/dbcool-$svc:$VERSION"
+  if ! docker buildx version >/dev/null 2>&1; then
+    # 无 buildx 的 docker 安装（2026-11-12 本环境实测 docker 29.1.3 无插件）：
+    # 多架构 manifest 必须 buildx，不能用经典 build 冒充 —— 显式拒绝并给指引。
+    if [[ "$PLATFORM" == *,* ]]; then
+      echo "❌ 退出码 2：本机 docker 无 buildx 插件，无法构建多架构 [$PLATFORM]。" >&2
+      echo "   单架构本地/推送：PLATFORM=linux/$(uname -m | sed 's/x86_64/amd64/') bash scripts/build-images.sh" >&2
+      echo "   多架构发布请在带 buildx 的环境（如 CI）执行。" >&2
+      exit 2
+    fi
+    echo "▶ 构建 $image [$PLATFORM]（无 buildx，经典 build + push）"
+    docker build --platform "$PLATFORM" -t "$image" -f "$ctx/Dockerfile" "$ctx"
+    if [[ $PUSH -eq 1 ]]; then
+      docker push "$image"
+    fi
+    echo "✅ $image"
+    continue
+  fi
   echo "▶ 构建 $image [$PLATFORM]"
   args=(buildx build --platform "$PLATFORM" -t "$image" -f "$ctx/Dockerfile" "$ctx")
   if [[ $PUSH -eq 1 ]]; then
