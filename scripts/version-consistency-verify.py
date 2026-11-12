@@ -44,6 +44,8 @@ SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 # 各文件中出现的其他合法 semver（依赖版本等），仅用于 README 徽章替换保护
 README_HEAD_LINES = 40
+# shields 徽章 badge/version-X.Y.Z 与粗体 **vX.Y.Z** 两种写法都要识别
+README_BADGE_RE = re.compile(r"(?:badge/version-|\bv)(\d+\.\d+\.\d+)\b")
 
 
 def read_text(p: Path) -> str:
@@ -105,10 +107,20 @@ def extract_version(content: str, kind: str, key: str) -> str:
 
     if kind == "md_badge":
         head = "\n".join(content.splitlines()[:README_HEAD_LINES])
-        m = re.search(r"\bv(\d+\.\d+\.\d+)\b", head)
-        if not m:
-            raise ValueError(f"README.md 前 {README_HEAD_LINES} 行未找到 v 语义化版本")
-        return m.group(1)
+        # README 头部有两种写法，必须都覆盖，否则 shields 徽章会静默漂移：
+        #   1) ![version](https://img.shields.io/badge/version-2.1.4-blue)
+        #   2) **v2.1.4**
+        # 头部出现的所有版本号必须彼此一致；多个不同值视为漂移，必须报错。
+        matches = [m.group(1) for m in re.finditer(README_BADGE_RE, head)]
+        if not matches:
+            raise ValueError(
+                f"README.md 前 {README_HEAD_LINES} 行未找到徽章/粗体语义化版本"
+            )
+        if len(set(matches)) > 1:
+            raise ValueError(
+                f"README.md 前 {README_HEAD_LINES} 行存在多个不同版本号：{sorted(set(matches))}"
+            )
+        return matches[0]
 
     raise ValueError(f"未知格式：{kind}")
 
@@ -144,14 +156,14 @@ def write_version(path: Path, kind: str, key: str, old_ver: str, new_ver: str) -
             flags=re.MULTILINE,
         )
     elif kind == "md_badge":
-        # 只替换头部第一处 v 版本（badge）
+        # 头部所有徽章/粗体版本（extract 已保证彼此一致）统一写回
         head_lines = content.splitlines(keepends=True)
         for i, line in enumerate(head_lines[:README_HEAD_LINES]):
-            if re.search(rf"\bv{re.escape(old_ver)}\b", line):
-                head_lines[i] = re.sub(
-                    rf"\bv{re.escape(old_ver)}\b", f"v{new_ver}", line
-                )
-                break
+            head_lines[i] = re.sub(
+                rf"(?:badge/version-|\bv){re.escape(old_ver)}\b",
+                lambda m: m.group(0).replace(old_ver, new_ver),
+                line,
+            )
         content = "".join(head_lines)
 
     path.write_text(content, encoding="utf-8")
@@ -180,10 +192,85 @@ def check_all(expected: str):
     return mismatches, errors
 
 
+def self_test() -> int:
+    """负向自测：覆盖旧正则漏掉的 shields 徽章写法，防止徽章静默漂移回归。"""
+    import tempfile
+
+    failures = 0
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        nonlocal failures
+        print(f"{'✅' if ok else '❌'} {name}{(' —— ' + detail) if detail else ''}")
+        if not ok:
+            failures += 1
+
+    # 1) shields 徽章写法必须被识别（旧正则只认 `vX.Y.Z`，会漏检漂移）
+    got = extract_version(
+        "![version](https://img.shields.io/badge/version-1.2.3-blue)\n",
+        "md_badge", "badge",
+    )
+    check("shields 徽章写法可被提取", got == "1.2.3", f"got={got!r}")
+
+    # 2) 粗体 v 前缀写法保持兼容
+    got = extract_version("**v4.5.6**（当前稳定版）\n", "md_badge", "badge")
+    check("粗体 v 前缀写法可被提取", got == "4.5.6", f"got={got!r}")
+
+    # 3) 头部完全无版本必须报错（恒真门禁防线）
+    try:
+        extract_version("README\nnothing here\n", "md_badge", "badge")
+        check("无版本头部必须抛 ValueError", False)
+    except ValueError:
+        check("无版本头部必须抛 ValueError", True)
+
+    # 4) 头部两个不同版本必须报错（徽章漂移即此情形）
+    try:
+        extract_version(
+            "![version](https://img.shields.io/badge/version-1.2.3-blue)\n**v4.5.6**\n",
+            "md_badge", "badge",
+        )
+        check("头部多个不同版本必须抛 ValueError", False)
+    except ValueError:
+        check("头部多个不同版本必须抛 ValueError", True)
+
+    # 5) --fix 统一写回头部所有版本写法
+    sample = (
+        "![version](https://img.shields.io/badge/version-1.2.3-blue)\n"
+        "depends on lib v9.9.9\n"
+        "**v1.2.3**\n"
+    )
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "README.md"
+        p.write_text(sample, encoding="utf-8")
+        write_version(p, "md_badge", "badge", "1.2.3", "2.0.0")
+        out = p.read_text(encoding="utf-8")
+    check("写回覆盖徽章", "badge/version-2.0.0-blue" in out)
+    check("写回不动依赖版本", "v9.9.9" in out)
+    check("写回覆盖粗体版本", "**v2.0.0**" in out)
+
+    # 6) 仅粗体写法也能被写回
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "README.md"
+        p.write_text("**v1.2.3**\n", encoding="utf-8")
+        write_version(p, "md_badge", "badge", "1.2.3", "2.0.0")
+        out = p.read_text(encoding="utf-8")
+    check("粗体写法可被写回", out == "**v2.0.0**\n", f"got={out!r}")
+
+    print()
+    if failures:
+        print(f"❌ 自测失败 {failures} 项")
+        return 1
+    print("✅ 自测全部通过")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="版本一致性校验（单一真相源：VERSION）")
     parser.add_argument("--fix", action="store_true", help="从 VERSION 写回各文件")
+    parser.add_argument("--self-test", action="store_true", help="运行徽章正则负向自测")
     args = parser.parse_args()
+
+    if args.self_test:
+        return self_test()
 
     version_file = ROOT / "VERSION"
     if not version_file.exists():
