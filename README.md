@@ -4,9 +4,9 @@
 
 **自部署的企业协作低代码平台 —— 数据表 · 文档 Wiki · 即时通讯 · 看板 · 工作流 · AI，一套全有**
 
-**v2.1.4**（当前稳定版，发布于 2026-11-03）
+**v2.1.5**（当前稳定版，发布于 2026-11-03）
 
-[![Version](https://img.shields.io/badge/version-2.1.4-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.1.5-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-3552%20(backend%202853%20%2F%20frontend%20978)-brightgreen)](#-质量)
 [![Backend CI](https://img.shields.io/badge/Java%20coverage-80.35%25-success)](#-质量)

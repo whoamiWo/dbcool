@@ -1,3 +1,26 @@
+## v2.1.5 (2026-11-12)
+
+### N2 收口：Python 后端周期性 SIGSEGV 根因修复 + 证据/文档纠偏
+
+**稳定性修复（生产事故级）**
+- **backend-python 容器周期性 `exit=139` 崩溃**：后台调度线程（`alert.cache_hit_rate_check`，每 60s）直接调用 `asyncio.run()`，在线程内新建并销毁临时事件循环；共享的 async Redis 客户端被绑定到该短命循环，主循环随后使用时报 `Event loop is closed`（`/api/health/ready` 503），并在下一次巡检时触发进程级 SIGSEGV。默认栈与验收栈同时段每 ~60s 各崩一次，24h 观测窗口因此无法保持。
+  - `services/scheduler.py` 新增 `set_main_loop()` / `run_coro()`：主循环由 lifespan 注册，后台任务协程一律经 `asyncio.run_coroutine_threadsafe` 提交到主循环执行；无主循环（脚本/测试）时才退化为独立循环
+  - `main.py` lifespan 注册/注销主循环，`_reset_quotas` 改用 `run_coro`
+  - `redis_client.get_redis()` 增加事件循环亲和性守卫：缓存客户端绑定的循环已关闭或非当前循环时关闭旧客户端并重建
+  - 回归测试 `tests/test_scheduler_loop.py`（4 项）：主循环提交、无主循环退化、同循环复用、跨已关闭循环重建
+
+**文档/证据纠偏**
+- `README.md`：备份/PITR 行更新为 2026-11-11 release 实测 30/30；版本徽章修正（此前停留在 2.1.1）
+- `scripts/version-consistency-verify.py`：`md_badge` 正则同时识别 shields `badge/version-X.Y.Z` 与 `**vX.Y.Z**`，头部出现多个不同版本时直接报错；新增 `--self-test`（8 项负向自测）
+- `BASELINE.md` / `TECH_DEBT.md` / `docs/DEVELOPMENT_NOTES.md`：顶部标注“历史快照（非当前门禁数字）”
+- `docs/release-rollout-runbook.md`：补充 V85 迁移影响与回滚语义（含 `event_type='finish'` 默认值依据）
+
+**迁移**
+- 无新增迁移（V85 已随 2.1.4 进入 `main`，本版仅补文档说明）
+
+**验证**
+- 新增回归测试 4 项全绿；本机全量（Python 3.14）**85 passed / 1 skipped**；隔离栈修复镜像连续运行观测见 `docs/acceptance-run-2026-11-11.md`
+
 ## v2.1.4 (2026-11-09)
 
 ### Round 3 / N1 修复：飞书组织同步安全 + 外部身份按租户隔离
