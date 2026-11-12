@@ -6,7 +6,7 @@
 
 **v2.1.4**（当前稳定版，发布于 2026-11-03）
 
-[![Version](https://img.shields.io/badge/version-2.1.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.1.4-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-3552%20(backend%202853%20%2F%20frontend%20978)-brightgreen)](#-质量)
 [![Backend CI](https://img.shields.io/badge/Java%20coverage-80.35%25-success)](#-质量)
@@ -89,7 +89,7 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 | 前端 `npm run test:run` | ✅ 121 files / **978 passed / 0 failed / 0 unhandled errors**；行覆盖 77.12% |
 | TypeScript `tsc --noEmit` | ✅ 0 errors |
 | 前后端契约 | ✅ 460 后端端点 × 137 前端调用 → **0 漂移**（含反向自检） |
-| 备份/PITR 演练 | ⏭️ 未在 release 模式实测（SKIP 不计 PASS；真实通过后数字由门禁回填） |
+| 备份/PITR 演练 | ✅ 30/30（2026-11-11 release 模式实测通过） |
 | 冒烟 / 租户隔离 | ✅ 14/14 · 24/24 |
 | 上线终验 | ✅ 8/8 |
 | Playwright E2E | 260 用例 / 13 files（`--list` 实测；最近批次未复跑，以 CI 为准） |
