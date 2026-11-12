@@ -59,6 +59,13 @@ def clear_rate_limit() -> None:
     这是门禁编排的运维处理，不是放宽断言：每个脚本单独跑时同样会清理并保持自身断言强度。
     """
     redis_container = os.environ.get("REDIS_CONTAINER", "nocobase-redis")
+    if os.environ.get("ACCEPTANCE_MODE") == "1" and redis_container == "nocobase-redis":
+        # 2026-11-12 实测：ACCEPTANCE_MODE 下未显式指定 REDIS_CONTAINER 时，
+        # 清理落到了默认栈 redis（nocobase-redis），隔离栈的限流 key 一个都没清，
+        # 串行门禁后半段 smoke 登录 429。fail closed，不再静默清错目标。
+        fail("ACCEPTANCE_MODE=1 时必须显式设置 REDIS_CONTAINER（如 nocobase-acc-redis），"
+             "拒绝默认清理 nocobase-redis（默认栈）")
+        raise SystemExit(2)
     try:
         scan = subprocess.run(
             ["docker", "exec", redis_container, "redis-cli", "--scan", "--pattern", "ratelimit:*"],
