@@ -191,6 +191,49 @@ def main() -> int:
     check("F2：带凭据 JDBC URL → 跳过 userinfo 取真实主机",
           preflight.db_host_of("jdbc:postgresql://u:p@acc-postgres/nocobase") == "acc-postgres")
 
+    print("\n== 6b. preflight E6 数据面同栈（backend 与 PG 网络成员 + DNS 解析实证） ==")
+    # 不依赖真实 docker：stub 掉模块内 docker()，重放 2026-11-12 跨栈事故形态。
+    orig_docker = preflight.docker
+
+    def stub_docker_factory(pg_nets, backend_nets, pg_ip, resolved_ip):
+        def _stub(args):
+            target = args[-1]
+            if args[:2] == ["inspect", "-f"]:
+                tpl = args[2]
+                if "NetworkSettings.Networks" in tpl and "IPAddress" in tpl:
+                    return (0, pg_ip)
+                if target == pg_container:
+                    return (0, json.dumps({n: {} for n in pg_nets}))
+                return (0, json.dumps({n: {} for n in backend_nets}))
+            if args[:2] == ["exec", backend_name] and "getent" in args:
+                return (0, f"{resolved_ip} postgres postgres") if resolved_ip else (1, "")
+            return (1, "")
+        return _stub
+
+    pg_container, backend_name = "acc-postgres", "acc-backend-java"
+    try:
+        # 同网 + DNS 指向正确 → 无错误
+        preflight.docker = stub_docker_factory(["acc-net"], ["acc-net"], "172.20.0.9", "172.20.0.9")
+        check("E6：同网络且 DNS 指向本栈 PG → 通过",
+              preflight.check_backend_same_network(pg_container, [backend_name]) == [])
+        # 跨栈（事故形态）：backend 在默认网，与 PG 无共享网络 → 拒绝
+        preflight.docker = stub_docker_factory(["acc-net"], ["nocobase-net"], "", "")
+        errs = preflight.check_backend_same_network(pg_container, [backend_name])
+        check("E6：backend 与 PG 不共享网络（跨栈事故形态）→ 拒绝",
+              len(errs) == 1 and "不共享任何 Docker 网络" in errs[0])
+        # 共享网络但 DNS 指向默认栈同名 postgres → 拒绝
+        preflight.docker = stub_docker_factory(["acc-net"], ["acc-net"], "172.20.0.9", "172.18.0.5")
+        errs = preflight.check_backend_same_network(pg_container, [backend_name])
+        check("E6：DNS 解析到其它栈 postgres IP → 拒绝",
+              len(errs) == 1 and "DNS 指向了其它栈" in errs[0])
+        # PG 容器网络信息读不到 → 拒绝（fail closed）
+        preflight.docker = lambda args: (1, "")
+        errs = preflight.check_backend_same_network(pg_container, [backend_name])
+        check("E6：无法读取 PG 网络信息 → fail closed",
+              len(errs) == 1 and "拒绝继续" in errs[0])
+    finally:
+        preflight.docker = orig_docker
+
     print("\n" + "=" * 60)
     if failures:
         print(f"❌ 门禁自测失败 {len(failures)} 项：{', '.join(failures)}")
