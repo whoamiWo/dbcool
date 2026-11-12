@@ -176,6 +176,13 @@ management:
       # 开启 K8s readiness/liveness 分组(/actuator/health/readiness、/liveness)
       probes:
         enabled: true
+  # LDAP 健康指示器：无 LDAP 的部署（默认）不巡检 LDAP。
+  # 即便 LdapContextSource 由自动配置/占位 Bean 创建，也不应把
+  # "未使用 LDAP"误判为 DOWN；显式配置 spring.ldap.urls 或
+  # nocobase.ldap.url 时再由部署方自行打开。
+  health:
+    ldap:
+      enabled: ${LDAP_HEALTH_ENABLED:false}
   metrics:
     # 全局 tag,便于 Prometheus/Grafana 按应用/租户聚合
     tags:

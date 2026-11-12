@@ -108,8 +108,11 @@ public class SecurityConfig {
                         // 鉴权靠 URL 中的随机 token 与 trigger_json.token 常量时间比较（未命中 404）。
                         // 另有 GlobalRateLimitFilter 限流兜底（回调入站维度）。
                         .requestMatchers(HttpMethod.POST, "/api/workflows/webhook/*").permitAll()
-                        // Actuator: 生产 profile 下仅 health 匿名，其他需要认证
-                        .requestMatchers("/actuator/health").permitAll()
+                        // Actuator: 生产 profile 下仅 health 匿名，其他需要认证。
+                        // /actuator/health/** 同时放行：readiness/liveness 探针
+                        // （K8s probes enabled）与分组健康端点同属只读健康信息；
+                        // show-details=when_authorized 保证匿名只拿到聚合状态。
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         // PHASE104 审计修正：Prometheus 的 scrape 是匿名 HTTP GET，无法携带 JWT。
                         // 实测 /actuator/prometheus 返回 401 → Prometheus 抓取目标永远 down，
                         // 5xx / P99 告警规则取不到数据，整个监控链路空转。
