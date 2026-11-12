@@ -29,8 +29,14 @@
 
 用法：
     ACCEPTANCE_MODE=1 BASE_URL=http://127.0.0.1:18082 PG_CONTAINER=nocobase-acc-postgres \
-    PG_STRICT=1 BACKUP_DIR=target/acceptance/backups COMPOSE_PROJECT_NAME=nocobase-acceptance \
+    PG_STRICT=1 BACKUP_DIR=/abs/path/target/acceptance/backups \
+    COMPOSE_PROJECT_NAME=nocobase-acceptance BACKEND_SERVICE=backend-java \
+    REDIS_CONTAINER=nocobase-acc-redis \
     python3 scripts/acceptance-preflight.py
+
+注意：BACKUP_DIR 必须为绝对路径（launch-final-verify 以 scripts/ 为 cwd 调子脚本）；
+REDIS_CONTAINER 未设置时 launch-final/key-rotation 的限流清理会落到默认栈
+nocobase-redis（2026-11-12 实测导致 smoke 429），验收模式下这两个脚本会 fail closed。
 
 退出码：0 = 目标固定成功；1 = 任一项缺失/不匹配。
 """
@@ -219,13 +225,15 @@ def main() -> int:
     backend_service = os.environ.get("BACKEND_SERVICE", "") or "backend-java"
 
     for var in ("ACCEPTANCE_MODE", "BASE_URL", "PG_CONTAINER", "PG_STRICT",
-                "BACKUP_DIR", "COMPOSE_PROJECT_NAME"):
+                "BACKUP_DIR", "COMPOSE_PROJECT_NAME", "REDIS_CONTAINER"):
         if not os.environ.get(var):
             fail(f"缺少环境变量 {var}")
+    if os.environ.get("REDIS_CONTAINER") == "nocobase-redis":
+        fail("REDIS_CONTAINER 是默认栈容器 nocobase-redis；验收必须使用隔离容器")
     if failures:
         print("\n💡 示例：ACCEPTANCE_MODE=1 BASE_URL=http://127.0.0.1:18082 "
               "PG_CONTAINER=nocobase-acc-postgres PG_STRICT=1 "
-              "BACKUP_DIR=target/acceptance/backups COMPOSE_PROJECT_NAME=nocobase-acceptance "
+              "BACKUP_DIR=/abs/path/target/acceptance/backups COMPOSE_PROJECT_NAME=nocobase-acceptance "
               "python3 scripts/acceptance-preflight.py")
         return 1
     if os.environ.get("ACCEPTANCE_MODE") != "1":
@@ -239,6 +247,10 @@ def main() -> int:
         fail("BASE_URL 指向默认栈 8080；验收必须使用隔离栈端口（如 18082）")
     if not backup_dir or Path(backup_dir).resolve() == (ROOT / "backend-python" / "backups").resolve():
         fail("BACKUP_DIR 不得指向默认备份目录 backend-python/backups")
+    if backup_dir and not Path(backup_dir).is_absolute():
+        # launch-final-verify.py 以 scripts/ 为 cwd 运行子脚本，相对 BACKUP_DIR
+        # 会被解析到 scripts/target/... 而静默找不到备份（2026-11-12 实测）。
+        fail("BACKUP_DIR 必须为绝对路径（子脚本以 scripts/ 为 cwd，相对路径会解析错位）")
 
     # ---- 2) 容器存在且属于声明的 compose project ----
     db_name = ""
@@ -317,6 +329,7 @@ def main() -> int:
     print(f"  BACKEND_CONTAINER   = {', '.join(backend_names) or '(未核实)'}")
     print(f"  BACKEND_SERVICE     = {backend_service}")
     print(f"  PG_CONTAINER        = {pg_container or '(未设置)'}")
+    print(f"  REDIS_CONTAINER     = {os.environ.get('REDIS_CONTAINER', '(未设置)')}")
     print(f"  PGDATABASE / port   = {db_name or '(未实查)'} / {server_port or '(未实查)'}")
     print(f"  BACKUP_DIR          = {backup_dir or '(未设置)'}")
     print(f"  git commit          = {commit}")

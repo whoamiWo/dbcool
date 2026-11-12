@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -197,7 +198,12 @@ def cmd_scan_deps(args: argparse.Namespace) -> int:
             print(f"⚠️  {rel} 不存在，跳过", file=sys.stderr)
             continue
         print(f"🔍 trivy 扫描 {kind} 依赖 {rel} ...")
-        rc = _sev_report(["trivy", "fs",
+        # 部分网络环境访问不了默认 DB 镜像 mirror.gcr.io（SYN-SENT 超时，
+        # 2026-11-12 实测导致上线终验 300s 卡死），可用 TRIVY_DB_REPOSITORY
+        # 指向可达镜像（如 public.ecr.aws/aquasecurity/trivy-db）而不改扫描语义。
+        db_repo = os.environ.get("TRIVY_DB_REPOSITORY", "")
+        trivy_extra = ["--db-repository", db_repo] if db_repo else []
+        rc = _sev_report(["trivy", "fs", *trivy_extra,
                           "--scanners", "vuln,secret",
                           "--ignorefile", str(BASE / ".trivyignore"),
                           str(target.parent)],
