@@ -6,6 +6,7 @@ W1 (P0) 要求：Redis 连接失败须返回明确错误，禁止无感降级到
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import redis.asyncio as redis
@@ -15,6 +16,7 @@ from nocobase_py.config import get_settings
 logger = logging.getLogger(__name__)
 
 _redis: redis.Redis | None = None
+_redis_loop: asyncio.AbstractEventLoop | None = None
 _memory: _MemoryRedis | None = None
 
 
@@ -114,7 +116,7 @@ async def get_redis() -> redis.Redis | _MemoryRedis:
     - 默认：连接失败抛 RedisUnavailableError（禁止静默降级）。
     - REDIS_ENABLED=false：返回 _MemoryRedis（单副本模式，日志 WARN）。
     """
-    global _redis, _memory
+    global _redis, _memory, _redis_loop
     s = get_settings()
 
     if not s.redis_enabled:
@@ -126,8 +128,23 @@ async def get_redis() -> redis.Redis | _MemoryRedis:
             )
         return _memory
 
+    # 事件循环亲和性守卫：async Redis 客户端只能由创建它的循环使用。
+    # 若缓存的客户端绑定到已关闭/其他循环（历史 bug：后台线程 asyncio.run()
+    # 创建临时 uvloop），立即重建，避免 "Event loop is closed" 级联与 SIGSEGV。
     if _redis is not None:
-        return _redis
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+        if current_loop is not None and _redis_loop is current_loop and not _redis_loop.is_closed():
+            return _redis
+        stale = _redis
+        _redis = None
+        _redis_loop = None
+        try:
+            await stale.aclose()
+        except Exception:  # noqa: BLE001
+            pass
 
     try:
         client = redis.Redis(host=s.redis_host, port=s.redis_port, decode_responses=True)
@@ -138,13 +155,15 @@ async def get_redis() -> redis.Redis | _MemoryRedis:
         ) from e
 
     _redis = client
+    _redis_loop = asyncio.get_running_loop()
     return _redis
 
 
 async def close_redis() -> None:
     """关闭 Redis 连接。"""
-    global _redis, _memory
+    global _redis, _memory, _redis_loop
     if _redis is not None:
         await _redis.close()
         _redis = None
+    _redis_loop = None
     _memory = None
