@@ -134,15 +134,24 @@ def write_version(path: Path, kind: str, key: str, old_ver: str, new_ver: str) -
         data[key] = new_ver
         content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     elif kind == "xml":
-        content = content.replace(
-            f"<artifactId>nocobase-backend</artifactId>\n        <version>{old_ver}</version>",
-            f"<artifactId>nocobase-backend</artifactId>\n        <version>{new_ver}</version>",
-            1,
+        # 与 extract 同样的宽松空白匹配（标签间可有任意空白/注释）
+        pattern = re.compile(
+            r"(<artifactId>nocobase-backend</artifactId>\s*<version>)[^<]+(</version>)"
         )
+        content, n = pattern.subn(rf"\g<1>{new_ver}\g<2>", content, count=1)
+        if n == 0:
+            raise ValueError("pom.xml 写回失败：未定位到 nocobase-backend 的 <version>")
     elif kind == "toml_top":
         content = content.replace(f'version = "{old_ver}"', f'version = "{new_ver}"', 1)
     elif kind == "py_assign":
-        content = content.replace(f'{key} = "{old_ver}"', f'{key} = "{new_ver}"', 1)
+        # 允许类型注解与任意空白（如 app_version: str = "..."）
+        pattern = re.compile(
+            rf'^(\s*{re.escape(key)}\s*(?::\s*[^=]+)?=\s*)"{re.escape(old_ver)}"',
+            re.MULTILINE,
+        )
+        content, n = pattern.subn(rf'\g<1>"{new_ver}"', content, count=1)
+        if n == 0:
+            raise ValueError(f"Python 文件写回失败：未定位到 {key} = \"{old_ver}\"")
     elif kind == "java_put":
         content = content.replace(f'{key}, "{old_ver}")', f'{key}, "{new_ver}")', 1)
     elif kind == "java_method":
@@ -254,6 +263,25 @@ def self_test() -> int:
         write_version(p, "md_badge", "badge", "1.2.3", "2.0.0")
         out = p.read_text(encoding="utf-8")
     check("粗体写法可被写回", out == "**v2.0.0**\n", f"got={out!r}")
+
+    # 7) py_assign 带类型注解 + 任意空白也能写回（config.py app_version: str = "..."）
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "config.py"
+        p.write_text('    app_version: str = "1.2.3"\n', encoding="utf-8")
+        write_version(p, "py_assign", "app_version", "1.2.3", "2.0.0")
+        out = p.read_text(encoding="utf-8")
+    check("py_assign 带注解写回", out == '    app_version: str = "2.0.0"\n', f"got={out!r}")
+
+    # 8) xml 任意缩进也能写回（pom.xml 4 空格缩进，旧实现硬编码 8 空格失败）
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / "pom.xml"
+        p.write_text(
+            "    <artifactId>nocobase-backend</artifactId>\n    <version>1.2.3</version>\n",
+            encoding="utf-8",
+        )
+        write_version(p, "xml", "project.version", "1.2.3", "2.0.0")
+        out = p.read_text(encoding="utf-8")
+    check("xml 任意缩进写回", "<version>2.0.0</version>" in out, f"got={out!r}")
 
     print()
     if failures:
