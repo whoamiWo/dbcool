@@ -103,6 +103,54 @@ def db_host_of(value: str) -> str:
     return value.split(":")[0].strip()
 
 
+def check_backend_same_network(pg_container: str, backend_names: list[str]) -> list[str]:
+    """E6：backend 与 PG_CONTAINER 必须共享至少一个 Docker 网络。
+
+    2026-11-12 实测事故：compose 文件顺序错误（isolation override 放在
+    observability overlay 之前）导致 backend 被接到默认栈 nocobase-net，
+    服务名 postgres/redis 解析到默认栈容器——env 字符串检查（E5）全部通过，
+    但验收读写实际落到默认库。只有数据面的网络成员关系能证明同栈。
+    """
+    errs: list[str] = []
+    rc, raw = docker(["inspect", "-f", "{{json .NetworkSettings.Networks}}", pg_container])
+    try:
+        pg_nets = set(json.loads(raw).keys()) if rc == 0 and raw else set()
+    except json.JSONDecodeError:
+        pg_nets = set()
+    if not pg_nets:
+        return [f"无法读取 {pg_container} 的网络信息，拒绝继续"]
+    for name in backend_names:
+        rc, raw = docker(["inspect", "-f", "{{json .NetworkSettings.Networks}}", name])
+        try:
+            nets = set(json.loads(raw).keys()) if rc == 0 and raw else set()
+        except json.JSONDecodeError:
+            nets = set()
+        shared = pg_nets & nets
+        if not shared:
+            errs.append(f"后端容器 {name} 与 {pg_container} 不共享任何 Docker 网络"
+                        f"（backend={sorted(nets) or '(无)'} pg={sorted(pg_nets)}）——"
+                        "服务名解析会落到其它栈，验收数据面未隔离")
+        else:
+            # 进一步实证：backend 内解析 PG service 名得到的 IP 必须等于
+            # PG 容器在共享网络上的 IP（排除 DNS 指向其它栈的同名服务）。
+            for net in sorted(shared):
+                rc_ip, pg_ip = docker([
+                    "inspect", "-f",
+                    f'{{{{with index .NetworkSettings.Networks "{net}"}}}}{{{{.IPAddress}}}}{{{{end}}}}',
+                    pg_container])
+                if rc_ip != 0 or not pg_ip:
+                    continue
+                rc_dns, resolved = docker(["exec", name, "getent", "hosts", "postgres"])
+                if rc_dns == 0 and resolved:
+                    actual = resolved.split()[0]
+                    if actual != pg_ip:
+                        errs.append(f"后端容器 {name} 内 postgres 解析到 {actual}，"
+                                    f"但 {pg_container} 在网络 {net} 上的 IP 是 {pg_ip}——"
+                                    "DNS 指向了其它栈的 postgres")
+                break
+    return errs
+
+
 def check_backend_same_stack(base_url_port: int, project: str, pg_container: str,
                              backend_service: str) -> tuple[list[str], list[str]]:
     """BASE_URL 端口必须映射到本 project 的 backend 服务，且该 backend 连向 PG_CONTAINER。
@@ -248,6 +296,10 @@ def main() -> int:
         if backend_names and not errs:
             ok(f"BASE_URL 端口 {url_port} 对应本栈后端容器：{', '.join(backend_names)}")
             ok(f"后端数据源指向 {pg_container}（同一 compose project）")
+            for msg in check_backend_same_network(pg_container, backend_names):
+                fail(msg)
+            if not any("网络" in f or "DNS" in f for f in failures):
+                ok("backend 与 PG 共享 Docker 网络，且 postgres 域名解析到本栈 PG 容器（E6 数据面同栈）")
     elif not failures:
         ok(f"BASE_URL 非本机地址，无法本地核实 backend 同栈；需人工确认 {base_url} 属于 {project}")
 
