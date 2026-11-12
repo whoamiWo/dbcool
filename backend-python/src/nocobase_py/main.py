@@ -80,6 +80,15 @@ async def trace_id_middleware(request: Request, call_next):
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """应用生命周期."""
+    import asyncio
+
+    from nocobase_py.services.scheduler import set_main_loop
+
+    # 注册主事件循环：后台调度线程的协程必须提交到该循环执行，
+    # 禁止在后台线程 asyncio.run()（会把共享 Redis 客户端绑定到临时 uvloop，
+    # 循环销毁后主循环使用 → "Event loop is closed" / SIGSEGV）。
+    set_main_loop(asyncio.get_running_loop())
+
     settings = get_settings()
     print(f"🚀 {settings.app_name} v{__version__} 启动")
     print(f"   Java 后端: {settings.java_backend_url}")
@@ -142,16 +151,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         print(f"   ⚠ W6 闭环安装失败: {e}")
 
     yield
+    set_main_loop(None)
     print(f"🛑 {settings.app_name} 关闭")
 
 
 def _reset_quotas() -> None:
     """每日重置所有租户配额（调用 QuotaService.reset_daily）。"""
     try:
-        import asyncio
-
         from nocobase_py.redis_client import get_redis
         from nocobase_py.services.quota import QuotaService
+        from nocobase_py.services.scheduler import run_coro
 
         async def _do():
             redis = await get_redis()
@@ -163,7 +172,8 @@ def _reset_quotas() -> None:
                 await svc.reset_daily(user_id)
             logger.info("[quota] 重置 %d 个用户日配额", len(keys))
 
-        asyncio.run(_do())
+        # 提交到主循环执行，禁止在后台调度线程 asyncio.run()（同 scheduler.run_coro 注释）
+        run_coro(_do())
     except Exception:  # noqa: BLE001
         import logging
         logging.getLogger(__name__).warning("[quota] 重置失败:\n%s", __import__("traceback").format_exc())
