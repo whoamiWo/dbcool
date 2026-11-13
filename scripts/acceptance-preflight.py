@@ -25,7 +25,10 @@
        （挡住 18082 → 本栈 frontend/minio，E5）；
     6. 后端容器的数据源环境变量（SPRING_DATASOURCE_URL / PGHOST / POSTGRES_HOST / DB_HOST）
        指向 PG_CONTAINER 或其 compose service 名（E5）；
-    7. 打印脱敏目标指纹：base URL / project / backend / container / 数据库 / 端口 / 当前 commit。
+    7. E6 数据面同栈：backend 与 PG_CONTAINER / REDIS_CONTAINER 共享 Docker 网络，
+       且容器内 `getent hosts <compose service>` 解析到目标容器 IP；service 名取自
+       `com.docker.compose.service` label（不硬编码 postgres/redis），getent 失败即 fail closed；
+    8. 打印脱敏目标指纹：base URL / project / backend / container / 数据库 / 端口 / 当前 commit。
 
 用法：
     ACCEPTANCE_MODE=1 BASE_URL=http://127.0.0.1:18082 PG_CONTAINER=nocobase-acc-postgres \
@@ -73,9 +76,10 @@ def docker(args: list[str]) -> tuple[int, str]:
 def compose_labels(cid: str) -> dict:
     rc, raw = docker(["inspect", "-f", "{{json .Config.Labels}}", cid])
     try:
-        return json.loads(raw) if rc == 0 and raw else {}
+        data = json.loads(raw) if rc == 0 and raw else {}
     except json.JSONDecodeError:
         return {}
+    return data if isinstance(data, dict) else {}
 
 
 DB_ENV_KEYS = ("SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_JDBC_URL",
@@ -109,51 +113,82 @@ def db_host_of(value: str) -> str:
     return value.split(":")[0].strip()
 
 
-def check_backend_same_network(pg_container: str, backend_names: list[str]) -> list[str]:
-    """E6：backend 与 PG_CONTAINER 必须共享至少一个 Docker 网络。
+def check_backend_same_network(pg_container: str, backend_names: list[str],
+                               redis_container: str = "") -> list[str]:
+    """E6：backend 必须与 PG/Redis 同栈（网络成员 + 容器内 DNS 解析实证）。
 
     2026-11-12 实测事故：compose 文件顺序错误（isolation override 放在
     observability overlay 之前）导致 backend 被接到默认栈 nocobase-net，
     服务名 postgres/redis 解析到默认栈容器——env 字符串检查（E5）全部通过，
-    但验收读写实际落到默认库。只有数据面的网络成员关系能证明同栈。
+    但验收读写实际落到默认库/默认 redis。只有数据面的网络成员关系与 DNS
+    解析结果能证明同栈；只查 PG 也不够，Redis 会被同一条错误路径污染。
+
+    实现约束：
+    - service 名从容器 label ``com.docker.compose.service`` 读取，不硬编码
+      postgres/redis（compose 服务名可以被 overlay 改名）；
+    - ``getent`` 缺失/解析失败一律 fail closed，不能当作“跳过”；
+    - 读不到目标容器网络/IP 也 fail closed，不给“无法证明但继续”的口子。
     """
     errs: list[str] = []
-    rc, raw = docker(["inspect", "-f", "{{json .NetworkSettings.Networks}}", pg_container])
-    try:
-        pg_nets = set(json.loads(raw).keys()) if rc == 0 and raw else set()
-    except json.JSONDecodeError:
-        pg_nets = set()
-    if not pg_nets:
-        return [f"无法读取 {pg_container} 的网络信息，拒绝继续"]
-    for name in backend_names:
-        rc, raw = docker(["inspect", "-f", "{{json .NetworkSettings.Networks}}", name])
+    targets = [("PG", pg_container)]
+    if redis_container:
+        targets.append(("Redis", redis_container))
+
+    for label, container in targets:
+        service = compose_labels(container).get("com.docker.compose.service", "")
+        if not service:
+            errs.append(f"无法从 {label} 容器 {container} 的 compose label 读取 service 名，"
+                        "拒绝继续（无法证明数据面同栈）")
+            continue
+
+        rc, raw = docker(["inspect", "-f", "{{json .NetworkSettings.Networks}}", container])
         try:
-            nets = set(json.loads(raw).keys()) if rc == 0 and raw else set()
+            target_nets = set(json.loads(raw).keys()) if rc == 0 and raw else set()
         except json.JSONDecodeError:
-            nets = set()
-        shared = pg_nets & nets
-        if not shared:
-            errs.append(f"后端容器 {name} 与 {pg_container} 不共享任何 Docker 网络"
-                        f"（backend={sorted(nets) or '(无)'} pg={sorted(pg_nets)}）——"
-                        "服务名解析会落到其它栈，验收数据面未隔离")
-        else:
-            # 进一步实证：backend 内解析 PG service 名得到的 IP 必须等于
-            # PG 容器在共享网络上的 IP（排除 DNS 指向其它栈的同名服务）。
+            target_nets = set()
+        if not target_nets:
+            errs.append(f"无法读取 {label} 容器 {container} 的网络信息，拒绝继续")
+            continue
+
+        for name in backend_names:
+            rc, raw = docker(["inspect", "-f", "{{json .NetworkSettings.Networks}}", name])
+            try:
+                nets = set(json.loads(raw).keys()) if rc == 0 and raw else set()
+            except json.JSONDecodeError:
+                nets = set()
+            shared = target_nets & nets
+            if not shared:
+                errs.append(f"后端容器 {name} 与 {label} 容器 {container} 不共享任何 Docker 网络"
+                            f"（backend={sorted(nets) or '(无)'} {label}={sorted(target_nets)}）——"
+                            "服务名解析会落到其它栈，验收数据面未隔离")
+                continue
+
+            # 目标容器在共享网络上的 IP 集合（多网络时逐一比对）
+            target_ips = set()
             for net in sorted(shared):
-                rc_ip, pg_ip = docker([
+                rc_ip, ip = docker([
                     "inspect", "-f",
                     f'{{{{with index .NetworkSettings.Networks "{net}"}}}}{{{{.IPAddress}}}}{{{{end}}}}',
-                    pg_container])
-                if rc_ip != 0 or not pg_ip:
-                    continue
-                rc_dns, resolved = docker(["exec", name, "getent", "hosts", "postgres"])
-                if rc_dns == 0 and resolved:
-                    actual = resolved.split()[0]
-                    if actual != pg_ip:
-                        errs.append(f"后端容器 {name} 内 postgres 解析到 {actual}，"
-                                    f"但 {pg_container} 在网络 {net} 上的 IP 是 {pg_ip}——"
-                                    "DNS 指向了其它栈的 postgres")
-                break
+                    container])
+                if rc_ip == 0 and ip:
+                    target_ips.add(ip)
+            if not target_ips:
+                errs.append(f"无法读取 {label} 容器 {container} 在共享网络 "
+                            f"{sorted(shared)} 上的 IP，拒绝继续")
+                continue
+
+            # backend 内解析 compose service 名；getent 不存在/解析失败都必须是 FAIL。
+            rc_dns, resolved = docker(["exec", name, "getent", "hosts", service])
+            if rc_dns != 0 or not resolved.strip():
+                errs.append(f"后端容器 {name} 内执行 `getent hosts {service}` 失败"
+                            f"（exit={rc_dns}，输出={resolved.strip()[:120] or '(空)'}）——"
+                            f"无法证明 {label} 域名指向本栈 {container}，拒绝继续")
+                continue
+            actual = resolved.split()[0]
+            if actual not in target_ips:
+                errs.append(f"后端容器 {name} 内 {service} 解析到 {actual}，"
+                            f"但 {label} 容器 {container} 在网络 {sorted(shared)} 上的 IP 是 "
+                            f"{sorted(target_ips)}——DNS 指向了其它栈的 {service}")
     return errs
 
 
@@ -234,6 +269,7 @@ def main() -> int:
         print("\n💡 示例：ACCEPTANCE_MODE=1 BASE_URL=http://127.0.0.1:18082 "
               "PG_CONTAINER=nocobase-acc-postgres PG_STRICT=1 "
               "BACKUP_DIR=/abs/path/target/acceptance/backups COMPOSE_PROJECT_NAME=nocobase-acceptance "
+              "REDIS_CONTAINER=nocobase-acc-redis "
               "python3 scripts/acceptance-preflight.py")
         return 1
     if os.environ.get("ACCEPTANCE_MODE") != "1":
@@ -308,10 +344,13 @@ def main() -> int:
         if backend_names and not errs:
             ok(f"BASE_URL 端口 {url_port} 对应本栈后端容器：{', '.join(backend_names)}")
             ok(f"后端数据源指向 {pg_container}（同一 compose project）")
-            for msg in check_backend_same_network(pg_container, backend_names):
+            network_errs = check_backend_same_network(
+                pg_container, backend_names, os.environ.get("REDIS_CONTAINER", ""))
+            for msg in network_errs:
                 fail(msg)
-            if not any("网络" in f or "DNS" in f for f in failures):
-                ok("backend 与 PG 共享 Docker 网络，且 postgres 域名解析到本栈 PG 容器（E6 数据面同栈）")
+            if not network_errs:
+                ok("backend 与 PG/Redis 共享 Docker 网络，且服务名解析到本栈容器"
+                   "（E6 数据面同栈）")
     elif not failures:
         ok(f"BASE_URL 非本机地址，无法本地核实 backend 同栈；需人工确认 {base_url} 属于 {project}")
 

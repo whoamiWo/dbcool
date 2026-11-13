@@ -146,6 +146,12 @@ app:
     previous-secret: ${JWT_PREVIOUS_SECRET:}
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
+    rotation:
+      # 2.1.5 默认禁用：rotate() 生成的是进程内随机 key（kid=k-1），不持久化、
+      # 也不与 Python 共享；旋转后 Python 只认共享 JWT_SECRET（kid=k-0），
+      # /api/ai/* 与 /api/admin/backup 会统一 401。持久化/共享 keyring 排期 2.1.6。
+      # 打开前必须确保 Java/Python 使用同一 keyring 存储，否则仅用于本地实验。
+      enabled: ${JWT_ROTATION_ENABLED:false}
   cors:
     allowed-origins: http://localhost:5173,http://localhost:3000
 

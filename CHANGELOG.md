@@ -1,5 +1,22 @@
 ## v2.1.5 (2026-11-12)
 
+### 发布收口：JWT 轮换默认禁用 + 镜像可证性闸门
+
+**安全/兼容性**
+- **JWT 密钥轮换在 2.1.5 默认禁用**（`app.jwt.rotation.enabled=${JWT_ROTATION_ENABLED:false}`）：
+  现有实现只生成进程内随机 key（`kid=k-1`），不持久化、也不与 Python 共享；轮换后
+  Python 仍只认共享 `JWT_SECRET`（`kid=k-0`），`/api/ai/*` 与 `/api/admin/backup` 会统一 401。
+  - `POST /api/admin/jwt-keys/rotate` 在禁用时返回 **409**，不生成新 key、不写审计；只读快照保留
+  - `GET /api/admin/jwt-keys` 增加 `data.enabled`，供门禁判断当前模式
+  - `key-rotation-verify.py` 在禁用模式断言 **6/6**：`enabled=false`、rotate 409/501、密钥环不变、
+    同一 k-0 token 在 Java 与 Python 均可用；不再执行轮换，发布门禁结束后**无需重启 backend-java**
+  - 持久化/共享 keyring（Java/Python 同源）计划在 **2.1.6** 提供；在此之前不得以轮换后重启绕过
+
+**构建可证性**
+- `scripts/build-images.sh` 新增脏构建闸门：工作树有未提交改动时默认 **exit 2**；发布镜像必须从
+  干净 commit 构建。确需脏构建须显式 `ALLOW_DIRTY_BUILD=1`，此时 revision label 写
+  `<sha>-dirty` 并记录 `io.dbcool.build.diff-sha256`，不得冒充干净 revision。
+
 ### N2 收口：Python 后端周期性 SIGSEGV 根因修复 + 证据/文档纠偏
 
 **稳定性修复（生产事故级）**
@@ -16,7 +33,7 @@
 - `docs/release-rollout-runbook.md`：补充 V85 迁移影响与回滚语义（含 `event_type='finish'` 默认值依据）
 
 **迁移**
-- 无新增迁移（V85 已随 2.1.4 进入 `main`，本版仅补文档说明）
+- 无新增迁移。V85 在 2.1.4 发布（2026-11-09）之后才进入 `main`，**2.1.5 是首个包含 V85 的正式版本**；本版未修改已发布的 V83–V85，仅补文档说明
 
 **验证**
 - 新增回归测试 4 项全绿；本机全量（Python 3.14）**85 passed / 1 skipped**；隔离栈修复镜像连续运行观测见 `docs/acceptance-run-2026-11-11.md`

@@ -1,0 +1,24 @@
+PR / 发布通道状态（2026-11-13T00:35Z）
+环境：gh authenticated as whoamiWo；token 权限不足，读不到 Checks。
+
+PR #7（release/2.1.5-prep）
+  state=OPEN
+  head=712efb64709fdda5b7eb1a6095433efdce774cb2
+  mergeStateStatus=UNSTABLE
+  gh pr checks 7 → GraphQL: Resource not accessible by personal access token
+  （缺 checks:read/actions:read，无法判断 UNSTABLE 是 pending 还是真失败）
+
+PR #6（同一 SIGSEGV 修复，已被 f026329 cherry-pick）
+  state=OPEN
+  head=17c9f820f03b7b30480f632739919cbb2949c2f2
+  mergeStateStatus=UNSTABLE
+
+本地工作树
+  branch=release/2.1.5-prep
+  HEAD=712efb6（与 PR #7 head 相同）
+  本轮改动尚未 commit/push（等待明确授权；不得用 admin 强合）
+
+结论
+- 按计划 D2：先合并 #7，再关闭 #6（superseded by f026329）。
+- 当前 Checks 不可读 + 本轮改动未提交，合并/关闭/tag 均未执行。
+- GHCR push 仍缺 write:packages；未推送，未宣称发布物。
