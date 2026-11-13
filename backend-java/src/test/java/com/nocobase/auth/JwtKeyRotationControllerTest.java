@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -33,7 +34,7 @@ class JwtKeyRotationControllerTest {
     void setUp() {
         keyRing = new KeyRingService(
                 "this-is-a-32-byte-secret-key-for-hmac-sha256!!", "", mockEnv());
-        controller = new JwtKeyRotationController(keyRing, auditService);
+        controller = new JwtKeyRotationController(keyRing, auditService, true);
     }
 
     @Test
@@ -43,6 +44,37 @@ class JwtKeyRotationControllerTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> data = (Map<String, Object>) resp.get("data");
         assertThat(data.get("size")).isEqualTo(1);
+    }
+
+    @Test
+    void snapshot_reportsRotationDisabled() {
+        JwtKeyRotationController disabled =
+                new JwtKeyRotationController(keyRing, auditService, false);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) disabled.snapshot().get("data");
+        assertThat(data.get("enabled")).isEqualTo(false);
+    }
+
+    /**
+     * 2.1.5 发布约束：轮换默认关闭。关闭时 rotate 必须 409，且不得生成新 key、
+     * 不得写审计 —— 否则 Python 只认 k-0，会在轮换后统一 401。
+     */
+    @Test
+    void rotate_disabled_throws409AndKeepsKeys() {
+        JwtKeyRotationController disabled =
+                new JwtKeyRotationController(keyRing, auditService, false);
+        String activeBefore = keyRing.currentActive().orElseThrow().kid();
+        int sizeBefore = keyRing.size();
+
+        assertThatThrownBy(disabled::rotate)
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("2.1.5")
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(org.springframework.http.HttpStatus.CONFLICT));
+
+        assertThat(keyRing.size()).isEqualTo(sizeBefore);
+        assertThat(keyRing.currentActive().orElseThrow().kid()).isEqualTo(activeBefore);
+        verifyNoInteractions(auditService);
     }
 
     @Test

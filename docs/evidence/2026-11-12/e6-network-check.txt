@@ -1,0 +1,17 @@
+E6 数据面同栈实证（2026-11-13T00:27Z，最终镜像部署后）
+隔离网络：nocobase-acc-net（project=nocobase-acceptance）
+
+目标容器 IP：
+  nocobase-acc-postgres  172.20.0.12
+  nocobase-acc-redis     172.20.0.2
+
+backend-java 容器内解析：
+  getent hosts postgres → 172.20.0.12 postgres
+  getent hosts redis    → 172.20.0.2  redis
+
+backend-python 容器内解析：
+  getent hosts postgres → 172.20.0.12
+  getent hosts redis    → 172.20.0.2
+
+结论：两个后端的数据面 service 名均解析到本栈容器，未落到默认栈 nocobase-postgres /
+nocobase-redis；与 acceptance-preflight.py 的 E6 输出一致。

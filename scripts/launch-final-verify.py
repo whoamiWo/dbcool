@@ -8,7 +8,7 @@
   4. 备份可恢复 (backup-e2e-verify.py)
   5. 租户隔离 (tenant-isolation-e2e-verify.py)
   6. 配额控制 (quota-e2e-verify.py)
-  7. 密钥轮换 (key-rotation-verify.py)
+  7. 密钥轮换禁用断言 (key-rotation-verify.py；2.1.5 默认 JWT_ROTATION_ENABLED=false)
   8. 冒烟测试 (smoke.py)
 
 用法:
@@ -90,7 +90,7 @@ def run_script(name: str, args: List[str], timeout: int = 300) -> Tuple[bool, st
             capture_output=True,
             text=True,
             timeout=timeout,
-            env={**os.environ, "BASE_URL": BASE_URL}
+            env={**os.environ, "BASE_URL": os.environ.get("BASE_URL", BASE_URL)}
         )
         output = result.stdout + "\n" + result.stderr
         if result.returncode == 0:
@@ -107,6 +107,94 @@ def run_script(name: str, args: List[str], timeout: int = 300) -> Tuple[bool, st
         return False, str(e)
 
 
+def check_backup_gateway() -> bool:
+    """WP3：验证备份端点经前端网关可达（而不是被 nginx `/api/` 截到 Java）。
+
+    根因（2026-11-12）：nginx 把所有 `/api/*` 转给 Java，Java 没有
+    `/api/admin/backup` 路由，所以经网关恒 401/404；Python 直连才正常。
+    修复是在 nginx 增加精确前缀 `location ^~ /api/admin/backup` → Python。
+
+    - `FRONTEND_URL` 未设置：开发模式跳过（打印提示）；`ACCEPTANCE_MODE=1`
+      时必须设置，否则 fail closed（发布证据不得缺这条）。
+    - 正例：ADMIN JWT POST 返回 200 且 data.path 以 .tar.gz 结尾；
+    - 负例：无 token 必须 401/403。
+    """
+    frontend_url = os.environ.get("FRONTEND_URL", "").rstrip("/")
+    base_url = (os.environ.get("BASE_URL") or BASE_URL).rstrip("/")
+    if not frontend_url:
+        if os.environ.get("ACCEPTANCE_MODE") == "1":
+            fail("ACCEPTANCE_MODE=1 但未设置 FRONTEND_URL，无法验证备份网关路由")
+            return False
+        print("  ℹ️  未设置 FRONTEND_URL，跳过备份网关检查（开发模式）")
+        return True
+
+    import base64
+    import json
+    import urllib.error
+    import urllib.request
+
+    # 与子脚本一致：串行门禁会累计登录次数，先清隔离栈限流，避免把 429 误判成鉴权失败。
+    clear_rate_limit()
+
+    username = os.environ.get("USERNAME", "admin")
+    password = os.environ.get("PASSWORD", "admin123")
+    login = urllib.request.Request(
+        f"{base_url}/api/auth/login",
+        data=json.dumps({"username": username, "password": password}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(login, timeout=10) as resp:
+            token = json.loads(resp.read())["data"]["access_token"]
+    except Exception as e:  # noqa: BLE001
+        fail(f"备份网关检查：登录 {base_url} 失败：{e}")
+        return False
+
+    # 2.1.5 默认禁用 JWT 轮换，正常 token 应为 k-0。若仍出现 kid=k-1，说明
+    # 运行的是旧镜像/旧配置（或用 JWT_ROTATION_ENABLED=true 启动），而 Python 只持有
+    # 共享 JWT_SECRET（k-0），无法验签。此时继续 POST 只会得到误导性的 401，
+    # 因此 fail closed 并给出可操作结论：回到默认配置并重启 backend-java。
+    try:
+        header_b64 = token.split(".")[0]
+        header = json.loads(base64.urlsafe_b64decode(header_b64 + "=" * (-len(header_b64) % 4)))
+        kid = header.get("kid")
+    except Exception:  # noqa: BLE001
+        kid = None
+    if kid not in (None, "k-0"):
+        fail(f"备份网关检查：当前 admin token kid={kid}，来自 JWT 轮换后的进程内随机 key；"
+             "2.1.5 默认 JWT_ROTATION_ENABLED=false，正常应为 k-0。"
+             "Python 只持有共享 JWT_SECRET（k-0），无法验签。"
+             "请确认未启用轮换并重启 backend-java 恢复 k-0 后再跑发布门禁")
+        return False
+
+    def post_backup(auth_token: str) -> int:
+        req = urllib.request.Request(
+            f"{frontend_url}/api/admin/backup", data=b"", method="POST",
+            headers={"Authorization": f"Bearer {auth_token}"} if auth_token else {},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return resp.status
+        except urllib.error.HTTPError as e:
+            return e.code
+        except Exception as e:  # noqa: BLE001
+            fail(f"备份网关检查：POST {frontend_url}/api/admin/backup 失败：{e}")
+            return 0
+
+    status = post_backup(token)
+    if status != 200:
+        fail(f"备份网关检查：ADMIN POST {frontend_url}/api/admin/backup → {status}"
+             "（期望 200；若 401/404 说明仍被 nginx /api/ 截到 Java）")
+        return False
+    anon_status = post_backup("")
+    if anon_status not in (401, 403):
+        fail(f"备份网关检查：无 JWT POST 返回 {anon_status}（期望 401/403）")
+        return False
+    ok(f"备份网关可达：{frontend_url}/api/admin/backup → 200；无 JWT → {anon_status}")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="上线前全量门禁编排")
     parser.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://localhost:8080"), help="后端地址")
@@ -119,6 +207,11 @@ def main() -> int:
     log(f"目标后端：{base_url}")
     log(f"DB 目标：container={os.environ.get('PG_CONTAINER', '(auto)')} "
         f"strict={os.environ.get('PG_STRICT', '0')}")
+
+    # WP3：备份网关路由是发布前置条件，不计入下面 8 项业务门禁。
+    if not check_backup_gateway():
+        log("\n❌ 备份网关检查失败，终止上线终验")
+        return 1
 
     # 依赖漏洞扫描：优先官方 security-gates.py（需 trivy 二进制，CI 环境可用）；
     # 本地无 trivy 时回落离线替代 java-dependency-audit.py（PHASE104 方案，本地可跑且非恒真）。
@@ -137,9 +230,11 @@ def main() -> int:
         ("备份可恢复", ["python3", "backup-e2e-verify.py"]),
         ("租户隔离", ["python3", "tenant-isolation-e2e-verify.py"]),
         ("配额控制", ["python3", "quota-e2e-verify.py"]),
-        # key-rotation-verify.py 通过 BASE_URL 环境变量取后端地址（run_script 已注入），
-        # 不再接受 --base-url；传该参数会 argparse 报错 unrecognized arguments（PHASE110 审计修正）。
-        ("密钥轮换", ["python3", "key-rotation-verify.py"]),
+        # key-rotation-verify.py 通过 BASE_URL/PYTHON_URL 环境变量取后端地址
+        # （run_script 已注入），不接受 --base-url。2.1.5 默认禁用轮换，脚本断言
+        # rotate 返回 409/501 且同一 k-0 token 在 Java/Python 均可用，不再执行轮换，
+        # 因此门禁结束后无需重启 backend-java。
+        ("密钥轮换（禁用断言）", ["python3", "key-rotation-verify.py"]),
         ("冒烟测试", ["python3", "smoke.py"]),
     ]
 

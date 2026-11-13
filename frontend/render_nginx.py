@@ -135,6 +135,19 @@ TLS_BLOCK = "\n# ---------- HTTPS 443 server 块（域名模式） ----------\n"
     "    gzip_types text/plain text/css application/javascript application/json image/svg+xml;\n" \
     "    gzip_min_length 1024;\n" \
     "\n" \
+    "    # 备份管理端点只在 Python 后端（Java 没有 /api/admin/backup 路由）。\n" \
+    "    # 必须放在 /api/ 之前，否则会被 /api/ 截获转发到 Java；只放行该精确前缀。\n" \
+    "    location ^~ /api/admin/backup {\n" \
+    "        proxy_pass http://" + PYTHON_BACKEND + ":8000;\n" \
+    "        proxy_set_header Host $host;\n" \
+    "        proxy_set_header X-Real-IP $remote_addr;\n" \
+    "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n" \
+    "        proxy_set_header X-Forwarded-Proto $scheme;\n" \
+    "        proxy_read_timeout 300s;\n" \
+    "        proxy_send_timeout 300s;\n" \
+    "        client_max_body_size 512m;\n" \
+    "    }\n" \
+    "\n" \
     "    location /api/ {\n" \
     "        proxy_pass http://" + JAVA_BACKEND + ":8080;\n" \
     "        proxy_set_header Host $host;\n" \

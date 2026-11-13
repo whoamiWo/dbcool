@@ -1,0 +1,86 @@
+======================================================================
+PHASE95 R5: Cross-tenant Isolation E2E Validation (Improved)
+Base: http://127.0.0.1:18082
+DB 目标: container=nocobase-acc-postgres db=nocobase host=localhost:5432 strict=1
+======================================================================
+Tenant A admin: tid=tenant_default roles=['admin']
+
+... Seeding tenant B ...
+Tenant B admin: tid=tenant_b roles=['admin']
+
+--- Creating resources in tenant A ---
+  KB A: id=d1619118-3483-49bc-920b-a6945dcf7aa3
+  Page A: id=bf9a94ae-273f-410a-8a70-30b291901c45
+  Automation rule A: id=fd35c339-b48a-4142-9411-3dae689d5937
+  Channel A: id=41b13c2a-f7db-4ccb-b6be-70e836c1653d
+  Message A: id=476c9f16-cbfb-4271-8160-e0bdc17814ab
+  Huddle A: id=bdf4152f-e14a-45e4-bc6b-e8df07203f34
+  BI Report A: id=14b43fa0-9070-4554-82cc-68fa415d11ed
+  Test User A: id=9365cf85-15ec-4467-a38e-33fcde28de44
+  Role A (admin): id=00000000-0000-0000-0000-000000000010
+  Role B: id=98cea02e-197f-4a11-a110-d4b93cb4111a
+
+--- Cross-tenant access tests ---
+  ✅ 1-automation A own: A→200 B→404 (want A=200 B=404)
+  ✅ role-assign baseline A→A: A→200 B→404 (want A=200 B=404)
+  ✅ 3-users B→A (GET): A→200 B→404 (want A=200 B=404)
+  ✅ 4-role-assign B→A: A→404 B→404 (want A=404 B=404)
+  ✅ 6-wikiKB B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 7-wikiPage B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 8-categories B→A: A→200 B→200 (want A=200 B=200), content={"message": "success", "data": [], "code": 0}
+  ✅ 9-templates B→A: A→200 B→200 (want A=200 B=200), content={"data": [], "total": 0, "code": 0, "message": "success"}
+  ✅ 10-huddle B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 11-thread B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 12-pins B→A: A→200 B→200 (want A=200 B=200), content={"message": "success", "data": {"pins": []}, "code": 0}
+  ✅ 13-reports B→A: A→200 B→200 (want A=200 B=200), content={"message": "success", "data": [], "code": 0}
+
+--- PHASE96 B2: BI 报表写端点跨租户覆盖改写 ---
+  ✅ 15-biReport-write B→A: B 传 A 的报表 id → 404（越权覆盖被拒）
+  ✅ 16-biReport-write A→A 正向基线: A 保存自己的报表 → 200（证明 404 归因于租户隔离）
+  ✅ 14-users B≠A: A→200 B→200 (want A=200 B=200), content={"message": "success", "data": [{"tenant_id": "tenant_b", "department_id": null, "created_at": "2026
+
+--- R6: enterprise tables cross-tenant ---
+  ✅ 17-orgUnit B≠A: A→200 B→200 (want A=200 B=200), content={"message": "success", "data": [], "code": 0}
+  ✅ 18-orgMember B→A: A→200 B→404 (want A=200 B=404)
+  ✅ 19-approvalTemplate B≠A: A→200 B→200 (want A=200 B=200), content={"message": "success", "data": [], "code": 0}
+  ✅ 20-approvalRequest B→A read: A→200 B→404 (want A=200 B=404)
+  ✅ 21-approvalRequest B→A write: A→403 B→404 (want A=403 B=404)
+  ✅ 22-approvalCc B≠A: A→200 B→200 (want A=200 B=200), content={"message": "success", "data": [], "code": 0}
+
+--- R6: search index cross-tenant visibility ---
+  ✅ 23-search A record not visible to B: A=1 B=0 (want A>=1 B=0)
+  ✅ 24-search B record not visible to A: A=0 B=1 (want B>=1 A=0)
+
+--- R5-7: Control assertion for random IDs ---
+  ✅ control random KB A→404: A→404 B→404 (want A=404 B=404)
+  Random KB ID B→404 (diagnostic, not judged)
+
+======================================================================
+Results: 24/24 PASS
+  ✅ 1-automation A own
+  ✅ role-assign baseline A→A
+  ✅ 3-users B→A (GET)
+  ✅ 4-role-assign B→A
+  ✅ 6-wikiKB B→A
+  ✅ 7-wikiPage B→A
+  ✅ 8-categories B→A
+  ✅ 9-templates B→A
+  ✅ 10-huddle B→A
+  ✅ 11-thread B→A
+  ✅ 12-pins B→A
+  ✅ 13-reports B→A
+  ✅ 14-users B≠A
+  ✅ 17-orgUnit B≠A
+  ✅ 18-orgMember B→A
+  ✅ 19-approvalTemplate B≠A
+  ✅ 20-approvalRequest B→A read
+  ✅ 21-approvalRequest B→A write
+  ✅ 22-approvalCc B≠A
+  ✅ 23-search A record not visible to B
+  ✅ 24-search B record not visible to A
+  ✅ control random KB A→404
+
+--- Cleaning up tenant_default resources ---
+  tenant_default cleanup complete
+
+--- Cleaning up tenant B ---

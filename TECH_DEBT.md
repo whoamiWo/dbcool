@@ -79,7 +79,7 @@
 
 ```
 ruff check .  →  All checks passed!
-pytest tests/  →  81 passed, 1 skipped（2026-11-11 实测）
+pytest tests/  →  85 passed, 1 skipped（2026-11-13 实测）
 ```
 
 **0 error**，且测试套件未破坏。

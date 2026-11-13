@@ -11,7 +11,13 @@
 # 版本来源：根目录 VERSION（Wave0 单一真相源），可用 APP_VERSION 覆盖。
 # 镜像名：${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-<svc>:<version>
 #
-# 退出码：0 = 成功；2 = 前置条件缺失（VERSION 不存在 / docker 不可用）
+# 发布构建可证性（H2b）：
+#   默认要求工作树干净 —— 镜像 label 的 revision 必须真的等于镜像内容来源。
+#   若确实需要脏构建，设置 ALLOW_DIRTY_BUILD=1：revision 会标记为 <sha>-dirty，
+#   并写入 io.dbcool.build.diff-sha256（工作树 diff + 未跟踪文件内容的 sha256）。
+#   .kilo/ 是本地工具配置，不参与构建，也不计入脏判定。
+#
+# 退出码：0 = 成功；2 = 前置条件缺失（VERSION 不存在 / docker 不可用 / 工作树脏且未允许）
 # =====================================================================
 set -euo pipefail
 
@@ -45,6 +51,53 @@ if ! command -v docker >/dev/null 2>&1; then
   echo "❌ 退出码 2：docker 不可用" >&2
   exit 2
 fi
+
+# 镜像可证性（H2）：把构建时的 commit / 版本 / 源码地址写进 OCI label，
+# 事后可用 `docker inspect` 证明运行中的镜像到底包含哪个提交，而不是靠时间戳推断。
+REVISION_SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+REVISION="$REVISION_SHA"
+SOURCE_URL="${IMAGE_SOURCE:-https://github.com/whoamiWo/dbcool}"
+
+# H2b：revision label 只有在干净工作树上才可信。旧行为直接用 `git rev-parse HEAD`，
+# 构建时若有未提交改动，镜像内容 ≠ revision —— 发布证据会被误读。
+if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  # .kilo/ 是本地工具状态（不入库），不参与构建，从脏判定中排除。
+  GIT_STATUS="$(git -C "$ROOT" status --porcelain | grep -Ev '^.. \.kilo/' || true)"
+  if [[ -n "$GIT_STATUS" ]]; then
+    if [[ "${ALLOW_DIRTY_BUILD:-0}" != "1" ]]; then
+      echo "❌ 退出码 2：工作树有未提交改动，不能生成可证 revision 的发布镜像。" >&2
+      echo "   先提交（或设置 ALLOW_DIRTY_BUILD=1 接受 <sha>-dirty 标签）：" >&2
+      echo "$GIT_STATUS" | sed 's/^/     /' >&2
+      exit 2
+    fi
+    # 记录工作树状态的 sha256：tracked diff + 未跟踪文件内容，二者共同标识构建输入。
+    DIFF_SHA="$(
+      {
+        git -C "$ROOT" diff HEAD --binary
+        while IFS= read -r -d '' f; do
+          case "$f" in .kilo/*) continue ;; esac
+          printf 'untracked:%s\n' "$f"
+          sha256sum "$ROOT/$f" 2>/dev/null || true
+        done < <(git -C "$ROOT" ls-files --others --exclude-standard -z)
+      } | sha256sum | awk '{print $1}'
+    )"
+    REVISION="${REVISION_SHA}-dirty"
+    echo "⚠️  ALLOW_DIRTY_BUILD=1：工作树不干净，revision 标记为 $REVISION"
+    echo "   dirty-diff-sha256=$DIFF_SHA（不得作为发布镜像冒充干净 commit）"
+  fi
+fi
+
+# label 必须使用最终 revision（脏构建为 <sha>-dirty），否则会冒充干净 commit。
+LABEL_ARGS=(
+  --label "org.opencontainers.image.revision=$REVISION"
+  --label "org.opencontainers.image.version=$VERSION"
+  --label "org.opencontainers.image.source=$SOURCE_URL"
+)
+if [[ "${REVISION}" == *-dirty ]]; then
+  LABEL_ARGS+=(--label "io.dbcool.build.dirty=true")
+  LABEL_ARGS+=(--label "io.dbcool.build.diff-sha256=${DIFF_SHA:-unknown}")
+fi
+echo "▶ 构建来源：version=$VERSION revision=$REVISION"
 
 # Wave4：backend-java 的 Dockerfile 用 `COPY target/nocobase-backend-*.jar ./`，
 # 若 target 里残留上一版本的 jar（如 2.1.1 与 2.1.2 同时存在），COPY 会因
@@ -82,15 +135,18 @@ for svc in backend-java backend-python crdt-service frontend; do
       exit 2
     fi
     echo "▶ 构建 $image [$PLATFORM]（无 buildx，经典 build + push）"
-    docker build --platform "$PLATFORM" -t "$image" -f "$ctx/Dockerfile" "$ctx"
+    docker build --platform "$PLATFORM" -t "$image" "${LABEL_ARGS[@]}" \
+      -f "$ctx/Dockerfile" "$ctx"
     if [[ $PUSH -eq 1 ]]; then
       docker push "$image"
     fi
     echo "✅ $image"
+    # 本地镜像必须留下可核对的 image ID + revision label（容器 image ID 要能对上）。
+    docker image inspect -f '   image id={{.Id}} revision={{index .Config.Labels "org.opencontainers.image.revision"}} version={{index .Config.Labels "org.opencontainers.image.version"}}' "$image"
     continue
   fi
   echo "▶ 构建 $image [$PLATFORM]"
-  args=(buildx build --platform "$PLATFORM" -t "$image" -f "$ctx/Dockerfile" "$ctx")
+  args=(buildx build --platform "$PLATFORM" -t "$image" "${LABEL_ARGS[@]}" -f "$ctx/Dockerfile" "$ctx")
   if [[ $PUSH -eq 1 ]]; then
     args+=(--push)
   elif [[ $LOAD -eq 1 ]]; then
@@ -100,6 +156,9 @@ for svc in backend-java backend-python crdt-service frontend; do
   fi
   docker "${args[@]}"
   echo "✅ $image"
+  if [[ $PUSH -eq 0 && $LOAD -eq 1 ]]; then
+    docker image inspect -f '   image id={{.Id}} revision={{index .Config.Labels "org.opencontainers.image.revision"}} version={{index .Config.Labels "org.opencontainers.image.version"}}' "$image"
+  fi
 done
 
-echo "完成：版本 $VERSION，registry=$REGISTRY，push=$PUSH"
+echo "完成：版本 $VERSION，revision=$REVISION，registry=$REGISTRY，push=$PUSH"

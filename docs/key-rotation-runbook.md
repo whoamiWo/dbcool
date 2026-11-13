@@ -16,26 +16,48 @@
 
 ## 2. JWT 签名密钥轮换
 
-### 2.1 当前机制
+### 2.0 2.1.5 发布状态：默认禁用（重要）
+
+2.1.5 **不允许执行 JWT 轮换**。`app.jwt.rotation.enabled` 默认 `false`
+（环境变量 `JWT_ROTATION_ENABLED`），`POST /api/admin/jwt-keys/rotate` 返回 **409**，
+只读 `GET /api/admin/jwt-keys` 保留并返回 `data.enabled=false`。
+
+原因：当前 `KeyRingService.rotate()` 只生成进程内随机 key（`kid=k-1`），不持久化，
+也不与 Python 后端共享。Python 只认共享 `JWT_SECRET`（`kid=k-0`），轮换后
+`/api/ai/*` 与 `/api/admin/backup` 会统一 401。持久化/共享 keyring 计划在 **2.1.6**
+提供；在此之前不得用“轮换后重启 Java”绕过。
+
+2.1.5 的验证只断言禁用与共享密钥可用：
+
+```bash
+BASE_URL=http://localhost:8080 PYTHON_URL=http://localhost:8000 \
+  python3 scripts/key-rotation-verify.py
+# 期望：6/6 PASS（enabled=false、rotate 409/501、密钥环不变、k-0 在 Java/Python 均可用）
+```
+
+### 2.1 当前机制（2.1.6 启用前仅供理解）
 
 - `JwtKeyRotationController`（`/api/admin/jwt-keys`）提供 `rotate` 端点
 - `KeyRingService` 维护内存中的密钥环，支持 ACTIVE / RETIRED 两种状态
 - **双密钥窗口**：轮换后旧密钥仍可验证存量 token，直到 access TTL（默认 15 min）过期
 - **重启丢失**：内存中的密钥环重启后从 yml 重读，需同步更新 `app.jwt.previous-secret`
 
-### 2.2 操作步骤
+### 2.2 操作步骤（仅 2.1.6 共享 keyring 落地后）
+
+> 2.1.5 不要执行本节；当前 endpoint 会直接 409。
 
 ```bash
-# 1. 记录当前密钥环状态
+# 1. 记录当前密钥环状态（含 enabled 标志）
 curl -s -H "Authorization: Bearer <admin-token>" \
   http://localhost:8080/api/admin/jwt-keys | jq
 
-# 2. 触发轮换
+# 2. 触发轮换（仅当 enabled=true）
 curl -s -X POST -H "Authorization: Bearer <admin-token>" \
   http://localhost:8080/api/admin/jwt-keys/rotate | jq
 
-# 3. 验证新密钥生效
-python3 scripts/key-rotation-verify.py --base-url http://localhost:8080
+# 3. 验证（BASE_URL/PYTHON_URL 由环境变量传入，脚本不接受 --base-url）
+BASE_URL=http://localhost:8080 PYTHON_URL=http://localhost:8000 \
+  python3 scripts/key-rotation-verify.py
 
 # 4. 同步更新 yml 配置（重启后保留旧密钥）
 # app.jwt.previous-secret = <RETIRED key 的 secret>
@@ -45,6 +67,8 @@ python3 scripts/key-rotation-verify.py --base-url http://localhost:8080
 
 - 如果轮换后出现异常，重新调用 `/api/admin/jwt-keys/rotate` 并在 yml 中恢复旧密钥配置
 - 存量 token 在 15 min 内仍有效（双密钥窗口），无需全量登出
+- 2.1.5 若误将 `JWT_ROTATION_ENABLED` 设为 `true`，改回 `false` 并重启 `backend-java`
+  即恢复共享 `k-0`；不需要（也不应）依赖轮换后重启来“修复”
 
 ---
 
@@ -100,8 +124,9 @@ sed -i "s/^INTEGRATION_CREDENTIAL_MASTER_KEY=.*/INTEGRATION_CREDENTIAL_MASTER_KE
 # 4. 重启服务
 docker compose restart backend-java backend-python
 
-# 5. 验证
-python3 scripts/key-rotation-verify.py --base-url http://localhost:8080
+# 5. 验证（2.1.5 为禁用模式 6/6 断言）
+BASE_URL=http://localhost:8080 PYTHON_URL=http://localhost:8000 \
+  python3 scripts/key-rotation-verify.py
 ```
 
 ### 4.3 注意事项
@@ -116,7 +141,7 @@ python3 scripts/key-rotation-verify.py --base-url http://localhost:8080
 
 | 验证项 | 命令 | 预期 |
 |--------|------|------|
-| JWT 密钥轮换 | `python3 scripts/key-rotation-verify.py` | 全部 PASS |
+| JWT 密钥轮换 | `python3 scripts/key-rotation-verify.py` | 2.1.5 禁用模式 6/6 PASS |
 | 服务健康 | `python3 scripts/smoke.py` | 11/11 |
 | 备份可恢复 | `python3 scripts/backup-e2e-verify.py` | 30/30 |
 | 生产检查 | `python3 scripts/startup-checklist.py` | 0 问题 |

@@ -16,6 +16,7 @@
 import importlib.util
 import io
 import json
+import re
 import sys
 import tempfile
 from contextlib import redirect_stdout
@@ -191,46 +192,103 @@ def main() -> int:
     check("F2：带凭据 JDBC URL → 跳过 userinfo 取真实主机",
           preflight.db_host_of("jdbc:postgresql://u:p@acc-postgres/nocobase") == "acc-postgres")
 
-    print("\n== 6b. preflight E6 数据面同栈（backend 与 PG 网络成员 + DNS 解析实证） ==")
+    print("\n== 6b. preflight E6 数据面同栈（backend 与 PG/Redis 网络成员 + DNS 解析实证） ==")
     # 不依赖真实 docker：stub 掉模块内 docker()，重放 2026-11-12 跨栈事故形态。
     orig_docker = preflight.docker
 
-    def stub_docker_factory(pg_nets, backend_nets, pg_ip, resolved_ip):
+    def stub_docker_factory(targets, backend_nets, resolve):
+        """最小 docker 桩。
+
+        targets: {容器名: {"service": 服务名, "nets": [...], "ips": {网络: IP}}}
+        backend_nets: {backend 容器名: [网络...]}
+        resolve: {(backend, service): IP}；缺键/None 表示 getent 解析失败。
+        """
         def _stub(args):
-            target = args[-1]
-            if args[:2] == ["inspect", "-f"]:
-                tpl = args[2]
+            if args[0] == "inspect" and args[1] == "-f":
+                tpl, target = args[2], args[-1]
+                spec = targets.get(target)
+                if "Config.Labels" in tpl:
+                    if spec is None:
+                        return 1, ""
+                    labels = {}
+                    if spec.get("service"):
+                        labels["com.docker.compose.service"] = spec["service"]
+                    return 0, json.dumps(labels)
                 if "NetworkSettings.Networks" in tpl and "IPAddress" in tpl:
-                    return (0, pg_ip)
-                if target == pg_container:
-                    return (0, json.dumps({n: {} for n in pg_nets}))
-                return (0, json.dumps({n: {} for n in backend_nets}))
-            if args[:2] == ["exec", backend_name] and "getent" in args:
-                return (0, f"{resolved_ip} postgres postgres") if resolved_ip else (1, "")
-            return (1, "")
+                    m = re.search(r'index \.NetworkSettings\.Networks "([^"]+)"', tpl)
+                    ip = (spec or {}).get("ips", {}).get(m.group(1) if m else "")
+                    return (0, ip) if ip else (1, "")
+                if "NetworkSettings.Networks" in tpl:
+                    if spec is not None:
+                        return 0, json.dumps({n: {} for n in spec.get("nets", [])})
+                    if target in backend_nets:
+                        return 0, json.dumps({n: {} for n in backend_nets[target]})
+                    return 1, ""
+                return 1, ""
+            if args[0] == "exec" and "getent" in args:
+                backend, service = args[1], args[-1]
+                ip = resolve.get((backend, service))
+                return (0, f"{ip} {service} {service}") if ip else (1, "getent: not found")
+            return 1, ""
         return _stub
 
-    pg_container, backend_name = "acc-postgres", "acc-backend-java"
+    pg_container, redis_container, backend_name = "acc-postgres", "acc-redis", "acc-backend-java"
+    good_targets = {
+        pg_container: {"service": "postgres", "nets": ["acc-net"],
+                       "ips": {"acc-net": "172.20.0.9"}},
+        redis_container: {"service": "redis", "nets": ["acc-net"],
+                          "ips": {"acc-net": "172.20.0.12"}},
+    }
+    good_resolve = {(backend_name, "postgres"): "172.20.0.9",
+                    (backend_name, "redis"): "172.20.0.12"}
     try:
-        # 同网 + DNS 指向正确 → 无错误
-        preflight.docker = stub_docker_factory(["acc-net"], ["acc-net"], "172.20.0.9", "172.20.0.9")
-        check("E6：同网络且 DNS 指向本栈 PG → 通过",
-              preflight.check_backend_same_network(pg_container, [backend_name]) == [])
-        # 跨栈（事故形态）：backend 在默认网，与 PG 无共享网络 → 拒绝
-        preflight.docker = stub_docker_factory(["acc-net"], ["nocobase-net"], "", "")
-        errs = preflight.check_backend_same_network(pg_container, [backend_name])
+        # 正例：PG + Redis 同网络且 DNS 均指向本栈容器 → 无错误
+        preflight.docker = stub_docker_factory(
+            good_targets, {backend_name: ["acc-net"]}, good_resolve)
+        check("E6：PG/Redis 同网络且 DNS 指向本栈容器 → 通过",
+              preflight.check_backend_same_network(
+                  pg_container, [backend_name], redis_container) == [])
+        # PG 跨栈（事故形态）：backend 在默认网，与 PG 无共享网络 → 拒绝
+        preflight.docker = stub_docker_factory(
+            good_targets, {backend_name: ["nocobase-net"]}, good_resolve)
+        errs = preflight.check_backend_same_network(
+            pg_container, [backend_name], redis_container)
         check("E6：backend 与 PG 不共享网络（跨栈事故形态）→ 拒绝",
-              len(errs) == 1 and "不共享任何 Docker 网络" in errs[0])
-        # 共享网络但 DNS 指向默认栈同名 postgres → 拒绝
-        preflight.docker = stub_docker_factory(["acc-net"], ["acc-net"], "172.20.0.9", "172.18.0.5")
-        errs = preflight.check_backend_same_network(pg_container, [backend_name])
+              any("与 PG 容器" in e and "不共享任何 Docker 网络" in e for e in errs),
+              f"errs={errs}")
+        # Redis 跨栈：PG 在本栈网，Redis 落到默认网 → 必须拒绝，不能只查 PG 就放行
+        redis_cross = {**good_targets,
+                       redis_container: {"service": "redis", "nets": ["nocobase-net"],
+                                         "ips": {"nocobase-net": "172.18.0.6"}}}
+        preflight.docker = stub_docker_factory(
+            redis_cross, {backend_name: ["acc-net"]}, good_resolve)
+        errs = preflight.check_backend_same_network(
+            pg_container, [backend_name], redis_container)
+        check("E6：Redis 跨栈（PG 同栈但 Redis 在默认网）→ 拒绝",
+              len(errs) == 1 and "与 Redis 容器" in errs[0]
+              and "不共享任何 Docker 网络" in errs[0], f"errs={errs}")
+        # 共享网络但 DNS 指向默认栈同名 PG → 拒绝
+        preflight.docker = stub_docker_factory(
+            good_targets, {backend_name: ["acc-net"]},
+            {**good_resolve, (backend_name, "postgres"): "172.18.0.5"})
+        errs = preflight.check_backend_same_network(
+            pg_container, [backend_name], redis_container)
         check("E6：DNS 解析到其它栈 postgres IP → 拒绝",
-              len(errs) == 1 and "DNS 指向了其它栈" in errs[0])
-        # PG 容器网络信息读不到 → 拒绝（fail closed）
-        preflight.docker = lambda args: (1, "")
+              len(errs) == 1 and "DNS 指向了其它栈" in errs[0], f"errs={errs}")
+        # getent 不存在/解析失败 → fail closed（不得当成跳过）
+        preflight.docker = stub_docker_factory(
+            good_targets, {backend_name: ["acc-net"]}, {})
+        errs = preflight.check_backend_same_network(pg_container, [backend_name])
+        check("E6：容器内无 getent / 解析失败 → fail closed",
+              len(errs) == 1 and "getent hosts postgres" in errs[0]
+              and "拒绝继续" in errs[0], f"errs={errs}")
+        # 读不到网络信息 → fail closed
+        preflight.docker = stub_docker_factory(
+            {pg_container: {"service": "postgres", "nets": [], "ips": {}}},
+            {backend_name: ["acc-net"]}, {})
         errs = preflight.check_backend_same_network(pg_container, [backend_name])
         check("E6：无法读取 PG 网络信息 → fail closed",
-              len(errs) == 1 and "拒绝继续" in errs[0])
+              len(errs) == 1 and "拒绝继续" in errs[0], f"errs={errs}")
     finally:
         preflight.docker = orig_docker
 
