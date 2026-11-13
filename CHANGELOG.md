@@ -36,7 +36,12 @@
 - 无新增迁移。V85 在 2.1.4 发布（2026-11-09）之后才进入 `main`，**2.1.5 是首个包含 V85 的正式版本**；本版未修改已发布的 V83–V85，仅补文档说明
 
 **验证**
-- 新增回归测试 4 项全绿；本机全量（Python 3.14）**85 passed / 1 skipped**；隔离栈修复镜像连续运行观测见 `docs/acceptance-run-2026-11-11.md`
+- 新增回归测试：JWT 禁用 409/密钥环不变 2 项、`key-rotation-verify` 禁用模式 6/6 断言；
+  Java `mvn -o verify` **2855 tests / 0F / 0E**、BUNDLE LINE **80.26%**
+- 最终镜像 `revision=5504206` 上重跑 release 门禁 **16/16 PASS**（`docs/evidence/2026-11-13/monthly-gate-release.log`）：
+  Python **85 passed / 1 skipped**、smoke 14/14、tenant 24/24、backup 30/30、launch 8/8
+- 隔离栈修复镜像连续运行与 24h 观察基线见 `docs/acceptance-run-2026-11-11.md` 与
+  `docs/evidence/2026-11-13/observation-baseline.txt`
 
 ## v2.1.4 (2026-11-09)
 

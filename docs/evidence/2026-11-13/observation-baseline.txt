@@ -1,0 +1,25 @@
+# 24h 观察基线（2.1.5 最终镜像 revision=5504206）
+# 记录时间：2026-11-13T01:41Z（部署完成后；发布门禁不再重启 backend-java）
+# 窗口起点：2026-11-13T01:16:26Z（最后一次计划内启动）
+# 窗口到期：2026-11-14T01:16Z
+
+## 容器重启
+/nocobase-acc-backend-java    restarts=0 started=2026-11-13T01:15:55.057381307Z
+/nocobase-acc-backend-python  restarts=0 started=2026-11-13T01:16:20.800642583Z
+/nocobase-acc-crdt-service    restarts=0 started=2026-11-13T01:15:55.053516427Z
+/nocobase-acc-frontend        restarts=0 started=2026-11-13T01:16:26.501780522Z
+
+## 告警
+Prometheus  http://127.0.0.1:19090/api/v1/alerts → data.alerts=[]（0 条 firing）
+Alertmanager http://127.0.0.1:19093/api/v2/alerts → []（0 条 firing）
+
+## 镜像
+四容器 image ID == 本地镜像 ID，OCI revision=550420682277a06133e6653812354530f24a0b37；
+详见 image-provenance.txt。
+
+## 到期检查项（2026-11-14T01:16Z）
+- 四个应用容器 RestartCount 是否仍为 0、StartedAt 是否未变
+- Prometheus / Alertmanager 是否新增 firing
+- backend-java / backend-python 5xx 是否新增
+- alerts.db 是否有未 resolved 的告警
+- 任一非计划重启 → 重新计时 24h

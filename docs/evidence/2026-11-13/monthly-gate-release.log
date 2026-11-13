@@ -1,0 +1,100 @@
+========================================================================
+Wave4 月度门禁（共 15 项，工作目录 /home/who/multistack-project，发布模式 --release）
+========================================================================
+
+▶ 验收目标预检（acceptance-preflight）...
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✓ 容器 nocobase-acc-postgres 属于隔离 project nocobase-acceptance
+  ✓ 数据库指纹 current_database()=nocobase inet_server_port()=5432
+  ✓ GET http://127.0.0.1:18082/api/health → 200
+  ✓ BASE_URL 端口 18082 对应本栈后端容器：nocobase-acc-backend-java
+  ✓ 后端数据源指向 nocobase-acc-postgres（同一 compose project）
+  ✓ backend 与 PG/Redis 共享 Docker 网络，且服务名解析到本栈容器（E6 数据面同栈）
+
+验收目标指纹（脱敏）：
+  BASE_URL            = http://127.0.0.1:18082
+  COMPOSE_PROJECT     = nocobase-acceptance
+  BACKEND_CONTAINER   = nocobase-acc-backend-java
+  BACKEND_SERVICE     = backend-java
+  PG_CONTAINER        = nocobase-acc-postgres
+  REDIS_CONTAINER     = nocobase-acc-redis
+  PGDATABASE / port   = nocobase / 5432
+  BACKUP_DIR          = /home/who/multistack-project/target/acceptance/backups
+  git commit          = 5504206
+
+✅ 验收目标已固定，所有后续脚本将作用于上述目标
+
+▶ 版本一致性 ...
+  ✅ PASS (0.1s, exit=0)
+
+▶ 契约 0 漂移 ...
+  ✅ PASS (0.0s, exit=0)
+
+▶ 依赖漏洞审计 ...
+  ✅ PASS (4.4s, exit=0)
+
+▶ 后端 mvn -o verify ...
+  ✅ PASS (127.3s, exit=0)
+
+▶ 前端 npm run test:run ...
+  ✅ PASS (51.0s, exit=0)
+
+▶ 前端 tsc --noEmit ...
+  ✅ PASS (14.6s, exit=0)
+
+▶ 前端 eslint src ...
+  ✅ PASS (14.6s, exit=0)
+
+▶ Python pytest ...
+  ✅ PASS (8.8s, exit=0)
+
+▶ 冒烟 smoke.py ...
+  ✅ PASS (0.8s, exit=0)
+
+▶ 租户隔离 ...
+  ✅ PASS (8.3s, exit=0)
+
+▶ 归属写入静态门禁 ...
+  ✅ PASS (0.0s, exit=0)
+
+▶ 企业套件真实 PG (pg IT) ...
+  ✅ PASS (52.7s, exit=0)
+
+▶ 企业套件 schema smoke ...
+  ✅ PASS (3.8s, exit=0)
+
+▶ 备份/PITR 演练 ...
+  ✅ PASS (19.9s, exit=0)
+
+▶ 上线终验 ...
+  ✅ PASS (40.8s, exit=0)
+
+📊 实测数字已写入 target/gate-numbers.json
+
+▶ 文档数字校验 ...
+  模式: 只校验（release）
+  ✅ PASS (0.1s, exit=0)
+
+========================================================================
+汇总
+========================================================================
+  ✅ 版本一致性: exit=0 (0.1s)
+  ✅ 契约 0 漂移: exit=0 (0.0s)
+  ✅ 依赖漏洞审计: exit=0 (4.4s)
+  ✅ 后端 mvn -o verify: exit=0 (127.3s)
+  ✅ 前端 npm run test:run: exit=0 (51.0s)
+  ✅ 前端 tsc --noEmit: exit=0 (14.6s)
+  ✅ 前端 eslint src: exit=0 (14.6s)
+  ✅ Python pytest: exit=0 (8.8s)
+  ✅ 冒烟 smoke.py: exit=0 (0.8s)
+  ✅ 租户隔离: exit=0 (8.3s)
+  ✅ 归属写入静态门禁: exit=0 (0.0s)
+  ✅ 企业套件真实 PG (pg IT): exit=0 (52.7s)
+  ✅ 企业套件 schema smoke: exit=0 (3.8s)
+  ✅ 备份/PITR 演练: exit=0 (19.9s)
+  ✅ 上线终验: exit=0 (40.8s)
+  ✅ 文档数字校验: exit=0 (0.1s)
+
+✅ 全部 16 项门禁通过

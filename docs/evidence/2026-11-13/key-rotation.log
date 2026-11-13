@@ -1,0 +1,13 @@
+[09:16:33] 目标后端：http://127.0.0.1:18082
+  ✅ PASS: 取得 admin token
+  ✅ PASS: 基线：token 可访问管理端点 (200)
+  ✅ PASS: 断言1 通过：后端快照明确 enabled=false（JWT 轮换已禁用）
+  ✅ PASS: 断言2 通过：admin token kid=k-0，来自共享 JWT_SECRET
+  ✅ PASS: 断言3 通过：rotate 返回 409（禁用生效，未生成新 key）
+  ✅ PASS: 断言4 通过：密钥环未变化（size=1，ACTIVE=1，无 k-1）
+  ✅ PASS: 断言5 通过：同一 token 在 Java 侧仍被接受（200）
+  ✅ PASS: Python 侧接受同一 token：http://127.0.0.1:18000/api/ai/whoami → 200（user_id=00000000-0000-0000-0000-000000000001）
+  ✅ PASS: 断言6 通过：同一 token 在 Python 侧仍被接受（共享 JWT_SECRET）
+[09:16:33]
+=== 验证结果（2.1.5 禁用模式） ===
+  ✅ PASS: JWT 轮换禁用断言 6/6 全部通过

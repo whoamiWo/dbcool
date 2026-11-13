@@ -3,7 +3,7 @@
 > 本文是受控证据索引（G1/D22）：每条结论都可通过「命令 + 输出摘要」复现。
 > 原始日志已脱敏提交到 `docs/evidence/<date>/`（`target/` 仍为 gitignore 的工作副本）。
 > 2026-11-11 的 `/tmp/kilo/*.log` 已丢失；本文不补写其内容，只记录可重跑项的真实输出。
-> **2026-11-12 发现隔离栈跨栈网络逃逸事故（见 §4）；2026-11-13 在最终镜像 revision=712efb6 上重跑，16/16 PASS。2026-11-11 的数字仅作历史参考。**
+> **2026-11-12 发现隔离栈跨栈网络逃逸事故（见 §4）；2026-11-13 在最终镜像 revision=5504206 上重跑，16/16 PASS。2026-11-11 的数字仅作历史参考。**
 
 ## 1. 目标指纹
 
@@ -19,8 +19,8 @@ PGDATABASE / port   = nocobase / 5432
 Prometheus          = http://127.0.0.1:19090   Alertmanager = http://127.0.0.1:19093
 ```
 
-镜像版本：`2.1.5`，OCI label `org.opencontainers.image.revision=712efb64709fdda5b7eb1a6095433efdce774cb2`
-（四镜像：backend-java / backend-python / crdt-service / frontend；容器 image ID 与镜像 ID 逐一相等，见 §7 与 `docs/evidence/2026-11-12/observation-baseline.txt`）。
+镜像版本：`2.1.5`，OCI label `org.opencontainers.image.revision=550420682277a06133e6653812354530f24a0b37`
+（四镜像：backend-java / backend-python / crdt-service / frontend；容器 image ID 与镜像 ID 逐一相等，见 §7 与 `docs/evidence/2026-11-13/observation-baseline.txt`）。
 默认栈（`nocobase`，8080/5432）**不是**验收目标，任何指向它的输出都不是证据。
 
 ## 2. 迁移双轨
@@ -48,10 +48,10 @@ REDIS_CONTAINER=nocobase-acc-redis \
 python3 scripts/acceptance-preflight.py
 ```
 
-- 正向：`docs/evidence/2026-11-12/preflight-positive.log` → exit=0，含 **E6 数据面同栈实证**
+- 正向：`docs/evidence/2026-11-13/preflight-positive.log` → exit=0，含 **E6 数据面同栈实证**
   （backend 与 **PG 及 Redis** 共享 Docker 网络 + backend 内 `getent hosts <compose service>`
   解析到本栈容器 IP；service 名取自 `com.docker.compose.service` label，不硬编码）。
-  Java 与 Python 两个后端的 DNS 实测见 `docs/evidence/2026-11-12/e6-network-check.txt`。
+  Java 与 Python 两个后端的 DNS 实测见 `docs/evidence/2026-11-13/e6-network-check.txt`。
 - 负向（`docs/evidence/2026-11-11/preflight-negative.log`，2026-11-12 新增 `preflight-negative-extra.log`）：
 
 | 用例 | 期望 | 实测 |
@@ -87,17 +87,25 @@ refresh token、ratelimit key 全部写入默认库/默认 redis，而 E5（env 
 → `172.20.0.9 postgres` / `172.20.0.12 redis`（本栈）；acc-postgres 出现 backend-java
 连接与 ratelimit key 写入；默认库 `audit_log` 计数停止增长。
 
-**默认栈残留与处置**（2026-11-12T23:52Z，详见 `docs/evidence/2026-11-12/default-stack-residue.txt`）：
+**默认栈残留与处置**（2026-11-12T23:52Z 初盘；2026-11-13 只读补盘，详见
+`docs/evidence/2026-11-13/default-stack-residue.txt`）：
 - 事故窗口（02:22Z 前后）默认库 `audit_log` 新增 16 行（总数 270104→270120）、`users` 新增 1 行
   （`smoke_user_2654e98c`）、`approval_request` 新增 1 行；默认 redis `refresh:*` 481 个。
+- 2026-11-13 按 audit 资源 ID 补盘：collection `smokede1b9eb8col`（含
+  `data_smokede1b9eb8col` 1 行）、form `dff87b74`（含 `data_smokede1b9eb8_form` 1 行）、
+  wiki_page `7ed81abf`、im_message `4104ea58`、user `48016fec`、approval `3b89aef3`；
+  im_attachment 事故窗口 0 行；workflow `d500b10f` 创建于 2026-11-09，非事故新建。
+- 默认栈长期 smoke 残留：`collection_meta name LIKE 'smoke%'` **338** 个、
+  `users username LIKE 'smoke_user_%'` **34** 个（含本次事故对象），建议单独排期清理。
 - 已按测试用户 ID 吊销 refresh token（`48016fec-…`：删除 `refresh:{token}` 与
   `refresh:user:{userId}` 索引，481→479），未执行 `FLUSHDB`。`ratelimit:*` 当时已自然过期（0 个）。
-- `audit_log` 16 行、测试用户、审批行**全部保留未删**；是否删除/隔离由默认栈 owner 决定（计划 D3）。
-  未执行 `DELETE FROM audit_log`。
+- `audit_log` 16 行、测试用户、审批行**全部保留未删**；删除/隔离需默认栈 owner 批准（计划 D3），
+  本轮只读盘点，未执行 `DELETE FROM audit_log`、未批量删除测试对象。
 
 ## 5. 业务门禁（2026-11-13 最终镜像重跑，全部作用于隔离栈）
 
-完整 release 门禁（16 项全 PASS，无 SKIP）：`docs/evidence/2026-11-12/monthly-gate-release.log`
+完整 release 门禁（16 项全 PASS，无 SKIP）：`docs/evidence/2026-11-13/monthly-gate-release.log`
+（`git commit=5504206`；同镜像另见 `launch-final.log` 8/8、`key-rotation.log` 6/6）
 
 ```
 ✅ 全部 16 项门禁通过（monthly-gate exit=0）
@@ -108,16 +116,16 @@ refresh token、ratelimit key 全部写入默认库/默认 redis，而 E5（env 
 | 版本一致性 | exit=0 | 10 文件 + README 徽章一致（VERSION=2.1.5） |
 | 契约 0 漂移 | exit=0 | 460 后端端点 × 137 前端调用 |
 | 依赖漏洞审计 | exit=0 | java 10 条漏洞 0 条 HIGH/CRITICAL；node 0 条（trivy，DB 镜像 public.ecr.aws） |
-| 后端 mvn -o verify | exit=0 | 2853 tests / 0F / 0E，JaCoCo BUNDLE 行覆盖 80.27% |
+| 后端 mvn -o verify | exit=0 | 2855 tests / 0F / 0E，JaCoCo BUNDLE 行覆盖 80.26% |
 | 前端 npm run test:run | exit=0 | 121 files / 978 passed / 0 failed / 0 unhandled errors |
 | 前端 tsc / eslint | exit=0 | 0 errors |
 | Python pytest | exit=0 | 85 passed / 1 skipped（门禁在本机 Python 3.14 执行；运行时镜像为 Python 3.12；含 `test_scheduler_loop.py` 4 项） |
-| 冒烟 smoke.py | 14/14 | `docs/evidence/2026-11-12/smoke-2.1.5.log`（最终 2.1.5 镜像复测） |
-| 租户隔离 | 24/24 | `docs/evidence/2026-11-12/tenant-isolation.log` |
+| 冒烟 smoke.py | 14/14 | `docs/evidence/2026-11-13/smoke.log`（最终 2.1.5 镜像复测） |
+| 租户隔离 | 24/24 | `docs/evidence/2026-11-13/tenant-isolation.log` |
 | 归属写入静态门禁 | exit=0 | |
-| 企业套件真实 PG (pg IT) | exit=0 | 47.9s |
+| 企业套件真实 PG (pg IT) | exit=0 | 52.7s |
 | 企业套件 schema smoke | exit=0 | 迁移重放 |
-| 备份/PITR 演练 | 30/30 | T1 真实备份 / T2 独立恢复 / T3 PITR / T4 副本 |
+| 备份/PITR 演练 | 30/30 | T1 真实备份 / T2 独立恢复 / T3 PITR / T4 副本（`docs/evidence/2026-11-13/backup-e2e.log`） |
 | 上线终验 launch-final | 8/8 | 通过率 8/8（输出见 `monthly-gate-release.log` 的「上线终验」段） |
 | 文档数字校验 | exit=0 | 28 锚点一致（`doc-numbers-verify.py` 无 --fix） |
 
@@ -159,28 +167,29 @@ refresh token、ratelimit key 全部写入默认库/默认 redis，而 E5（env 
 - `redis_client.get_redis()` 事件循环亲和性守卫（旧循环已关闭/非当前循环时重建客户端）。
 - 回归测试 `tests/test_scheduler_loop.py` 4 项全绿；本机全量 85 passed / 1 skipped。
 
-**验证**：最终 2.1.5 镜像（revision=712efb6，含修复，OCI label 可证，见
-`docs/evidence/2026-11-12/image-provenance.txt`）于 2026-11-13T00:00Z 重新部署；backend-python 日志跨多个 60s 巡检周期 0 次 `Event loop is closed`，restarts=0。
-发布门禁（16/16）结束后重启 backend-java 恢复 JWT k-0，24h 观察窗口自 **2026-11-13T00:26:34Z**
-（最后一次计划内重启）重新计时。
+**验证**：最终 2.1.5 镜像（revision=5504206，含修复，OCI label 可证，见
+`docs/evidence/2026-11-13/image-provenance.txt`）于 2026-11-13T01:15Z 重新部署；backend-python
+日志跨多个 60s 巡检周期 0 次 `Event loop is closed`，restarts=0。
+发布门禁（16/16）不再执行 JWT 轮换，结束后**无需重启 backend-java**；24h 观察窗口自
+**2026-11-13T01:16:26Z**（最后一次计划内部署完成）重新计时。
 
 ## 8. 已知限制与未验证项
 
-- **24h 观察窗口未到期**：基线 `docs/evidence/2026-11-12/observation-baseline.txt`
-  （窗口起点 2026-11-13T00:26:34Z），到期 2026-11-14T00:26Z 复核 RestartCount / StartedAt /
+- **24h 观察窗口未到期**：基线 `docs/evidence/2026-11-13/observation-baseline.txt`
+  （窗口起点 2026-11-13T01:16:26Z），到期 2026-11-14T01:16Z 复核 RestartCount / StartedAt /
   firing 告警 / 5xx 后才算完成 W1。任何计划内重建/重启都会重新计时；当前首检
   Prometheus/Alertmanager 均为 0 条 firing，应用容器 restarts=0。
 - **GHCR push 未完成**：本机 gh token 无 `write:packages`（`permission_denied`），
-  四镜像已本地构建（`docs/evidence/2026-11-12/build-images-final.log`），OCI
-  `revision=712efb6`、`version=2.1.5`；容器 image ID 与镜像 ID 逐一相等。
-  多架构 manifest 需 buildx（本机无插件），`build-images.sh` 已改为无 buildx 时
-  单架构经典 build、多架构明确 exit 2。单架构本地镜像不得冒充 GHCR 发布物。
+  四镜像已从干净 commit `5504206` 本地构建（`docs/evidence/2026-11-13/build-images.log`），OCI
+  `revision=550420682277a06133e6653812354530f24a0b37`、`version=2.1.5`；容器 image ID
+  与镜像 ID 逐一相等。多架构 manifest 需 buildx（本机无插件），`build-images.sh` 已改为
+  无 buildx 时单架构经典 build、多架构明确 exit 2。单架构本地镜像不得冒充 GHCR 发布物。
 - **分支保护（W4）未启用**：需仓库管理员操作；发布说明须标注。
-- **PR 合并被 Checks 权限阻塞**：PR #7 head=712efb6 / state=OPEN / UNSTABLE；
-  `gh pr checks 7` 因 token 缺 `checks:read`/`actions:read` 返回 403，无法确认 UNSTABLE
-  是 pending 还是失败。按 D2 应先合并 #7、再关闭 #6（superseded by f026329），但本轮
-  改动尚未 commit/push，合并/关闭/tag 均未执行；不得 admin 强合。见
-  `docs/evidence/2026-11-12/gh-pr-status.txt`。
+- **PR 合并被 Checks 权限阻塞**：PR #7 已包含本轮代码提交 `5504206`（其后仅追加证据/文档提交）；
+  检查时 state=OPEN / mergeable=MERGEABLE / mergeStateStatus=UNSTABLE。`gh pr checks 7` 因 token
+  缺 `checks:read`/`actions:read` 返回 “Resource not accessible”，无法确认 UNSTABLE 是 pending
+  还是失败。按 D2 应先合并 #7、再关闭 #6（superseded by f026329），但本轮**未**执行合并/关闭/tag；
+  不得 admin 强合。见 `docs/evidence/2026-11-13/gh-pr-status.txt`。
 - **JWT 轮换在 2.1.5 默认禁用（已收口，不再靠重启恢复）**：`application.yml` 新增
   `app.jwt.rotation.enabled=${JWT_ROTATION_ENABLED:false}`；禁用时
   `POST /api/admin/jwt-keys/rotate` 返回 **409**，不生成新 key、不写审计，只读快照保留并
@@ -200,5 +209,6 @@ refresh token、ratelimit key 全部写入默认库/默认 redis，而 E5（env 
   Java 直连 18082 仍 401，文档明确“备份只经网关/Python”。见
   `docs/evidence/2026-11-12/backup-gateway.log`。
 - **默认栈事故残留已按保守策略处置**：测试用户 refresh token 已吊销（481→479），
-  audit_log 16 行/用户 1 行/审批 1 行保留未删，详见 §4 与
-  `docs/evidence/2026-11-12/default-stack-residue.txt`。
+  audit_log 16 行/用户 1 行/审批 1 行保留未删；事故资源（collection/form/wiki/im/user/approval）
+  已于 2026-11-13 只读盘点，删除需 owner 批准。另有历史 smoke 残留 338 个 collection /
+  34 个用户待单独排期。详见 §4 与 `docs/evidence/2026-11-13/default-stack-residue.txt`。
