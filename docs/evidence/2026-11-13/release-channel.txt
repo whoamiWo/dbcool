@@ -1,0 +1,10 @@
+# 2026-11-13 发布通道检查
+
+## branch protection main
+{"message":"Resource not accessible by personal access token","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","status":"403"}gh: Resource not accessible by personal access token (HTTP 403)
+
+## PR #6
+{"headRefOid":"17c9f820f03b7b30480f632739919cbb2949c2f2","mergeable":"MERGEABLE","number":6,"state":"OPEN","url":"https://github.com/whoamiWo/dbcool/pull/6"}
+
+## workflow runs
+failed to get runs: HTTP 403: Resource not accessible by personal access token (https://api.github.com/repos/whoamiWo/dbcool/actions/runs?per_page=3&exclude_pull_requests=true)

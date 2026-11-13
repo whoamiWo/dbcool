@@ -1,0 +1,11 @@
+# 2026-11-13 PR/Checks 状态
+
+## gh pr view 7
+{"headRefOid":"550420682277a06133e6653812354530f24a0b37","mergeStateStatus":"UNSTABLE","mergeable":"MERGEABLE","number":7,"state":"OPEN","url":"https://github.com/whoamiWo/dbcool/pull/7"}
+
+## gh pr checks 7
+GraphQL: Resource not accessible by personal access token (node.statusCheckRollup.nodes.0.commit.statusCheckRollup)
+
+## 结论
+- head=5504206，state=OPEN，mergeable=MERGEABLE，mergeStateStatus=UNSTABLE
+- token 缺 checks:read/actions:read，无法读取 Checks；不得 admin 强合

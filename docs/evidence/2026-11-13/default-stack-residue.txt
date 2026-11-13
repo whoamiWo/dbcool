@@ -1,0 +1,38 @@
+# 默认栈测试对象只读盘点（2026-11-13，WP-C）
+# 目标：project=nocobase（默认栈，非验收目标）；仅 SELECT，未删除任何行、未 FLUSHDB。
+
+## 1. 事故窗口新增对象（2026-11-12T02:00–03:00Z，按 audit_log 资源 ID 核对）
+collection_meta  smokede1b9eb8col             id=ebeba45d-26b0-427a-93f6-3a70f706a7ac created=2026-11-12T02:22:17Z
+collection_meta  smokede1b9eb8_form          created=2026-11-12T02:22:18Z
+data table       data_smokede1b9eb8col        rows=1
+data table       data_smokede1b9eb8_form       rows=1
+wiki_page        7ed81abf-6808-457f-be50-4403e9e6ffcc  title=Smoke Page created=2026-11-12T02:22:18Z
+im_message       4104ea58-6aff-4dd7-97b6-582efec62ed3  channel=12186e46-8211-4f6d-ad32-2706203185a0 created=2026-11-12T02:22:18Z
+workflows        d500b10f-916e-488d-8912-391f3472ed62  name=approval_d500b10f title=冒烟请假 created=2026-11-09T01:20:38Z（非事故窗口新建，仅被触发）
+forms            dff87b74-e4da-4a9b-b83e-b290725e6729  collection=smokede1b9eb8_form title=smokede1b9eb8 created=2026-11-12T02:22:19Z
+users            48016fec-97de-4e9a-9731-6a8b6a802c2f  smoke_user_2654e98c created=2026-11-12T02:22:20Z
+approval_request 3b89aef3-e883-4153-8b64-3ea25722070e  status=APPROVED submitted=2026-11-12T02:22:20Z
+im_attachment    事故窗口 0 行（未产生附件）
+audit_log        collection.export_file 1 行（导出文件仅审计记录，未发现对应 DB 附件行）
+
+## 2. 默认栈长期 smoke 残留（非本次事故新增，但同属测试对象）
+collection_meta name LIKE 'smoke%'  = 338
+users username LIKE 'smoke_user_%'  = 34
+（含本窗口新建的 smokede1b9eb8col / smokede1b9eb8_form）
+
+## 3. 处置结论（待 owner 批准，未执行删除）
+- 本次事故窗口对象：已列清单，建议按依赖顺序清理：
+  form `dff87b74` → data_smokede1b9eb8_form → collection `smokede1b9eb8col` +
+  data_smokede1b9eb8col → im_message `4104ea58` → wiki_page `7ed81abf` →
+  user `48016fec` → approval_request `3b89aef3`。
+- workflow `d500b10f` 创建于 2026-11-09，非事故新建；是否保留由 owner 决定。
+- 长期 338 个 smoke collection / 34 个 smoke 用户属于历史门禁残留，建议单独排期清理；
+  本轮不做批量删除。
+- audit_log 16 行保留（D3）；未执行 `DELETE FROM audit_log`；未执行 `FLUSHDB`。
+- 测试用户 refresh token 已于 2026-11-12 吊销（481→479），本轮未新增 token。
+
+## 4. 复核命令（只读）
+docker exec nocobase-postgres psql -U nocobase -d nocobase -Atc \
+  "select count(*) from collection_meta where name like 'smoke%';"
+docker exec nocobase-postgres psql -U nocobase -d nocobase -Atc \
+  "select count(*) from users where username like 'smoke_user_%';"

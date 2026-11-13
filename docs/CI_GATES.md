@@ -33,7 +33,7 @@
 
 | 门禁 | 命令 | 阈值 | 失败怎么办 |
 |---|---|---|---|
-| Java 测试 | `cd backend-java && mvn -o verify` | 2853，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
+| Java 测试 | `cd backend-java && mvn -o verify` | 2855，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
 | Java 覆盖率 | `cd backend-java && mvn -o verify` | JaCoCo BUNDLE ≥ 79%（唯一阈值来源：`backend-java/pom.xml`） | 见 §3 覆盖率缺口与补测计划 |
 | 前端单测 | `cd frontend && npm run test:run` | 978 passed / 121 files | 看 vitest 输出中失败的 spec |
 | Playwright（含 375px） | `cd frontend && npx playwright test` | 260 tests / 13 files（`--list` 实测；chromium/firefox/mobile-390/mobile-375） | 看 Playwright 报告（`npx playwright show-report`） |
