@@ -9,15 +9,37 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 import time
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from datetime import UTC
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# 应用主事件循环（由 FastAPI lifespan 注册）。
+# 背景：后台调度线程内直接调用 asyncio.run() 会在线程中新建并销毁一个
+# uvloop，共享的 async Redis 客户端会绑定到那个短命循环上——主循环随后使用
+# 该客户端时出现 "Event loop is closed"，且 uvloop 的跨循环/已销毁循环
+# 生命周期问题会直接导致进程 SIGSEGV（exit=139）。
+_main_loop: asyncio.AbstractEventLoop | None = None
+
+
+def set_main_loop(loop: asyncio.AbstractEventLoop | None) -> None:
+    """注册/注销应用主事件循环（lifespan 启动时注册，关闭时注销）。"""
+    global _main_loop
+    _main_loop = loop
+
+
+def run_coro(coro: Coroutine[Any, Any, Any], timeout: float = 10.0) -> Any:
+    """在应用主事件循环上执行协程；无主循环（脚本/测试环境）时退化为独立循环。"""
+    loop = _main_loop
+    if loop is not None and loop.is_running():
+        return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout)
+    return asyncio.run(coro)
 
 
 class _Task:
@@ -241,16 +263,17 @@ def install_default_alert_checks(
         cache = cache_getter()
         if cache is None:
             return
-        import asyncio
+        # 必须提交到主循环执行：调度器跑在后台线程，asyncio.run() 会新建并销毁
+        # 一个临时 uvloop，导致共享 Redis 客户端绑定失效（见 run_coro 注释）。
         try:
-            hit_low = asyncio.run(cache.should_warn_low_hit_rate())
+            hit_low = run_coro(cache.should_warn_low_hit_rate())
         except Exception:
             hit_low = False
         if hit_low:
             from nocobase_py.services.alerts import get_collector
 
             try:
-                stats = asyncio.run(cache.stats())
+                stats = run_coro(cache.stats())
             except Exception:
                 stats = {"hit_rate": 0, "hits": 0, "misses": 0}
             get_collector().emit(

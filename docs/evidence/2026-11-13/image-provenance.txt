@@ -1,0 +1,21 @@
+# 2.1.5 最终镜像可证性（2026-11-13）
+# HEAD: 550420682277a06133e6653812354530f24a0b37
+# 构建时工作树：仅 ?? .kilo/（build-images.sh 脏构建闸门通过，非 -dirty）
+# 构建平台：linux/amd64（本机无 buildx；多架构发布需 CI）
+
+## 镜像 label / image ID
+backend-java    image=sha256:f6e943cd7e474f5e3e1b027302727a3af152a0c454218f5476fd7db7a7f9d906 revision=550420682277a06133e6653812354530f24a0b37 version=2.1.5
+backend-python  image=sha256:7a75e5ad0c45026f4d3a302736fef1ce5e9f85b0dcfcf7a35e8ebc1a7d575ec7 revision=550420682277a06133e6653812354530f24a0b37 version=2.1.5
+crdt-service    image=sha256:ebd44f44d77144d65b143850a721f330070cfaad7315644f89b0df62232ce8e4 revision=550420682277a06133e6653812354530f24a0b37 version=2.1.5
+frontend        image=sha256:b3d322741d07510e35bcc91d5fda25e01ba99379ed0ff3597ef2eb5d98eff33a revision=550420682277a06133e6653812354530f24a0b37 version=2.1.5
+
+## 验收容器（image ID 与镜像逐一相等；RestartCount=0）
+nocobase-acc-backend-java     image=sha256:f6e943cd7e474f5e3e1b027302727a3af152a0c454218f5476fd7db7a7f9d906 started=2026-11-13T01:15:55.057381307Z restarts=0
+nocobase-acc-backend-python   image=sha256:7a75e5ad0c45026f4d3a302736fef1ce5e9f85b0dcfcf7a35e8ebc1a7d575ec7 started=2026-11-13T01:16:20.800642583Z restarts=0
+nocobase-acc-crdt-service     image=sha256:ebd44f44d77144d65b143850a721f330070cfaad7315644f89b0df62232ce8e4 started=2026-11-13T01:15:55.053516427Z restarts=0
+nocobase-acc-frontend         image=sha256:b3d322741d07510e35bcc91d5fda25e01ba99379ed0ff3597ef2eb5d98eff33a started=2026-11-13T01:16:26.501780522Z restarts=0
+
+## 备注
+- 旧镜像（revision=712efb6）构建时工作树有未提交改动，label 不可信；本轮已由 build-images.sh 闸门阻止。
+- 本轮改动提交 5504206 后重新构建；label revision 与 git HEAD 完全一致。
+- GHCR 未推送（本机 token 无 write:packages），本地单架构镜像只作验收，不冒充发布物。

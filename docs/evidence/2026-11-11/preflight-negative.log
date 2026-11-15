@@ -1,0 +1,84 @@
+=== N1 缺 BASE_URL ===
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✗ FAIL 缺少环境变量 BASE_URL
+
+💡 示例：ACCEPTANCE_MODE=1 BASE_URL=http://127.0.0.1:18082 PG_CONTAINER=nocobase-acc-postgres PG_STRICT=1 BACKUP_DIR=target/acceptance/backups COMPOSE_PROJECT_NAME=nocobase-acceptance python3 scripts/acceptance-preflight.py
+exit=1
+=== N2 指错 8080 默认栈 ===
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✗ FAIL BASE_URL 指向默认栈 8080；验收必须使用隔离栈端口（如 18082）
+
+验收目标指纹（脱敏）：
+  BASE_URL            = http://127.0.0.1:8080
+  COMPOSE_PROJECT     = nocobase-acceptance
+  BACKEND_CONTAINER   = (未核实)
+  BACKEND_SERVICE     = backend-java
+  PG_CONTAINER        = nocobase-acc-postgres
+  PGDATABASE / port   = (未实查) / (未实查)
+  BACKUP_DIR          = target/acceptance/backups
+  git commit          = a0b9f1f
+
+❌ 验收目标预检未通过（1 项）；修正前不得运行 release 门禁/迁移/外部验收
+exit=1
+=== N3 指向默认 PG nocobase-postgres ===
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✗ FAIL PG_CONTAINER 是默认栈容器 nocobase-postgres；验收必须使用隔离容器
+
+验收目标指纹（脱敏）：
+  BASE_URL            = http://127.0.0.1:18082
+  COMPOSE_PROJECT     = nocobase-acceptance
+  BACKEND_CONTAINER   = (未核实)
+  BACKEND_SERVICE     = backend-java
+  PG_CONTAINER        = nocobase-postgres
+  PGDATABASE / port   = (未实查) / (未实查)
+  BACKUP_DIR          = target/acceptance/backups
+  git commit          = a0b9f1f
+
+❌ 验收目标预检未通过（1 项）；修正前不得运行 release 门禁/迁移/外部验收
+exit=1
+=== N4 端口指向非 backend 容器(18080 前端) ===
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✓ 容器 nocobase-acc-postgres 属于隔离 project nocobase-acceptance
+  ✓ 数据库指纹 current_database()=nocobase inet_server_port()=5432
+  ✓ GET http://127.0.0.1:18080/api/health → 200
+  ✗ FAIL BASE_URL 端口 18080 映射到 nocobase-acc-frontend（compose service=frontend），不是后端服务 'backend-java'
+
+验收目标指纹（脱敏）：
+  BASE_URL            = http://127.0.0.1:18080
+  COMPOSE_PROJECT     = nocobase-acceptance
+  BACKEND_CONTAINER   = (未核实)
+  BACKEND_SERVICE     = backend-java
+  PG_CONTAINER        = nocobase-acc-postgres
+  PGDATABASE / port   = nocobase / 5432
+  BACKUP_DIR          = target/acceptance/backups
+  git commit          = a0b9f1f
+
+❌ 验收目标预检未通过（1 项）；修正前不得运行 release 门禁/迁移/外部验收
+exit=1
+=== N5 跨栈 COMPOSE_PROJECT ===
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✗ FAIL 容器 compose project='nocobase-acceptance'，与 COMPOSE_PROJECT_NAME='nocobase-other' 不一致
+  ✓ 容器 nocobase-acc-postgres 属于隔离 project nocobase-other
+
+验收目标指纹（脱敏）：
+  BASE_URL            = http://127.0.0.1:18082
+  COMPOSE_PROJECT     = nocobase-other
+  BACKEND_CONTAINER   = (未核实)
+  BACKEND_SERVICE     = backend-java
+  PG_CONTAINER        = nocobase-acc-postgres
+  PGDATABASE / port   = (未实查) / (未实查)
+  BACKUP_DIR          = target/acceptance/backups
+  git commit          = a0b9f1f
+
+❌ 验收目标预检未通过（1 项）；修正前不得运行 release 门禁/迁移/外部验收
+exit=1

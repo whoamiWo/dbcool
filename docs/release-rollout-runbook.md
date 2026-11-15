@@ -61,7 +61,7 @@ docker compose logs backend-python 2>&1 | grep -E "FAILED|alert" | tail -10
 - 应用回滚只切镜像 tag，**PostgreSQL 数据不回滚**（数据库 schema 变更需另行评估）
 - 若回滚涉及不兼容的 schema 变更，须先执行 `docs/backup-restore-runbook.md` 的恢复流程
 
-### 2.4 V81–V84 迁移影响与回滚（N2 批次）
+### 2.4 V81–V85 迁移影响与回滚（N2 批次）
 
 | 迁移 | 内容 | 对数据的影响 | 回滚语义 |
 |---|---|---|---|
@@ -69,6 +69,7 @@ docker compose logs backend-python 2>&1 | grep -E "FAILED|alert" | tail -10
 | **V82** | `users.external_source/external_id/disable_reason` + `(tenant_id, source, external_id)` 唯一索引；历史 `external_id` 为**近似值**（WeCom/WeChat 为 12 位摘要，LDAP/OIDC 不回填） | 首次同步会用完整 id 覆盖近似值；同租户重复外部 id 会让迁移失败 → 先清理冲突再重跑，禁止删用户绕过 | 需备份恢复（索引与列） |
 | **V83** | 钉钉审批外部绑定/回调事件表、`approval_template.external_config`、`approval_request.external_push_status/external_push_error` | 仅新增表/列，不改写历史审批归属；历史无绑定 request 保持本地流程 | 需备份恢复；回滚应用时须同时关闭钉钉外推 |
 | **V84** | 回调事件主键改为 `(corp_id, event_id)`、回填 corpId；新增 `oidc_login_code`（仅存 code 哈希） | **孤儿事件（无法确定 corpId）会阻止升级** → 先对账清理再重跑；`oidc_login_code` 不含 JWT | 需备份恢复；回滚应用时须同时关闭 OIDC 与钉钉回调 |
+| **V85** | 补列 `approval_callback_event.event_type/claimed_at`（`ADD COLUMN IF NOT EXISTS`，幂等） | 修复 V83 `CREATE TABLE IF NOT EXISTS` 在已有表上整体跳过、后续补列缺失导致的 Hibernate schema-validation 启动失败；`event_type` 默认 `'finish'`——`ApprovalCallbackEventService` 只接收 `instanceAction=finish` 的事件，历史落库事件必然都是 finish，默认值语义安全 | 仅新增列，降级应用不受影响（旧版本不读新列）；无需数据回滚 |
 
 **发布前必读**：
 

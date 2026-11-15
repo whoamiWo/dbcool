@@ -175,8 +175,9 @@ def main():
         # JwtKeyRotationController
         ("GET",    "/api/admin/jwt-keys",                           "jwt keys snapshot",
          [200],           [403], None),
+        # 2.1.5 默认禁用进程内轮换：admin=409；本地显式开启时仍可为 200/429。
         ("POST",   "/api/admin/jwt-keys/rotate",                    "rotate jwt key",
-         [200, 429],      [403], None),
+         [200, 409, 429], [403], None),
         # TenantQuotaController — self-service quota is authenticated but not admin-only
         # Design: any authenticated user can check their own quota (user=200 is correct)
         # This endpoint uses @PreAuthorize("isAuthenticated()") — not ADMIN-specific.

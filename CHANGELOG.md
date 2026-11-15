@@ -1,3 +1,48 @@
+## v2.1.5 (2026-11-12)
+
+### 发布收口：JWT 轮换默认禁用 + 镜像可证性闸门
+
+**安全/兼容性**
+- **JWT 密钥轮换在 2.1.5 默认禁用**（`app.jwt.rotation.enabled=${JWT_ROTATION_ENABLED:false}`）：
+  现有实现只生成进程内随机 key（`kid=k-1`），不持久化、也不与 Python 共享；轮换后
+  Python 仍只认共享 `JWT_SECRET`（`kid=k-0`），`/api/ai/*` 与 `/api/admin/backup` 会统一 401。
+  - `POST /api/admin/jwt-keys/rotate` 在禁用时返回 **409**，不生成新 key、不写审计；只读快照保留
+  - `GET /api/admin/jwt-keys` 增加 `data.enabled`，供门禁判断当前模式
+  - `key-rotation-verify.py` 在禁用模式断言 **6/6**：`enabled=false`、rotate 409/501、密钥环不变、
+    同一 k-0 token 在 Java 与 Python 均可用；不再执行轮换，发布门禁结束后**无需重启 backend-java**
+  - 持久化/共享 keyring（Java/Python 同源）计划在 **2.1.6** 提供；在此之前不得以轮换后重启绕过
+
+**构建可证性**
+- `scripts/build-images.sh` 新增脏构建闸门：工作树有未提交改动时默认 **exit 2**；发布镜像必须从
+  干净 commit 构建。确需脏构建须显式 `ALLOW_DIRTY_BUILD=1`，此时 revision label 写
+  `<sha>-dirty` 并记录 `io.dbcool.build.diff-sha256`，不得冒充干净 revision。
+
+### N2 收口：Python 后端周期性 SIGSEGV 根因修复 + 证据/文档纠偏
+
+**稳定性修复（生产事故级）**
+- **backend-python 容器周期性 `exit=139` 崩溃**：后台调度线程（`alert.cache_hit_rate_check`，每 60s）直接调用 `asyncio.run()`，在线程内新建并销毁临时事件循环；共享的 async Redis 客户端被绑定到该短命循环，主循环随后使用时报 `Event loop is closed`（`/api/health/ready` 503），并在下一次巡检时触发进程级 SIGSEGV。默认栈与验收栈同时段每 ~60s 各崩一次，24h 观测窗口因此无法保持。
+  - `services/scheduler.py` 新增 `set_main_loop()` / `run_coro()`：主循环由 lifespan 注册，后台任务协程一律经 `asyncio.run_coroutine_threadsafe` 提交到主循环执行；无主循环（脚本/测试）时才退化为独立循环
+  - `main.py` lifespan 注册/注销主循环，`_reset_quotas` 改用 `run_coro`
+  - `redis_client.get_redis()` 增加事件循环亲和性守卫：缓存客户端绑定的循环已关闭或非当前循环时关闭旧客户端并重建
+  - 回归测试 `tests/test_scheduler_loop.py`（4 项）：主循环提交、无主循环退化、同循环复用、跨已关闭循环重建
+
+**文档/证据纠偏**
+- `README.md`：备份/PITR 行更新为 2026-11-11 release 实测 30/30；版本徽章修正（此前停留在 2.1.1）
+- `scripts/version-consistency-verify.py`：`md_badge` 正则同时识别 shields `badge/version-X.Y.Z` 与 `**vX.Y.Z**`，头部出现多个不同版本时直接报错；新增 `--self-test`（8 项负向自测）
+- `BASELINE.md` / `TECH_DEBT.md` / `docs/DEVELOPMENT_NOTES.md`：顶部标注“历史快照（非当前门禁数字）”
+- `docs/release-rollout-runbook.md`：补充 V85 迁移影响与回滚语义（含 `event_type='finish'` 默认值依据）
+
+**迁移**
+- 无新增迁移。V85 在 2.1.4 发布（2026-11-09）之后才进入 `main`，**2.1.5 是首个包含 V85 的正式版本**；本版未修改已发布的 V83–V85，仅补文档说明
+
+**验证**
+- 新增回归测试：JWT 禁用 409/密钥环不变 2 项、`key-rotation-verify` 禁用模式 6/6 断言；
+  Java `mvn -o verify` **2855 tests / 0F / 0E**、BUNDLE LINE **80.26%**
+- 最终镜像 `revision=5504206` 上重跑 release 门禁 **16/16 PASS**（`docs/evidence/2026-11-13/monthly-gate-release.log`）：
+  Python **85 passed / 1 skipped**、smoke 14/14、tenant 24/24、backup 30/30、launch 8/8
+- 隔离栈修复镜像连续运行与 24h 观察基线见 `docs/acceptance-run-2026-11-11.md` 与
+  `docs/evidence/2026-11-13/observation-baseline.txt`
+
 ## v2.1.4 (2026-11-09)
 
 ### Round 3 / N1 修复：飞书组织同步安全 + 外部身份按租户隔离

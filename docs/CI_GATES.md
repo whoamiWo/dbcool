@@ -16,21 +16,30 @@
 > - SKIP/FAIL 门禁的旧 `gate-numbers.json` 键会被删除，禁止历史 PASS 数字残留；
 >   备份数字只在 `--release` 真实执行通过时写入。
 > - `python3 scripts/monthly-gate.py --release` 会先运行 `scripts/acceptance-preflight.py`
->   固定验收目标（`BASE_URL`/`PG_CONTAINER`/`PG_STRICT=1`/`BACKUP_DIR`/`COMPOSE_PROJECT_NAME`，
->   可选 `BACKEND_SERVICE`，默认 `backend-java`；预检还会校验 BASE_URL 端口落在该后端服务、
->   且后端数据源指向 `PG_CONTAINER`），且任何 SKIP 一律判 FAIL；门禁真实性自测见
->   `python3 scripts/gate-skip-selfcheck.py`。
+>   固定验收目标（`BASE_URL`/`PG_CONTAINER`/`PG_STRICT=1`/`BACKUP_DIR`/`COMPOSE_PROJECT_NAME`/
+>   `REDIS_CONTAINER`，可选 `BACKEND_SERVICE`，默认 `backend-java`；预检还会校验 BASE_URL
+>   端口落在该后端服务、后端数据源指向 `PG_CONTAINER`），且任何 SKIP 一律判 FAIL；门禁真实性
+>   自测见 `python3 scripts/gate-skip-selfcheck.py`。
+> - **E6 数据面同栈**：preflight 不只比对环境变量，还要求 backend 与 **PG 和 Redis** 都共享
+>   Docker 网络，并在 backend 容器内用 `getent hosts <compose service>` 解析到目标容器 IP。
+>   service 名取自容器 label `com.docker.compose.service`（不硬编码 `postgres`/`redis`）；
+>   `getent` 缺失、解析失败、读不到网络/IP 一律 **fail closed**，不能当作「跳过」。
+>   这堵的是 2026-11-12 实测的跨栈事故：compose 顺序错误使 backend 接到默认网络，
+>   env 检查全过但数据写入默认库/默认 redis。
+> - **JWT 轮换 2.1.5 默认禁用**：`JWT_ROTATION_ENABLED=false`，`POST /api/admin/jwt-keys/rotate`
+>   返回 409/501；`key-rotation-verify.py` 断言禁用生效且同一 k-0 token 在 Java/Python
+>   均可用，不再执行轮换，门禁结束后无需重启 backend-java。持久化/共享 keyring 排期 2.1.6。
 > - 分支保护：未配置；需仓库管理员开启并保存证据；未配置不得宣称 N2 收口。
 
 | 门禁 | 命令 | 阈值 | 失败怎么办 |
 |---|---|---|---|
-| Java 测试 | `cd backend-java && mvn -o verify` | 2853，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
+| Java 测试 | `cd backend-java && mvn -o verify` | 2855，0 failures / 0 errors | 看 `target/surefire-reports/` 中对应测试报告 |
 | Java 覆盖率 | `cd backend-java && mvn -o verify` | JaCoCo BUNDLE ≥ 79%（唯一阈值来源：`backend-java/pom.xml`） | 见 §3 覆盖率缺口与补测计划 |
 | 前端单测 | `cd frontend && npm run test:run` | 978 passed / 121 files | 看 vitest 输出中失败的 spec |
 | Playwright（含 375px） | `cd frontend && npx playwright test` | 260 tests / 13 files（`--list` 实测；chromium/firefox/mobile-390/mobile-375） | 看 Playwright 报告（`npx playwright show-report`） |
 | 类型检查 | `cd frontend && npx tsc --noEmit` | 0 errors | 按报错文件与行号修 |
 | E2E | `cd frontend && npx playwright test` | ≥ 135 | collab-crdt 偶发 429 见 §4 |
-| Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 81 passed / 1 skipped | 看 pytest 输出 |
+| Python | `cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q` | 85 passed / 1 skipped | 看 pytest 输出 |
 | 备份演练 | `python3 scripts/backup-e2e-verify.py` | 仅 release 实测通过后写数字；SKIP 不计 PASS | 见 `docs/backup-restore-runbook.md` |
 | 管理员鉴权 | `python3 scripts/admin-authz-e2e-verify.py` | 18 / 18 | 检查 admin/user 登录状态码 |
 | 越权回归 | `python3 scripts/tenant-isolation-e2e-verify.py` | 24 / 24 PASS | 检查跨租户断言 |
@@ -42,7 +51,7 @@
 | 归属写入静态门禁 | `python3 scripts/actor-writer-verify.py` | PASS | 禁止控制器回退旧 UUID-less 重载 |
 | 企业套件 schema smoke | `python3 scripts/verify-enterprise-suite.py` | 20/20 | 检查 V77–V84 迁移是否已应用 |
 | 依赖漏洞扫描（离线替代） | `python3 scripts/java-dependency-audit.py --backend offline`（离线环境） | 0 高危 | 补 `config/known-vulnerabilities.json` 或升级依赖 |
-| 密钥轮换验证 | `python3 scripts/key-rotation-verify.py` | 3/3 断言 | 见 `docs/key-rotation-runbook.md` |
+| 密钥轮换验证 | `python3 scripts/key-rotation-verify.py` | 2.1.5 禁用模式 6/6 断言（rotate 409/501、k-0 在 Java/Python 均可用） | 见 `docs/key-rotation-runbook.md` |
 | 配额端到端 | `python3 scripts/quota-e2e-verify.py` | 5/5 | 检查存储/席位配额链路 |
 | 证书生命周期 | `./scripts/cert-lifecycle.sh check` | exit 0 | 见 `PHASE100_DEPLOY_GUIDE.md` §4.1 |
 | 上线终验编排 | `python3 scripts/launch-final-verify.py` | 8/8 | 看失败项输出 |

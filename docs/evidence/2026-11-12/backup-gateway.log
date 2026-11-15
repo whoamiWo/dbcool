@@ -1,0 +1,29 @@
+备份网关路由验证（WP3 / H5）
+时间：2026-11-13T00:00Z 之后；目标：隔离栈 frontend 18080 → backend-python:8000
+镜像：frontend sha256:2a22971c052c... revision=712efb6；backend-python sha256:6e303668e0f2...
+
+== 修复前（旧 frontend 镜像，2026-11-12 23:56Z 实测） ==
+POST http://127.0.0.1:18080/api/admin/backup  (ADMIN JWT) → 401
+{"code":1001,"message":"???","data":{}}
+原因：nginx location /api/ 把所有 /api/* 转给 Java；Java 没有 /api/admin/backup 路由。
+同一 token 直连 http://127.0.0.1:18000/api/admin/backup → 200（证明端点本身正常）。
+
+== 修复后（新 frontend 镜像，nginx ^~ /api/admin/backup → backend-python:8000） ==
+1) ADMIN JWT POST /api/admin/backup（经 18080）→ 200
+{"code":0,"message":"backup created","data":{"backup_id":"backup_20261113_000056",
+ "path":"/app/backups/backup_20261113_000056.tar.gz","size_bytes":114481,
+ "components":["postgresql","media","redis"], ...}}
+
+2) 无 JWT POST /api/admin/backup（经 18080）→ 401
+{"detail":"缺少或非法的 Authorization 头"}
+
+3) 非 ADMIN 用户 JWT POST /api/admin/backup（经 18080）→ 403
+{"detail":"需要管理员权限"}
+
+4) ADMIN JWT GET /api/admin/backup（经 18080）→ 200，返回备份列表（含上条 backup_20261113_000056）
+
+5) Java 直连 18082 POST /api/admin/backup → 401
+{"code":1001,"message":"???","data":{}}
+说明：Java 没有该路由；备份支持入口是网关（18080/443）→ Python，18082 不作为支持入口。
+
+产物：/app/backups/backup_20261113_000056.tar.gz（114481 bytes，含 postgresql/media/redis 三组件）

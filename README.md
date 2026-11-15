@@ -4,12 +4,12 @@
 
 **自部署的企业协作低代码平台 —— 数据表 · 文档 Wiki · 即时通讯 · 看板 · 工作流 · AI，一套全有**
 
-**v2.1.4**（当前稳定版，发布于 2026-11-03）
+**v2.1.5**（发布候选，2026-11-12）
 
-[![Version](https://img.shields.io/badge/version-2.1.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.1.5-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-3552%20(backend%202853%20%2F%20frontend%20978)-brightgreen)](#-质量)
-[![Backend CI](https://img.shields.io/badge/Java%20coverage-80.35%25-success)](#-质量)
+[![Tests](https://img.shields.io/badge/tests-3833%20(backend%202855%20%2F%20frontend%20978)-brightgreen)](#-质量)
+[![Backend CI](https://img.shields.io/badge/Java%20coverage-80.26%25-success)](#-质量)
 
 **Apache-2.0 开源 · 可私有化部署 · 支持订阅与企业版附加**
 
@@ -81,18 +81,22 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 
 ## 质量
 
-全部数字可当场复现（最近实测于 2026-11-10 @36289e9；以 `target/gate-numbers.json` 为准）：
+全部数字可当场复现（最近实测于 2026-11-13 @5504206；以 `target/gate-numbers.json` 为准）：
 
 | 门禁 | 结果 |
 |---|---|
-| Java `mvn -o verify` | ✅ 2853 tests / 0 Failures / 0 Errors；JaCoCo BUNDLE 行覆盖 **80.35%**（红线 0.79） |
+| Java `mvn -o verify` | ✅ 2855 tests / 0 Failures / 0 Errors；JaCoCo BUNDLE 行覆盖 **80.26%**（红线 0.79） |
 | 前端 `npm run test:run` | ✅ 121 files / **978 passed / 0 failed / 0 unhandled errors**；行覆盖 77.12% |
 | TypeScript `tsc --noEmit` | ✅ 0 errors |
 | 前后端契约 | ✅ 460 后端端点 × 137 前端调用 → **0 漂移**（含反向自检） |
-| 备份/PITR 演练 | ⏭️ 未在 release 模式实测（SKIP 不计 PASS；真实通过后数字由门禁回填） |
+| 备份/PITR 演练 | ✅ 30/30（2026-11-11 release 模式实测通过） |
 | 冒烟 / 租户隔离 | ✅ 14/14 · 24/24 |
 | 上线终验 | ✅ 8/8 |
 | Playwright E2E | 260 用例 / 13 files（`--list` 实测；最近批次未复跑，以 CI 为准） |
+
+> **2.1.5 JWT 轮换默认禁用**：`JWT_ROTATION_ENABLED=false`，`POST /api/admin/jwt-keys/rotate`
+> 返回 409；现有共享 `JWT_SECRET`（`kid=k-0`）在 Java/Python 两侧继续可用。持久化/共享
+> keyring 计划在 2.1.6 提供，详见 [`docs/key-rotation-runbook.md`](docs/key-rotation-runbook.md)。
 
 ## 技术栈
 

@@ -51,6 +51,9 @@ public class LdapSyncService {
             LdapConfigRepository ldapConfigRepository,
             LdapUserMappingRepository ldapUserMappingRepository,
             UserRepository userRepository,
+            // 未配置 nocobase.ldap.url 时无 LdapTemplate Bean（占位 Bean 会拖垮健康检查），
+            // 可选注入；执行同步时为空则返回明确错误而非假成功。
+            @org.springframework.beans.factory.annotation.Autowired(required = false)
             LdapTemplate ldapTemplate,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
             com.nocobase.auth.UserProvisioningService provisioningService
@@ -112,6 +115,10 @@ public class LdapSyncService {
         
         if (!config.getEnabled()) {
             throw new RuntimeException("LDAP 配置未启用");
+        }
+        if (ldapTemplate == null) {
+            throw new RuntimeException(
+                    "LDAP 未配置：请设置 nocobase.ldap.url（及可选 base/username/password）后重试");
         }
         
         Map<String, Object> result = new HashMap<>();
