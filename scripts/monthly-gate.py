@@ -238,8 +238,9 @@ def main() -> int:
             print(f"  - {n}: {c}")
         return 0
 
+    doc_suffix = " + 文档数字校验" if not args.quick else ""
     print("=" * 72)
-    print(f"Wave4 月度门禁（共 {len(gates)} 项，工作目录 {ROOT}"
+    print(f"Wave4 月度门禁（共 {len(gates)} 项主门禁{doc_suffix}，工作目录 {ROOT}"
           f"{'，发布模式 --release' if args.release else ''}）")
     print("=" * 72)
 
