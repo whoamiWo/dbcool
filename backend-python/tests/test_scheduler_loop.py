@@ -11,7 +11,6 @@ SIGSEGV（exit=139）。修复：
 from __future__ import annotations
 
 import asyncio
-import threading
 from types import SimpleNamespace
 
 import pytest

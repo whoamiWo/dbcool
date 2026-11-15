@@ -7,6 +7,7 @@ W1 (P0) 要求：Redis 连接失败须返回明确错误，禁止无感降级到
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 
 import redis.asyncio as redis
@@ -141,10 +142,8 @@ async def get_redis() -> redis.Redis | _MemoryRedis:
         stale = _redis
         _redis = None
         _redis_loop = None
-        try:
+        with contextlib.suppress(Exception):
             await stale.aclose()
-        except Exception:  # noqa: BLE001
-            pass
 
     try:
         client = redis.Redis(host=s.redis_host, port=s.redis_port, decode_responses=True)
