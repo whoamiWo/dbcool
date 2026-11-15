@@ -175,10 +175,15 @@ refresh token、ratelimit key 全部写入默认库/默认 redis，而 E5（env 
 
 ## 8. 已知限制与未验证项
 
-- **24h 观察窗口未到期**：基线 `docs/evidence/2026-11-13/observation-baseline.txt`
-  （窗口起点 2026-11-13T01:16:26Z），到期 2026-11-14T01:16Z 复核 RestartCount / StartedAt /
-  firing 告警 / 5xx 后才算完成 W1。任何计划内重建/重启都会重新计时；当前首检
-  Prometheus/Alertmanager 均为 0 条 firing，应用容器 restarts=0。
+- **24h 观察已完成（有效窗口观察门槛 PASS，非无异常声明）**：基线及 2026-11-14T03:49Z
+  到期复核见 `docs/evidence/2026-11-13/observation-baseline.txt`。原始窗口起点为
+  2026-11-13T01:16:26Z；门禁在此后产生 3 次 Java 500（01:35:26Z / 01:41:26Z / 01:48:26Z，
+  租户清理请求），故**有效观察起点固定为最后一次 500 之后的 2026-11-13T01:48:26Z**，
+  至复核时已持续 26h+。四个应用容器 restarts=0、StartedAt 未变，Prometheus/Alertmanager
+  0 firing，readiness 200；有效窗口内 Java/Python 无新增 5xx，Python 全窗口无 5xx。
+  不宣称原始全窗口 0 个 5xx。alerts.db 有 1 条原始窗口前已结束告警的 `resolved=0`
+  索引遗留，非当前告警。Java quota 刷回 DB 仍持续 WARN，作为非阻断运行缺陷单独排期，
+  详见证据文件。
 - **GHCR push 未完成**：本机 gh token 无 `write:packages`（`permission_denied`），
   四镜像已从干净 commit `5504206` 本地构建（`docs/evidence/2026-11-13/build-images.log`），OCI
   `revision=550420682277a06133e6653812354530f24a0b37`、`version=2.1.5`；容器 image ID
