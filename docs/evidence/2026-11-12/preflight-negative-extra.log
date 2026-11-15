@@ -1,0 +1,9 @@
+=== N6 缺 REDIS_CONTAINER ===
+  ✗ FAIL 缺少环境变量 REDIS_CONTAINER
+exit=1
+=== N7 REDIS_CONTAINER 指默认栈 ===
+  ✗ FAIL REDIS_CONTAINER 是默认栈容器 nocobase-redis；验收必须使用隔离容器
+exit=1
+=== N8 BACKUP_DIR 相对路径 ===
+  ✗ FAIL BACKUP_DIR 必须为绝对路径（子脚本以 scripts/ 为 cwd，相对路径会解析错位）
+exit=1

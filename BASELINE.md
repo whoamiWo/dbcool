@@ -1,12 +1,15 @@
 # 三栈质量基线 (Baseline)
 
+> **历史快照（非当前门禁数字）**：本文数字为对应里程碑时刻的实测记录，会随版本演进过时。
+> 当前门禁口径以 `target/gate-numbers.json` 与最近一次 release 模式运行结果为准。
+
 ## 一、后端 Java 栈
 
 ### 1.1 编译与测试
 ```bash
 cd backend-java
 mvn clean compile          # ✅ BUILD SUCCESS
-mvn test                   # ✅ 2853/2853 PASS（2026-10-30 @02b3a59，Wave0.5 后复测）
+mvn test                   # ✅ 2855/2855 PASS（2026-10-30 @02b3a59，Wave0.5 后复测）
 mvn test -Dtest='Wiki*Test' # ✅ 33/33 PASS
 ```
 
@@ -314,7 +317,7 @@ cd frontend && npx tsc --noEmit
 
 # Python 后端
 cd backend-python && PYTHONPATH=src python3 -m pytest tests/ -q
-# 81 passed, 1 skipped（2026-11-11 实测）
+# 85 passed, 1 skipped（2026-11-13 实测）
 ```
 
 ### 十.2 集成测试

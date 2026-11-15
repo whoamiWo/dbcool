@@ -1,0 +1,20 @@
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✓ 容器 nocobase-acc-postgres 属于隔离 project nocobase-acceptance
+  ✓ 数据库指纹 current_database()=nocobase inet_server_port()=5432
+  ✓ GET http://127.0.0.1:18082/api/health → 200
+  ✓ BASE_URL 端口 18082 对应本栈后端容器：nocobase-acc-backend-java
+  ✓ 后端数据源指向 nocobase-acc-postgres（同一 compose project）
+
+验收目标指纹（脱敏）：
+  BASE_URL            = http://127.0.0.1:18082
+  COMPOSE_PROJECT     = nocobase-acceptance
+  BACKEND_CONTAINER   = nocobase-acc-backend-java
+  BACKEND_SERVICE     = backend-java
+  PG_CONTAINER        = nocobase-acc-postgres
+  PGDATABASE / port   = nocobase / 5432
+  BACKUP_DIR          = target/acceptance/backups
+  git commit          = a0b9f1f
+
+✅ 验收目标已固定，所有后续脚本将作用于上述目标

@@ -1,0 +1,47 @@
+默认栈（project=nocobase）跨栈事故残留盘点与处置
+生成时间：2026-11-12T23:52Z（事故窗口：2026-11-12T02:22Z 前后，见验收文档 §4）
+
+== 1. 只读计数（处置前） ==
+audit_log 总数                       = 270120
+audit_log 02:00-03:00Z 新增行数      = 16
+users 02:00-03:00Z 新增行数          = 1
+approval_request 02:00-03:00Z 新增数 = 1
+approval_callback_event 同期新增数   = 0
+默认 redis refresh:* 键数            = 481
+默认 redis ratelimit:* 键数          = 0（已自然过期，未手工删除）
+
+== 2. audit_log 新增行清单（时间/租户/用户/动作/资源/IP） ==
+2026-11-12 02:22:17.467358+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+2026-11-12 02:22:18.035971+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|CREATE|smokede1b9eb8col|33a98cb5-f96f-4eff-ac6e-5c366b495c5f|172.18.0.1
+2026-11-12 02:22:18.250989+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|CREATE|wiki_page|7ed81abf-6808-457f-be50-4403e9e6ffcc|172.18.0.1
+2026-11-12 02:22:18.391687+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|im.message.create|im_message|4104ea58-6aff-4dd7-97b6-582efec62ed3|172.18.0.1
+2026-11-12 02:22:18.557401+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|TRIGGER|workflow|d500b10f-916e-488d-8912-391f3472ed62|172.18.0.1
+2026-11-12 02:22:19.108211+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|form.share|form|dff87b74-e4da-4a9b-b83e-b290725e6729|172.18.0.1
+2026-11-12 02:22:19.917032+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|collection.export_file|collection|smokede1b9eb8col|172.18.0.1
+2026-11-12 02:22:20.132893+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|user.create|user|48016fec-97de-4e9a-9731-6a8b6a802c2f|172.18.0.1
+2026-11-12 02:22:20.355937+00|tenant_default|48016fec-97de-4e9a-9731-6a8b6a802c2f|smoke_user_2654e98c|auth.login.success|auth|48016fec-97de-4e9a-9731-6a8b6a802c2f|172.18.0.1
+2026-11-12 02:22:21.43697+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+2026-11-12 02:36:27.107975+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+2026-11-12 02:37:22.055055+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+2026-11-12 02:44:14.330246+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+2026-11-12 02:44:14.41192+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+2026-11-12 02:44:14.486056+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+2026-11-12 02:49:49.312148+00|tenant_default|00000000-0000-0000-0000-000000000001|admin|auth.login.success|auth|00000000-0000-0000-0000-000000000001|172.18.0.1
+
+== 3. 测试用户与审批行（保留，未删除） ==
+users:             48016fec-97de-4e9a-9731-6a8b6a802c2f | smoke_user_2654e98c | created 2026-11-12 02:22:20Z
+approval_request:  3b89aef3-e883-4153-8b64-3ea25722070e | tenant_default | applicant 48016fec... | APPROVED | submitted 2026-11-12 02:22:20Z
+
+== 4. refresh token 吊销（按测试用户 ID，未 FLUSHDB） ==
+refresh:user:48016fec-97de-4e9a-9731-6a8b6a802c2f 集合成员 = 1
+  zg_Z5eUQSP393K8ZDTAGTmS2m24OVQbrZ3MnGveYPXg → DEL refresh:{token}
+反向索引 refresh:user:48016fec... → DEL
+处置后 refresh:* 键数 = 479（481 - token - 索引；其余用户 token 未触碰）
+处置后该用户索引 EXISTS = 0
+
+== 5. 处置结论 ==
+- 测试 refresh token 已全部失效（revokeAll 等价操作：token + 反向索引）。
+- audit_log 16 行、users 1 行、approval_request 1 行全部保留，未删除生产行；
+  是否删除/隔离由默认栈 owner 决定（计划 D3）。
+- 默认 redis ratelimit:* 当前 0 个，未手工删除（依赖自然过期）。
+- 未执行 FLUSHDB，未执行 DELETE FROM audit_log。

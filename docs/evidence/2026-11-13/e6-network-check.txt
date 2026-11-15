@@ -1,0 +1,6 @@
+== nocobase-acc-backend-java ==
+postgres: 172.20.0.12       postgres  postgres
+redis: 172.20.0.2        redis  redis
+== nocobase-acc-backend-python ==
+postgres: 172.20.0.12     postgres
+redis: 172.20.0.2      redis

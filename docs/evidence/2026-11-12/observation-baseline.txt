@@ -1,0 +1,30 @@
+24h 观察窗口基线（最终 2.1.5 镜像 + 发布门禁后重置）
+记录时间：2026-11-13T00:27Z
+窗口起点：2026-11-13T00:26:34Z（backend-java 最后一次计划内重启；其它应用容器 00:00Z）
+说明：发布门禁的上线终验会在末尾执行 JWT rotate（kid=k-0 → k-1，进程内随机 key），
+      Python 只持有共享 JWT_SECRET(k-0)，因此门禁后重启 backend-java 恢复 k-0；
+      重启后开始 24h 观察计时。
+
+容器 image ID / StartedAt / RestartCount / health：
+/nocobase-acc-backend-java    sha256:726620c14bdb3ff58931b0ea583f4554f2f12539e90800746f7f597fb01ae755  started=2026-11-13T00:26:34.060239663Z  restarts=0  healthy
+/nocobase-acc-backend-python  sha256:6e303668e0f259de43750dde0a572e808f8bcb7cae904a018b35846fc9b43309  started=2026-11-13T00:00:38.132435926Z  restarts=0  healthy
+/nocobase-acc-crdt-service    sha256:14aff661ee94d9366b0b8abb808172286b8f4d0a3aad06cfda59972dbf4db68d  started=2026-11-13T00:00:12.367307832Z  restarts=0  healthy
+/nocobase-acc-frontend        sha256:2a22971c052c391985a946f8e1cb3f50aef55e5087aa54a62e3d548d67ede89c  started=2026-11-13T00:00:43.859727405Z  restarts=0  healthy
+/nocobase-acc-postgres        sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b  started=2026-11-12T23:22:01.372505731Z  restarts=0  healthy
+/nocobase-acc-redis           sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf  started=2026-11-12T23:22:01.109061105Z  restarts=0  healthy
+
+镜像 OCI label：revision=712efb64709fdda5b7eb1a6095433efdce774cb2 version=2.1.5
+容器 image ID 与本地镜像 ID 逐一相等（见上）。
+
+观察项（到期 2026-11-13T00:26Z + 24h）：
+- RestartCount 保持 0；StartedAt 不变（除非计划内重建，重建则重新计时）
+- Prometheus /api/v1/alerts 与 Alertmanager /api/v2/alerts 无新增 firing
+- alerts.db 无未预期的新增行
+- 5xx 计数无异常峰值
+- backend-python 日志 0 次 "Event loop is closed"
+
+部署/门禁后首检（2026-11-13T00:27Z）：
+- backend-python 日志 grep "event loop is closed" = 0
+- 4 个应用容器 restarts=0
+- Prometheus alerts = []；Alertmanager alerts = []
+- admin token kid=k-0；备份网关 POST = 200

@@ -146,6 +146,12 @@ app:
     previous-secret: ${JWT_PREVIOUS_SECRET:}
     access-ttl-minutes: ${JWT_ACCESS_TTL_MINUTES:15}
     refresh-ttl-days: ${JWT_REFRESH_TTL_DAYS:7}
+    rotation:
+      # 2.1.5 默认禁用：rotate() 生成的是进程内随机 key（kid=k-1），不持久化、
+      # 也不与 Python 共享；旋转后 Python 只认共享 JWT_SECRET（kid=k-0），
+      # /api/ai/* 与 /api/admin/backup 会统一 401。持久化/共享 keyring 排期 2.1.6。
+      # 打开前必须确保 Java/Python 使用同一 keyring 存储，否则仅用于本地实验。
+      enabled: ${JWT_ROTATION_ENABLED:false}
   cors:
     allowed-origins: http://localhost:5173,http://localhost:3000
 
@@ -176,6 +182,13 @@ management:
       # 开启 K8s readiness/liveness 分组(/actuator/health/readiness、/liveness)
       probes:
         enabled: true
+  # LDAP 健康指示器：无 LDAP 的部署（默认）不巡检 LDAP。
+  # 即便 LdapContextSource 由自动配置/占位 Bean 创建，也不应把
+  # "未使用 LDAP"误判为 DOWN；显式配置 spring.ldap.urls 或
+  # nocobase.ldap.url 时再由部署方自行打开。
+  health:
+    ldap:
+      enabled: ${LDAP_HEALTH_ENABLED:false}
   metrics:
     # 全局 tag,便于 Prometheus/Grafana 按应用/租户聚合
     tags:

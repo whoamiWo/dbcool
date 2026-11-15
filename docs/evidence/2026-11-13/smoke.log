@@ -1,0 +1,43 @@
+======================================================================
+PHASE89 跨模块端到端冒烟（真调后端，禁止 mock）
+目标: http://127.0.0.1:18082  前缀: smoke22bba7ae
+======================================================================
+  ✅ [1] 存活/就绪 GET /api/health (14ms)
+  ✅ [2] 认证 POST /api/auth/login (96ms)
+
+  ✅ [3] 租户 GET /api/admin/tenants (7ms)
+  ✅ [4] 集合 POST+GET /api/collections (37ms)
+  ✅ [5] 记录 POST+GET /collections/{name}/records (48ms)
+  ✅ [6] 视图 GET /api/views (5ms)
+  ✅ [7] Wiki POST+GET /api/wiki/pages (44ms)
+  ✅ [8] IM POST /api/im/channels+messages (28ms)
+  ✅ [9] 附件 POST upload+GET download (19ms)
+  ✅ [10] 工作流 POST /api/workflows/{id}/trigger (20ms)
+  ✅ [11] 审计回查 GET /api/audit (7ms)
+  ✅ [12] 公开表单 POST /api/forms + share + public submit (97ms)
+  ✅ [13] 导出 GET /api/collections/{name}/export-file?format=xlsx (35ms)
+  ✅ [14] 组织→审批→通知→搜索链路 (520ms)
+
+======================================================================
+汇总表
+======================================================================
+步骤    链路                                      结果      耗时ms      失败原因
+----------------------------------------------------------------------------------------------------
+1     存活/就绪 GET /api/health                   PASS    14
+2     认证 POST /api/auth/login                 PASS    96
+3     租户 GET /api/admin/tenants               PASS    7
+4     集合 POST+GET /api/collections            PASS    37
+5     记录 POST+GET /collections/{name}/records PASS    48
+6     视图 GET /api/views                       PASS    5
+7     Wiki POST+GET /api/wiki/pages           PASS    44
+8     IM POST /api/im/channels+messages       PASS    28
+9     附件 POST upload+GET download             PASS    19
+10    工作流 POST /api/workflows/{id}/trigger    PASS    20
+11    审计回查 GET /api/audit                     PASS    7
+12    公开表单 POST /api/forms + share + public submitPASS    97
+13    导出 GET /api/collections/{name}/export-file?format=xlsxPASS    35
+14    组织→审批→通知→搜索链路                           PASS    520
+----------------------------------------------------------------------------------------------------
+总计: 14 | PASS: 14 | FAIL: 0 | SKIP: 0
+
+✅ 冒烟全部通过

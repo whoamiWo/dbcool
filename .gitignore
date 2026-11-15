@@ -5,6 +5,8 @@
 # 通用
 .DS_Store
 *.log
+# 验收证据日志必须随仓库归档（避免 *.log 规则把 docs/evidence 一起忽略）
+!docs/evidence/**/*.log
 *.swp
 *.bak
 *.tmp
