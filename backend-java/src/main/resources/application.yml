@@ -242,7 +242,9 @@ spring:
     activate:
       on-profile: test
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    # @DataJpaTest 会按实体自动建表；H2 不识别实体里的 jsonb 类型名，
+    # 与 src/test/resources/application-test.properties 保持一致，先建 JSONB 域。
+    url: jdbc:h2:mem:nocobase_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;INIT=CREATE DOMAIN IF NOT EXISTS JSONB AS CLOB\;
     username: sa
     password:
     driver-class-name: org.h2.Driver

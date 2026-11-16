@@ -7,8 +7,11 @@ import static org.mockito.Mockito.when;
 import com.nocobase.audit.AuditService;
 import com.nocobase.tenant.TenantEntity;
 import com.nocobase.tenant.TenantRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -17,10 +20,10 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.transaction.TestTransaction;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 /** H12：定时 flush 在调用方没有事务时，也必须能真实更新数据库。 */
 @DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 @ExtendWith(OutputCaptureExtension.class)
 class TenantQuotaServiceTransactionTest {
@@ -30,6 +33,11 @@ class TenantQuotaServiceTransactionTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @AfterEach
+    void removeFixture() {
+        jdbcTemplate.update("DELETE FROM tenant WHERE id = ?", "tenant_h12");
+    }
 
     @Test
     void flushWithoutCallerTransactionUpdatesDatabaseWithoutWarning(CapturedOutput output) {
