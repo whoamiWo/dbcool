@@ -1,17 +1,8 @@
 name: Release
 
-# Wave1 T1.2 / Wave4 v2.1.2：tag 触发的发布流水线。
-#
-# 结构（v2.1.2 发布实测三次失败后定稿）：
-#   job release    : amd64 单架构构建推送 → 抽 CHANGELOG → SHA256 → 创建 GitHub Release
-#   job multi-arch : arm64 单独构建（continue-on-error，不阻塞 Release）
-#
-# 教训（均为真实失败）：
-#   1) mvn -o 离线模式在 CI 无缓存必失败 → 改为在线构建；
-#   2) runner 默认 JDK 不支持 release 21 → 必须 setup-java 21；
-#   3) GHCR 仓库名必须全小写 → whoamiWo 会被拒；
-#   4) 多架构一次构建（QEMU 模拟 arm64）在 runner 上耗时过长导致 job 被取消
-#      → 拆分：发布主链路只做 amd64，arm64 独立且失败不阻塞。
+# tag 触发的发布流水线。每个架构只推 digest，manifest job 统一组装并校验四镜像。
+# 禁止不同架构直接向同一个版本 tag 推送：后推者会覆盖先推者，而不是形成多架构 manifest。
+# 任一架构失败均阻断 Release，不用 continue-on-error 把单架构产物冒充完整发布。
 
 on:
   push:
@@ -23,78 +14,20 @@ permissions:
   packages: write   # 推 ghcr.io 镜像需要
 
 jobs:
-  release:
+  build:
+    name: Build ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, platform: linux/amd64 }
+          - { arch: arm64, platform: linux/arm64 }
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 21（backend-java 构建需要；含 Maven 缓存）
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Version consistency（发布前置门禁）
-        run: python3 scripts/version-consistency-verify.py
-
-      - name: Build & push images（amd64）
-        env:
-          APP_VERSION: ${{ github.ref_name }}
-          IMAGE_REGISTRY: ghcr.io/whoamiwo/dbcool
-        run: |
-          # VERSION 真相源与 tag 一致性：tag vX.Y.Z 必须等于 VERSION 内容
-          if [ "v$(cat VERSION | tr -d '[:space:]')" != "${GITHUB_REF_NAME}" ]; then
-            echo "❌ tag ${GITHUB_REF_NAME} 与 VERSION $(cat VERSION) 不一致"; exit 2
-          fi
-          APP_VERSION=${GITHUB_REF_NAME#v} PLATFORM=linux/amd64 \
-            IMAGE_REGISTRY=ghcr.io/whoamiwo/dbcool \
-            bash scripts/build-images.sh
-
-      - name: Extract Release Notes（版本不存在则失败）
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          python3 scripts/extract-changelog.py --version "$TAG" > /tmp/RELEASE_NOTES.md
-          wc -l /tmp/RELEASE_NOTES.md
-
-      - name: Generate checksums
-        run: |
-          mkdir -p dist
-          python3 scripts/extract-changelog.py --version "${GITHUB_REF_NAME}" > dist/RELEASE_NOTES-${GITHUB_REF_NAME}.md
-          cd dist
-          sha256sum RELEASE_NOTES-*.md > SHA256SUMS.txt
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          body_path: /tmp/RELEASE_NOTES.md
-          files: |
-            dist/RELEASE_NOTES-*.md
-            dist/SHA256SUMS.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  multi-arch:
-    # arm64 单独构建：失败不阻塞 Release（QEMU 模拟耗时长，已实测会拖垮整体）
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -114,11 +47,132 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push images（arm64）
+      - name: Version consistency（发布前置门禁）
+        run: |
+          test "v$(cat VERSION | tr -d '[:space:]')" = "$GITHUB_REF_NAME"
+          python3 scripts/version-consistency-verify.py
+
+      - name: Build & push four architecture digests
         env:
           APP_VERSION: ${{ github.ref_name }}
           IMAGE_REGISTRY: ghcr.io/whoamiwo/dbcool
+          PLATFORM: ${{ matrix.platform }}
+          PUSH_BY_DIGEST: "1"
         run: |
-          APP_VERSION=${GITHUB_REF_NAME#v} PLATFORM=linux/arm64 \
-            IMAGE_REGISTRY=ghcr.io/whoamiwo/dbcool \
-            bash scripts/build-images.sh
+          set -euo pipefail
+          bash scripts/build-images.sh
+          : > "${RUNNER_TEMP}/images"
+          for svc in backend-java backend-python crdt-service frontend; do
+            # push-by-digest 不创建版本 tag；digest 只能来自本次构建的 metadata。
+            digest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["containerimage.digest"])' "${RUNNER_TEMP}/${svc}.json")"
+            test -n "$digest"
+            echo "${svc}@${digest}" >> "${RUNNER_TEMP}/images"
+          done
+          cat "${RUNNER_TEMP}/images"
+
+      - name: Upload architecture digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-images-${{ matrix.arch }}
+          path: ${{ runner.temp }}/images
+          if-no-files-found: error
+          retention-days: 1
+
+  manifest:
+    name: Publish and verify multi-arch manifests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download architecture digests
+        uses: actions/download-artifact@v4
+        with:
+          path: digests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create four multi-arch manifests
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for svc in backend-java backend-python crdt-service frontend; do
+            refs=()
+            for arch in amd64 arm64; do
+              line="$(grep "^${svc}@" "digests/release-images-${arch}/images")"
+              refs+=("ghcr.io/whoamiwo/dbcool/dbcool-${line}")
+            done
+            image="ghcr.io/whoamiwo/dbcool/dbcool-${svc}:${APP_VERSION#v}"
+            docker buildx imagetools create --tag "$image" "${refs[@]}"
+          done
+
+      - name: Verify architectures and OCI provenance
+        env:
+          APP_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for svc in backend-java backend-python crdt-service frontend; do
+            image="ghcr.io/whoamiwo/dbcool/dbcool-${svc}:${APP_VERSION#v}"
+            docker buildx imagetools inspect "$image" --format '{{json .}}'
+            platforms="$(docker buildx imagetools inspect "$image" --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+            echo "$platforms" | grep -q 'linux/amd64'
+            echo "$platforms" | grep -q 'linux/arm64'
+            docker buildx imagetools inspect "$image" --raw > manifest.json
+            python3 - "$image" "${GITHUB_SHA}" "$APP_VERSION" <<'PY'
+          import json, subprocess, sys
+          image, revision, version = sys.argv[1:]
+          manifest = json.load(open("manifest.json"))
+          platforms = {m["platform"]["os"] + "/" + m["platform"]["architecture"]: m["digest"] for m in manifest["manifests"]}
+          if set(platforms) != {"linux/amd64", "linux/arm64"}:
+              raise SystemExit(f"unexpected platforms: {sorted(platforms)}")
+          for platform, digest in sorted(platforms.items()):
+              raw = subprocess.check_output(["docker", "buildx", "imagetools", "inspect", image + "@" + digest, "--raw"], text=True)
+              child = json.loads(raw)
+              config = child["config"]
+              if config.get("architecture") not in platform or config.get("os") != "linux":
+                  raise SystemExit(f"unexpected image config platform: {config}")
+
+              labels = config["Labels"]
+              expected = {"org.opencontainers.image.revision": revision, "org.opencontainers.image.version": version.removeprefix("v")}
+              for key, value in expected.items():
+                  if labels.get(key) != value:
+                      raise SystemExit(f"{platform} {key}: {labels.get(key)!r} != {value!r}")
+              print(f"{image} {platform} {digest}: OCI labels verified")
+          PY
+          done
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: manifest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract Release Notes（版本不存在则失败）
+        run: |
+          python3 scripts/extract-changelog.py --version "$GITHUB_REF_NAME" > /tmp/RELEASE_NOTES.md
+          test -s /tmp/RELEASE_NOTES.md
+
+      - name: Generate checksums
+        run: |
+          mkdir -p dist
+          cp /tmp/RELEASE_NOTES.md "dist/RELEASE_NOTES-${GITHUB_REF_NAME}.md"
+          (cd dist && sha256sum RELEASE_NOTES-*.md > SHA256SUMS.txt)
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: /tmp/RELEASE_NOTES.md
+          files: |
+            dist/RELEASE_NOTES-*.md
+            dist/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

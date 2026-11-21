@@ -118,6 +118,11 @@ declare -A CONTEXT=(
   [frontend]="$ROOT/frontend"
 )
 
+if [[ -n "${PUSH_BY_DIGEST:-}" ]]; then
+  METADATA_DIR="${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}"
+  mkdir -p "$METADATA_DIR"
+fi
+
 for svc in backend-java backend-python crdt-service frontend; do
   ctx="${CONTEXT[$svc]}"
   if [[ ! -f "$ctx/Dockerfile" ]]; then
@@ -146,15 +151,38 @@ for svc in backend-java backend-python crdt-service frontend; do
     continue
   fi
   echo "▶ 构建 $image [$PLATFORM]"
-  args=(buildx build --platform "$PLATFORM" -t "$image" "${LABEL_ARGS[@]}" -f "$ctx/Dockerfile" "$ctx")
+  args=(buildx build --platform "$PLATFORM" "${LABEL_ARGS[@]}" -f "$ctx/Dockerfile" "$ctx")
   if [[ $PUSH -eq 1 ]]; then
-    args+=(--push)
+    if [[ -n "${PUSH_BY_DIGEST:-}" ]]; then
+      # 多架构 release：先按 digest 推送，统一由 imagetools 创建版本 manifest。
+      # 各架构绝不能直接覆盖同一个版本 tag；metadata 是 digest 的发布证据。
+      if [[ "$PLATFORM" == *,* ]]; then
+        echo "❌ PUSH_BY_DIGEST=1 要求单架构 PLATFORM，实际为 $PLATFORM" >&2
+        exit 2
+      fi
+      mkdir -p "${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}"
+      args+=(--push --output=type=image,push-by-digest=true,name-canonical=true
+        --metadata-file="${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}/${svc}.json")
+    else
+      args+=(-t "$image" --push)
+    fi
   elif [[ $LOAD -eq 1 ]]; then
     args+=(--load)
   else
     args+=(--output=type=cacheonly)
   fi
   docker "${args[@]}"
+  if [[ -n "${PUSH_BY_DIGEST:-}" ]]; then
+    python3 - "$svc" "$image" "${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}/${svc}.json" <<'PY'
+import json, sys
+svc, image, path = sys.argv[1:]
+metadata = json.load(open(path, encoding="utf-8"))
+digest = metadata["containerimage.digest"]
+if not digest.startswith("sha256:"):
+    raise SystemExit(f"invalid image digest for {svc}: {digest!r}")
+print(f"{svc}@{digest}")
+PY
+  fi
   echo "✅ $image"
   if [[ $PUSH -eq 0 && $LOAD -eq 1 ]]; then
     docker image inspect -f '   image id={{.Id}} revision={{index .Config.Labels "org.opencontainers.image.revision"}} version={{index .Config.Labels "org.opencontainers.image.version"}}' "$image"
