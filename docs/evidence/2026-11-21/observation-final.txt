@@ -1,0 +1,38 @@
+# 24h 到期复核 — 2026-11-21T14:52Z–14:55Z
+# 观察 revision=3be5ea12bcf81e0aebecf070ccd0f3fe31ba1159 / version=2.1.5
+
+## 连续窗口
+
+- 宿主本次启动：2026-11-20T14:26:21Z；四应用容器 StartedAt=2026-11-20T14:26:29Z。
+- 本文件 `observation-baseline.txt` 保存了固定起止时间的 Prometheus range query：
+  `up{job="backend-java"}`，2026-11-20T14:27:30Z → 2026-11-21T14:51:30Z。
+- 结果：1,465 个采样点、全部 up=1、0 个 >300s 空档，已实际覆盖 24h24m。
+- 健康：Java 18082=200、Python 18000=200、frontend 18080=200。
+- Prometheus / Alertmanager：均 0 firing。
+- Java 500 计数：本段无序列；Python 日志 5xx=0。
+- 四容器 RestartCount=0、running、ExitCode=0、OOMKilled=false。
+- 镜像 ID：Java `318c7534d10c13f910e5331b806633215740586f5293c587f566087d1cebd5f2`；
+  Python `7fc2e2a0a2284077aad5663b9d713299467974bf57386ae12ca9be45243aacaf`；
+  CRDT `e18655abe6521755aedc7fc3b6851ecdca8d20ec649ea53b17a53b72495cd1e6`；
+  frontend `7be330b6308c30685fbc02c42b9f6121c12917c27fdbb05937efd8738462a0ad`。
+  四镜像 OCI revision 均为上述 3be5ea1。
+
+## 边界与历史告警
+
+- 多个更早窗口因宿主休眠/重启作废，均未计入；本 PASS 只针对上述连续段。
+- `alerts.db` 仍有 1 行 2026-11-12 的 alertmanager.NocoBaseJavaDown，索引 resolved=0，
+  但 detail.status=resolved、endsAt=2026-11-12T03:05:15.84Z，当前无 firing。
+  这是 H11 历史索引遗留，不是本窗口新增故障；2.1.6 PR #9 已修复后续写入。
+- 2.1.6 的 PR #8 / #9 已合并 main，但未混入本次 2.1.5 镜像、worktree 或证据 revision。
+
+## 到期后的证据重跑（不倒填观察段）
+
+- 14:55 后为了恢复被 `/tmp` 清理的原始门禁日志，在同一镜像、同一验收栈重跑
+  `monthly-gate.py --release`；15 项主门禁 PASS。
+- 重跑中租户清理在 2026-11-21T15:24:30Z 首次出现 1 次 Java 500：
+  `DELETE /api/admin/users/{userId}/tenants/{tenantId}`。这发生在已完成观察段之后，
+  不得把 14:55 的复核改写为“截至之后仍无 5xx”，也不得宣称重跑后开启了新的 24h。
+- 15:25 四容器仍无重启、health 全 200、0 firing；Python 5xx=0。
+- 首次重跑唯一失败是文档声明 80.26 vs 本次 JaCoCo 实测 80.25；原始 FAIL 保留在
+  `monthly-gate-release.log`。仅同步文档为实测值后，`doc-numbers-verify.py` 28 锚点 PASS；
+  相关 3 个文档文件以纯证据/数字提交，不改应用代码、脚本、配置或镜像。
