@@ -117,6 +117,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download architecture digests
         uses: actions/download-artifact@v4
         with:
@@ -276,7 +279,10 @@ jobs:
 
           ## 重试说明
 
-          本次使用重试 tag \`${GITHUB_REF_NAME}\`，GHCR 镜像 tag 使用 \`${image_tag}\`，OCI version 保持 \`${app_version}\`。原始 tag \`v${app_version}\` 的流水线在镜像初始构建时失败，未发布镜像 manifest 或 GitHub Release；原 tag 未移动。
+          本次使用重试 tag \`${GITHUB_REF_NAME}\`，GHCR 镜像 tag 使用 \`${image_tag}\`，OCI version 保持 \`${app_version}\`。
+          - \`v${app_version}\` 首次尝试在初始构建失败，未推送镜像。
+          - \`v${app_version}-1\` 的 amd64/arm64 构建成功并推送了 digest-only 镜像；manifest job 因未 checkout、找不到 VERSION 而失败，未创建版本化多架构 manifest 或 GitHub Release。未标记的 digest 产物可能仍留在 GHCR。
+          先前 tag 均未移动。
           NOTES
           fi
 
