@@ -51,6 +51,7 @@ public interface TenantRepository extends JpaRepository<TenantEntity, String> {
      * 每 60 秒调用一次（PHASE135 由 5 秒降频而来）。
      */
     @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Query(
             "UPDATE TenantEntity t SET t.apiCallUsage = t.apiCallUsage + ?2 WHERE t.id = ?1")
     int incrementApiUsage(String tenantId, long delta);

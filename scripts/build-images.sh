@@ -54,7 +54,17 @@ fi
 
 # 镜像可证性（H2）：把构建时的 commit / 版本 / 源码地址写进 OCI label，
 # 事后可用 `docker inspect` 证明运行中的镜像到底包含哪个提交，而不是靠时间戳推断。
-REVISION_SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+# release 分支的应用代码与 tag 提交可能不同（仅 CI backport），因此允许用
+# APP_REVISION 固定真正对应的应用 commit；脏构建仍会追加 -dirty，不能冒充干净 revision。
+if [[ -n "${APP_REVISION:-}" ]]; then
+  if ! [[ "$APP_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "❌ 退出码 2：APP_REVISION 必须是完整的 40 位小写 commit SHA，实际为 '$APP_REVISION'" >&2
+    exit 2
+  fi
+  REVISION_SHA="$APP_REVISION"
+else
+  REVISION_SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+fi
 REVISION="$REVISION_SHA"
 SOURCE_URL="${IMAGE_SOURCE:-https://github.com/whoamiWo/dbcool}"
 
@@ -118,6 +128,11 @@ declare -A CONTEXT=(
   [frontend]="$ROOT/frontend"
 )
 
+if [[ -n "${PUSH_BY_DIGEST:-}" ]]; then
+  METADATA_DIR="${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}"
+  mkdir -p "$METADATA_DIR"
+fi
+
 for svc in backend-java backend-python crdt-service frontend; do
   ctx="${CONTEXT[$svc]}"
   if [[ ! -f "$ctx/Dockerfile" ]]; then
@@ -146,15 +161,40 @@ for svc in backend-java backend-python crdt-service frontend; do
     continue
   fi
   echo "▶ 构建 $image [$PLATFORM]"
-  args=(buildx build --platform "$PLATFORM" -t "$image" "${LABEL_ARGS[@]}" -f "$ctx/Dockerfile" "$ctx")
+  args=(buildx build --platform "$PLATFORM" "${LABEL_ARGS[@]}" -f "$ctx/Dockerfile" "$ctx")
   if [[ $PUSH -eq 1 ]]; then
-    args+=(--push)
+    if [[ -n "${PUSH_BY_DIGEST:-}" ]]; then
+      # 多架构 release：先按 digest 推送，统一由 imagetools 创建版本 manifest。
+      # 各架构绝不能直接覆盖同一个版本 tag；metadata 是 digest 的发布证据。
+      if [[ "$PLATFORM" == *,* ]]; then
+        echo "❌ PUSH_BY_DIGEST=1 要求单架构 PLATFORM，实际为 $PLATFORM" >&2
+        exit 2
+      fi
+      mkdir -p "${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}"
+      # 关闭 buildx 的 attestation manifest：发布契约要求每个镜像索引只含
+      # linux/amd64 与 linux/arm64 两个平台。可证性由上面的 OCI labels 提供。
+      args+=(--provenance=false --push --output=type=image,push-by-digest=true,name-canonical=true
+        --metadata-file="${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}/${svc}.json")
+    else
+      args+=(-t "$image" --push)
+    fi
   elif [[ $LOAD -eq 1 ]]; then
     args+=(--load)
   else
     args+=(--output=type=cacheonly)
   fi
   docker "${args[@]}"
+  if [[ -n "${PUSH_BY_DIGEST:-}" ]]; then
+    python3 - "$svc" "$image" "${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}/${svc}.json" <<'PY'
+import json, sys
+svc, image, path = sys.argv[1:]
+metadata = json.load(open(path, encoding="utf-8"))
+digest = metadata["containerimage.digest"]
+if not digest.startswith("sha256:"):
+    raise SystemExit(f"invalid image digest for {svc}: {digest!r}")
+print(f"{svc}@{digest}")
+PY
+  fi
   echo "✅ $image"
   if [[ $PUSH -eq 0 && $LOAD -eq 1 ]]; then
     docker image inspect -f '   image id={{.Id}} revision={{index .Config.Labels "org.opencontainers.image.revision"}} version={{index .Config.Labels "org.opencontainers.image.version"}}' "$image"
