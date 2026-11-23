@@ -40,6 +40,8 @@ def persist_alert(payload: AlertPayload) -> int:
     for alert in payload.alerts:
         labels = alert.get("labels", {})
         annotations = alert.get("annotations", {})
+        alert_status = alert.get("status") or payload.status
+        resolved = alert_status == "resolved"
         store.insert_alert({
             "id": alert.get("fingerprint") or uuid.uuid4().hex[:12],
             "kind": f"alertmanager.{labels.get('alertname', 'unknown')}",
@@ -49,12 +51,14 @@ def persist_alert(payload: AlertPayload) -> int:
                 "service": labels.get("service", ""),
                 "summary": annotations.get("summary", ""),
                 "description": annotations.get("description", ""),
-                "status": payload.status,
+                "status": alert_status,
                 "startsAt": alert.get("startsAt", ""),
                 "endsAt": alert.get("endsAt", ""),
                 "externalURL": payload.externalURL,
             },
             "timestamp": _parse_ts(alert.get("startsAt")),
+            "resolved": resolved,
+            "resolved_at": _parse_ts(alert.get("endsAt", "")) if resolved else None,
         })
         count += 1
     logger.info("[alert] 落盘 %d 条告警 (status=%s)", count, payload.status)

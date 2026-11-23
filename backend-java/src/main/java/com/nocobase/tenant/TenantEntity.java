@@ -24,7 +24,7 @@ import java.time.Instant;
  *   <li>status — 启用/禁用</li>
  *   <li>schemaName — 实际 schema 名(默认 = id)</li>
  *   <li>apiCallLimit — API 调用配额(每分钟)</li>
- *   <li>apiCallUsage — 当前 API 调用使用量(每分钟)</li>
+ *   <li>apiCallUsage — 累计 API 调用快照(最终一致,延迟 ≤60 秒)</li>
  *   <li>storageLimit — 存储配额(字节)</li>
  *   <li>storageUsage — 当前存储用量(字节)</li>
  *   <li>seatsLimit — 席位配额上限</li>
