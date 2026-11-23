@@ -52,14 +52,31 @@ jobs:
           test "v$(cat VERSION | tr -d '[:space:]')" = "$GITHUB_REF_NAME"
           python3 scripts/version-consistency-verify.py
 
+      - name: Resolve application revision
+        run: |
+          set -euo pipefail
+          if [ -f .release-app-revision ]; then
+            revision="$(tr -d '[:space:]' < .release-app-revision)"
+          else
+            revision="$(git rev-parse HEAD)"
+          fi
+          if ! [[ "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "❌ invalid application revision: $revision" >&2
+            exit 2
+          fi
+          printf '%s\n' "$revision" > "${RUNNER_TEMP}/revision"
+          echo "APP_REVISION=$revision" >> "$GITHUB_ENV"
+          echo "Application revision: $revision" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build & push four architecture digests
         env:
-          APP_VERSION: ${{ github.ref_name }}
           IMAGE_REGISTRY: ghcr.io/whoamiwo/dbcool
           PLATFORM: ${{ matrix.platform }}
           PUSH_BY_DIGEST: "1"
         run: |
           set -euo pipefail
+          # OCI version 不带 v 前缀；tag 只在引用镜像时使用。
+          export APP_VERSION="${GITHUB_REF_NAME#v}"
           bash scripts/build-images.sh
           : > "${RUNNER_TEMP}/images"
           for svc in backend-java backend-python crdt-service frontend; do
@@ -70,11 +87,13 @@ jobs:
           done
           cat "${RUNNER_TEMP}/images"
 
-      - name: Upload architecture digests
+      - name: Upload architecture digests and revision
         uses: actions/upload-artifact@v4
         with:
           name: release-images-${{ matrix.arch }}
-          path: ${{ runner.temp }}/images
+          path: |
+            ${{ runner.temp }}/images
+            ${{ runner.temp }}/revision
           if-no-files-found: error
           retention-days: 1
 
@@ -87,6 +106,27 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: digests
+
+      - name: Verify matching application revisions
+        run: |
+          set -euo pipefail
+          revisions=()
+          for arch in amd64 arm64; do
+            file="digests/release-images-${arch}/revision"
+            test -f "$file"
+            revision="$(tr -d '[:space:]' < "$file")"
+            if ! [[ "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "❌ invalid ${arch} application revision: $revision" >&2
+              exit 2
+            fi
+            revisions+=("$revision")
+          done
+          if [ "${revisions[0]}" != "${revisions[1]}" ]; then
+            echo "❌ architecture revisions differ: amd64=${revisions[0]} arm64=${revisions[1]}" >&2
+            exit 2
+          fi
+          echo "APP_REVISION=${revisions[0]}" >> "$GITHUB_ENV"
+          echo "Application revision: ${revisions[0]}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -118,29 +158,38 @@ jobs:
           APP_VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          test -n "${APP_REVISION:-}"
           for svc in backend-java backend-python crdt-service frontend; do
             image="ghcr.io/whoamiwo/dbcool/dbcool-${svc}:${APP_VERSION#v}"
             docker buildx imagetools inspect "$image" --format '{{json .}}'
-            platforms="$(docker buildx imagetools inspect "$image" --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
-            echo "$platforms" | grep -q 'linux/amd64'
-            echo "$platforms" | grep -q 'linux/arm64'
             docker buildx imagetools inspect "$image" --raw > manifest.json
-            python3 - "$image" "${GITHUB_SHA}" "$APP_VERSION" <<'PY'
+            python3 - "$image" "$APP_REVISION" "$APP_VERSION" <<'PY'
           import json, subprocess, sys
+
           image, revision, version = sys.argv[1:]
-          manifest = json.load(open("manifest.json"))
-          platforms = {m["platform"]["os"] + "/" + m["platform"]["architecture"]: m["digest"] for m in manifest["manifests"]}
+          manifest = json.load(open("manifest.json", encoding="utf-8"))
+          platforms = {
+              f"{entry['platform']['os']}/{entry['platform']['architecture']}": entry["digest"]
+              for entry in manifest["manifests"]
+          }
           if set(platforms) != {"linux/amd64", "linux/arm64"}:
               raise SystemExit(f"unexpected platforms: {sorted(platforms)}")
-          for platform, digest in sorted(platforms.items()):
-              raw = subprocess.check_output(["docker", "buildx", "imagetools", "inspect", image + "@" + digest, "--raw"], text=True)
-              child = json.loads(raw)
-              config = child["config"]
-              if config.get("architecture") not in platform or config.get("os") != "linux":
-                  raise SystemExit(f"unexpected image config platform: {config}")
 
-              labels = config["Labels"]
-              expected = {"org.opencontainers.image.revision": revision, "org.opencontainers.image.version": version.removeprefix("v")}
+          for platform, digest in sorted(platforms.items()):
+              child_json = subprocess.check_output(
+                  ["docker", "buildx", "imagetools", "inspect", f"{image}@{digest}", "--format", "{{json .Image}}"],
+                  text=True,
+              )
+              child = json.loads(child_json)
+              expected_arch = platform.rsplit("/", 1)[1]
+              if child.get("architecture") != expected_arch or child.get("os") != "linux":
+                  raise SystemExit(f"unexpected image config platform for {platform}: {child.get('os')}/{child.get('architecture')}")
+
+              labels = (child.get("config") or {}).get("Labels") or {}
+              expected = {
+                  "org.opencontainers.image.revision": revision,
+                  "org.opencontainers.image.version": version.removeprefix("v"),
+              }
               for key, value in expected.items():
                   if labels.get(key) != value:
                       raise SystemExit(f"{platform} {key}: {labels.get(key)!r} != {value!r}")
