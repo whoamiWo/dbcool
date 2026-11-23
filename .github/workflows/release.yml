@@ -49,7 +49,21 @@ jobs:
 
       - name: Version consistency（发布前置门禁）
         run: |
-          test "v$(cat VERSION | tr -d '[:space:]')" = "$GITHUB_REF_NAME"
+          set -euo pipefail
+          APP_VERSION="$(tr -d '[:space:]' < VERSION)"
+          tag_prefix="v${APP_VERSION}"
+          if [[ "$GITHUB_REF_NAME" == "$tag_prefix" ]]; then
+            :
+          elif [[ "$GITHUB_REF_NAME" == "$tag_prefix-"* ]]; then
+            retry_suffix="${GITHUB_REF_NAME#"$tag_prefix"-}"
+            if ! [[ "$retry_suffix" =~ ^[1-9][0-9]*$ ]]; then
+              echo "❌ invalid release retry suffix: ${GITHUB_REF_NAME}" >&2
+              exit 2
+            fi
+          else
+            echo "❌ tag ${GITHUB_REF_NAME} 与 VERSION ${APP_VERSION} 不一致" >&2
+            exit 2
+          fi
           python3 scripts/version-consistency-verify.py
 
       - name: Resolve application revision
@@ -75,8 +89,9 @@ jobs:
           PUSH_BY_DIGEST: "1"
         run: |
           set -euo pipefail
-          # OCI version 不带 v 前缀；tag 只在引用镜像时使用。
-          export APP_VERSION="${GITHUB_REF_NAME#v}"
+          # OCI version 固定为 VERSION；GHCR tag 保留重试后缀，避免覆盖原版本 tag。
+          export APP_VERSION="$(tr -d '[:space:]' < VERSION)"
+          export APP_IMAGE_TAG="${GITHUB_REF_NAME#v}"
           bash scripts/build-images.sh
           : > "${RUNNER_TEMP}/images"
           for svc in backend-java backend-python crdt-service frontend; do
@@ -139,17 +154,26 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create four multi-arch manifests
-        env:
-          APP_VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          app_version="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$GITHUB_REF_NAME" == "v${app_version}" ]]; then
+            image_tag="$app_version"
+          else
+            retry_suffix="${GITHUB_REF_NAME#"v${app_version}"-}"
+            if ! [[ "$retry_suffix" =~ ^[1-9][0-9]*$ ]]; then
+              echo "❌ invalid retry tag: $GITHUB_REF_NAME" >&2
+              exit 2
+            fi
+            image_tag="${app_version}-${retry_suffix}"
+          fi
           for svc in backend-java backend-python crdt-service frontend; do
             refs=()
             for arch in amd64 arm64; do
               line="$(grep "^${svc}@" "digests/release-images-${arch}/images")"
               refs+=("ghcr.io/whoamiwo/dbcool/dbcool-${line}")
             done
-            image="ghcr.io/whoamiwo/dbcool/dbcool-${svc}:${APP_VERSION#v}"
+            image="ghcr.io/whoamiwo/dbcool/dbcool-${svc}:${image_tag}"
             docker buildx imagetools create --tag "$image" "${refs[@]}"
           done
 
@@ -159,11 +183,25 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${APP_REVISION:-}"
+          expected_version="$(tr -d '[:space:]' < VERSION)"
+          if [[ "$APP_VERSION" == "v${expected_version}-"* ]]; then
+            retry_suffix="${APP_VERSION#"v${expected_version}"-}"
+            if ! [[ "$retry_suffix" =~ ^[1-9][0-9]*$ ]]; then
+              echo "❌ invalid release retry suffix: $APP_VERSION" >&2
+              exit 2
+            fi
+            image_tag="${expected_version}-${retry_suffix}"
+          elif [[ "$APP_VERSION" == "v${expected_version}" ]]; then
+            image_tag="$expected_version"
+          else
+            echo "❌ release tag $APP_VERSION differs from VERSION $expected_version" >&2
+            exit 2
+          fi
           for svc in backend-java backend-python crdt-service frontend; do
-            image="ghcr.io/whoamiwo/dbcool/dbcool-${svc}:${APP_VERSION#v}"
+            image="ghcr.io/whoamiwo/dbcool/dbcool-${svc}:${image_tag}"
             docker buildx imagetools inspect "$image" --format '{{json .}}'
             docker buildx imagetools inspect "$image" --raw > manifest.json
-            python3 - "$image" "$APP_REVISION" "$APP_VERSION" <<'PY'
+            python3 - "$image" "$APP_REVISION" "$expected_version" <<'PY'
           import json, subprocess, sys
 
           image, revision, version = sys.argv[1:]
@@ -207,14 +245,47 @@ jobs:
 
       - name: Extract Release Notes（版本不存在则失败）
         run: |
-          python3 scripts/extract-changelog.py --version "$GITHUB_REF_NAME" > /tmp/RELEASE_NOTES.md
+          set -euo pipefail
+          app_version="$(tr -d '[:space:]' < VERSION)"
+          app_revision="$(tr -d '[:space:]' < .release-app-revision)"
+          tag_commit="$(git rev-parse HEAD)"
+          image_tag="${GITHUB_REF_NAME#v}"
+          retry_suffix=""
+          if [[ "$GITHUB_REF_NAME" != "v${app_version}" ]]; then
+            retry_suffix="${GITHUB_REF_NAME#"v${app_version}"-}"
+            if ! [[ "$retry_suffix" =~ ^[1-9][0-9]*$ ]]; then
+              echo "❌ invalid release retry tag: $GITHUB_REF_NAME" >&2
+              exit 2
+            fi
+          fi
+          python3 scripts/extract-changelog.py --version "$app_version" > /tmp/RELEASE_NOTES.md
           test -s /tmp/RELEASE_NOTES.md
+          cat >> /tmp/RELEASE_NOTES.md <<NOTES
+
+          ## 发布对象与已知限制
+
+          - 发布 tag：\`${GITHUB_REF_NAME}\`；tag commit：\`${tag_commit}\`。
+          - 应用 revision：\`${app_revision}\`。tag commit 只附带发布 CI/backport 变更，应用代码对应上述 revision。
+          - 钉钉外推、飞书同步、OIDC 尚未完成真实外部验收，相关生产开关保持关闭。
+          - JWT 密钥轮换在 2.1.5 默认禁用。
+          - H12 quota flush 事务修复与 H11 alerts resolved 落盘修复不在 2.1.5，属于 2.1.6；quota DB 快照 WARN 与 alerts.resolved 历史索引遗留仍是已知问题。
+          - ROW/CUSTOM 聚合 403 为设计行为；历史 created_by 不自动回填，需 reindex。
+          NOTES
+          if [[ -n "$retry_suffix" ]]; then
+            cat >> /tmp/RELEASE_NOTES.md <<NOTES
+
+          ## 重试说明
+
+          本次使用重试 tag \`${GITHUB_REF_NAME}\`，GHCR 镜像 tag 使用 \`${image_tag}\`，OCI version 保持 \`${app_version}\`。原始 tag \`v${app_version}\` 的流水线在镜像初始构建时失败，未发布镜像 manifest 或 GitHub Release；原 tag 未移动。
+          NOTES
+          fi
 
       - name: Generate checksums
         run: |
+          set -euo pipefail
           mkdir -p dist
           cp /tmp/RELEASE_NOTES.md "dist/RELEASE_NOTES-${GITHUB_REF_NAME}.md"
-          (cd dist && sha256sum RELEASE_NOTES-*.md > SHA256SUMS.txt)
+          (cd dist && sha256sum "RELEASE_NOTES-${GITHUB_REF_NAME}.md" > SHA256SUMS.txt)
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

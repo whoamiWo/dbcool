@@ -8,8 +8,8 @@
 #   bash scripts/build-images.sh --load               # 构建并 load 到本地 docker（单架构）
 #   bash scripts/build-images.sh --help
 #
-# 版本来源：根目录 VERSION（Wave0 单一真相源），可用 APP_VERSION 覆盖。
-# 镜像名：${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-<svc>:<version>
+# 版本来源：根目录 VERSION（Wave0 单一真相源），可用 APP_VERSION 覆盖；APP_IMAGE_TAG 可覆盖镜像 tag（发布重试用）。
+# 镜像名：${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-<svc>:<tag>
 #
 # 发布构建可证性（H2b）：
 #   默认要求工作树干净 —— 镜像 label 的 revision 必须真的等于镜像内容来源。
@@ -45,6 +45,11 @@ fi
 VERSION="${APP_VERSION:-$(cat "$ROOT/VERSION" 2>/dev/null || true)}"
 if [[ -z "$VERSION" ]]; then
   echo "❌ 退出码 2：VERSION 文件缺失且未设置 APP_VERSION" >&2
+  exit 2
+fi
+IMAGE_TAG="${APP_IMAGE_TAG:-$VERSION}"
+if ! [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+  echo "❌ 退出码 2：APP_IMAGE_TAG 不是有效的 Docker tag：'$IMAGE_TAG'" >&2
   exit 2
 fi
 if ! command -v docker >/dev/null 2>&1; then
@@ -139,7 +144,7 @@ for svc in backend-java backend-python crdt-service frontend; do
     echo "❌ 退出码 2：$ctx/Dockerfile 不存在" >&2
     exit 2
   fi
-  image="$REGISTRY/dbcool-$svc:$VERSION"
+  image="$REGISTRY/dbcool-$svc:$IMAGE_TAG"
   if ! docker buildx version >/dev/null 2>&1; then
     # 无 buildx 的 docker 安装（2026-11-12 本环境实测 docker 29.1.3 无插件）：
     # 多架构 manifest 必须 buildx，不能用经典 build 冒充 —— 显式拒绝并给指引。
@@ -173,7 +178,9 @@ for svc in backend-java backend-python crdt-service frontend; do
       mkdir -p "${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}"
       # 关闭 buildx 的 attestation manifest：发布契约要求每个镜像索引只含
       # linux/amd64 与 linux/arm64 两个平台。可证性由上面的 OCI labels 提供。
-      args+=(--provenance=false --push --output=type=image,push-by-digest=true,name-canonical=true
+      # 指定不带 tag 的仓库名并通过 image exporter 按 digest push，避免创建版本 tag。
+      args+=(--provenance=false
+        "--output=type=image,name=${image%:*},push=true,push-by-digest=true,name-canonical=true"
         --metadata-file="${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}/${svc}.json")
     else
       args+=(-t "$image" --push)
