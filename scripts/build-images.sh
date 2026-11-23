@@ -54,7 +54,17 @@ fi
 
 # 镜像可证性（H2）：把构建时的 commit / 版本 / 源码地址写进 OCI label，
 # 事后可用 `docker inspect` 证明运行中的镜像到底包含哪个提交，而不是靠时间戳推断。
-REVISION_SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+# release 分支的应用代码与 tag 提交可能不同（仅 CI backport），因此允许用
+# APP_REVISION 固定真正对应的应用 commit；脏构建仍会追加 -dirty，不能冒充干净 revision。
+if [[ -n "${APP_REVISION:-}" ]]; then
+  if ! [[ "$APP_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "❌ 退出码 2：APP_REVISION 必须是完整的 40 位小写 commit SHA，实际为 '$APP_REVISION'" >&2
+    exit 2
+  fi
+  REVISION_SHA="$APP_REVISION"
+else
+  REVISION_SHA="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+fi
 REVISION="$REVISION_SHA"
 SOURCE_URL="${IMAGE_SOURCE:-https://github.com/whoamiWo/dbcool}"
 
@@ -161,7 +171,9 @@ for svc in backend-java backend-python crdt-service frontend; do
         exit 2
       fi
       mkdir -p "${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}"
-      args+=(--push --output=type=image,push-by-digest=true,name-canonical=true
+      # 关闭 buildx 的 attestation manifest：发布契约要求每个镜像索引只含
+      # linux/amd64 与 linux/arm64 两个平台。可证性由上面的 OCI labels 提供。
+      args+=(--provenance=false --push --output=type=image,push-by-digest=true,name-canonical=true
         --metadata-file="${BUILD_METADATA_DIR:-${RUNNER_TEMP:-$ROOT/target/build-metadata}}/${svc}.json")
     else
       args+=(-t "$image" --push)
