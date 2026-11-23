@@ -43,9 +43,45 @@
 
 若要求“最终一次门禁之后再连续 24h 无 5xx”，需从 `2026-11-21T15:24:30Z` 后重新观察至 `2026-11-22T15:24:30Z`；本文件不声称该新窗口已完成。
 
-## 未发布/待办
+## 发布 tag 与工作流验收（2026-11-23）
 
-- 2.1.6 PR #8/#9 已合入 main，但不属于本发布 revision；H12/H11 修复不在 3be5ea1。
-- 原 `release.yml` 的 amd64/arm64 两个 job 均直接推同一 GHCR tag，存在单架构 manifest 相互覆盖风险，且 arm64 continue-on-error；PR #10 修复中，尚未用于发布。
-- main 保护已配置：PR + 1 approval，Java/Python/Frontend/Regression 四项必检，禁 force-push/删除，管理员同样受限。
-- 本文创建时 v2.1.5 tag、GHCR 发布、GitHub Release 均未创建；R5 外部系统验收仍待完成。
+### 固定发布对象
+
+- 应用 revision：`3be5ea12bcf81e0aebecf070ccd0f3fe31ba1159`（`.release-app-revision`）。
+- 发布 tag：[`v2.1.5-3`](https://github.com/whoamiWo/dbcool/releases/tag/v2.1.5-3)。tag commit：`9570e8d130906bc2d42b671216c197be1afe83a5`；该提交为 `3be5ea1` 加发布 CI backport，仅包含 `.github/workflows/release.yml`、`scripts/build-images.sh`、`.release-app-revision`。
+- `git diff 3be5ea1 v2.1.5-3` 确认应用源码与配置未变化；OCI `org.opencontainers.image.revision` 对所有镜像均为 `3be5ea12bcf81e0aebecf070ccd0f3fe31ba1159`，`org.opencontainers.image.version=2.1.5`。
+- 工作流：https://github.com/whoamiWo/dbcool/actions/runs/45133947389，结论 `success`；Build amd64/native arm64、manifest 发布与校验、GitHub Release 四个 job 均通过。arm64 使用 GitHub 原生 `ubuntu-24.04-arm` runner，避开此前 QEMU 在 `crdt-service` `npm install` 上的 SIGILL。
+
+### GHCR 多架构 manifests 与 digest
+
+以下 digest 为 GHCR index digest；每个 index 恰含 `linux/amd64`、`linux/arm64`。流水线以及对 GHCR registry manifest/config 的独立检查均验证平台和 OCI labels。
+
+| 镜像 | tag | index digest | amd64 child digest | arm64 child digest |
+|---|---|---|---|---|
+| `ghcr.io/whoamiwo/dbcool/dbcool-backend-java` | `2.1.5-3` | `sha256:44f5f37769855a7401c5f03356544ccb76656dd56008d67183484577397a43ba` | `sha256:ad1b2d1a5d421d39435e8dd66e4e1d785cb9d14023dbd0fa33edbb8c44fc8678` | `sha256:f87b0cbae10911ecc6775cdee465c3ddbce95bde21443c891cede3d6add9861b` |
+| `ghcr.io/whoamiwo/dbcool/dbcool-backend-python` | `2.1.5-3` | `sha256:c6cb159ded37a07c67fc71fa6b43cb01779f00fc04f4acf1eb6c46c223f24578` | `sha256:a7f4e4fa2778b0c02b942ed81e9a6f26df249d72d9ed827368e9b9a4a990e5f7` | `sha256:d6b72c9fc087e891566b9902d1508cfb56fa39d817a45e06f32d2ca0b5824eea` |
+| `ghcr.io/whoamiwo/dbcool/dbcool-crdt-service` | `2.1.5-3` | `sha256:ac4df5804d72192bae6fd7041f28b322b95145d52996ec8b4161335608d4fa4e` | `sha256:09e24835779991b4a679ec954e00b1c61cbeb1471bffac8f2eb5359af27a14d0` | `sha256:c92739009b2711a2ab805f34f1935feae3c3c026ce137be9a539d27a47fdd03e` |
+| `ghcr.io/whoamiwo/dbcool/dbcool-frontend` | `2.1.5-3` | `sha256:ab8b02817af2159548f3c711e583d52e18714bc89828f9f915b6eaa5d316a77c` | `sha256:a32292bb080f2cd07fb41eca37f396852846677b06f60605d8a42f4630a9b76c` | `sha256:bd0e3c61e608e373bbfe4b62174cd27477611b5dd3a8ef43bb7e45f5f4b0a67e` |
+
+### Release 页面与资产
+
+- GitHub Release：<https://github.com/whoamiWo/dbcool/releases/tag/v2.1.5-3>；非 draft、非 prerelease。
+- 资产：`RELEASE_NOTES-v2.1.5-3.md`、`SHA256SUMS.txt`。下载的 notes SHA256 为 `7dd54429a83878a804c945b7a0bde377ae7e2deddee975ff5ea05e1bd88dc11f`，与 `SHA256SUMS.txt` 一致。
+- 发布说明记录 tag commit 与应用 revision 的区别、外部集成未验收、JWT 轮换禁用、H12/H11 不在 v2.1.5、ROW/CUSTOM 403 与 `created_by` 不自动回填等边界。
+
+### 隔离启动 smoke（有限范围）
+
+- 测试对象：GHCR `dbcool-backend-java:2.1.5-3` amd64 image，独立临时 Docker network、全新 pgvector/PostgreSQL volume 与一次性 Redis；未使用/重启/删除任何既有容器或数据卷。测试结束后只删除本次创建的容器、network 和 volume。
+- PostgreSQL Flyway 从空库成功应用 82 migrations 至 V85；注入独立临时 JWT 与 AES-256 integration key。Java 启动健康；`GET http://127.0.0.1:28082/api/health` 返回 200，body `status=ok, service=nocobase-backend, version=2.1.5`；容器内 `java -version` 为 Temurin 21.0.13.1。
+- 初次以镜像默认 `./alerts.db` 路径启动时，非 root 用户遇到 SQLite permission denied；隔离 smoke 通过设置 `NOCOBASE_ALERTS_PATH=/tmp/release-smoke-alerts.db` 后成功。这次测试未验证默认 Compose 中 `/data` 持久化挂载行为。
+- 限制：只执行健康 API 与 JVM 运行检查，**不等价于 `scripts/smoke.py` 14 项业务 smoke**，不证明外部集成、备份/PITR、24h 观测或生产部署路径通过。
+- arm64 runtime 未在本机执行：宿主为 x86_64，直接 `docker run --platform linux/arm64` 因本机无 ARM64 emulator 报 `exec format error`。因此 arm64 的构建、GHCR index、架构声明及 OCI labels 已核验，但 arm64 容器实际启动仍未验证；不能标记为 PASS。
+
+### Retry 历史与未完成项
+
+- `v2.1.5` 首次工作流在 digest-only exporter 初始 push 处失败；未创建版本化 manifest/Release。
+- `v2.1.5-1` 的两个架构 digest 构建与 push 成功，但 manifest job 缺少 checkout、找不到 `VERSION`；留下的 untagged digest 可能仍在 GHCR，未创建版本化 manifest/Release。
+- `v2.1.5-2` 因 arm64 QEMU 在 CRDT `npm install --omit=dev` 上 SIGILL 被取消；未完成 arm64 digest，未创建 manifest/Release。
+- 未移动或删除上述 tag；最终经原生 ARM64 runner 成功发布为 `v2.1.5-3`。
+- H12 quota flush 与 H11 alerts resolved 修复属于 2.1.6（PR #8/#9 已在 main，不包含在 `3be5ea1` 应用 revision）。上述原始 24h 观察结论只覆盖 2026-11-20 至 2026-11-21 的已完成区间，不声称此后重新观察了 24h。
+- 钉钉/飞书/OIDC 真实外部验收仍待凭证与单独验收；相关生产开关保持关闭。
