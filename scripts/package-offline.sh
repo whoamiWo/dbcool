@@ -9,7 +9,7 @@
 #
 # 产物：dist/dbcool-offline-<version>.tar.gz
 #   packaging/offline/ 目录含：images.tar / docker-compose.offline.yml /
-#     .env.example / install-offline.sh / SHA256SUMS
+#     .env.example / install-offline.sh / offline-smoke.py / image-tags.txt / SHA256SUMS
 #
 # 退出码：0 = 成功；2 = 前置条件缺失（APP_VERSION / docker / 镜像缺失）
 # =====================================================================
@@ -32,6 +32,8 @@ VERSION="${APP_VERSION:-}"
 export APP_VERSION="$VERSION"
 command -v docker >/dev/null || { echo "❌ 退出码 2：docker 不可用"; exit 2; }
 REGISTRY="${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}"
+BASE_IMAGES=(pgvector/pgvector:pg16 redis:7.4-alpine \
+  minio/minio:RELEASE.2025-09-07T16-13-09Z rabbitmq:3.13.7-management-alpine)
 
 mkdir -p "$OUT" "$DIST"
 
@@ -49,7 +51,7 @@ for svc in backend-java backend-python crdt-service frontend; do
     exit 2
   fi
 done
-for base in pgvector/pgvector:pg16 redis:7.4-alpine minio/minio:RELEASE.2025-09-07T16-13-09Z rabbitmq:3.13.7-management-alpine; do
+for base in "${BASE_IMAGES[@]}"; do
   if ! docker image inspect "$base" >/dev/null 2>&1; then
     echo "❌ 退出码 2：基础镜像缺失 $base（离线包必须包含，否则断网安装会联网拉取）" >&2
     exit 2
@@ -62,8 +64,7 @@ docker save -o "$OUT/images.tar" \
   "$REGISTRY/dbcool-backend-python:$VERSION" \
   "$REGISTRY/dbcool-crdt-service:$VERSION" \
   "$REGISTRY/dbcool-frontend:$VERSION" \
-  pgvector/pgvector:pg16 redis:7.4-alpine \
-  minio/minio:RELEASE.2025-09-07T16-13-09Z rabbitmq:3.13.7-management-alpine
+  "${BASE_IMAGES[@]}"
 echo "✅ images.tar 生成（$(du -h "$OUT/images.tar" | cut -f1)）"
 
 # 3) 生成仅含 image: 的离线 compose（去掉 build 段，保证断网可用）
@@ -99,12 +100,12 @@ cat > "$OUT/.env.example" <<EOF
 # Wave1 T1.3 离线部署包环境变量样例（拷贝为 .env 后按需修改）
 APP_VERSION=$VERSION
 IMAGE_REGISTRY=$REGISTRY
-POSTGRES_USER=nocobase
+POSTGRES_USER=CHANGEME_postgres_user
 POSTGRES_PASSWORD=请设置强密码
 POSTGRES_DB=nocobase
-MINIO_ROOT_USER=nocobase
+MINIO_ROOT_USER=CHANGEME_minio_root_user
 MINIO_ROOT_PASSWORD=请设置强密码
-RABBITMQ_USER=nocobase
+RABBITMQ_USER=CHANGEME_rabbitmq_user
 RABBITMQ_PASSWORD=请设置强密码
 JWT_SECRET=请设置至少32位随机密钥
 INTERNAL_SERVICE_TOKEN=请设置服务间调用令牌
@@ -122,10 +123,24 @@ JAVA_PORT=8080
 PYTHON_PORT=8000
 CRDT_PORT=3100
 FRONTEND_PORT=80
+# 可选：前端非回环绑定地址（smoke 优先探测该地址；留空用 127.0.0.1）
+# FRONTEND_BIND_ADDR=127.0.0.1
+# 可选：私有 CA / 自签证书路径（默认使用包内 certs/fullchain.pem，若存在；smoke 不关闭证书校验）
+# SMOKE_CA_BUNDLE=/path/to/fullchain.pem
 EOF
 
-# 5) 校验和
-(cd "$OUT" && sha256sum images.tar docker-compose.offline.yml .env.example install-offline.sh > SHA256SUMS)
+# 5) 将健康 smoke 与精确镜像清单（4 应用 + 4 基础）纳入离线包。
+cp "$ROOT/scripts/offline-smoke.py" "$OUT/offline-smoke.py"
+chmod 755 "$OUT/offline-smoke.py"
+{
+  for svc in backend-java backend-python crdt-service frontend; do
+    printf '%s\n' "$REGISTRY/dbcool-$svc:$VERSION"
+  done
+  printf '%s\n' "${BASE_IMAGES[@]}"
+} > "$OUT/image-tags.txt"
+
+# 6) 校验和
+(cd "$OUT" && sha256sum images.tar docker-compose.offline.yml .env.example install-offline.sh offline-smoke.py image-tags.txt > SHA256SUMS)
 echo "✅ SHA256SUMS 生成"
 
 # 6) 打包
