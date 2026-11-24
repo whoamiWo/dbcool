@@ -11,9 +11,15 @@
 *.bak
 *.tmp
 .env
+.env.dev
 .env.local
 .env.*.local
 !.env.example
+!.env.dev.example
+
+# 部署版本记录（deploy.sh 生成，含本地部署状态）
+.last-deployed-tag
+.prev-deployed-tag
 
 # IDE
 .idea/
