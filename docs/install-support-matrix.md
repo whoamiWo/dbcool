@@ -15,4 +15,8 @@
 
 通用前置（所有发行版）：Docker Engine 20.10+ 与 docker compose 插件（脚本会检测/安装）。
 
-离线安装请使用 Wave 1 T1.3 的 `packaging/offline/install-offline.sh`（无包管理器依赖）。
+生产 Compose 必须在 `.env` 显式设置 `APP_VERSION` 为**已发布的镜像 tag**（当前示例 `2.1.5-3`）；
+根目录 `VERSION` 是源码版本，不能自动当作镜像 tag。主 compose 不含应用 build，缺镜像或 tag 不可拉取时应失败。
+本地源码构建仅用于开发：复制 `.env.dev.example` 为 `.env.dev`，叠加 `docker-compose.dev-build.yml`。
+
+离线安装请使用 Wave 1 T1.3 的 `packaging/offline/install-offline.sh`（无包管理器依赖）；离线包生成器要求显式传入 `APP_VERSION`。

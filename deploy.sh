@@ -20,12 +20,63 @@ RESET='\033[0m'
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 DATE=$(date +%Y%m%d_%H%M%S)
+LOG_FILE="${DEPLOY_LOG_FILE:-/tmp/nocobase-deploy.log}"
 
-log() { echo -e "${CYAN}[$(date '+%H:%M:%S')]${RESET} $*" | tee -a /tmp/nocobase-deploy.log; }
+log() { echo -e "${CYAN}[$(date '+%H:%M:%S')]${RESET} $*" | tee -a "$LOG_FILE"; }
 ok()  { echo -e "${GREEN}✅${RESET} $*"; }
 warn(){ echo -e "${YELLOW}⚠️${RESET}  $*"; }
 err() { echo -e "${RED}❌${RESET} $*"; exit 1; }
 error() { echo -e "${RED}❌${RESET} $*"; }
+
+# 从 env 文件读取单个变量（不 source 整个文件，避免执行任意内容）
+env_file_value() {
+    local file="$1" key="$2"
+    [ -f "$file" ] || return 0
+    grep -E "^${key}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2-
+}
+
+set_env_app_version() {
+    local tag="$1" env_file="$PROJECT_ROOT/.env"
+    [ -f "$env_file" ] || return 0
+    python3 - "$env_file" "$tag" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+tag = sys.argv[2]
+lines = path.read_text(encoding="utf-8").splitlines()
+for index, line in enumerate(lines):
+    if line.startswith("APP_VERSION="):
+        lines[index] = f"APP_VERSION={tag}"
+        break
+else:
+    lines.append(f"APP_VERSION={tag}")
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+}
+
+# 记录部署版本：.last-deployed-tag 为本次 tag，.prev-deployed-tag 为上一版。
+# 回滚读取 .prev-deployed-tag；两者都是 APP_VERSION（镜像 tag），不是 git SHA。
+record_deployed_tag() {
+    local new_tag="$1" old_tag=""
+    if [ -f .last-deployed-tag ]; then
+        old_tag=$(cat .last-deployed-tag)
+    fi
+    if [ -n "$old_tag" ] && [ "$old_tag" != "$new_tag" ]; then
+        echo "$old_tag" > .prev-deployed-tag
+    fi
+    echo "$new_tag" > .last-deployed-tag
+}
+
+# 非部署命令（stop/logs/ps）也要能解析 compose：优先 .env，其次上次部署记录
+load_deployed_version() {
+    if [ -z "${APP_VERSION:-}" ]; then
+        APP_VERSION="$(env_file_value .env APP_VERSION)"
+    fi
+    if [ -z "${APP_VERSION:-}" ] && [ -f .last-deployed-tag ]; then
+        APP_VERSION="$(cat .last-deployed-tag)"
+    fi
+    export APP_VERSION
+}
 
 # ============================================================
 #  检查环境
@@ -45,7 +96,8 @@ docker_cmd() {
     if docker ps &>/dev/null 2>&1; then
         docker "$@"
     else
-        sudo docker "$@"
+        # APP_VERSION 必须传给 sudo 下的 Compose，尤其 rollback 不能被 .env 新版本覆盖。
+        sudo --preserve-env=APP_VERSION docker "$@"
     fi
 }
 
@@ -54,11 +106,21 @@ docker_cmd() {
 # ============================================================
 deploy_prod() {
     log "=== 生产模式部署 ==="
+    cd "$PROJECT_ROOT"
     check_docker
     [ ! -f .env ] && cp .env.example .env
 
+    # APP_VERSION 必须是显式镜像 tag；缺失时先以 exit 2 失败，且不执行 Docker 写操作。
+    APP_VERSION="$(env_file_value .env APP_VERSION)"
+    if [ -z "$APP_VERSION" ] || [[ "$APP_VERSION" == *CHANGEME* ]]; then
+        echo "❌ 退出码 2：.env 未设置 APP_VERSION（必须是已发布镜像 tag，如 2.1.5-3）" >&2
+        echo "   生产部署只拉取已发布镜像，不执行本地 build。" >&2
+        exit 2
+    fi
+    export APP_VERSION
+
     # 生产环境必须强密码,检测到默认口令直接阻断
-    if grep -qE "(dev_password|minio123|guest)" .env 2>/dev/null; then
+    if grep -qE "(CHANGEME|dev_password|minio123|guest)" .env 2>/dev/null; then
         echo "❌ 错误:.env 中仍包含默认口令,生产部署被阻断!" >&2
         echo "   请修改以下项:" >&2
         echo "   - POSTGRES_PASSWORD=强密码(至少 16 位随机)" >&2
@@ -74,13 +136,19 @@ deploy_prod() {
         exit 1
     fi
 
-    # PHASE100 T8: 记录当前版本(用于回滚)
-    IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d_%H%M%S)}"
-    echo "$IMAGE_TAG" > .last-deployed-tag
-    log "本次部署镜像 tag: $IMAGE_TAG"
+    log "本次部署镜像 tag (APP_VERSION): $APP_VERSION"
 
-    log "启动全栈(包含前端 nginx)..."
-    docker_cmd compose up -d --build
+    log "拉取已发布镜像（缺失/不可拉取即失败，不回退本地 build）..."
+    if ! docker_cmd compose pull; then
+        err "镜像拉取失败（APP_VERSION=$APP_VERSION）—— 检查 tag 是否已发布到 registry"
+    fi
+
+    record_deployed_tag "$APP_VERSION"
+
+    log "启动全栈(包含前端 nginx，仅用已拉取镜像)..."
+    if ! docker_cmd compose up -d --no-build; then
+        err "启动失败（APP_VERSION=$APP_VERSION）—— 请检查日志，必要时 ./deploy.sh rollback"
+    fi
 
     # PHASE104 审计修正：prometheus 必须一并启动。
     # Grafana 数据源 url 为 http://prometheus:9090，而 prometheus 只定义在
@@ -88,7 +156,7 @@ deploy_prod() {
     # depends_on，故不显式拉起则数据源不可达、面板无数据。
     log "启动可观测性栈 (Prometheus + AlertManager + Grafana)..."
     if [ -f docker-compose.observability.yml ]; then
-        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d prometheus alertmanager grafana
+        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d --no-build prometheus alertmanager grafana
         ok "可观测性栈已启动"
         echo ""
         echo -e "${CYAN}监控访问:${RESET}"
@@ -100,7 +168,7 @@ deploy_prod() {
     fi
 
     echo ""
-    ok "生产部署完成! (tag=$IMAGE_TAG)"
+    ok "生产部署完成! (APP_VERSION=$APP_VERSION)"
 
     # PHASE114: 根据 PUBLIC_HOST 决定访问提示与健康检查协议
     # 域名模式(PUBLIC_HOST 有值) → https://PUBLIC_HOST + 绑定 127.0.0.1
@@ -162,26 +230,27 @@ deploy_prod() {
 # ============================================================
 rollback() {
     log "=== 回滚到上一个版本 ==="
+    cd "$PROJECT_ROOT"
     check_docker
 
-    if [ ! -f .last-deployed-tag ]; then
-        err "没有找到 .last-deployed-tag,无法回滚"
+    local tag_file=".prev-deployed-tag"
+    [ -f "$tag_file" ] || err "没有找到上一版 APP_VERSION（.prev-deployed-tag）；拒绝把当前 tag 当作回滚目标"
+
+    PREV_TAG=$(cat "$tag_file")
+    log "回滚目标 APP_VERSION: $PREV_TAG"
+    [ -n "$PREV_TAG" ] || err "$tag_file 为空，无法回滚"
+
+    CURRENT_TAG=$(cat .last-deployed-tag 2>/dev/null || echo "unknown")
+    log "当前部署版本: $CURRENT_TAG → 回滚到: $PREV_TAG"
+
+    # 用上一版 APP_VERSION 精确拉起：只拉已发布镜像，不 build、不回退旧默认值
+    export APP_VERSION="$PREV_TAG"
+    if ! docker_cmd compose pull; then
+        err "回滚镜像拉取失败（APP_VERSION=$PREV_TAG）"
     fi
-
-    PREV_TAG=$(cat .last-deployed-tag)
-    log "回滚目标 tag: $PREV_TAG"
-
-    # 验证回滚目标不是空值
-    if [ -z "$PREV_TAG" ]; then
-        err ".last-deployed-tag 为空,无法回滚"
+    if ! docker_cmd compose up -d --no-build; then
+        err "回滚启动失败（APP_VERSION=$PREV_TAG）"
     fi
-
-    # 记录当前正在运行的 tag,便于回滚失败时对比
-    CURRENT_TAG=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-    log "当前运行 tag: $CURRENT_TAG → 回滚到: $PREV_TAG"
-
-    # 用上一个 tag 重新拉起(镜像已在本机则秒起)
-    IMAGE_TAG="$PREV_TAG" docker_cmd compose up -d
 
     # 等待回滚完成并做带重试的健康检查(首次 10s 可能仍在拉镜像/启动中)
     local max_attempts=6 attempt=1 health_ok=false
@@ -199,7 +268,11 @@ rollback() {
     done
 
     if [ "$health_ok" = true ]; then
-        ok "回滚成功: tag=$PREV_TAG, /api/health 通"
+        local failed_tag="$(cat .last-deployed-tag 2>/dev/null || true)"
+        [ -n "$failed_tag" ] && [ "$failed_tag" != "$PREV_TAG" ] && echo "$failed_tag" > .prev-deployed-tag
+        set_env_app_version "$PREV_TAG"
+        echo "$PREV_TAG" > .last-deployed-tag
+        ok "回滚成功: APP_VERSION=$PREV_TAG, /api/health 通"
     else
         # 回滚失败:尝试再拉起,但保持 PREV_TAG 不变
         err "回滚后 /api/health 仍未通,请人工介入"
@@ -210,19 +283,25 @@ rollback() {
 #  演示模式
 # ============================================================
 deploy_demo() {
-    log "=== 演示模式部署 ==="
+    log "=== 演示模式部署（源码构建） ==="
+    cd "$PROJECT_ROOT"
     check_docker
-    [ ! -f .env ] && cp .env.example .env
+    [ ! -f .env.dev ] && cp .env.dev.example .env.dev
+    APP_VERSION="$(env_file_value .env.dev APP_VERSION)"
+    if [ -z "$APP_VERSION" ]; then
+        echo "❌ 退出码 2：.env.dev 未设置 APP_VERSION（开发源码构建通常使用 dev）" >&2
+        exit 2
+    fi
+    [ "$APP_VERSION" != "dev" ] && warn ".env.dev 的 APP_VERSION=$APP_VERSION（建议使用 dev）"
+    export APP_VERSION
 
-    log "启动全栈(暴露所有端口便于调试)..."
-    docker_cmd compose up -d --build
+    log "启动全栈(源码构建，暴露所有端口便于调试)..."
+    docker_cmd compose -f docker-compose.yml -f docker-compose.dev-build.yml --env-file .env.dev up -d --build
 
-    # PHASE104 审计修正：deploy_demo 此前完全没有可观测性块
-    # （原 deploy_prod 内那段重复代码的注释写着"演示模式"，但其实一直留在 prod 里）。
-    # 此处补上，并显式拉起 prometheus 以保证 Grafana 数据源可达。
+    # PHASE104 审计修正：演示模式显式拉起可观测性栈；复用 .env.dev 与源码构建 override。
     log "启动可观测性栈 (Prometheus + AlertManager + Grafana)..."
     if [ -f docker-compose.observability.yml ]; then
-        docker_cmd compose -f docker-compose.yml -f docker-compose.observability.yml up -d prometheus alertmanager grafana
+        docker_cmd compose -f docker-compose.yml -f docker-compose.dev-build.yml -f docker-compose.observability.yml --env-file .env.dev up -d --no-build prometheus alertmanager grafana
         ok "可观测性栈已启动"
         echo ""
         echo -e "${CYAN}监控访问:${RESET}"
@@ -251,6 +330,7 @@ deploy_demo() {
 stop_all() {
     log "停止所有服务..."
     cd "$PROJECT_ROOT"
+    load_deployed_version
     docker_cmd compose stop 2>/dev/null || true
     ok "停止完成"
 }
@@ -260,6 +340,7 @@ stop_all() {
 # ============================================================
 show_logs() {
     cd "$PROJECT_ROOT"
+    load_deployed_version
     docker_cmd compose logs -f --tail=100
 }
 
@@ -350,18 +431,23 @@ prepare_build_artifacts() {
 #  Docker 构建与启动
 # ============================================================
 docker_up() {
-    log "构建 Docker 镜像..."
+    log "构建 Docker 开发镜像..."
     cd "$PROJECT_ROOT"
+    [ -f .env.dev ] || cp .env.dev.example .env.dev
+    APP_VERSION="$(env_file_value .env.dev APP_VERSION)"
+    [ -n "$APP_VERSION" ] || { error ".env.dev 缺少 APP_VERSION"; return 2; }
+    export APP_VERSION
+    local dev_compose=( -f docker-compose.yml -f docker-compose.dev-build.yml --env-file .env.dev )
 
-    docker_cmd compose build
+    docker_cmd compose "${dev_compose[@]}" build
     if [ $? -ne 0 ]; then
         error "Docker 构建失败"
         return 1
     fi
     ok "Docker 构建完成"
 
-    log "启动服务..."
-    docker_cmd compose up -d
+    log "启动开发服务..."
+    docker_cmd compose "${dev_compose[@]}" up -d
     if [ $? -ne 0 ]; then
         error "Docker 启动失败"
         return 1
@@ -396,6 +482,7 @@ verify_deploy() {
     fi
 
     log "verify-deploy.py 不存在，执行基本健康检查"
+    load_deployed_version
     docker_cmd compose ps --format "table {{.Name}}\t{{.Status}}"
 
     if curl -sf http://localhost:8080/api/health/ready >/dev/null 2>&1; then

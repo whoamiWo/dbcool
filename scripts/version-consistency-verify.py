@@ -201,6 +201,104 @@ def check_all(expected: str):
     return mismatches, errors
 
 
+def check_compose_version_policy() -> int:
+    """校验部署入口不提供隐式镜像版本或生产源码 build。"""
+    failures = 0
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        nonlocal failures
+        print(f"{'✅' if ok else '❌'} {name}{(' —— ' + detail) if detail else ''}")
+        if not ok:
+            failures += 1
+
+    try:
+        production = read_text(ROOT / "docker-compose.yml")
+        dev_override = read_text(ROOT / "docker-compose.dev-build.yml")
+        blue_green = read_text(ROOT / "docker-compose.blue-green.yml")
+        offline = read_text(ROOT / "packaging/offline/docker-compose.offline.yml")
+        offline_package = read_text(ROOT / "scripts/package-offline.sh")
+        env_example = read_text(ROOT / ".env.example")
+        dev_env_example = read_text(ROOT / ".env.dev.example")
+        readme = read_text(ROOT / "README.md")
+    except FileNotFoundError as exc:
+        print(f"❌ 部署版本策略源文件缺失：{exc}", file=sys.stderr)
+        return 2
+
+    app_services = ("backend-java", "backend-python", "crdt-service", "frontend")
+    check(
+        "生产 compose 四个应用镜像均要求显式 APP_VERSION",
+        production.count("${APP_VERSION:?") == len(app_services),
+        f"found={production.count('${APP_VERSION:?')}",
+    )
+    check(
+        "生产 compose 不含 APP_VERSION 默认 fallback",
+        "${APP_VERSION:-" not in production,
+    )
+    service_builds_ok = True
+    for service in app_services:
+        match = re.search(
+            rf"(?ms)^  {re.escape(service)}:\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|^volumes:|^networks:|\Z)",
+            production,
+        )
+        if not match or re.search(r"^    build:", match.group(1), re.MULTILINE):
+            service_builds_ok = False
+            break
+    check("生产 compose 应用服务不包含 build", service_builds_ok)
+    check(
+        "开发 override 含四个应用 build 配置",
+        dev_override.count("    build:") == len(app_services),
+        f"found={dev_override.count('    build:')}",
+    )
+    check(
+        "开发环境样例显式 APP_VERSION=dev",
+        re.search(r"^APP_VERSION=dev$", dev_env_example, re.MULTILINE) is not None,
+    )
+
+    app_version = re.search(r"^APP_VERSION=([^\s#]+)$", env_example, re.MULTILINE)
+    check(
+        ".env.example 含非空 APP_VERSION 镜像 tag",
+        app_version is not None and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", app_version.group(1)) is not None,
+        f"value={app_version.group(1) if app_version else 'missing'}",
+    )
+    check(
+        "蓝绿 compose 三个 green 镜像要求显式 TO_TAG",
+        blue_green.count("${TO_TAG:?") == 3,
+        f"found={blue_green.count('${TO_TAG:?')}",
+    )
+    check(
+        "离线 compose 四个应用镜像要求显式 APP_VERSION",
+        offline.count("${APP_VERSION:?") == len(app_services),
+        f"found={offline.count('${APP_VERSION:?')}",
+    )
+    check(
+        "离线打包必须显式读取 APP_VERSION，不得回退到 VERSION",
+        'VERSION="${APP_VERSION:-}"' in offline_package
+        and "$(cat \"$ROOT/VERSION\"" not in offline_package,
+    )
+    check(
+        "生产/蓝绿/离线 compose 均无 APP_VERSION 默认 fallback",
+        all("${APP_VERSION:-" not in content for content in (production, blue_green, offline)),
+    )
+    check(
+        "README 首次启动说明 config → pull → --no-build",
+        all(
+            command in readme
+            for command in (
+                "docker compose config --images",
+                "docker compose pull",
+                "docker compose up -d --no-build",
+            )
+        ),
+    )
+
+    print()
+    if failures:
+        print(f"❌ Compose 版本策略失败 {failures} 项")
+        return 1
+    print("✅ Compose 版本策略全部通过")
+    return 0
+
+
 def self_test() -> int:
     """负向自测：覆盖旧正则漏掉的 shields 徽章写法，防止徽章静默漂移回归。"""
     import tempfile
@@ -295,10 +393,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="版本一致性校验（单一真相源：VERSION）")
     parser.add_argument("--fix", action="store_true", help="从 VERSION 写回各文件")
     parser.add_argument("--self-test", action="store_true", help="运行徽章正则负向自测")
+    parser.add_argument("--compose-policy-only", action="store_true", help="只校验 Compose 镜像版本策略")
     args = parser.parse_args()
 
     if args.self_test:
         return self_test()
+    if args.compose_policy_only:
+        return check_compose_version_policy()
 
     version_file = ROOT / "VERSION"
     if not version_file.exists():
@@ -311,6 +412,10 @@ def main() -> int:
         return 2
 
     print(f"🎯 基准版本（VERSION）：{expected}")
+    print()
+    policy_rc = check_compose_version_policy()
+    if policy_rc:
+        return policy_rc
     print()
 
     mismatches, errors = check_all(expected)
