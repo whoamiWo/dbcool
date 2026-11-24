@@ -40,12 +40,22 @@ DBCool 是一个 **NocoBase 风格的中文企业协作平台**，把七类工�
 
 完整能力矩阵与七强对标实证见 [`docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md`](docs/PLATFORM_BENCHMARK_ANALYSIS_2026-10-30.md)。
 
-## 30 秒上手
+## 首次启动（Docker Compose）
+
+生产 Compose 只拉取已发布镜像，不会在缺镜像时本地构建。先复制环境模板并确认 `APP_VERSION`
+指向一个已发布的 GHCR 镜像 tag（当前示例 `2.1.5-3`；它与源码版本 `VERSION=2.1.5` 是不同概念）：
 
 ```bash
 git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
-./install.sh all          # 自动装 Docker/JDK 依赖并启动全栈（Ubuntu/Debian/RHEL 系/麒麟）
+cp .env.example .env
+# 编辑 .env：替换所有 CHANGEME_* 口令；确认 APP_VERSION 是已发布镜像 tag
+
+docker compose config --images   # 检查解析结果；这一步不证明镜像已发布/可拉取
+docker compose pull              # 确认目标 tag 实际可拉取；失败时停止，不要改用本地 build
+docker compose up -d --no-build
 ```
+
+源码开发构建见下方“部署方式”，通过独立 `.env.dev` 与 `docker-compose.dev-build.yml` 显式启用。
 
 启动后：
 
@@ -71,13 +81,21 @@ git clone https://github.com/whoamiWo/dbcool.git && cd dbcool
 
 | 方式 | 适用 | 入口 |
 |---|---|---|
-| **Docker Compose**（推荐） | 单机 / 小团队 | `./install.sh all` 或 `docker compose up -d` |
-| **离线包**（内网/断网） | 无外网生产环境 | `bash scripts/package-offline.sh` → `packaging/offline/install-offline.sh`（beta，断网安装待实测） |
+| **Docker Compose**（推荐） | 单机 / 小团队 | 按上方步骤设置 `APP_VERSION`，执行 `docker compose pull && docker compose up -d --no-build` |
+| **离线包**（内网/断网） | 无外网生产环境 | `APP_VERSION=<已发布镜像tag> bash scripts/package-offline.sh` → `packaging/offline/install-offline.sh`（beta，断网安装待实测） |
 | **K8s 裸 yaml** | 已有集群 | `kubectl apply -f k8s/` |
 | **Helm** | 参数化集群部署 | `helm install dbcool charts/dbcool`（beta，未实测） |
 | **升级** | 版本迭代 | `bash scripts/upgrade.sh --from <旧> --to <新>`（自动备份+回滚） |
 
-详见 [`docs/upgrade-runbook.md`](docs/upgrade-runbook.md) 与 [`docs/install-support-matrix.md`](docs/install-support-matrix.md)。
+本地源码构建（仅开发）使用独立变量文件与 Compose override：
+
+```bash
+cp .env.dev.example .env.dev
+docker compose -f docker-compose.yml -f docker-compose.dev-build.yml \
+  --env-file .env.dev up -d --build
+```
+
+详见 [`docs/upgrade-runbook.md`](docs/upgrade-runbook.md)、[`docs/blue-green-deploy.md`](docs/blue-green-deploy.md) 与 [`docs/install-support-matrix.md`](docs/install-support-matrix.md)。
 
 ## 质量
 

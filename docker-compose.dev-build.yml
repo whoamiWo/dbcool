@@ -1,0 +1,37 @@
+# =====================================================================
+# 开发源码构建 override（仅本地开发使用，不参与生产部署）
+#
+# 生产/离线/蓝绿一律只用已发布镜像（docker-compose.yml 里 APP_VERSION 必填）。
+# 需要从源码构建时显式叠加本文件，并显式给出 APP_VERSION=dev：
+#
+#   cp .env.dev.example .env.dev            # 内含 APP_VERSION=dev
+#   docker compose -f docker-compose.yml -f docker-compose.dev-build.yml \
+#     --env-file .env.dev up -d --build
+#
+# 只叠加本文件而不提供 APP_VERSION 仍会失败 —— 这是刻意的：不允许隐式版本，
+# 也不允许默认 build 模糊生产/开发边界。
+# =====================================================================
+services:
+  backend-java:
+    build:
+      context: ./backend-java
+      dockerfile: Dockerfile
+
+  backend-python:
+    build:
+      context: ./backend-python
+      dockerfile: Dockerfile
+      args:
+        # PHASE 57 真语义向量：true = 构建时安装 sentence-transformers(torch)，
+        # /api/ai/embedding 使用真语义向量；false(默认) = 回退确定性哈希向量。
+        INSTALL_SEMANTIC: ${INSTALL_SEMANTIC:-false}
+
+  crdt-service:
+    build:
+      context: ./crdt-service
+      dockerfile: Dockerfile
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile

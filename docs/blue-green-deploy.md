@@ -15,19 +15,19 @@
 
 ## 二、前置条件
 
-1. `.env` 已配置（`POSTGRES_PASSWORD` / `JWT_SECRET` / `MINIO_*` 等必填项）；
-2. **新版本镜像已存在于 registry 或本地**（`ghcr.io/whoamiwo/dbcool/dbcool-*:<tag>`）——
+1. `.env` 已配置（`APP_VERSION` / `POSTGRES_PASSWORD` / `JWT_SECRET` / `MINIO_*` 等必填项）；
+2. `--to` 必须显式提供目标 tag（例如当前已发布的 `2.1.5-3`）；脚本先 pull 四个 green 镜像，缺失即退出。
    green 副本**不使用本地 build**（拉不到即失败，避免"任意 tag 都能构建成功"掩盖问题）；
 3. 前端容器 `nocobase-frontend` 正常运行（承担 upstream 切换）。
 
 ## 三、命令
 
 ```bash
-bash scripts/blue-green-deploy.sh --to 2.1.2     # 蓝绿升级到指定 tag
+bash scripts/blue-green-deploy.sh --to 2.1.5-3   # 蓝绿升级到明确发布的 tag
 bash scripts/blue-green-deploy.sh --status       # 查看当前颜色与 green 状态
 bash scripts/blue-green-deploy.sh --rollback     # 回切 blue 并清理 green
 bash scripts/blue-green-deploy.sh --cleanup      # 仅清理 green 副本
-bash scripts/blue-green-deploy.sh --dry-run --to 2.1.2   # 只打印将执行的命令
+bash scripts/blue-green-deploy.sh --dry-run --to 2.1.5-3 # 只打印将执行的命令
 ```
 
 ## 四、流程
@@ -44,7 +44,7 @@ bash scripts/blue-green-deploy.sh --dry-run --to 2.1.2   # 只打印将执行的
 5) blue 保留运行以备回切；观察稳定后执行 --cleanup
 ```
 
-## 五、实测状态（2026-10-31）
+## 五、历史实测状态（2026-10-31；tag 2.1.2 为当时测试样本，不是当前推荐版本）
 
 | 场景 | 结果 |
 |---|---|

@@ -42,8 +42,18 @@ if [[ ! -f .env ]]; then
   fi
 fi
 
+# APP_VERSION 是离线包内镜像 tag 的唯一来源；禁止空值或回退到 VERSION。
+APP_VERSION="$(grep -E '^APP_VERSION=' .env | tail -1 | cut -d= -f2- || true)"
+[[ -n "$APP_VERSION" ]] || fail ".env 缺少 APP_VERSION（必须与离线包内镜像 tag 一致）"
+IMAGE_REGISTRY="$(grep -E '^IMAGE_REGISTRY=' .env | tail -1 | cut -d= -f2- || true)"
+IMAGE_REGISTRY="${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}"
+
+# 在任何启动前确认 compose 使用精确 tag，且不会遇到未设置的插值。
+docker compose -f docker-compose.offline.yml --env-file .env config --images >/dev/null \
+  || fail "离线 compose 配置无效（检查 APP_VERSION 与必填环境变量）"
+
 if [[ $VERIFY_ONLY -eq 1 ]]; then
-  log "校验通过（--verify 模式，未启动）"
+  log "配置校验通过（--verify 模式，未加载镜像、未启动）"
   exit 0
 fi
 
@@ -51,9 +61,16 @@ fi
 log "加载镜像 images.tar"
 docker load -i images.tar
 
+# 确认 tar 中含有当前 .env 指定的四个精确应用 tag。
+for svc in backend-java backend-python crdt-service frontend; do
+  image="$IMAGE_REGISTRY/dbcool-$svc:$APP_VERSION"
+  docker image inspect "$image" >/dev/null 2>&1 \
+    || fail "离线包缺少精确应用镜像 $image（.env APP_VERSION 与 images.tar 不一致）"
+done
+
 # 4) 启动
-log "启动服务"
-docker compose -f docker-compose.offline.yml --env-file .env up -d
+log "启动服务（APP_VERSION=$APP_VERSION）"
+docker compose -f docker-compose.offline.yml --env-file .env up -d --no-build
 
 # 5) 等待健康（最多 5 分钟）
 log "等待服务健康"
