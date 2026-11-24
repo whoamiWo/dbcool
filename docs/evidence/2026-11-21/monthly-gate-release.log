@@ -1,0 +1,109 @@
+========================================================================
+Wave4 月度门禁（共 15 项，工作目录 /home/who/multistack-project/.kilo/worktrees/release-2.1.5-evidence，发布模式 --release）
+========================================================================
+
+▶ 验收目标预检（acceptance-preflight）...
+============================================================
+验收目标固定预检（acceptance-preflight）
+============================================================
+  ✓ 容器 nocobase-acc-postgres 属于隔离 project nocobase-acceptance
+  ✓ 数据库指纹 current_database()=nocobase inet_server_port()=5432
+  ✓ GET http://127.0.0.1:18082/api/health → 200
+  ✓ BASE_URL 端口 18082 对应本栈后端容器：nocobase-acc-backend-java
+  ✓ 后端数据源指向 nocobase-acc-postgres（同一 compose project）
+  ✓ backend 与 PG/Redis 共享 Docker 网络，且服务名解析到本栈容器（E6 数据面同栈）
+
+验收目标指纹（脱敏）：
+  BASE_URL            = http://127.0.0.1:18082
+  COMPOSE_PROJECT     = nocobase-acceptance
+  BACKEND_CONTAINER   = nocobase-acc-backend-java
+  BACKEND_SERVICE     = backend-java
+  PG_CONTAINER        = nocobase-acc-postgres
+  REDIS_CONTAINER     = nocobase-acc-redis
+  PGDATABASE / port   = nocobase / 5432
+  BACKUP_DIR          = /home/who/multistack-project/.kilo/worktrees/release-2.1.5-evidence/target/acceptance/backups
+  git commit          = 3be5ea1
+
+✅ 验收目标已固定，所有后续脚本将作用于上述目标
+
+▶ 版本一致性 ...
+  ✅ PASS (0.1s, exit=0)
+
+▶ 契约 0 漂移 ...
+  ✅ PASS (0.0s, exit=0)
+
+▶ 依赖漏洞审计 ...
+  ✅ PASS (5.2s, exit=0)
+
+▶ 后端 mvn -o verify ...
+  ✅ PASS (123.1s, exit=0)
+
+▶ 前端 npm run test:run ...
+  ✅ PASS (46.7s, exit=0)
+
+▶ 前端 tsc --noEmit ...
+  ✅ PASS (15.7s, exit=0)
+
+▶ 前端 eslint src ...
+  ✅ PASS (15.1s, exit=0)
+
+▶ Python pytest ...
+  ✅ PASS (7.3s, exit=0)
+
+▶ 冒烟 smoke.py ...
+  ✅ PASS (5.3s, exit=0)
+
+▶ 租户隔离 ...
+  ✅ PASS (8.5s, exit=0)
+
+▶ 归属写入静态门禁 ...
+  ✅ PASS (0.0s, exit=0)
+
+▶ 企业套件真实 PG (pg IT) ...
+  ✅ PASS (50.7s, exit=0)
+
+▶ 企业套件 schema smoke ...
+  ✅ PASS (3.5s, exit=0)
+
+▶ 备份/PITR 演练 ...
+  ✅ PASS (20.3s, exit=0)
+
+▶ 上线终验 ...
+  ✅ PASS (45.0s, exit=0)
+
+📊 实测数字已写入 target/gate-numbers.json
+
+▶ 文档数字校验 ...
+  模式: 只校验（release）
+  ❌ FAIL (0.1s, exit=1)
+  ---- 输出尾部 ----
+    docs/PRODUCTIZATION_ROADMAP.md:33  声明=80.26  实测=80.25
+        锚点: Wave 0\.5 后复测\*\*（2026-11-10）：Java (\d+) run / 0F / 0E（BUNDLE LINE ([\d.]+)）
+    docs/PRODUCTIZATION_ROADMAP.md:127  声明=80.26  实测=80.25
+        锚点: ✅ 已统一（Java (\d+)、前端 (\d+)/(\d+) files、BUNDLE ([\d.]+)、前端行覆盖 ([\d.]+)%、Python (\d+)/(\d+)
+    RISK_REGISTER.md:126  声明=80.26  实测=80.25
+        锚点: \| 后端单测覆盖率 \|.*?\| ([\d.]+)% \|
+  
+  💡 修复方式：python3 scripts/doc-numbers-verify.py --fix（锚点缺失时需人工改）
+
+========================================================================
+汇总
+========================================================================
+  ✅ 版本一致性: exit=0 (0.1s)
+  ✅ 契约 0 漂移: exit=0 (0.0s)
+  ✅ 依赖漏洞审计: exit=0 (5.2s)
+  ✅ 后端 mvn -o verify: exit=0 (123.1s)
+  ✅ 前端 npm run test:run: exit=0 (46.7s)
+  ✅ 前端 tsc --noEmit: exit=0 (15.7s)
+  ✅ 前端 eslint src: exit=0 (15.1s)
+  ✅ Python pytest: exit=0 (7.3s)
+  ✅ 冒烟 smoke.py: exit=0 (5.3s)
+  ✅ 租户隔离: exit=0 (8.5s)
+  ✅ 归属写入静态门禁: exit=0 (0.0s)
+  ✅ 企业套件真实 PG (pg IT): exit=0 (50.7s)
+  ✅ 企业套件 schema smoke: exit=0 (3.5s)
+  ✅ 备份/PITR 演练: exit=0 (20.3s)
+  ✅ 上线终验: exit=0 (45.0s)
+  ❌ 文档数字校验: exit=1 (0.1s)
+
+❌ 1 项未通过：文档数字校验
