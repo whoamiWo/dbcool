@@ -25,6 +25,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 TO_TAG=""
 MODE=""
 DRY_RUN=0
@@ -43,8 +44,6 @@ done
 [[ -z "$MODE" ]] && { echo "❌ 退出码 2：需要 --to / --rollback / --status / --cleanup"; exit 2; }
 command -v docker >/dev/null || { echo "❌ 退出码 2：docker 不可用"; exit 2; }
 docker compose version >/dev/null 2>&1 || { echo "❌ 退出码 2：docker compose 不可用"; exit 2; }
-[[ -f "$ROOT/.env" ]] || { echo "❌ 退出码 2：缺少 $ROOT/.env"; exit 2; }
-
 BG_FILE="$ROOT/docker-compose.blue-green.yml"
 log() { echo "▶ $*"; }
 run() {
@@ -87,7 +86,7 @@ wait_green_ready() {
 
 cleanup_green() {
   log "清理 green 副本"
-  run docker compose -f "$BG_FILE" --profile bg down --remove-orphans 2>/dev/null || true
+  # 直接移除显式命名的 green 容器，不解析 blue-green compose 的必填 TO_TAG。
   run docker rm -f nocobase-backend-java-green nocobase-backend-python-green nocobase-crdt-green 2>/dev/null || true
 }
 
@@ -115,17 +114,25 @@ esac
 CUR=$(current_color)
 [[ "$CUR" != "blue" ]] && { echo "❌ 退出码 2：当前颜色为 $CUR，请先 --rollback 回 blue 再升级"; exit 2; }
 
-log "启动 green 副本（镜像 tag=$TO_TAG，仅用预构建镜像：拉不到即失败）"
+log "拉取 green 镜像（镜像 tag=$TO_TAG；缺失即退出，不触发本地 build）"
 if [[ $DRY_RUN -eq 0 ]]; then
   if ! env TO_TAG="$TO_TAG" docker compose -f "$ROOT/docker-compose.yml" -f "$BG_FILE" --profile bg \
-      up -d backend-java-green backend-python-green crdt-service-green; then
+      pull backend-java-green backend-python-green crdt-service-green; then
+    log "❌ green 镜像不可用（tag=$TO_TAG）→ 保持 blue（现网未受影响）"
+    exit 1
+  fi
+  log "启动 green 副本（仅用已拉取镜像）"
+  if ! env TO_TAG="$TO_TAG" docker compose -f "$ROOT/docker-compose.yml" -f "$BG_FILE" --profile bg \
+      up -d --no-build backend-java-green backend-python-green crdt-service-green; then
     log "❌ green 启动失败（镜像不可用）→ 保持 blue（现网未受影响）"
     cleanup_green
     exit 1
   fi
 else
   run env TO_TAG="$TO_TAG" docker compose -f "$ROOT/docker-compose.yml" -f "$BG_FILE" --profile bg \
-      up -d backend-java-green backend-python-green crdt-service-green
+      pull backend-java-green backend-python-green crdt-service-green
+  run env TO_TAG="$TO_TAG" docker compose -f "$ROOT/docker-compose.yml" -f "$BG_FILE" --profile bg \
+      up -d --no-build backend-java-green backend-python-green crdt-service-green
 fi
 
 if [[ $DRY_RUN -eq 0 ]] && ! wait_green_ready 180; then

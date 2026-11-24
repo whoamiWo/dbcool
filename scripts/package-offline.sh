@@ -3,15 +3,15 @@
 # Wave1 T1.3 — 离线部署包打包（内网/断网安装用）
 #
 # 用法：
-#   bash scripts/package-offline.sh                 # 构建镜像并打包（需联网构建）
-#   bash scripts/package-offline.sh --skip-build    # 用本地已有镜像打包
+#   APP_VERSION=<已发布tag> bash scripts/package-offline.sh              # 构建镜像并打包（需联网构建）
+#   APP_VERSION=<已发布tag> bash scripts/package-offline.sh --skip-build # 用本地已有镜像打包
 #   bash scripts/package-offline.sh --help
 #
 # 产物：dist/dbcool-offline-<version>.tar.gz
 #   packaging/offline/ 目录含：images.tar / docker-compose.offline.yml /
 #     .env.example / install-offline.sh / SHA256SUMS
 #
-# 退出码：0 = 成功；2 = 前置条件缺失（docker / VERSION / 镜像缺失）
+# 退出码：0 = 成功；2 = 前置条件缺失（APP_VERSION / docker / 镜像缺失）
 # =====================================================================
 set -euo pipefail
 
@@ -27,8 +27,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-VERSION="${APP_VERSION:-$(cat "$ROOT/VERSION" 2>/dev/null || true)}"
-[[ -z "$VERSION" ]] && { echo "❌ 退出码 2：VERSION 缺失"; exit 2; }
+VERSION="${APP_VERSION:-}"
+[[ -z "$VERSION" ]] && { echo "❌ 退出码 2：必须显式设置 APP_VERSION（已发布镜像 tag；不会回退到 VERSION）" >&2; exit 2; }
+export APP_VERSION="$VERSION"
 command -v docker >/dev/null || { echo "❌ 退出码 2：docker 不可用"; exit 2; }
 REGISTRY="${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}"
 
