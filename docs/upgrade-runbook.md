@@ -6,19 +6,24 @@
 
 | 项 | 要求 |
 |---|---|
-| 当前版本 | `docker inspect nocobase-backend-java --format '{{index .Config.Labels "org.opencontainers.image.version"}}'` 或查 `.env` 的 `APP_VERSION` |
+| 当前版本 | `docker inspect nocobase-backend-java --format '{{index .Config.Labels "org.opencontainers.image.version"}}'` 或查 `.env` 的 `APP_VERSION`；后者必须是实际已发布的镜像 tag，不保证等于根 `VERSION` |
 | 磁盘 | ≥ 2× 镜像体积 + 备份体积 |
 | 备份 | **必须**有升级前备份（脚本自动做；`--skip-backup` 禁止在生产使用） |
-| 镜像 | 目标版本 4 个应用镜像已推送到 registry 或已 load 到本地 |
+| 镜像 | 目标版本 4 个应用镜像已发布且可从 registry pull（升级脚本不会本地 build） |
 
 ## 二、标准升级步骤
 
-```bash
-# 1. 干跑（确认参数）
-bash scripts/upgrade.sh --from 2.1.0 --to 2.1.1 --help
+升级脚本按 `APP_VERSION` 镜像 tag 拉取目标镜像并使用 `--no-build` 启动；成功后把当前/上一版
+tag 记录到 `.last-deployed-tag` / `.prev-deployed-tag`。运行 `deploy.sh prod` 时同样先 pull 再启动。
 
-# 2. 执行升级（自动：备份 → 换镜像 → 等健康 → 冒烟）
-bash scripts/upgrade.sh --from 2.1.0 --to 2.1.1
+
+```bash
+# 确认 .env 的 APP_VERSION 为当前部署的镜像 tag；--from / --to 都传已发布 tag
+FROM_TAG=2.1.5-3  # 当前版本示例；升级时改为实际正在运行的 tag
+: "${TO_TAG:?请先设置为已发布的新镜像 tag}"
+
+# 执行升级（自动：备份 → pull 精确镜像 → --no-build 启动 → 等健康 → 冒烟）
+bash scripts/upgrade.sh --from "$FROM_TAG" --to "$TO_TAG"
 
 # 3. 验证
 docker compose ps                      # 全部 healthy
@@ -32,11 +37,13 @@ python3 scripts/launch-final-verify.py # 8/8（如可用）
 手动兜底（数据回滚 = 恢复备份）：
 
 ```bash
-# 1. 镜像回滚
-APP_VERSION=2.1.0 docker compose up -d backend-java backend-python crdt-service frontend
+# 1. 镜像回滚（将示例改为上一版实际发布的 tag）
+PREV_TAG=2.1.5-3
+APP_VERSION="$PREV_TAG" docker compose pull backend-java backend-python crdt-service frontend
+APP_VERSION="$PREV_TAG" docker compose up -d --no-build backend-java backend-python crdt-service frontend
 
 # 2. 数据回滚（危险：会覆盖当前库）
-gunzip -c backups/pre-upgrade-2.1.0-to-2.1.1-<stamp>.sql.gz \
+gunzip -c backups/pre-upgrade-2.1.5-3-to-<newtag>-<stamp>.sql.gz \
   | docker exec -i nocobase-postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
 ```
 
