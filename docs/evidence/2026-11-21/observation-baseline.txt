@@ -1,0 +1,8 @@
+prometheus_job=backend-java
+query_range_start=2026-11-20T14:27:30Z
+query_range_end=2026-11-21T14:51:30Z
+sample_points= 1465
+first= 2026-11-20T14:27:30+00:00
+last= 2026-11-21T14:51:30+00:00
+gaps_over_300s= 0
+all_up_values= ['1']
