@@ -20,3 +20,11 @@
 本地源码构建仅用于开发：复制 `.env.dev.example` 为 `.env.dev`，叠加 `docker-compose.dev-build.yml`。
 
 离线安装请使用 Wave 1 T1.3 的 `packaging/offline/install-offline.sh`（无包管理器依赖）；离线包生成器要求显式传入 `APP_VERSION`。
+
+### 离线安装器前置条件
+
+- 目标主机已有 Docker Engine 20.10+ 与 `docker compose` 插件；
+- 目标主机已有 **Python 3**（安装器用它解析 `.env`、比对 Compose 插值并执行健康探针；缺失时安装器立即 exit 2，不会做任何 Docker 写操作）；
+- 首次运行前由人工准备 `.env`：非交互模式下缺 `.env` 直接 exit 2；交互模式只会生成模板并返回 `CONFIG_REQUIRED`，不会以占位凭证启动；
+- 安装器会校验 `image-tags.txt` 中 8 个精确镜像（4 个应用 + 4 个基础镜像）并对每个 `docker image inspect`，任一缺失即在 `compose up` 前失败；
+- 私有 CA / 自签证书场景需显式提供 `SMOKE_CA_BUNDLE`（默认使用包内 `certs/fullchain.pem`，若存在）；smoke 不提供关闭证书校验的开关。
