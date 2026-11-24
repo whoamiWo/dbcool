@@ -16,7 +16,7 @@
 # =====================================================================
 services:
   backend-java-green:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${TO_TAG:-${APP_VERSION:-2.1.2}}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${TO_TAG:?Pass --to <published tag>}
     container_name: nocobase-backend-java-green
     profiles:
     - bg
@@ -83,7 +83,7 @@ services:
     networks:
     - nocobase-net
   backend-python-green:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${TO_TAG:-${APP_VERSION:-2.1.2}}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${TO_TAG:?Pass --to <published tag>}
     container_name: nocobase-backend-python-green
     profiles:
     - bg
@@ -117,7 +117,7 @@ services:
     networks:
     - nocobase-net
   crdt-service-green:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${TO_TAG:-${APP_VERSION:-2.1.2}}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${TO_TAG:?Pass --to <published tag>}
     container_name: nocobase-crdt-green
     profiles:
     - bg
