@@ -750,8 +750,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install PyYAML for offline package self-check
+        run: python -m pip install PyYAML
+
       - name: Verify version consistency
         run: python3 scripts/version-consistency-verify.py
+
+      - name: Verify Compose APP_VERSION contract
+        run: python3 scripts/compose-version-selfcheck.py
 
   # ============================================================
   #  契约文件静态校验

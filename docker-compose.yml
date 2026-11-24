@@ -154,13 +154,9 @@ services:
   #  后端 — Java (核心引擎)
   # ============================================================
   backend-java:
-    # Wave1 T1.1：优先使用已推送的版本化镜像（与 scripts/build-images.sh 一致）。
-    # 本地开发构建：用 `docker compose --profile dev-build build <svc>`，详见镜像内注释。
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:-2.1.2}
-    # 本地开发：镜像不存在时自动按下方 Dockerfile 构建（build 与 image 并存是合法写法）
-    build:
-      context: ./backend-java
-      dockerfile: Dockerfile
+    # 生产部署只用已发布镜像：APP_VERSION 必填（缺失时 docker compose 直接失败）。
+    # 本地源码构建请显式叠加 docker-compose.dev-build.yml（见该文件与 .env.dev.example）。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:?Set APP_VERSION to a published image tag}
     container_name: nocobase-backend-java
     environment:
       SPRING_PROFILES_ACTIVE: docker
@@ -293,18 +289,8 @@ services:
   #  后端 — Python (AI / 集成)
   # ============================================================
   backend-python:
-    # Wave1 T1.1：优先使用已推送的版本化镜像；本地无镜像时自动 build。
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:-2.1.2}
-    build:
-      context: ./backend-python
-      dockerfile: Dockerfile
-      args:
-        # PHASE 57 真语义向量：true = 构建时安装 sentence-transformers(torch)，
-        # /api/ai/embedding 使用真语义向量；false(默认) = 回退确定性哈希向量。
-        # 启用方式二选一：
-        #   1) docker compose build --build-arg INSTALL_SEMANTIC=true backend-python
-        #   2) .env 中设置 INSTALL_SEMANTIC=true 后 docker compose build
-        INSTALL_SEMANTIC: ${INSTALL_SEMANTIC:-false}
+    # 生产部署只用已发布镜像：APP_VERSION 必填；源码构建见 docker-compose.dev-build.yml。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:?Set APP_VERSION to a published image tag}
     container_name: nocobase-backend-python
     environment:
       JAVA_BACKEND_URL: http://backend-java:8080
@@ -389,11 +375,8 @@ services:
   #  CRDT 实时协作服务 (PHASE 64 T3)
   # ============================================================
   crdt-service:
-    # Wave1 T1.1：优先使用已推送的版本化镜像；本地无镜像时自动 build。
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:-2.1.2}
-    build:
-      context: ./crdt-service
-      dockerfile: Dockerfile
+    # 生产部署只用已发布镜像：APP_VERSION 必填；源码构建见 docker-compose.dev-build.yml。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:?Set APP_VERSION to a published image tag}
     container_name: nocobase-crdt-service
     environment:
       PG_HOST: postgres
@@ -430,11 +413,8 @@ services:
   #  前端 — Nginx 静态服务 + 反向代理
   # ============================================================
   frontend:
-    # Wave1 T1.1：优先使用已推送的版本化镜像；本地无镜像时自动 build。
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:-2.1.2}
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    # 生产部署只用已发布镜像：APP_VERSION 必填；源码构建见 docker-compose.dev-build.yml。
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:?Set APP_VERSION to a published image tag}
     container_name: nocobase-frontend
     environment:
       API_BASE_URL: /

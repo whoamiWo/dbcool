@@ -130,7 +130,7 @@ services:
           memory: 512M
     restart: unless-stopped
   backend-java:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:-2.1.1}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
     environment:
       SPRING_PROFILES_ACTIVE: docker
       AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
@@ -220,7 +220,7 @@ services:
           memory: 1024M
     restart: unless-stopped
   backend-python:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:-2.1.1}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
     environment:
       JAVA_BACKEND_URL: http://backend-java:8080
       JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET}
@@ -280,7 +280,7 @@ services:
           memory: 768M
     restart: unless-stopped
   crdt-service:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:-2.1.1}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
     environment:
       PG_HOST: postgres
       PG_PORT: 5432
@@ -313,7 +313,7 @@ services:
           memory: 512M
     restart: unless-stopped
   frontend:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:-2.1.1}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
     environment:
       API_BASE_URL: /
       PUBLIC_HOST: ${PUBLIC_HOST:-}
