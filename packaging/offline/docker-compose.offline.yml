@@ -1,10 +1,10 @@
-name: nocobase
+name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    command: 'postgres -c wal_level=replica -c archive_mode=on -c archive_command=''test
-      -f /var/lib/postgresql/data/pg_archive/%f || cp %p /var/lib/postgresql/data/pg_archive/%f''
-      -c max_wal_senders=5
+    command: 'postgres -c wal_level=replica -c archive_mode=on -c archive_command=''mkdir
+      -p /var/lib/postgresql/data/pg_archive && { test -f /var/lib/postgresql/data/pg_archive/%f
+      || cp %p /var/lib/postgresql/data/pg_archive/%f; }'' -c max_wal_senders=5
 
       '
     environment:
@@ -130,7 +130,8 @@ services:
           memory: 512M
     restart: unless-stopped
   backend-java:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-java:${APP_VERSION:?Set
+      APP_VERSION to a published image tag}
     environment:
       SPRING_PROFILES_ACTIVE: docker
       AI_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
@@ -220,7 +221,8 @@ services:
           memory: 1024M
     restart: unless-stopped
   backend-python:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-backend-python:${APP_VERSION:?Set
+      APP_VERSION to a published image tag}
     environment:
       JAVA_BACKEND_URL: http://backend-java:8080
       JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET}
@@ -280,7 +282,8 @@ services:
           memory: 768M
     restart: unless-stopped
   crdt-service:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-crdt-service:${APP_VERSION:?Set
+      APP_VERSION to a published image tag}
     environment:
       PG_HOST: postgres
       PG_PORT: 5432
@@ -313,7 +316,8 @@ services:
           memory: 512M
     restart: unless-stopped
   frontend:
-    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:?Set APP_VERSION to the packaged image tag}
+    image: ${IMAGE_REGISTRY:-ghcr.io/whoamiwo/dbcool}/dbcool-frontend:${APP_VERSION:?Set
+      APP_VERSION to a published image tag}
     environment:
       API_BASE_URL: /
       PUBLIC_HOST: ${PUBLIC_HOST:-}
@@ -345,18 +349,18 @@ services:
     restart: unless-stopped
 volumes:
   pgdata:
-    name: dbcool-offline-pgdata
+    name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-pgdata
   redisdata:
-    name: dbcool-offline-redisdata
+    name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-redisdata
   miniodata:
-    name: dbcool-offline-miniodata
+    name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-miniodata
   rabbitmqdata:
-    name: dbcool-offline-rabbitmqdata
+    name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-rabbitmqdata
   alertsdata:
-    name: dbcool-offline-alertsdata
+    name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-alertsdata
   backupsdata:
-    name: dbcool-offline-backupsdata
+    name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-backupsdata
 networks:
   nocobase-net:
-    name: dbcool-offline-nocobase-net
+    name: dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-nocobase-net
     driver: bridge

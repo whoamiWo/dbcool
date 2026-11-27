@@ -1,0 +1,136 @@
+network_block_started_at=2026-11-28T04:13:10+08:00
+--- EXTERNAL MUST FAIL ---
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+  0      0   0      0   0      0      0      0                              0curl: (6) Could not resolve host: ghcr.io
+NETWORK_BLOCK_CONFIRMED
+--- REINSTALL WITHOUT INTERNET ---
+▶ 校验文件完整性
+▶ 加载镜像 images.tar
+Loaded image: ghcr.io/whoamiwo/dbcool/dbcool-backend-java:2.1.5-3
+Loaded image: ghcr.io/whoamiwo/dbcool/dbcool-backend-python:2.1.5-3
+Loaded image: ghcr.io/whoamiwo/dbcool/dbcool-crdt-service:2.1.5-3
+Loaded image: ghcr.io/whoamiwo/dbcool/dbcool-frontend:2.1.5-3
+Loaded image: pgvector/pgvector:pg16
+Loaded image: redis:7.4-alpine
+Loaded image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+Loaded image: rabbitmq:3.13.7-management-alpine
+▶ 启动服务（APP_VERSION=2.1.5-3）
+ Container dbcool-offline-final-a-rabbitmq-1  Running
+ Container dbcool-offline-final-a-postgres-1  Running
+ Container dbcool-offline-final-a-redis-1  Running
+ Container dbcool-offline-final-a-minio-1  Running
+ Container dbcool-offline-final-a-backend-java-1  Running
+ Container dbcool-offline-final-a-crdt-service-1  Running
+ Container dbcool-offline-final-a-backend-python-1  Running
+ Container dbcool-offline-final-a-frontend-1  Running
+ Container dbcool-offline-final-a-postgres-1  Waiting
+ Container dbcool-offline-final-a-redis-1  Waiting
+ Container dbcool-offline-final-a-rabbitmq-1  Waiting
+ Container dbcool-offline-final-a-minio-1  Waiting
+ Container dbcool-offline-final-a-postgres-1  Waiting
+ Container dbcool-offline-final-a-minio-1  Healthy
+ Container dbcool-offline-final-a-redis-1  Healthy
+ Container dbcool-offline-final-a-postgres-1  Healthy
+ Container dbcool-offline-final-a-postgres-1  Healthy
+ Container dbcool-offline-final-a-rabbitmq-1  Healthy
+ Container dbcool-offline-final-a-postgres-1  Waiting
+ Container dbcool-offline-final-a-redis-1  Waiting
+ Container dbcool-offline-final-a-rabbitmq-1  Waiting
+ Container dbcool-offline-final-a-backend-java-1  Waiting
+ Container dbcool-offline-final-a-postgres-1  Healthy
+ Container dbcool-offline-final-a-redis-1  Healthy
+ Container dbcool-offline-final-a-rabbitmq-1  Healthy
+ Container dbcool-offline-final-a-backend-java-1  Healthy
+ Container dbcool-offline-final-a-backend-python-1  Waiting
+ Container dbcool-offline-final-a-backend-java-1  Waiting
+ Container dbcool-offline-final-a-backend-python-1  Healthy
+ Container dbcool-offline-final-a-backend-java-1  Healthy
+▶ 等待 8 个服务逐项健康（超时 300s）
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
+FAIL frontend GET /api/health: 连接失败或超时
+FAIL frontend GET /api/health/ready: 连接失败或超时
+OFFLINE_SMOKE_FAILED
