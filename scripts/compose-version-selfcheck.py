@@ -235,6 +235,9 @@ def check_offline_package(tmp: Path) -> bool:
     images_file.write_text("\n".join(image_names) + "\n", encoding="utf-8")
     success = run(["bash", "scripts/package-offline.sh", "--skip-build"], cwd=fixture,
                   env={**base_env, "MOCK_IMAGE_POLICY": "all", "APP_VERSION": RELEASE_TAG})
+    base_env = {key: value for key, value in base_env.items()
+                if key not in {"MOCK_DOCKER_LOG", "MOCK_IMAGES_FILE", "MOCK_IMAGE_POLICY"}}
+    base_env["PATH"] = os.environ.get("PATH", "/usr/bin:/bin")
     out = fixture / "packaging/offline"
     sample, generated_compose = out / ".env.example", out / "docker-compose.offline.yml"
     archive = fixture / "dist" / f"dbcool-offline-{RELEASE_TAG}.tar.gz"
@@ -248,6 +251,27 @@ def check_offline_package(tmp: Path) -> bool:
         generated_ok &= {"offline-smoke.py", "image-tags.txt"} <= sums
         parsed = yaml.safe_load(generated_compose.read_text(encoding="utf-8"))
         generated_ok &= all("${APP_VERSION:?" in parsed["services"][service]["image"] for service in APP_SERVICES)
+        generated_ok &= "# OFFLINE_INSTANCE_ID=default" in sample.read_text(encoding="utf-8")
+        # Compose 仅检查项目名是否合法，不负责离线实例 ID 的完整安全约束。
+        # 安装器反向测试覆盖非法值在 Docker 写操作前被拒绝。
+        project_isolation_ok = parsed.get("name") == "dbcool-offline-${OFFLINE_INSTANCE_ID:-default}"
+        generated_ok &= project_isolation_ok
+        ok &= report("离线 Compose 项目名与实例 ID 一致", project_isolation_ok,
+                     f"name={parsed.get('name')!r}")
+        resource_isolation_ok = all(
+            resource["name"].startswith("dbcool-offline-${OFFLINE_INSTANCE_ID:-default}-")
+            for group in ("volumes", "networks") for resource in parsed.get(group, {}).values()
+        )
+        custom_instance = compose_config(generated_compose, sample, tmp,
+                                         env={**base_env, "OFFLINE_INSTANCE_ID": "wsl-a"},
+                                         args=("config", "--format", "yaml"))
+        instance_text = custom_instance.stdout
+        instance_isolation_ok = custom_instance.returncode == 0 \
+            and "dbcool-offline-wsl-a-pgdata" in instance_text \
+            and "dbcool-offline-wsl-a-nocobase-net" in instance_text
+        generated_ok &= resource_isolation_ok and instance_isolation_ok
+        ok &= report("离线卷与网络默认隔离且支持独立实例 ID", resource_isolation_ok and instance_isolation_ok,
+                     f"default={resource_isolation_ok}; custom={instance_isolation_ok}; exit={custom_instance.returncode}")
         tar_result = subprocess.run(["tar", "-tzf", str(archive)], text=True, capture_output=True, check=False)
         generated_ok &= tar_result.returncode == 0 and "offline/offline-smoke.py" in tar_result.stdout \
             and "offline/image-tags.txt" in tar_result.stdout
@@ -446,6 +470,16 @@ def check_offline_installer(tmp: Path) -> bool:
         ok &= report("缺少 python3 时明确失败且不调用 Docker", result.returncode == 2
                      and "需要 Python 3" in result.stderr and not docker_log.read_text(),
                      f"exit={result.returncode}; stderr={result.stderr.strip()}")
+        bad_instance = fixture("installer-bad-instance")
+        instance_env = (bad_instance / ".env").read_text(encoding="utf-8")
+        (bad_instance / ".env").write_text(instance_env + "OFFLINE_INSTANCE_ID=../unsafe\n", encoding="utf-8")
+        docker_log.write_text("", encoding="utf-8")
+        result = run(["bash", "install-offline.sh"], cwd=bad_instance, env=env_base)
+        calls = docker_log.read_text(encoding="utf-8")
+        ok &= report("非法实例 ID 在 docker load 前拒绝", result.returncode == 2
+                     and "OFFLINE_INSTANCE_ID" in result.stderr
+                     and "load" not in calls and "up -d" not in calls,
+                     f"exit={result.returncode}")
     finally:
         http_ok.shutdown()
         http_bad.shutdown()

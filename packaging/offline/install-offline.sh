@@ -81,6 +81,25 @@ fi
 [[ -f image-tags.txt ]] || fail "离线包缺少 image-tags.txt"
 [[ -f offline-smoke.py ]] || fail "离线包缺少 offline-smoke.py"
 
+if [[ -f "$ENV_FILE" ]]; then
+  ENV_INSTANCE_ID="$(python3 - "$ENV_FILE" <<'PY'
+import re
+import sys
+from pathlib import Path
+for raw in Path(sys.argv[1]).read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if line.startswith("export "):
+        line = line[7:].lstrip()
+    key, separator, value = line.partition("=")
+    if separator and key.strip() == "OFFLINE_INSTANCE_ID":
+        print(value.strip().strip("'\""))
+PY
+)"
+  ENV_INSTANCE_ID="${ENV_INSTANCE_ID:-default}"
+  [[ "$ENV_INSTANCE_ID" =~ ^[a-z0-9][a-z0-9_-]{0,31}$ ]] \
+    || fail "OFFLINE_INSTANCE_ID 必须为 1-32 位小写字母、数字、下划线或连字符，且以字母或数字开头"
+fi
+
 CHECKED_CONFIG="$(python3 - "$ENV_FILE" image-tags.txt "$VERIFY_ONLY" <<'PY'
 import base64
 import binascii
@@ -136,6 +155,9 @@ if not version or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", version
 registry = env.get("IMAGE_REGISTRY", "ghcr.io/whoamiwo/dbcool").strip()
 if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]+)?(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*", registry):
     reject("IMAGE_REGISTRY 格式无效")
+instance_id = env.get("OFFLINE_INSTANCE_ID", "default").strip()
+if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,31}", instance_id):
+    reject("OFFLINE_INSTANCE_ID 必须为 1-32 位小写字母、数字、下划线或连字符，且以字母或数字开头")
 try:
     manifest = [line.strip() for line in Path(sys.argv[2]).read_text(encoding="utf-8").splitlines()
                 if line.strip() and not line.lstrip().startswith("#")]

@@ -52,6 +52,7 @@ cp .env.example .env
 
 docker compose config --images   # 检查解析结果；这一步不证明镜像已发布/可拉取
 docker compose pull              # 确认目标 tag 实际可拉取；失败时停止，不要改用本地 build
+bash scripts/gen-selfsigned-cert.sh  # 生成本地自签占位证书；生产域名证书请替换 certs/*.pem
 docker compose up -d --no-build
 ```
 
@@ -82,7 +83,7 @@ docker compose up -d --no-build
 | 方式 | 适用 | 入口 |
 |---|---|---|
 | **Docker Compose**（推荐） | 单机 / 小团队 | 按上方步骤设置 `APP_VERSION`，执行 `docker compose pull && docker compose up -d --no-build` |
-| **离线包**（内网/断网） | 无外网生产环境 | `APP_VERSION=<已发布镜像tag> bash scripts/package-offline.sh` → `packaging/offline/install-offline.sh`（beta，断网安装待实测） |
+| **离线包**（内网/断网） | 无外网生产环境 | `APP_VERSION=<已发布镜像tag> bash scripts/package-offline.sh` → `packaging/offline/install-offline.sh`（`2.1.5-3` 已在 WSL 阻断外网后完成安装与 14/14 核心冒烟；其他干净 VM 仍待实测） |
 | **K8s 裸 yaml** | 已有集群 | `kubectl apply -f k8s/` |
 | **Helm** | 参数化集群部署 | `helm install dbcool charts/dbcool`（beta，未实测） |
 | **升级** | 版本迭代 | `bash scripts/upgrade.sh --from <旧> --to <新>`（自动备份+回滚） |
@@ -109,6 +110,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev-build.yml \
 | 前后端契约 | ✅ 460 后端端点 × 137 前端调用 → **0 漂移**（含反向自检） |
 | 备份/PITR 演练 | ✅ 30/30（2026-11-11 release 模式实测通过） |
 | 冒烟 / 租户隔离 | ✅ 14/14 · 24/24 |
+| 断网离线安装 | ✅ `2.1.5-3` WSL 实测；健康检查及核心冒烟 14/14（[证据](docs/evidence/offline-install-blocked-network-2.1.5-3.log)），其他 VM 未实测 |
 | 上线终验 | ✅ 8/8 |
 | Playwright E2E | 260 用例 / 13 files（`--list` 实测；最近批次未复跑，以 CI 为准） |
 

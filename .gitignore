@@ -77,6 +77,7 @@ temp/
 
 # AI 工具生成产物
 .codebuddy/
+.kilo/
 
 # 技术债清单(本地生成产物)
 TECH_DEBT_CLEARANCE.md
@@ -107,6 +108,9 @@ test-results/
 # 验证脚本的 Python 字节码产物(scripts/ 下的 E2E 脚本会被 py_compile / 直接执行)
 scripts/__pycache__/
 target/
+
+# 本地自签证书与私钥由 scripts/gen-selfsigned-cert.sh 生成；严禁入库
+certs/*.pem
 
 # Wave1 T1.3/T1.6 构建产物与备份（严禁入库）
 /dist/
