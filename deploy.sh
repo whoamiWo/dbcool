@@ -511,8 +511,8 @@ deploy_from_scratch() {
     log "=========================================="
 
     init_env || return 1
-    preflight_check || return 1
     gen_cert || return 1
+    preflight_check || return 1
     prepare_build_artifacts || return 1
     docker_up || return 1
     verify_deploy || return 1

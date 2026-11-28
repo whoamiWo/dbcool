@@ -759,6 +759,14 @@ jobs:
       - name: Verify Compose APP_VERSION contract
         run: python3 scripts/compose-version-selfcheck.py
 
+      - name: Verify no TLS private keys are committed
+        shell: bash
+        run: |
+          if git grep -Il -E -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----' -- ':!*.md'; then
+            echo "Committed TLS private keys are forbidden" >&2
+            exit 1
+          fi
+
   # ============================================================
   #  契约文件静态校验
   # ============================================================

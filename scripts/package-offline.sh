@@ -78,18 +78,20 @@ for svc, cfg in doc.get('services', {}).items():
         # Wave1 T1.3 实测缺陷修复：主栈的 container_name 是全局唯一名，
         # 离线栈与主栈并存时会直接 Conflict。离线栈改用 compose 项目前缀命名。
         cfg.pop('container_name', None)
+# 顶层项目名也必须隔离：固定继承 `nocobase` 会接管或重建同项目的其他容器。
+doc['name'] = 'dbcool-offline-${OFFLINE_INSTANCE_ID:-default}'
 # ⚠️ 数据安全级修复：主 compose 顶级卷显式命名（name: nocobase-pgdata 等），
 # 离线栈若原样复用会与主栈共用数据卷 → 串库/覆盖（实测已复现：离线栈直接挂上
 # 主栈 pgdata 导致密码不匹配起不来，主栈数据险些被共存写坏）。离线栈强制独立前缀。
 for vol_key, vol_cfg in (doc.get('volumes') or {}).items():
     if isinstance(vol_cfg, dict) and 'name' in vol_cfg:
-        vol_cfg['name'] = f"dbcool-offline-{vol_key}"
+        vol_cfg['name'] = f"dbcool-offline-${{OFFLINE_INSTANCE_ID:-default}}-{vol_key}"
 # 同理：网络名显式命名（name: nocobase-net）会让离线栈与主栈共用网络，
 # `postgres` 等 DNS 别名解析到主栈容器 → backend 连到主栈数据库（实测 28P01）。
-# 离线栈强制独立网络名。
+# 离线栈强制独立网络名；OFFLINE_INSTANCE_ID 允许同机多次验收互不串库。
 for net_key, net_cfg in (doc.get('networks') or {}).items():
     if isinstance(net_cfg, dict) and 'name' in net_cfg:
-        net_cfg['name'] = f"dbcool-offline-{net_key}"
+        net_cfg['name'] = f"dbcool-offline-${{OFFLINE_INSTANCE_ID:-default}}-{net_key}"
 (out / 'docker-compose.offline.yml').write_text(
     yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding='utf-8')
 print('✅ docker-compose.offline.yml 生成（不含 build 段）')
@@ -100,6 +102,8 @@ cat > "$OUT/.env.example" <<EOF
 # Wave1 T1.3 离线部署包环境变量样例（拷贝为 .env 后按需修改）
 APP_VERSION=$VERSION
 IMAGE_REGISTRY=$REGISTRY
+# 同机多实例/重复验收时设置唯一小写实例 ID（默认 default）；用于隔离卷与网络。
+# OFFLINE_INSTANCE_ID=default
 POSTGRES_USER=CHANGEME_postgres_user
 POSTGRES_PASSWORD=请设置强密码
 POSTGRES_DB=nocobase
